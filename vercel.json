@@ -16,8 +16,8 @@
       "dest": "/index.html"
     }
   ],
-  "installCommand": "cd frontend && npm install",
-  "buildCommand": "cd frontend && npm run build",
+  "installCommand": "npm run postinstall",
+  "buildCommand": "npm run build",
   "outputDirectory": "frontend/build",
   "framework": "create-react-app"
 }

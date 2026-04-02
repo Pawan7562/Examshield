@@ -1,0 +1,13 @@
+{
+  "name": "examshield",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "cd frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm start"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
