@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "postinstall": "cd frontend && npm install",
-    "build": "cd frontend && npm run build",
-    "start": "cd frontend && npm start"
+    "build": "cd frontend && npm install && npm run build",
+    "start": "cd frontend && npm start",
+    "vercel-build": "cd frontend && npm run build"
   },
   "engines": {
     "node": ">=16.0.0"
