@@ -1,0 +1,55 @@
+{
+  "colleges": [
+    {
+      "id": 1,
+      "name": "cgc",
+      "email": "pawankumaryadav756286976@gmail.com",
+      "password": "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LrUpm",
+      "phone": "7562869762",
+      "address": "chandigarh",
+      "website": "astrastudio.in",
+      "subscription_plan": "basic",
+      "is_active": true,
+      "created_at": "2026-04-01T08:48:08.129Z"
+    },
+    {
+      "id": 2,
+      "name": "Test College",
+      "email": "test@example.com",
+      "password": "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LrUpm",
+      "phone": "1234567890",
+      "address": "Test Address",
+      "website": "http://test.com",
+      "subscription_plan": "basic",
+      "subscription_expiry": "2026-04-15T08:49:52.078Z",
+      "is_active": true,
+      "created_at": "2026-04-01T08:49:52.082Z"
+    },
+    {
+      "id": 3,
+      "name": "Test College",
+      "email": "test@examshield.com",
+      "password": "$2a$12$iGKR0au8j09EfzWhLKJPaORI.L/UhR9DqFY4EmPvQHHceOeRT/W0e",
+      "phone": "1234567890",
+      "address": "Test Address",
+      "website": "http://test.com",
+      "subscription_plan": "basic",
+      "subscription_expiry": "2026-04-15T08:53:32.542Z",
+      "is_active": true,
+      "created_at": "2026-04-01T08:53:32.548Z"
+    }
+  ],
+  "super_admins": [
+    {
+      "id": 1,
+      "name": "Super Admin",
+      "email": "admin@examshield.com",
+      "password": "$2a$12$Eegqb8BbC9AM2CRAvSpJ9O/GIlft9TTk2BCbamP5KmhJ11/9EWZha",
+      "role": "super_admin",
+      "created_at": "2026-04-01T08:54:02.836Z"
+    }
+  ],
+  "subscriptions": [],
+  "students": [],
+  "exams": []
+}

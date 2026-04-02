@@ -1,0 +1,307 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+.auth-theme-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(255, 205, 52, 0.6), transparent 26%),
+    radial-gradient(circle at bottom left, rgba(255, 209, 74, 0.35), transparent 24%),
+    linear-gradient(180deg, #fff8e7 0%, #ffffff 26%, #fffdf9 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  font-family: 'Manrope', sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-theme-page * {
+  box-sizing: border-box;
+}
+
+.auth-theme-glow {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(12px);
+}
+
+.auth-theme-glow-top {
+  top: -120px;
+  left: -80px;
+  width: 340px;
+  height: 340px;
+  background: radial-gradient(circle, rgba(255, 206, 42, 0.58), rgba(255, 206, 42, 0));
+}
+
+.auth-theme-glow-bottom {
+  left: -120px;
+  bottom: 120px;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(255, 213, 63, 0.3), rgba(255, 213, 63, 0));
+}
+
+.auth-theme-card {
+  width: 100%;
+  max-width: 460px;
+  padding: 36px 32px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 184, 0, 0.16);
+  box-shadow: 0 16px 38px rgba(191, 156, 53, 0.16);
+  position: relative;
+  z-index: 1;
+}
+
+.auth-theme-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 24px;
+  text-decoration: none;
+}
+
+.auth-theme-brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #ffd75c, #f6ae00);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 7px 18px rgba(246, 174, 0, 0.24);
+}
+
+.auth-theme-brand-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #1f2430;
+  box-shadow:
+    -6px 1px 0 -4px rgba(255, 255, 255, 0.96),
+    6px -2px 0 -4px rgba(255, 255, 255, 0.96);
+}
+
+.auth-theme-brand-text {
+  color: #2d3138;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.auth-theme-title {
+  margin: 0;
+  text-align: center;
+  color: #2d3138;
+  font-size: 1.9rem;
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.auth-theme-subtitle {
+  margin: 10px 0 0;
+  text-align: center;
+  color: #8a8f97;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.auth-theme-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.auth-theme-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-theme-label {
+  color: #6e7480;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-theme-input-wrap {
+  position: relative;
+}
+
+.auth-theme-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 252, 245, 0.95);
+  color: #2d3138;
+  font-size: 0.95rem;
+  font-family: 'Manrope', sans-serif;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-theme-input::placeholder {
+  color: #9da3ad;
+}
+
+.auth-theme-input:focus {
+  outline: none;
+  border-color: rgba(255, 184, 0, 0.65);
+  box-shadow: 0 0 0 4px rgba(255, 184, 0, 0.12);
+}
+
+.auth-theme-input-with-button {
+  padding-right: 50px;
+}
+
+.auth-theme-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 34px;
+  min-height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 184, 0, 0.1);
+  color: #9b6c00;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.auth-theme-button,
+.auth-theme-secondary-button {
+  min-height: 48px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-family: 'Manrope', sans-serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.auth-theme-button {
+  background: linear-gradient(180deg, #ffd133, #ffb800);
+  color: #1f2430;
+  box-shadow: 0 14px 24px rgba(255, 184, 0, 0.22);
+}
+
+.auth-theme-secondary-button {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  color: #2d3138;
+}
+
+.auth-theme-button:disabled,
+.auth-theme-secondary-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-theme-meta {
+  margin-top: 20px;
+  color: #8a8f97;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.auth-theme-meta a {
+  color: #9b6c00;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.auth-theme-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.auth-theme-divider::before,
+.auth-theme-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.auth-theme-divider span {
+  color: #9da3ad;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.auth-theme-link-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.auth-theme-link-row a {
+  color: #9b6c00;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-theme-stepbar {
+  display: flex;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.auth-theme-stepbar span {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.auth-theme-stepbar .auth-theme-stepbar-active {
+  background: linear-gradient(180deg, #ffd133, #ffb800);
+}
+
+.auth-theme-button-row {
+  display: flex;
+  gap: 10px;
+}
+
+.auth-theme-icon-top {
+  width: 66px;
+  height: 66px;
+  margin: 0 auto 12px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 199, 40, 0.28), rgba(255, 249, 232, 0.95));
+  color: #f0ad00;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+@media (max-width: 560px) {
+  .auth-theme-page {
+    padding: 14px 8px;
+  }
+
+  .auth-theme-card {
+    padding: 26px 18px;
+  }
+
+  .auth-theme-button-row {
+    flex-direction: column;
+  }
+}

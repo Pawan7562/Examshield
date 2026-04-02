@@ -1,0 +1,81 @@
+MANUAL SQL INSTRUCTIONS FOR EXAMS 500 ERROR FIX
+
+PROBLEM: 500 Internal Server Error on /api/admin/exams
+CAUSE: Missing 'title' column in exams table
+
+SOLUTION: Execute this SQL in your Supabase Dashboard
+
+STEP 1: Go to Supabase Dashboard
+- URL: https://jzxvxxgsfbzqhri rnqfm.supabase.co
+- Login with your credentials
+
+STEP 2: Open SQL Editor
+- Click on "SQL Editor" in the left sidebar
+
+STEP 3: Execute this SQL (choose one option)
+
+OPTION A: Complete Table Recreation (RECOMMENDED)
+-------------------------------------------------
+DROP TABLE IF EXISTS exams;
+
+CREATE TABLE exams (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  college_id UUID NOT NULL REFERENCES colleges(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  subject VARCHAR(100) NOT NULL,
+  type VARCHAR(50) NOT NULL CHECK (type IN ('mcq', 'essay', 'practical')),
+  duration INTEGER NOT NULL CHECK (duration > 0),
+  start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+  end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'completed', 'cancelled')),
+  total_marks INTEGER DEFAULT 100,
+  passing_marks INTEGER DEFAULT 50,
+  instructions TEXT,
+  is_proctored BOOLEAN DEFAULT true,
+  max_violations INTEGER DEFAULT 3,
+  exam_key VARCHAR(50) UNIQUE NOT NULL DEFAULT 'EXAM-000',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-------------------------------------------------
+
+OPTION B: Add Missing Columns Only
+-------------------------------------------------
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS title VARCHAR(255) NOT NULL;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS instructions TEXT;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS is_proctored BOOLEAN DEFAULT true;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS max_violations INTEGER DEFAULT 3;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS exam_key VARCHAR(50) UNIQUE NOT NULL DEFAULT 'EXAM-000';
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS start_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS end_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS total_marks INTEGER DEFAULT 100;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS passing_marks INTEGER DEFAULT 50;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'completed', 'cancelled'));
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+-------------------------------------------------
+
+STEP 4: Execute
+- Click "Run" to execute the SQL
+
+STEP 5: Wait for Success
+- Look for "Success" message in the results
+
+STEP 6: Test
+- Go to http://localhost:3000
+- Login as admin
+- Navigate to Exams
+- Try creating an exam
+- The 500 error should be resolved!
+
+EXPECTED RESULT:
+✅ Exams table will have ALL required columns
+✅ Exam creation will work (201 Created)
+✅ No more 500 Internal Server Error
+✅ Exam management features will work
+
+NOTE: Option A is recommended as it creates a clean table with all required columns.
+Option B only works if the table already exists and has some columns.
+
+After executing either option, restart your backend server and test exam creation.

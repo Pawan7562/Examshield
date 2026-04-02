@@ -1,0 +1,18 @@
+# Professional Exam Proctoring System Requirements
+opencv-python==4.8.1.78
+numpy==1.24.3
+Pillow==10.0.1
+requests==2.31.0
+psutil==5.9.6
+pyautogui==0.9.54
+
+# GUI and window monitoring
+# For Windows (pywin32) - install with: pip install pywin32
+# For Linux/Mac - alternative window monitoring libraries
+
+# Optional for enhanced features
+# tensorflow==2.13.0
+# face-recognition==1.3.0
+# dlib==19.24.2
+# pygetwindow==0.0.9
+# mss==6.1.0
