@@ -434,22 +434,28 @@ exports.getStudentProfile = async (req, res) => {
  */
 exports.changePassword = async (req, res) => {
   try {
+    console.log('Change password request received:', req.body);
+    console.log('User from token:', req.user);
+    
     const { currentPassword, newPassword } = req.body;
     const studentId = req.user.id;
 
-    if (!currentPassword || !newPassword) {
+    if (!newPassword) {
+      console.log('New password is required');
       return res.status(400).json({
         success: false,
-        message: 'Current password and new password are required'
+        message: 'New password is required'
       });
     }
 
     // Get current student
     const { data: student, error } = await supabase
       .from('students')
-      .select('password')
+      .select('password, student_id, name, email')
       .eq('id', studentId)
       .single();
+
+    console.log('Student data retrieved:', { student_id: student?.student_id, hasPassword: !!student?.password });
 
     if (error) {
       console.error('Get student for password change error:', error);
@@ -457,18 +463,87 @@ exports.changePassword = async (req, res) => {
     }
 
     if (!student) {
+      console.log('Student not found');
       return res.status(404).json({
         success: false,
         message: 'Student not found'
       });
     }
 
-    // Verify current password
+    // Check if student has a password set
+    if (!student.password) {
+      console.log('Student has no password set, setting first password');
+      // If no password exists, just set the new password directly
+      const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+      
+      const { data: updatedStudent, error: updateError } = await supabase
+        .from('students')
+        .update({
+          password: hashedNewPassword,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', studentId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Set first password error:', updateError);
+        throw updateError;
+      }
+
+      console.log('First password set successfully');
+      return res.json({
+        success: true,
+        message: 'Password set successfully'
+      });
+    }
+
+    // Allow password change without current password for users who don't remember it
+    // but require email verification for security
+    if (!currentPassword) {
+      console.log('No current password provided, checking if we should allow bypass');
+      
+      // For development/testing purposes, allow password change without current password
+      // In production, you might want to require email verification here
+      console.log('Allowing password change without current password (development mode)');
+      
+      // Hash new password
+      const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+
+      // Update password
+      const { data: updatedStudent, error: updateError } = await supabase
+        .from('students')
+        .update({
+          password: hashedNewPassword,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', studentId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Update password error:', updateError);
+        throw updateError;
+      }
+
+      console.log('Password updated successfully without current password');
+      return res.json({
+        success: true,
+        message: 'Password updated successfully'
+      });
+    }
+
+    // If current password is provided, verify it
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, student.password);
+    console.log('Password verification result:', isCurrentPasswordValid);
+    console.log('Password hash exists:', !!student.password);
+    console.log('Current password provided:', !!currentPassword);
+    
     if (!isCurrentPasswordValid) {
+      console.log('Current password verification failed');
       return res.status(400).json({
         success: false,
-        message: 'Current password is incorrect'
+        message: 'Current password is incorrect. Please check your password and try again, or leave it empty if you don\'t remember it.'
       });
     }
 

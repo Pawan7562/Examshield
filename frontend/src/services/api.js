@@ -2,17 +2,19 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-// Use proxy in development, direct URL in production
-const developmentApiBaseURL = '/api';  // Use proxy in development
+// Use direct backend URL for both development and production
+const developmentApiBaseURL = 'http://localhost:5000/api';  // Direct URL in development
 const productionApiBaseURL = 'http://localhost:5000/api';  // Direct URL in production
 
 const API_BASE_URL =
   process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === 'development' ? developmentApiBaseURL : productionApiBase_URL);
+  (process.env.NODE_ENV === 'development' ? developmentApiBaseURL : productionApiBaseURL);
+
+console.log('API Base URL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 10000, // Reduced timeout to 10 seconds
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -30,8 +32,23 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response.data,
   async (error) => {
+    console.error('=== API ERROR ===');
+    console.error('Error config:', error.config);
+    console.error('Error message:', error.message);
+    console.error('Error response:', error.response);
+    console.error('Error request:', error.request);
+    
     const original = error.config || {};
     const isAuthRequest = original.url?.includes('/auth/');
+
+    if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+      console.error('Network error - Backend may not be running');
+      return Promise.reject({
+        message: 'Cannot connect to server. Please check if the backend is running.',
+        code: error.code,
+        isNetworkError: true
+      });
+    }
 
     if (error.response?.status === 401) {
       // Login failures are expected sometimes; keep the browser console clean.
@@ -59,14 +76,16 @@ api.interceptors.response.use(
           return api(original);
         } catch (refreshError) {
           console.error('Token refresh failed:', refreshError);
-          localStorage.clear();
-          window.location.href = '/login';
-          return Promise.reject(error.response?.data || error);
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/admin/login';
+          return Promise.reject(refreshError);
         }
+      } else {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/admin/login';
       }
-
-      localStorage.clear();
-      window.location.href = '/login';
     }
 
     if (error.response?.status === 403 && error.response.data?.code === 'SUBSCRIPTION_EXPIRED') {

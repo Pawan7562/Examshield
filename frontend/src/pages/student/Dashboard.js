@@ -4,6 +4,20 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { studentAPI } from '../../services/api';
 import { format, formatDistanceToNow } from 'date-fns';
+import { 
+  BookOpen, 
+  Trophy, 
+  TrendingUp, 
+  Calendar,
+  Clock,
+  Target,
+  Award,
+  Activity,
+  ArrowRight,
+  User,
+  BarChart3
+} from 'lucide-react';
+import '../../components/student/StudentSidebar.css';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -52,109 +66,223 @@ export default function StudentDashboard() {
     return '#ef4444';
   };
 
+  // Calculate statistics
+  const totalExams = exams.length;
+  const completedExams = results.length;
+  const averageScore = results.length > 0 
+    ? Math.round(results.reduce((acc, r) => acc + (r.percentage || 0), 0) / results.length)
+    : 0;
+  const passRate = results.length > 0 
+    ? Math.round((results.filter(r => r.status === 'pass').length / results.length) * 100)
+    : 0;
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <div className="loading-text">Loading your dashboard...</div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      {/* Greeting */}
-      <div style={{ marginBottom: 28, padding: '24px 28px', background: 'linear-gradient(135deg, rgba(233,69,96,0.12), rgba(139,92,246,0.08))', border: '1px solid rgba(233,69,96,0.2)', borderRadius: 14 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e2e8f0' }}>Welcome back, {user?.name?.split(' ')[0]}! 👋</h1>
-        <p style={{ fontSize: 13, color: '#718096', marginTop: 6 }}>{user?.studentId} · {user?.collegeName}</p>
+      {/* Welcome Section */}
+      <div className="content-card">
+        <div className="welcome-section">
+          <div className="welcome-content">
+            <h1>Welcome back, {user?.name?.split(' ')[0]}! 👋</h1>
+            <p>{user?.studentId} · {user?.collegeName}</p>
+          </div>
+          <div className="welcome-actions">
+            <button className="btn" onClick={() => navigate('/student/exams')}>
+              <BookOpen size={20} />
+              Take Exam
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/student/results')}>
+              <Trophy size={20} />
+              View Results
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Upcoming Exams */}
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 700, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>Upcoming Exams</h2>
-          {upcoming.length === 0 ? (
-            <p style={{ fontSize: 13, color: '#4a5568', textAlign: 'center', padding: '20px 0' }}>No upcoming exams</p>
-          ) : upcoming.map(exam => (
-            <div key={exam.id} onClick={() => navigate('/student/exams')} style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, marginBottom: 8, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 4 }}>{exam.name}</div>
-              <div style={{ fontSize: 11, color: '#4a5568' }}>{format(new Date(exam.date_time), 'dd MMM, HH:mm')} · {exam.duration} min</div>
+      {/* Statistics Cards */}
+      <div className="grid-4">
+        <div className="content-card">
+          <div className="stat-card">
+            <div className="stat-header">
+              <div>
+                <div className="stat-value">{totalExams}</div>
+                <div className="stat-label">Total Exams</div>
+              </div>
+              <div className="stat-icon exams">
+                <BookOpen size={24} />
+              </div>
             </div>
-          ))}
-          <button onClick={() => navigate('/student/exams')} style={{ background: 'none', border: 'none', color: '#e94560', cursor: 'pointer', fontSize: 12, fontFamily: 'Sora, sans-serif', marginTop: 8 }}>View all exams →</button>
+          </div>
+        </div>
+
+        <div className="content-card">
+          <div className="stat-card">
+            <div className="stat-header">
+              <div>
+                <div className="stat-value">{completedExams}</div>
+                <div className="stat-label">Completed</div>
+              </div>
+              <div className="stat-icon results">
+                <Trophy size={24} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="content-card">
+          <div className="stat-card">
+            <div className="stat-header">
+              <div>
+                <div className="stat-value">{averageScore}%</div>
+                <div className="stat-label">Average Score</div>
+              </div>
+              <div className="stat-icon average">
+                <TrendingUp size={24} />
+              </div>
+            </div>
+            {averageScore > 0 && (
+              <div className="stat-change">
+                <ArrowRight size={12} />
+                {averageScore >= 70 ? 'Excellent' : averageScore >= 50 ? 'Good' : 'Needs Improvement'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="content-card">
+          <div className="stat-card">
+            <div className="stat-header">
+              <div>
+                <div className="stat-value">{passRate}%</div>
+                <div className="stat-label">Pass Rate</div>
+              </div>
+              <div className="stat-icon streak">
+                <Target size={24} />
+              </div>
+            </div>
+            {passRate > 0 && (
+              <div className="stat-change">
+                <ArrowRight size={12} />
+                {passRate >= 80 ? 'Outstanding' : passRate >= 60 ? 'Good' : 'Keep Trying'}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="grid-2">
+        {/* Upcoming Exams */}
+        <div className="content-card">
+          <div className="card-header">
+            <h2 className="card-title">
+              <Calendar size={20} />
+              Upcoming Exams
+            </h2>
+            <a href="/student/exams" className="card-action">
+              View All
+              <ArrowRight size={16} />
+            </a>
+          </div>
+          
+          {upcoming.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">
+                <Calendar size={48} />
+              </div>
+              <h3>No Upcoming Exams</h3>
+              <p>You don't have any scheduled exams at the moment.</p>
+            </div>
+          ) : (
+            <div className="item-list">
+              {upcoming.map(exam => (
+                <div key={exam.id} className="list-item" onClick={() => navigate('/student/exams')}>
+                  <div className="item-content">
+                    <div className="item-title">{exam.name}</div>
+                    <div className="item-meta">
+                      <Clock size={14} />
+                      {format(new Date(exam.date_time), 'dd MMM, HH:mm')}
+                      <span>·</span>
+                      <Activity size={14} />
+                      {exam.duration} min
+                    </div>
+                  </div>
+                  <span className="item-status status-upcoming">Upcoming</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Recent Results */}
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 700, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>Recent Results</h2>
+        <div className="content-card">
+          <div className="card-header">
+            <h2 className="card-title">
+              <Award size={20} />
+              Recent Results
+            </h2>
+            <a href="/student/results" className="card-action">
+              View All
+              <ArrowRight size={16} />
+            </a>
+          </div>
+          
           {recent.length === 0 ? (
-            <p style={{ fontSize: 13, color: '#4a5568', textAlign: 'center', padding: '20px 0' }}>No completed exams yet</p>
-          ) : recent.map(exam => {
-            const result = getResultForExam(exam.id);
-            return (
-              <div key={exam.id} onClick={() => navigate(`/student/results/${exam.id}`)} style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, marginBottom: 8, border: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 4 }}>{exam.name}</div>
-                  <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 6 }}>
-                    {exam.submitted_at ? formatDistanceToNow(new Date(exam.submitted_at)) + ' ago' : 'Submitted'}
-                  </div>
-                  
-                  {result && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {/* Score Display */}
-                      <span style={{ 
-                        fontSize: 12, 
-                        fontWeight: 700, 
-                        color: getScoreColor(result.status, result.percentage),
-                        background: `${getScoreColor(result.status, result.percentage)}15`,
-                        padding: '2px 8px',
-                        borderRadius: 12,
-                        border: `1px solid ${getScoreColor(result.status, result.percentage)}30`
-                      }}>
-                        {result.status === 'pending' ? 'Pending' : `${result.marks_obtained}/${result.total_marks}`}
-                      </span>
+            <div className="empty-state">
+              <div className="empty-state-icon">
+                <Trophy size={48} />
+              </div>
+              <h3>No Results Yet</h3>
+              <p>Complete your first exam to see results here.</p>
+            </div>
+          ) : (
+            <div className="item-list">
+              {recent.map(exam => {
+                const result = getResultForExam(exam.id);
+                return (
+                  <div key={exam.id} className="list-item" onClick={() => navigate(`/student/results/${exam.id}`)}>
+                    <div className="item-content">
+                      <div className="item-title">{exam.name}</div>
+                      <div className="item-meta">
+                        <Clock size={14} />
+                        {exam.submitted_at ? formatDistanceToNow(new Date(exam.submitted_at)) + ' ago' : 'Submitted'}
+                      </div>
                       
-                      {/* Percentage */}
-                      {result.status !== 'pending' && (
-                        <span style={{ 
-                          fontSize: 11, 
-                          color: '#718096',
-                          fontWeight: 500
-                        }}>
-                          ({result.percentage}%)
-                        </span>
-                      )}
-                      
-                      {/* Grade */}
-                      {result.grade && result.status !== 'pending' && (
-                        <span style={{ 
-                          fontSize: 11, 
-                          fontWeight: 700,
-                          color: getGradeColor(result.grade),
-                          background: `${getGradeColor(result.grade)}15`,
-                          padding: '2px 6px',
-                          borderRadius: 8
-                        }}>
-                          {result.grade}
-                        </span>
+                      {result && (
+                        <div className="score-display" style={{ marginTop: '0.5rem' }}>
+                          <span className={`score-badge ${result.status === 'pending' ? 'status-pending' : result.status === 'pass' ? 'status-pass' : 'status-fail'}`}>
+                            {result.status === 'pending' ? 'Pending' : `${result.marks_obtained}/${result.total_marks}`}
+                          </span>
+                          
+                          {result.status !== 'pending' && (
+                            <span className="score-percentage">({result.percentage}%)</span>
+                          )}
+                          
+                          {result.grade && result.status !== 'pending' && (
+                            <span className={`grade-badge ${result.status === 'pass' ? 'status-pass' : 'status-fail'}`}>
+                              {result.grade}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-                
-                {/* Status Badge */}
-                <span style={{ 
-                  fontSize: 11, 
-                  fontWeight: 700, 
-                  padding: '3px 10px', 
-                  borderRadius: 20, 
-                  background: result 
-                    ? `${getScoreColor(result.status, result.percentage)}15` 
-                    : 'rgba(59,130,246,0.12)', 
-                  color: result 
-                    ? getScoreColor(result.status, result.percentage)
-                    : '#3b82f6',
-                  border: result 
-                    ? `1px solid ${getScoreColor(result.status, result.percentage)}30`
-                    : '1px solid rgba(59,130,246,0.3)'
-                }}>
-                  {result ? (result.status === 'pending' ? 'EVALUATING' : result.status?.toUpperCase()) : 'SUBMITTED'}
-                </span>
-              </div>
-            );
-          })}
-          <button onClick={() => navigate('/student/results')} style={{ background: 'none', border: 'none', color: '#e94560', cursor: 'pointer', fontSize: 12, fontFamily: 'Sora, sans-serif', marginTop: 8 }}>View all results →</button>
+                    
+                    <span className={`item-status ${result ? (result.status === 'pending' ? 'status-pending' : result.status === 'pass' ? 'status-pass' : 'status-fail') : 'status-submitted'}`}>
+                      {result ? (result.status === 'pending' ? 'Evaluating' : result.status?.toUpperCase()) : 'Submitted'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

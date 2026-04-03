@@ -101,6 +101,12 @@ const Login = ({ role }) => {
           </p>
         )}
 
+        {isStudent && (
+          <p className="auth-theme-meta">
+            <Link to="/student/password-reset">Forgot Password?</Link>
+          </p>
+        )}
+
         <div className="auth-theme-divider">
           <span>or</span>
         </div>

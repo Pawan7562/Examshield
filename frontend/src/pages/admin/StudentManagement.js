@@ -2,48 +2,112 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { adminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
+import { 
+  Search, 
+  Plus, 
+  Upload, 
+  Edit2, 
+  Trash2, 
+  UserPlus, 
+  Download,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Mail,
+  Phone,
+  Users,
+  GraduationCap,
+  Building,
+  Calendar,
+  CheckCircle,
+  XCircle,
+  AlertCircle
+} from 'lucide-react';
+import '../../components/admin/AdminSidebar.css';
 
 const Modal = ({ open, onClose, title, children }) => {
   if (!open) return null;
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: '#0e0e1a', border: '1px solid rgba(233,69,96,0.25)', borderRadius: 14, padding: 28, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0' }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#718096', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+    <div className="admin-modal-overlay">
+      <div className="admin-modal">
+        <div className="admin-modal-header">
+          <h3 className="admin-modal-title">{title}</h3>
+          <button onClick={onClose} className="admin-modal-close">
+            <X size={20} />
+          </button>
         </div>
-        {children}
+        <div className="admin-modal-content">
+          {children}
+        </div>
       </div>
     </div>
   );
 };
 
-const Input = ({ label, ...props }) => (
-  <div style={{ marginBottom: 14 }}>
-    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{label}</label>
-    <input {...props} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#e2e8f0', fontSize: 14, fontFamily: 'Sora, sans-serif' }} />
+const Input = ({ label, icon: Icon, error, ...props }) => (
+  <div className="admin-form-group">
+    <label className="admin-form-label">
+      {Icon && <Icon size={16} />}
+      {label}
+    </label>
+    <input {...props} className={`admin-form-input ${error ? 'error' : ''}`} />
+    {error && <span className="admin-form-error">{error}</span>}
   </div>
 );
 
-const Btn = ({ children, variant = 'primary', size = 'md', ...props }) => {
-  const bg = variant === 'primary' ? 'linear-gradient(135deg,#e94560,#c62a47)' : variant === 'ghost' ? 'rgba(255,255,255,0.05)' : 'rgba(233,69,96,0.12)';
-  const color = variant === 'primary' ? 'white' : '#e2e8f0';
-  const pad = size === 'sm' ? '6px 14px' : '10px 20px';
+const Button = ({ children, variant = 'primary', size = 'md', icon: Icon, loading, ...props }) => {
   return (
-    <button {...props} style={{ background: bg, border: `1px solid ${variant === 'primary' ? 'transparent' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, padding: pad, color, fontSize: size === 'sm' ? 12 : 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Sora, sans-serif', transition: 'all 0.15s', whiteSpace: 'nowrap', ...props.style }}>
-      {children}
+    <button 
+      {...props} 
+      className={`admin-btn admin-btn-${variant} admin-btn-${size} ${loading ? 'loading' : ''}`}
+      disabled={loading || props.disabled}
+    >
+      {loading ? (
+        <div className="admin-btn-spinner"></div>
+      ) : (
+        <>
+          {Icon && <Icon size={16} />}
+          {children}
+        </>
+      )}
     </button>
   );
 };
 
+const StatusBadge = ({ isActive }) => (
+  <span className={`admin-status-badge ${isActive ? 'active' : 'inactive'}`}>
+    {isActive ? (
+      <>
+        <CheckCircle size={12} />
+        ACTIVE
+      </>
+    ) : (
+      <>
+        <XCircle size={12} />
+        INACTIVE
+      </>
+    )}
+  </span>
+);
+
 export default function StudentManagement() {
   const [students, setStudents] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, total: 0 });
+  const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [addModal, setAddModal] = useState(false);
   const [editStudent, setEditStudent] = useState(null);
-  const [form, setForm] = useState({ name: '', email: '', rollNo: '', department: '', semester: '', batch: '', phone: '' });
+  const [form, setForm] = useState({ 
+    name: '', 
+    email: '', 
+    rollNo: '', 
+    department: '', 
+    semester: '', 
+    batch: '', 
+    phone: '' 
+  });
+  const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
@@ -54,7 +118,11 @@ export default function StudentManagement() {
     try {
       const res = await adminAPI.getStudents({ page, limit: 15, search: search || undefined });
       setStudents(res.data.students);
-      setPagination({ page, total: res.data.pagination.total, pages: res.data.pagination.pages });
+      setPagination({ 
+        page, 
+        total: res.data.pagination.total, 
+        pages: res.data.pagination.pages 
+      });
     } catch {
       toast.error('Failed to load students');
     } finally {
@@ -67,26 +135,59 @@ export default function StudentManagement() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+  const setFormField = (field) => (e) => {
+    setForm(f => ({ ...f, [field]: e.target.value }));
+    setFormErrors(errors => ({ ...errors, [field]: '' }));
+  };
 
   const openAdd = () => {
-    setForm({ name: '', email: '', rollNo: '', department: '', semester: '', batch: '', phone: '' });
+    setForm({ 
+      name: '', 
+      email: '', 
+      rollNo: '', 
+      department: '', 
+      semester: '', 
+      batch: '', 
+      phone: '' 
+    });
     setEditStudent(null);
+    setFormErrors({});
     setAddModal(true);
   };
-  const openEdit = (s) => {
-    setForm({ name: s.name, email: s.email, rollNo: s.roll_no, department: s.department || '', semester: s.semester || '', batch: s.batch || '', phone: s.phone || '' });
-    setEditStudent(s);
+
+  const openEdit = (student) => {
+    setForm({ 
+      name: student.name, 
+      email: student.email, 
+      rollNo: student.roll_no, 
+      department: student.department || '', 
+      semester: student.semester || '', 
+      batch: student.batch || '', 
+      phone: student.phone || '' 
+    });
+    setEditStudent(student);
+    setFormErrors({});
     setAddModal(true);
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!form.name.trim()) errors.name = 'Name is required';
+    if (!form.email.trim()) errors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Invalid email format';
+    if (!form.rollNo.trim()) errors.rollNo = 'Roll number is required';
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async () => {
-    if (!form.name || !form.email || !form.rollNo) return toast.error('Name, email, and roll number are required');
+    if (!validateForm()) return;
+    
     setSubmitting(true);
     try {
       if (editStudent) {
         await adminAPI.updateStudent(editStudent.id, form);
-        toast.success('Student updated');
+        toast.success('Student updated successfully');
       } else {
         await adminAPI.addStudent(form);
         toast.success('Student added! Credentials sent via email.');
@@ -103,7 +204,7 @@ export default function StudentManagement() {
   const toggleStatus = async (id, name, isActive) => {
     try {
       await adminAPI.toggleStudent(id);
-      toast.success(`${name} ${isActive ? 'deactivated' : 'activated'}`);
+      toast.success(`${name} ${isActive ? 'deactivated' : 'activated'} successfully`);
       fetchStudents(pagination.page);
     } catch {
       toast.error('Status update failed');
@@ -114,7 +215,7 @@ export default function StudentManagement() {
     if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return;
     try {
       await adminAPI.deleteStudent(id);
-      toast.success('Student deleted');
+      toast.success('Student deleted successfully');
       fetchStudents(1);
     } catch {
       toast.error('Delete failed');
@@ -140,145 +241,305 @@ export default function StudentManagement() {
   };
 
   return (
-    <div>
+    <div className="admin-pages-container">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>Student Management</h1>
-          <p style={{ fontSize: 13, color: '#4a5568', marginTop: 4 }}>{pagination.total} students total</p>
+      <div className="admin-page-header">
+        <div className="admin-header-content">
+          <h1 className="admin-page-title">Student Management</h1>
+          <p className="admin-page-subtitle">
+            {pagination.total} {pagination.total === 1 ? 'student' : 'students'} total
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Btn variant="ghost" onClick={() => setBulkModal(true)}>⬆ Bulk Upload</Btn>
-          <Btn onClick={openAdd}>+ Add Student</Btn>
+        <div className="admin-header-actions">
+          <Button variant="secondary" icon={Upload} onClick={() => setBulkModal(true)}>
+            Bulk Upload
+          </Button>
+          <Button icon={UserPlus} onClick={openAdd}>
+            Add Student
+          </Button>
         </div>
       </div>
 
-      {/* Search */}
-      <div style={{ marginBottom: 16 }}>
-        <input
-          value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="🔍 Search by name, email, roll number, or student ID..."
-          style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 16px', color: '#e2e8f0', fontSize: 14, fontFamily: 'Sora, sans-serif' }}
-        />
+      {/* Search and Filters */}
+      <div className="admin-content-card">
+        <div className="admin-search-section">
+          <div className="admin-search-input">
+            <Search size={20} />
+            <input
+              value={search} 
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name, email, roll number, or student ID..."
+            />
+          </div>
+          <Button variant="secondary" icon={Filter}>
+            Filters
+          </Button>
+        </div>
       </div>
 
-      {/* Table */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              {['Student ID', 'Name', 'Email', 'Roll No', 'Department', 'Status', 'Actions'].map(h => (
-                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#4a5568', textTransform: 'uppercase', letterSpacing: 1, whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#4a5568' }}>Loading...</td></tr>
-            ) : students.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#4a5568' }}>
-                {search ? `No students found for "${search}"` : 'No students yet. Add one to get started.'}
-              </td></tr>
-            ) : students.map((s, i) => (
-              <tr key={s.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: 12, color: '#e94560' }}>{s.student_id}</td>
-                <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{s.name}</td>
-                <td style={{ padding: '12px 16px', fontSize: 12, color: '#718096' }}>{s.email}</td>
-                <td style={{ padding: '12px 16px', fontSize: 12, color: '#a0aec0' }}>{s.roll_no}</td>
-                <td style={{ padding: '12px 16px', fontSize: 12, color: '#a0aec0' }}>{s.department || '—'}</td>
-                <td style={{ padding: '12px 16px' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: s.is_active ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: s.is_active ? '#22c55e' : '#ef4444' }}>
-                    {s.is_active ? 'ACTIVE' : 'INACTIVE'}
-                  </span>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <Btn variant="ghost" size="sm" onClick={() => openEdit(s)}>Edit</Btn>
-                    <Btn variant="ghost" size="sm" onClick={() => toggleStatus(s.id, s.name, s.is_active)} style={{ color: s.is_active ? '#f59e0b' : '#22c55e' }}>
-                      {s.is_active ? 'Disable' : 'Enable'}
-                    </Btn>
-                    <Btn variant="ghost" size="sm" onClick={() => deleteStudent(s.id, s.name)} style={{ color: '#ef4444' }}>Del</Btn>
-                  </div>
-                </td>
+      {/* Students Table */}
+      <div className="admin-content-card">
+        <div className="admin-table-container">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Roll No</th>
+                <th>Department</th>
+                <th>Semester</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {pagination.pages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
-          {Array.from({ length: pagination.pages }, (_, i) => i + 1).map(p => (
-            <button key={p} onClick={() => fetchStudents(p)} style={{
-              width: 32, height: 32, borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: 'Sora, sans-serif', fontSize: 13,
-              background: p === pagination.page ? '#e94560' : 'rgba(255,255,255,0.05)',
-              color: p === pagination.page ? 'white' : '#a0aec0',
-            }}>{p}</button>
-          ))}
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="admin-table-loading">
+                    <div className="admin-loading-spinner"></div>
+                    Loading students...
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="admin-table-empty">
+                    <Users size={48} />
+                    <h3>No students found</h3>
+                    <p>
+                      {search ? `No students found for "${search}"` : 'No students yet. Add one to get started.'}
+                    </p>
+                    {!search && (
+                      <Button icon={UserPlus} onClick={openAdd}>
+                        Add First Student
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ) : students.map((student) => (
+                <tr key={student.id}>
+                  <td className="admin-student-id">{student.student_id}</td>
+                  <td className="admin-student-name">
+                    <div className="admin-student-info">
+                      <span>{student.name}</span>
+                    </div>
+                  </td>
+                  <td className="admin-student-email">
+                    <Mail size={14} />
+                    {student.email}
+                  </td>
+                  <td className="admin-student-roll">{student.roll_no}</td>
+                  <td className="admin-student-department">
+                    <Building size={14} />
+                    {student.department || '—'}
+                  </td>
+                  <td className="admin-student-semester">
+                    <GraduationCap size={14} />
+                    {student.semester || '—'}
+                  </td>
+                  <td>
+                    <StatusBadge isActive={student.is_active} />
+                  </td>
+                  <td>
+                    <div className="admin-table-actions">
+                      <Button variant="ghost" size="sm" icon={Edit2} onClick={() => openEdit(student)}>
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => toggleStatus(student.id, student.name, student.is_active)}
+                        className={student.is_active ? 'warning' : 'success'}
+                      >
+                        {student.is_active ? 'Disable' : 'Enable'}
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        icon={Trash2} 
+                        onClick={() => deleteStudent(student.id, student.name)}
+                        className="danger"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+
+        {/* Pagination */}
+        {pagination.pages > 1 && (
+          <div className="admin-pagination">
+            <button 
+              onClick={() => fetchStudents(pagination.page - 1)}
+              disabled={pagination.page === 1}
+              className="admin-pagination-btn"
+            >
+              <ChevronLeft size={16} />
+              Previous
+            </button>
+            
+            <div className="admin-pagination-numbers">
+              {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                const pageNum = i + 1;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => fetchStudents(pageNum)}
+                    className={`admin-pagination-number ${pageNum === pagination.page ? 'active' : ''}`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button 
+              onClick={() => fetchStudents(pagination.page + 1)}
+              disabled={pagination.page === pagination.pages}
+              className="admin-pagination-btn"
+            >
+              Next
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Add/Edit Modal */}
       <Modal open={addModal} onClose={() => setAddModal(false)} title={editStudent ? 'Edit Student' : 'Add New Student'}>
-        <Input label="Full Name *" value={form.name} onChange={set('name')} placeholder="Student Full Name" />
-        <Input label="Email *" type="email" value={form.email} onChange={set('email')} placeholder="student@email.com" disabled={!!editStudent} />
-        <Input label="Roll Number *" value={form.rollNo} onChange={set('rollNo')} placeholder="CS-2024-001" />
-        <Input label="Department" value={form.department} onChange={set('department')} placeholder="Computer Science" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <Input label="Semester" value={form.semester} onChange={set('semester')} placeholder="5th" />
-          <Input label="Batch" value={form.batch} onChange={set('batch')} placeholder="2022-26" />
+        <div className="admin-form-grid">
+          <Input 
+            label="Full Name *" 
+            icon={Users}
+            value={form.name} 
+            onChange={setFormField('name')} 
+            placeholder="Student Full Name"
+            error={formErrors.name}
+          />
+          <Input 
+            label="Email *" 
+            type="email" 
+            icon={Mail}
+            value={form.email} 
+            onChange={setFormField('email')} 
+            placeholder="student@email.com" 
+            disabled={!!editStudent}
+            error={formErrors.email}
+          />
+          <Input 
+            label="Roll Number *" 
+            icon={GraduationCap}
+            value={form.rollNo} 
+            onChange={setFormField('rollNo')} 
+            placeholder="CS-2024-001"
+            error={formErrors.rollNo}
+          />
+          <Input 
+            label="Department" 
+            icon={Building}
+            value={form.department} 
+            onChange={setFormField('department')} 
+            placeholder="Computer Science" 
+          />
+          <div className="admin-form-row">
+            <Input 
+              label="Semester" 
+              icon={Calendar}
+              value={form.semester} 
+              onChange={setFormField('semester')} 
+              placeholder="5th" 
+            />
+            <Input 
+              label="Batch" 
+              icon={Calendar}
+              value={form.batch} 
+              onChange={setFormField('batch')} 
+              placeholder="2022-26" 
+            />
+          </div>
+          <Input 
+            label="Phone" 
+            icon={Phone}
+            value={form.phone} 
+            onChange={setFormField('phone')} 
+            placeholder="+91 9876543210" 
+          />
         </div>
-        <Input label="Phone" value={form.phone} onChange={set('phone')} placeholder="+91 9876543210" />
-        {!editStudent && <p style={{ fontSize: 12, color: '#4a5568', marginBottom: 14 }}>A unique password will be generated and sent to the student's email.</p>}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <Btn variant="ghost" onClick={() => setAddModal(false)}>Cancel</Btn>
-          <Btn onClick={handleSubmit} disabled={submitting}>{submitting ? 'Saving...' : editStudent ? 'Update Student' : 'Add Student'}</Btn>
+        
+        {!editStudent && (
+          <div className="admin-form-note">
+            <AlertCircle size={16} />
+            A unique password will be generated and sent to the student's email.
+          </div>
+        )}
+        
+        <div className="admin-form-actions">
+          <Button variant="secondary" onClick={() => setAddModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} loading={submitting}>
+            {submitting ? 'Saving...' : editStudent ? 'Update Student' : 'Add Student'}
+          </Button>
         </div>
       </Modal>
 
       {/* Bulk Upload Modal */}
       <Modal open={bulkModal} onClose={() => setBulkModal(false)} title="Bulk Upload Students">
-        <div style={{ marginBottom: 20 }}>
-          <p style={{ fontSize: 13, color: '#a0aec0', marginBottom: 12 }}>Upload a CSV file with columns:</p>
-          <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: 12, fontFamily: 'monospace', fontSize: 12, color: '#e94560' }}>
-            name,email,roll_no,department,semester,batch
+        <div className="admin-bulk-upload">
+          <div className="admin-bulk-info">
+            <p>Upload a CSV file with the following columns:</p>
+            <div className="admin-csv-format">
+              name,email,roll_no,department,semester,batch
+            </div>
           </div>
-        </div>
 
-        <div
-          onClick={() => fileRef.current.click()}
-          style={{
-            border: `2px dashed ${csvFile ? '#22c55e' : 'rgba(233,69,96,0.4)'}`,
-            borderRadius: 10, padding: 32, textAlign: 'center', cursor: 'pointer',
-            background: csvFile ? 'rgba(34,197,94,0.05)' : 'transparent', marginBottom: 16,
-          }}
-        >
-          <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
-          <div style={{ fontSize: 13, color: '#a0aec0' }}>
-            {csvFile ? csvFile.name : 'Click to select CSV file'}
+          <div 
+            className={`admin-file-upload ${csvFile ? 'has-file' : ''}`}
+            onClick={() => fileRef.current.click()}
+          >
+            <Upload size={32} />
+            <p>
+              {csvFile ? csvFile.name : 'Click to select CSV file'}
+            </p>
+            <span className="admin-file-hint">
+              Supported format: .csv (Max 5MB)
+            </span>
+            <input 
+              ref={fileRef} 
+              type="file" 
+              accept=".csv" 
+              style={{ display: 'none' }} 
+              onChange={e => setCsvFile(e.target.files[0])} 
+            />
           </div>
-          <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => setCsvFile(e.target.files[0])} />
-        </div>
 
-        <a href="data:text/csv;charset=utf-8,name,email,roll_no,department,semester,batch%0AJohn Doe,john@email.com,CS001,Computer Science,5th,2022-26"
-          download="students_template.csv"
-          style={{ fontSize: 12, color: '#e94560', display: 'block', textAlign: 'center', marginBottom: 16 }}>
-          ⬇ Download CSV Template
-        </a>
+          <a 
+            href="data:text/csv;charset=utf-8,name,email,roll_no,department,semester,batch%0AJohn Doe,john@email.com,CS001,Computer Science,5th,2022-26"
+            download="students_template.csv"
+            className="admin-download-template"
+          >
+            <Download size={16} />
+            Download CSV Template
+          </a>
 
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <Btn variant="ghost" onClick={() => setBulkModal(false)}>Cancel</Btn>
-          <Btn onClick={handleBulkUpload} disabled={!csvFile || submitting}>{submitting ? 'Uploading...' : 'Upload Students'}</Btn>
+          <div className="admin-form-actions">
+            <Button variant="secondary" onClick={() => setBulkModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleBulkUpload} 
+              disabled={!csvFile || submitting}
+              loading={submitting}
+            >
+              {submitting ? 'Uploading...' : 'Upload Students'}
+            </Button>
+          </div>
         </div>
       </Modal>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap');
-        input:focus{outline:none;border-color:#e94560!important;}
-        input::placeholder{color:#4a5568;}
-        button:hover:not(:disabled){opacity:0.85;}
-      `}</style>
     </div>
   );
 }

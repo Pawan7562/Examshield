@@ -12,6 +12,10 @@ const studentController = require('../controllers/studentController');
 const examController = require('../controllers/examController');
 const resultController = require('../controllers/resultController');
 const subscriptionController = require('../controllers/subscriptionController');
+const studentPasswordController = require('../controllers/studentPasswordController');
+
+// Student password routes
+const studentPasswordRoutes = require('./studentPasswordRoutes');
 
 // Multer config for CSV uploads
 const storage = multer.diskStorage({
@@ -58,6 +62,7 @@ admin.delete('/students/:id', studentController.deleteStudent);
 
 // Exam management
 admin.get('/exams', adminController.getExams);
+admin.get('/exams/health-check', examController.healthCheck);
 admin.post('/exams', checkSubscription, examController.createExam);
 admin.put('/exams/:id', examController.updateExam);
 admin.delete('/exams/:id', async (req, res) => {
@@ -179,6 +184,11 @@ superAdmin.get('/audit-logs', async (req, res) => {
   }
 });
 router.use('/super-admin', superAdmin);
+
+// =====================================================
+// STUDENT PASSWORD ROUTES (Public - No authentication required)
+// =====================================================
+router.use('/student-password', studentPasswordRoutes);
 
 // =====================================================
 // CODE EXECUTION (Sandboxed - basic implementation)

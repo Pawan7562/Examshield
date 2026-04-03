@@ -3,17 +3,29 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { studentAPI } from '../../services/api';
 import { format } from 'date-fns';
+import { 
+  Calendar, 
+  Clock, 
+  BookOpen, 
+  Filter,
+  Play,
+  FileText,
+  AlertCircle,
+  CheckCircle,
+  XCircle
+} from 'lucide-react';
+import '../../components/student/StudentSidebar.css';
 
 const statusConfig = {
-  published: { label: 'UPCOMING', color: '#e94560', bg: 'rgba(233,69,96,0.12)' },
-  active: { label: 'LIVE NOW', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
-  completed: { label: 'ENDED', color: '#718096', bg: 'rgba(113,128,150,0.12)' },
+  published: { label: 'UPCOMING', color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' },
+  active: { label: 'LIVE NOW', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.2)' },
+  completed: { label: 'ENDED', color: '#6b7280', bg: 'rgba(107, 114, 128, 0.2)' },
 };
 
 const sessionConfig = {
-  submitted: { label: 'SUBMITTED', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
-  terminated: { label: 'TERMINATED', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
-  active: { label: 'IN PROGRESS', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  submitted: { label: 'SUBMITTED', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.2)' },
+  terminated: { label: 'TERMINATED', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.2)' },
+  active: { label: 'IN PROGRESS', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.2)' },
 };
 
 export default function ExamList() {
@@ -42,77 +54,142 @@ export default function ExamList() {
   };
 
   const getStatus = (exam) => {
-    if (exam.session_status) return sessionConfig[exam.session_status] || { label: exam.session_status.toUpperCase(), color: '#718096', bg: 'rgba(113,128,150,0.12)' };
-    return statusConfig[exam.status] || { label: exam.status.toUpperCase(), color: '#718096', bg: 'rgba(113,128,150,0.12)' };
+    if (exam.session_status) return sessionConfig[exam.session_status] || { label: exam.session_status.toUpperCase(), color: '#6b7280', bg: 'rgba(107, 114, 128, 0.2)' };
+    return statusConfig[exam.status] || { label: exam.status.toUpperCase(), color: '#6b7280', bg: 'rgba(107, 114, 128, 0.2)' };
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: '#4a5568' }}>Loading exams...</div>;
+  if (loading) {
+    return (
+      <div className="student-pages-container">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <div className="loading-text">Loading your exams...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>My Exams</h1>
-          <p style={{ fontSize: 13, color: '#4a5568', marginTop: 4 }}>{exams.length} exams assigned</p>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {['all', 'upcoming', 'completed'].map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{
-              background: filter === f ? '#e94560' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: 20,
-              padding: '6px 16px', color: filter === f ? 'white' : '#718096', fontSize: 12, fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'Sora, sans-serif', textTransform: 'capitalize',
-            }}>{f}</button>
-          ))}
+      {/* Header */}
+      <div className="content-card">
+        <div className="card-header">
+          <h1>My Exams</h1>
+          <div className="header-actions">
+            <Filter size={20} />
+            <select 
+              value={filter} 
+              onChange={(e) => setFilter(e.target.value)}
+              className="form-input"
+              style={{ width: 'auto', padding: '0.5rem 1rem' }}
+            >
+              <option value="all">All Exams</option>
+              <option value="upcoming">Upcoming</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Content */}
+      <div className="content-card">
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: '#4a5568' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-            <p>No exams found</p>
-          </div>
-        ) : filtered.map(exam => {
-          const st = getStatus(exam);
-          const startable = canStart(exam);
-          return (
-            <div key={exam.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 20 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>{exam.name}</h3>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 20, background: st.bg, color: st.color }}>{st.label}</span>
-                </div>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                  {[
-                    ['Subject', exam.subject],
-                    ['Type', exam.type?.toUpperCase()],
-                    ['Date', format(new Date(exam.date_time), 'dd MMM yyyy, HH:mm')],
-                    ['Duration', `${exam.duration} min`],
-                    ['Marks', exam.total_marks],
-                  ].filter(([, v]) => v).map(([k, v]) => (
-                    <span key={k} style={{ fontSize: 12, color: '#4a5568' }}>
-                      <strong style={{ color: '#718096' }}>{k}:</strong> {v}
-                    </span>
-                  ))}
-                </div>
-                {exam.result_status && exam.result_status !== 'pending' && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: exam.result_status === 'pass' ? '#22c55e' : '#ef4444' }}>
-                    Result: {exam.marks_obtained} / {exam.total_marks} marks — {exam.result_status.toUpperCase()}
-                  </div>
-                )}
-              </div>
-              {startable ? (
-                <button onClick={() => navigate(`/student/exam/${exam.id}`)} style={{ background: 'linear-gradient(135deg,#e94560,#c62a47)', border: 'none', borderRadius: 10, padding: '12px 24px', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Sora, sans-serif', whiteSpace: 'nowrap' }}>
-                  Start Exam →
-                </button>
-              ) : exam.session_status === 'active' ? (
-                <button onClick={() => navigate(`/student/exam/${exam.id}`)} style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: 10, padding: '12px 24px', color: '#f59e0b', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Sora, sans-serif' }}>
-                  Resume →
-                </button>
-              ) : null}
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <FileText size={48} />
             </div>
-          );
-        })}
+            <h3>No Exams Found</h3>
+            <p>
+              {filter === 'upcoming' ? 'You don\'t have any upcoming exams at the moment.' :
+               filter === 'completed' ? 'You haven\'t completed any exams yet.' :
+               'No exams are currently assigned to you.'}
+            </p>
+          </div>
+        ) : (
+          <div className="exam-list">
+            {filtered.map(exam => {
+              const st = getStatus(exam);
+              const startable = canStart(exam);
+              return (
+                <div key={exam.id} className="list-item">
+                  <div className="exam-content">
+                    <div className="exam-header">
+                      <div className="exam-title-section">
+                        <h3 className="list-item-title">{exam.name}</h3>
+                        <span className={`status-badge status-${exam.status}`}>
+                          {st.label}
+                        </span>
+                      </div>
+                      
+                      {startable && (
+                        <button 
+                          onClick={() => navigate(`/student/exam/${exam.id}`)}
+                          className="btn btn-success"
+                        >
+                          <Play size={16} />
+                          Start Exam
+                        </button>
+                      )}
+                      
+                      {exam.session_status === 'active' && (
+                        <button 
+                          onClick={() => navigate(`/student/exam/${exam.id}`)}
+                          className="btn btn-secondary"
+                        >
+                          <Play size={16} />
+                          Resume
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="exam-details">
+                      <div className="detail-grid">
+                        <div className="detail-item">
+                          <Calendar size={16} />
+                          <span>{format(new Date(exam.date_time), 'dd MMM yyyy, HH:mm')}</span>
+                        </div>
+                        <div className="detail-item">
+                          <Clock size={16} />
+                          <span>{exam.duration} minutes</span>
+                        </div>
+                        <div className="detail-item">
+                          <BookOpen size={16} />
+                          <span>{exam.subject}</span>
+                        </div>
+                        <div className="detail-item">
+                          <FileText size={16} />
+                          <span>{exam.total_marks} marks</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {exam.result_status && exam.result_status !== 'pending' && (
+                      <div className="result-section">
+                        <div className="result-badge">
+                          {exam.result_status === 'pass' ? (
+                            <>
+                              <CheckCircle size={16} />
+                              <span>PASSED</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle size={16} />
+                              <span>FAILED</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="score-display">
+                          <span className="score-value">{exam.marks_obtained}</span>
+                          <span className="score-label">/ {exam.total_marks}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

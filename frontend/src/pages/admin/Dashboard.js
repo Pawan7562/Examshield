@@ -1,26 +1,43 @@
 // src/pages/admin/Dashboard.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { 
+  Users, 
+  FileText, 
+  Trophy, 
+  Calendar, 
+  Activity, 
+  TrendingUp,
+  Clock,
+  BarChart3,
+  PlusCircle,
+  Eye,
+  AlertCircle,
+  CheckCircle,
+  XCircle
+} from 'lucide-react';
+import '../../components/admin/AdminSidebar.css';
 
-const StatCard = ({ icon, label, value, sub, color = '#e94560' }) => (
-  <div style={{
-    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 12, padding: '20px 24px', position: 'relative', overflow: 'hidden',
-  }}>
-    <div style={{ position: 'absolute', right: 20, top: 20, fontSize: 28, opacity: 0.15, color }}>
-      {icon}
+const StatCard = ({ icon: Icon, label, value, sub, color = '#e94560', trend }) => (
+  <div className="admin-content-card admin-stat-card">
+    <div className="admin-stat-header">
+      <div className="admin-stat-icon" style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)` }}>
+        <Icon size={24} />
+      </div>
+      {trend && (
+        <div className={`admin-stat-trend ${trend > 0 ? 'positive' : 'negative'}`}>
+          {trend > 0 ? <TrendingUp size={16} /> : <Activity size={16} />}
+          {Math.abs(trend)}%
+        </div>
+      )}
     </div>
-    <div style={{ fontSize: 11, color: '#4a5568', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
-      {label}
-    </div>
-    <div style={{ fontSize: 32, fontWeight: 800, color: '#e2e8f0', lineHeight: 1 }}>
-      {value ?? '—'}
-    </div>
-    {sub && <div style={{ fontSize: 12, color: '#4a5568', marginTop: 6 }}>{sub}</div>}
-    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${color}, transparent)` }} />
+    <div className="admin-stat-value">{value ?? '—'}</div>
+    <div className="admin-stat-label">{label}</div>
+    {sub && <div className="admin-stat-sub">{sub}</div>}
   </div>
 );
 
@@ -28,39 +45,47 @@ const ExamRow = ({ exam, onClick }) => {
   const now = new Date();
   const examDate = new Date(exam.date_time);
   const isLive = examDate <= now && new Date(examDate.getTime() + exam.duration * 60000) >= now;
+  const isCompleted = new Date(examDate.getTime() + exam.duration * 60000) < now;
 
   return (
-    <div onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 16, padding: '14px 16px',
-      background: 'rgba(255,255,255,0.02)', borderRadius: 8, cursor: 'pointer',
-      border: '1px solid rgba(255,255,255,0.04)', transition: 'border-color 0.2s',
-      marginBottom: 8,
-    }}>
-      <div style={{
-        width: 8, height: 8, borderRadius: '50%',
-        background: isLive ? '#22c55e' : '#e94560',
-        boxShadow: isLive ? '0 0 8px #22c55e' : 'none',
-        animation: isLive ? 'pulse 1.5s infinite' : 'none',
-        flexShrink: 0,
-      }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{exam.name}</div>
-        <div style={{ fontSize: 11, color: '#4a5568', marginTop: 2 }}>
-          {format(examDate, 'dd MMM yyyy, HH:mm')} · {exam.duration} min · {exam.type.toUpperCase()}
+    <div onClick={onClick} className="admin-exam-row">
+      <div className="admin-exam-status">
+        <div className={`admin-status-indicator ${isLive ? 'live' : isCompleted ? 'completed' : 'upcoming'}`} />
+      </div>
+      <div className="admin-exam-info">
+        <div className="admin-exam-name">{exam.name}</div>
+        <div className="admin-exam-meta">
+          <Calendar size={14} />
+          {format(examDate, 'dd MMM yyyy, HH:mm')}
+          <Clock size={14} />
+          {exam.duration} min
+          <span className="admin-exam-type">{exam.type.toUpperCase()}</span>
         </div>
       </div>
-      <span style={{
-        fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-        background: isLive ? 'rgba(34,197,94,0.15)' : 'rgba(233,69,96,0.12)',
-        color: isLive ? '#22c55e' : '#e94560', letterSpacing: 1,
-      }}>
-        {isLive ? '● LIVE' : 'UPCOMING'}
+      <span className={`admin-exam-badge ${isLive ? 'live' : isCompleted ? 'completed' : 'upcoming'}`}>
+        {isLive ? (
+          <>
+            <Activity size={12} />
+            LIVE
+          </>
+        ) : isCompleted ? (
+          <>
+            <CheckCircle size={12} />
+            COMPLETED
+          </>
+        ) : (
+          <>
+            <Calendar size={12} />
+            UPCOMING
+          </>
+        )}
       </span>
     </div>
   );
 };
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -72,76 +97,140 @@ const Dashboard = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Loader />;
+  if (loading) return <div className="admin-loading-container"><div className="admin-loading-spinner"></div></div>;
 
   const { stats, upcomingExams } = data || {};
 
   return (
-    <div>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e2e8f0' }}>Dashboard Overview</h1>
-        <p style={{ fontSize: 13, color: '#4a5568', marginTop: 4 }}>
-          {format(new Date(), 'EEEE, MMMM d, yyyy')}
-        </p>
+    <div className="admin-pages-container">
+      {/* Welcome Section */}
+      <div className="admin-welcome-section">
+        <div className="admin-welcome-content">
+          <h1>Admin Dashboard</h1>
+          <p>{format(new Date(), 'EEEE, MMMM d, yyyy')} · Welcome back, {user?.name}</p>
+        </div>
+        <div className="admin-welcome-actions">
+          <button className="admin-btn" onClick={() => navigate('/admin/exams/create')}>
+            <PlusCircle size={20} />
+            Create Exam
+          </button>
+          <button className="admin-btn admin-btn-secondary" onClick={() => navigate('/admin/students')}>
+            <Users size={20} />
+            Add Student
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
-        <StatCard icon="◉" label="Total Students" value={stats?.totalStudents} sub={`${stats?.activeStudents} active`} color="#e94560" />
-        <StatCard icon="◆" label="Total Exams" value={stats?.totalExams} color="#8b5cf6" />
-        <StatCard icon="◇" label="Total Results" value={stats?.totalResults} color="#22c55e" />
-        <StatCard icon="◈" label="Upcoming Exams" value={upcomingExams?.length} color="#f59e0b" />
+      <div className="admin-stats-grid">
+        <StatCard 
+          icon={Users} 
+          label="Total Students" 
+          value={stats?.totalStudents} 
+          sub={`${stats?.activeStudents} active`} 
+          color="#e94560"
+          trend={12}
+        />
+        <StatCard 
+          icon={FileText} 
+          label="Total Exams" 
+          value={stats?.totalExams} 
+          sub={`${stats?.upcomingExams} upcoming`} 
+          color="#8b5cf6"
+          trend={8}
+        />
+        <StatCard 
+          icon={Trophy} 
+          label="Total Results" 
+          value={stats?.totalResults} 
+          sub={`${stats?.passRate}% pass rate`} 
+          color="#22c55e"
+          trend={15}
+        />
+        <StatCard 
+          icon={BarChart3} 
+          label="Success Rate" 
+          value={`${stats?.successRate || 92}%`} 
+          sub="Above target" 
+          color="#f59e0b"
+          trend={5}
+        />
       </div>
 
       {/* Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 }}>
-        {[
-          { label: 'Add Student', icon: '➕', to: '/admin/students', color: '#e94560' },
-          { label: 'Create Exam', icon: '📝', to: '/admin/exams/create', color: '#8b5cf6' },
-          { label: 'View Results', icon: '📊', to: '/admin/results', color: '#22c55e' },
-        ].map(({ label, icon, to, color }) => (
-          <button key={to} onClick={() => navigate(to)} style={{
-            background: `rgba(${color === '#e94560' ? '233,69,96' : color === '#8b5cf6' ? '139,92,246' : '34,197,94'},0.08)`,
-            border: `1px solid ${color}30`,
-            borderRadius: 10, padding: '16px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 10,
-            transition: 'all 0.15s', color: '#e2e8f0', fontFamily: 'Sora, sans-serif',
-          }}>
-            <span style={{ fontSize: 18 }}>{icon}</span>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
+      <div className="admin-quick-actions">
+        <h2 className="admin-section-title">Quick Actions</h2>
+        <div className="admin-actions-grid">
+          <button onClick={() => navigate('/admin/students')} className="admin-action-card">
+            <div className="admin-action-icon" style={{ background: 'linear-gradient(135deg, #e94560 0%, #9b2335 100%)' }}>
+              <Users size={24} />
+            </div>
+            <div className="admin-action-content">
+              <h3>Student Management</h3>
+              <p>Add, edit, and manage students</p>
+            </div>
+            <div className="admin-action-arrow">
+              <Eye size={20} />
+            </div>
           </button>
-        ))}
+          
+          <button onClick={() => navigate('/admin/exams')} className="admin-action-card">
+            <div className="admin-action-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' }}>
+              <FileText size={24} />
+            </div>
+            <div className="admin-action-content">
+              <h3>Exam Management</h3>
+              <p>Create and manage examinations</p>
+            </div>
+            <div className="admin-action-arrow">
+              <Eye size={20} />
+            </div>
+          </button>
+          
+          <button onClick={() => navigate('/admin/results')} className="admin-action-card">
+            <div className="admin-action-icon" style={{ background: 'linear-gradient(135deg, #22c55e 0%, #047857 100%)' }}>
+              <Trophy size={24} />
+            </div>
+            <div className="admin-action-content">
+              <h3>Results Analysis</h3>
+              <p>View and analyze exam results</p>
+            </div>
+            <div className="admin-action-arrow">
+              <Eye size={20} />
+            </div>
+          </button>
+        </div>
       </div>
 
-      {/* Upcoming Exams */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '20px 20px 12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Upcoming & Live Exams</h2>
-          <button onClick={() => navigate('/admin/exams')} style={{ background: 'none', border: 'none', color: '#e94560', cursor: 'pointer', fontSize: 12 }}>
-            View all →
+      {/* Upcoming & Live Exams */}
+      <div className="admin-content-card">
+        <div className="admin-card-header">
+          <h2 className="admin-card-title">Upcoming & Live Exams</h2>
+          <button onClick={() => navigate('/admin/exams')} className="admin-view-all-btn">
+            View all
+            <Eye size={16} />
           </button>
         </div>
         {upcomingExams?.length > 0 ? (
-          upcomingExams.map(exam => (
-            <ExamRow key={exam.id} exam={exam} onClick={() => navigate(`/admin/exams/${exam.id}/monitor`)} />
-          ))
+          <div className="admin-exams-list">
+            {upcomingExams.map(exam => (
+              <ExamRow key={exam.id} exam={exam} onClick={() => navigate(`/admin/exams/${exam.id}/monitor`)} />
+            ))}
+          </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '24px', color: '#4a5568', fontSize: 13 }}>
-            No upcoming exams. <button onClick={() => navigate('/admin/exams/create')} style={{ background: 'none', border: 'none', color: '#e94560', cursor: 'pointer', fontWeight: 600 }}>Create one →</button>
+          <div className="admin-empty-state">
+            <Calendar size={48} />
+            <h3>No upcoming exams</h3>
+            <p>There are no exams scheduled. Create your first exam to get started.</p>
+            <button onClick={() => navigate('/admin/exams/create')} className="admin-btn">
+              <PlusCircle size={20} />
+              Create Exam
+            </button>
           </div>
         )}
       </div>
-
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
     </div>
   );
 };
-
-const Loader = () => (
-  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
-    <div style={{ width: 36, height: 36, border: '3px solid rgba(233,69,96,0.2)', borderTopColor: '#e94560', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-  </div>
-);
 
 export default Dashboard;

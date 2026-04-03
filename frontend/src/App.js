@@ -17,6 +17,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import StudentManagement from './pages/admin/StudentManagement';
 import ExamManagement from './pages/admin/ExamManagement';
 import CreateExam from './pages/admin/CreateExam';
+import AIQuestionGenerator from './pages/admin/AIQuestionGenerator';
 import ExamQuestions from './pages/admin/ExamQuestions';
 import QuestionDetail from './pages/admin/QuestionDetail';
 import LiveMonitor from './pages/admin/LiveMonitor';
@@ -30,6 +31,8 @@ import ExamList from './pages/student/ExamList';
 import ExamRoom from './pages/student/ExamRoom';
 import StudentResults from './pages/student/Results';
 import Profile from './pages/student/Profile';
+import PasswordReset from './pages/student/PasswordReset';
+import Settings from './pages/student/Settings';
 
 import SuperAdminLayout from './components/admin/SuperAdminLayout';
 import SuperAdminDashboard from './pages/super-admin/Dashboard';
@@ -85,6 +88,7 @@ function App() {
           <Route path="/admin/login" element={<Login role="admin" />} />
           <Route path="/admin/register" element={<Register />} />
           <Route path="/student/login" element={<Login role="student" />} />
+          <Route path="/student/password-reset" element={<PasswordReset />} />
           <Route path="/super-admin/login" element={<SuperAdminLogin />} />
 
           <Route
@@ -100,6 +104,7 @@ function App() {
             <Route path="students" element={<StudentManagement />} />
             <Route path="exams" element={<ExamManagement />} />
             <Route path="exams/create" element={<CreateExam />} />
+            <Route path="ai-questions" element={<AIQuestionGenerator />} />
             <Route path="exams/:id/questions" element={<ExamQuestions />} />
             <Route path="exams/:id/questions/:questionId" element={<QuestionDetail />} />
             <Route path="exams/:id/monitor" element={<LiveMonitor />} />
@@ -121,6 +126,7 @@ function App() {
             <Route path="exams" element={<ExamList />} />
             <Route path="results" element={<StudentResults />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
 
           <Route
