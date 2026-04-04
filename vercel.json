@@ -15,6 +15,7 @@
   "env": {
     "NODE_ENV": "production",
     "NODE_OPTIONS": "--max-old-space-size=4096",
+    "GENERATE_SOURCEMAP": "false",
     "CI": "true"
   }
 }
