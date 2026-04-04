@@ -86,8 +86,8 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
   };
 
   const getDifficultyColor = (difficulty) => {
-    switch (difficulty) {
-      case 'easy': return '#22c55e';
+    switch (difficulty?.toLowerCase()) {
+      case 'easy': return '#10b981';
       case 'medium': return '#f59e0b';
       case 'hard': return '#ef4444';
       default: return '#6b7280';

@@ -9,12 +9,9 @@ import {
   Sparkles, 
   Layers, 
   Zap, 
-  AlertCircle, 
   BookOpen, 
   FileText, 
   FolderOpen, 
-  Copy, 
-  Share2, 
   Clock, 
   Award,
   Calendar,
@@ -1871,13 +1868,15 @@ const AIQuestionGenerator = () => {
             output: variation === 2 ? `${ex.output} (Alternative)` : ex.output
           })),
           // Randomize some values for variety
-          constraints: baseQuestion.constraints.map((c, idx) => {
-            if (variation === 1 && idx === 0) {
-              // Slightly modify first constraint
-              return c.replace(/\d+/, (match) => (parseInt(match) + Math.floor(Math.random() * 5 - 2)).toString());
-            }
-            return c;
-          })
+          constraints: typeof baseQuestion.constraints === 'string' 
+            ? [baseQuestion.constraints] 
+            : baseQuestion.constraints.map((c, idx) => {
+                if (variation === 1 && idx === 0) {
+                  // Slightly modify first constraint
+                  return c.replace(/\d+/, (match) => (parseInt(match) + Math.floor(Math.random() * 5 - 2)).toString());
+                }
+                return c;
+              })
         };
         
         expandedQuestions.push(question);
