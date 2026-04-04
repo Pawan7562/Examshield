@@ -137,13 +137,73 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
         </div>
       </div>
 
-      {/* Problem Description with HTML Fidelity */}
+      {/* Problem Description */}
       <div className="premium-section">
-        <div 
-          className="premium-description"
-          dangerouslySetInnerHTML={{ __html: question.question_text || question.description }}
-        />
+        <div className="premium-section-header">
+          <h4>Problem Statement</h4>
+          <div className="premium-section-line"></div>
+        </div>
+        <div className="premium-description">
+          {question.question_text || question.description || 'Write a function that solves the given problem.'}
+        </div>
       </div>
+
+      {/* Constraints */}
+      {question.constraints && (
+        <div className="premium-section">
+          <div className="premium-section-header">
+            <h4>Constraints</h4>
+            <div className="premium-section-line"></div>
+          </div>
+          <ul className="premium-constraints-list">
+            {Array.isArray(question.constraints) ? (
+              question.constraints.map((c, i) => <li key={i}>{c}</li>)
+            ) : (
+              <li>{question.constraints}</li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* Test Cases Preview */}
+      {(question.testCases || question.examples) && (question.testCases?.length > 0 || question.examples?.length > 0) && (
+        <div className="premium-section">
+          <div className="premium-section-header">
+            <h4>Sample Test Cases</h4>
+            <div className="premium-section-line"></div>
+          </div>
+          <div className="premium-examples-list">
+            {(question.testCases || question.examples).slice(0, 2).map((testCase, i) => (
+              <div key={i} className="premium-example-item">
+                <div className="premium-example-label">Sample {i + 1}</div>
+                <div className="premium-example-content">
+                  <div className="premium-io-group">
+                    <span className="premium-io-label">Input</span>
+                    <div className="premium-io-code">{testCase.input}</div>
+                  </div>
+                  <div className="premium-io-group">
+                    <span className="premium-io-label">Output</span>
+                    <div className="premium-io-code output">{testCase.output}</div>
+                  </div>
+                  {testCase.explanation && (
+                    <div className="premium-io-group">
+                      <span className="premium-io-label">Explanation</span>
+                      <div className="premium-description" style={{ fontSize: '0.9rem' }}>
+                        {testCase.explanation}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          {(question.testCases || question.examples).length > 2 && (
+            <p style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', marginTop: '0.5rem' }}>
+              +{(question.testCases || question.examples).length - 2} more test cases (hidden when you run the code)
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Code Editor */}
       <CodeEditor

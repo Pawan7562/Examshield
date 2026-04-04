@@ -38,7 +38,6 @@ import {
   Trash2
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
-import { questionDatabase } from '../../data/questionDatabase';
 
 const AIQuestionGenerator = () => {
   const [mode, setMode] = useState('partial'); // 'partial' or 'full'
@@ -173,76 +172,23 @@ const AIQuestionGenerator = () => {
         return;
       }
 
-      // Helper to generate a complete, professional, HTML-styled problem statement
-      const generateFullProblemStatement = (q) => {
-        let fullHTML = `<div class="pro-problem-container">`;
-        
-        // Main Task
-        fullHTML += `<p class="pro-task">${q.description || q.title}</p>`;
-        
-        // Constraints
-        if (q.constraints && q.constraints.length > 0) {
-          fullHTML += `<div class="pro-section"><h4 class="pro-section-title">Constraints</h4><ul class="pro-list">`;
-          if (Array.isArray(q.constraints)) {
-            q.constraints.forEach(c => {
-              fullHTML += `<li class="pro-list-item">${c}</li>`;
-            });
-          } else {
-            fullHTML += `<li class="pro-list-item">${q.constraints}</li>`;
-          }
-          fullHTML += `</ul></div>`;
-        }
-        
-        // Examples
-        if (q.examples && q.examples.length > 0) {
-          fullHTML += `<div class="pro-section"><h4 class="pro-section-title">Sample Test Cases</h4>`;
-          q.examples.forEach((ex, idx) => {
-            fullHTML += `
-              <div class="pro-example-card">
-                <div class="pro-example-header">Example ${idx + 1}</div>
-                <div class="pro-example-body">
-                  <div class="pro-io-row"><strong>Input:</strong> <code>${ex.input}</code></div>
-                  <div class="pro-io-row"><strong>Output:</strong> <code>${ex.output}</code></div>
-                  ${ex.explanation ? `<div class="pro-explanation"><strong>Explanation:</strong> ${ex.explanation}</div>` : ''}
-                </div>
-              </div>
-            `;
-          });
-          fullHTML += `</div>`;
-        }
-        
-        // Note Section (if any)
-        if (q.solution) {
-          fullHTML += `
-            <div class="pro-section pro-note">
-              <h4 class="pro-section-title">Note / Approach</h4>
-              <p>${q.solution}</p>
-            </div>
-          `;
-        }
-        
-        fullHTML += `</div>`;
-        return fullHTML;
-      };
-
       // Process and transform questions
       const processedQuestions = allQuestions.map((q, index) => {
-        const fullHTML = generateFullProblemStatement(q);
         const transformedQuestion = {
-          id: q.id || `ai_${Date.now()}_${index}`,
+          id: `ai_${Date.now()}_${index}`,
           type: 'coding',
-          questionText: fullHTML, // Main HTML description
-          question_text: fullHTML, // Student view compatibility
+          questionText: q.description || q.title, // Backward compatibility
+          question_text: q.description || q.title, // Student view compatibility
           title: q.title,
-          description: fullHTML, // Admin preview compatibility
+          description: q.description || q.title, // Admin preview compatibility
           marks: q.difficulty === 'easy' ? 5 : q.difficulty === 'medium' ? 10 : 15,
           difficulty: q.difficulty,
-          source: sources.find(s => s.id === q.source) || { name: q.source, id: q.source, icon: Globe },
+          source: sources.find(s => s.id === q.source),
           tags: q.tags || [],
           timeComplexity: q.timeComplexity,
           spaceComplexity: q.spaceComplexity,
-          examples: q.examples || [], 
-          testCases: q.examples || [], 
+          examples: q.examples || [], // Backward compatibility
+          testCases: q.examples || [], // Student view compatibility
           constraints: q.constraints || [],
           solution: q.solution,
           generatedAt: new Date().toISOString(),
@@ -292,7 +238,7 @@ const AIQuestionGenerator = () => {
 
   const fetchQuestionsFromSource = async (source, topic, difficulty, count) => {
     // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
     
     // Comprehensive question database for production-level generation
     const questionDatabase = {
@@ -300,14 +246,46 @@ const AIQuestionGenerator = () => {
         easy: [
           {
             title: "Two Sum",
-            description: "Given an array of integers <code>nums</code> and an integer <code>target</code>, return indices of the two numbers such that they add up to <code>target</code>.<br/><br/>You may assume that each input would have <b>exactly one solution</b>, and you may not use the same element twice.",
+            description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
             tags: ["array", "hash-table"],
             timeComplexity: "O(n)",
             spaceComplexity: "O(n)",
-            examples: [
-              { input: "nums = [2,7,11,15], target = 9", output: "[0,1]", explanation: "Because nums[0] + nums[1] == 9, we return [0, 1]." }
-            ],
-            constraints: ["2 <= nums.length <= 10^4", "-10^9 <= nums[i] <= 10^9", "-10^9 <= target <= 10^9", "Only one valid answer exists."],
+            examples: [{ input: "[2,7,11,15], target=9", output: "[0,1]" }],
+            constraints: ["2 <= nums.length <= 10^4"],
+            solution: "Use a hash map to store complement values"
+          },
+          {
+            title: "Palindrome Number",
+            description: "Given an integer x, return true if x is a palindrome, and false otherwise.",
+            tags: ["math", "two-pointers"],
+            timeComplexity: "O(log n)",
+            spaceComplexity: "O(1)",
+            examples: [{ input: "121", output: "true" }],
+            constraints: ["-2^31 <= x <= 2^31 - 1"],
+            solution: "Reverse half of the number and compare"
+          },
+          {
+            title: "Roman to Integer",
+            description: "Given a roman numeral, convert it to an integer.",
+            tags: ["hash-table", "math"],
+            timeComplexity: "O(n)",
+            spaceComplexity: "O(1)",
+            examples: [{ input: "III", output: "3" }],
+            constraints: ["1 <= s.length <= 15"],
+            solution: "Map symbols to values and process from left to right"
+          },
+          {
+            title: "Longest Common Prefix",
+            description: "Find the longest common prefix string amongst an array of strings.",
+            tags: ["string", "trie"],
+            timeComplexity: "O(S)",
+            spaceComplexity: "O(1)",
+            examples: [{ input: "[\"flower\",\"flow\",\"flight\"]", output: "\"fl\"" }],
+            constraints: ["1 <= strs.length <= 200"],
+            solution: "Compare characters vertically across all strings"
+          },
+          {
+            title: "Valid Parentheses",
             description: "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
             tags: ["stack", "string"],
             timeComplexity: "O(n)",
@@ -2709,12 +2687,67 @@ const AIQuestionGenerator = () => {
               </div>
               
               <div className="premium-modal-scroll-area">
-                {/* Main Content Section using dangerouslySetInnerHTML for Real Platform Fidelity */}
+                {/* Description Section */}
                 <div className="premium-section">
-                  <div 
-                    className="premium-description"
-                    dangerouslySetInnerHTML={{ __html: previewQuestion.description }}
-                  />
+                  <div className="premium-section-header">
+                    <h4>Problem Statement</h4>
+                    <div className="premium-section-line"></div>
+                  </div>
+                  <div className="premium-description">
+                    {previewQuestion.description || previewQuestion.question_text}
+                  </div>
+                </div>
+                
+                {/* Constraints Section */}
+                {previewQuestion.constraints && (
+                  <div className="premium-section">
+                    <div className="premium-section-header">
+                      <h4>Constraints</h4>
+                      <div className="premium-section-line"></div>
+                    </div>
+                    <ul className="premium-constraints-list">
+                      {Array.isArray(previewQuestion.constraints) ? (
+                        previewQuestion.constraints.map((constraint, index) => (
+                          <li key={index}>{constraint}</li>
+                        ))
+                      ) : (
+                        <li>{previewQuestion.constraints}</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+                
+                {/* Examples Section */}
+                <div className="premium-section">
+                  <div className="premium-section-header">
+                    <h4>Examples</h4>
+                    <div className="premium-section-line"></div>
+                  </div>
+                  <div className="premium-examples-list">
+                    {(previewQuestion.examples || previewQuestion.testCases || []).map((example, index) => (
+                      <div key={index} className="premium-example-item">
+                        <div className="premium-example-label">Example {index + 1}</div>
+                        <div className="premium-example-content">
+                          <div className="premium-io-group">
+                            <span className="premium-io-label">Input</span>
+                            <div className="premium-io-code">{example.input}</div>
+                          </div>
+                          <div className="premium-io-group">
+                            <span className="premium-io-label">Output</span>
+                            <div className="premium-io-code output">{example.output}</div>
+                          </div>
+                          {example.explanation && (
+                            <div className="premium-io-group">
+                              <span className="premium-io-label">Explanation</span>
+                              <div className="premium-description" style={{ fontSize: '0.9rem', padding: '0 0.5rem' }}>
+                                {example.explanation}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 
                 {/* Solution/Approach Section */}
