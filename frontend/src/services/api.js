@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 
 // Use direct backend URL for both development and production
 const developmentApiBaseURL = 'http://localhost:5000/api';  // Direct URL in development
-const productionApiBaseURL = '/api';  // Relative URL for Vercel deployment
+const productionApiBaseURL = '/_/backend/api';  // Experimental services route for Vercel
 
 const API_BASE_URL =
   process.env.REACT_APP_API_URL ||

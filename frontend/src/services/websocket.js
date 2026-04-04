@@ -29,7 +29,7 @@ class WebSocketService {
         // Connect to backend WebSocket server with professional configuration
         const wsUrl = process.env.NODE_ENV === 'development' 
           ? 'http://localhost:5000' 
-          : window.location.origin; // Use current domain in production
+          : window.location.origin + '/_/backend'; // Use experimental services route in production
         
         this.socket = io(wsUrl, {
           auth: {
