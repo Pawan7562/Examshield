@@ -24,11 +24,11 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "GENERATE_SOURCEMAP=false react-scripts build --max-old-space-size=8192",
+    "build": "react-scripts build --max-old-space-size=8192",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "vercel-build": "GENERATE_SOURCEMAP=false npm run build",
-    "build:prod": "NODE_ENV=production npm run build"
+    "vercel-build": "npm run build",
+    "build:prod": "npm run build"
   },
   "homepage": "https://examshield.vercel.app",
   "eslintConfig": {
