@@ -41,6 +41,7 @@
     "NODE_ENV": "production",
     "NODE_OPTIONS": "--max-old-space-size=8192",
     "GENERATE_SOURCEMAP": "false",
+    "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
     "CI": "true"
   }
 }
