@@ -1,7 +1,12 @@
 {
   "name": "examshield-frontend",
   "version": "1.0.0",
-  "private": true,`n  "browser": { "fs": false, "path": false, "os": false },
+  "private": true,
+  "browser": {
+    "fs": false,
+    "path": false,
+    "os": false
+  },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
     "axios": "^1.6.5",
