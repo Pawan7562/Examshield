@@ -1,7 +1,39 @@
 {
   "version": 2,
   "name": "examshield",
-  "buildCommand": "cd frontend && npm install && npm run build",
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    },
+    {
+      "src": "backend/package.json",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/backend/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "backend/**/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "installCommand": "cd frontend && npm install && cd ../backend && npm install",
+  "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/build",
   "framework": "create-react-app"
 }

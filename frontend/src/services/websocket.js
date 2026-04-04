@@ -27,7 +27,11 @@ class WebSocketService {
         console.log('🔗 Attempting WebSocket connection to backend...');
 
         // Connect to backend WebSocket server with professional configuration
-        this.socket = io('http://localhost:5000', {
+        const wsUrl = process.env.NODE_ENV === 'development' 
+          ? 'http://localhost:5000' 
+          : window.location.origin; // Use current domain in production
+        
+        this.socket = io(wsUrl, {
           auth: {
             token: token
           },
