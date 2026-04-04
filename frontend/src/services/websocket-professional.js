@@ -1,4 +1,4 @@
-// src/services/websocket.js - Professional WebSocket service with robust error handling
+// Professional WebSocket Service with Robust Error Handling
 import io from 'socket.io-client';
 
 class WebSocketService {
@@ -145,6 +145,8 @@ class WebSocketService {
       this.socket.emit(event, data);
     } else {
       console.warn('⚠️ WebSocket not connected, cannot emit:', event);
+      // Optionally queue the event for later
+      this.queueEvent(event, data);
     }
   }
 
@@ -157,6 +159,24 @@ class WebSocketService {
   off(event, callback) {
     if (this.socket) {
       this.socket.off(event, callback);
+    }
+  }
+
+  queueEvent(event, data) {
+    // Simple event queuing for when connection is lost
+    if (!this.eventQueue) {
+      this.eventQueue = [];
+    }
+    this.eventQueue.push({ event, data, timestamp: Date.now() });
+  }
+
+  // Process queued events when reconnected
+  processQueuedEvents() {
+    if (this.eventQueue && this.eventQueue.length > 0) {
+      this.eventQueue.forEach(({ event, data }) => {
+        this.emit(event, data);
+      });
+      this.eventQueue = [];
     }
   }
 }
