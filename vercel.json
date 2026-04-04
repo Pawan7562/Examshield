@@ -22,7 +22,10 @@
     },
     {
       "src": "backend/package.json",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "runtime": "nodejs18.x"
+      }
     }
   ],
   "routes": [
@@ -41,11 +44,6 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  },
-  "functions": {
-    "backend/**/*.js": {
-      "runtime": "nodejs18.x"
-    }
   },
   "installCommand": "cd frontend && npm install && cd ../backend && npm install",
   "buildCommand": "cd frontend && npm run build",
