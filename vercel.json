@@ -1,52 +1,20 @@
 {
   "version": 2,
   "name": "examshield",
-  "functions": {
-    "backend/**/*.js": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 30
+  "experimentalServices": {
+    "frontend": {
+      "entrypoint": "frontend",
+      "routePrefix": "/",
+      "framework": "create-react-app"
+    },
+    "backend": {
+      "entrypoint": "backend",
+      "routePrefix": "/_/backend"
     }
   },
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build",
-        "buildCommand": "npm run build",
-        "installCommand": "npm ci --production"
-      }
-    },
-    {
-      "src": "backend/package.json",
-      "use": "@vercel/node",
-      "config": {
-        "runtime": "nodejs18.x",
-        "maxLambdaSize": "15mb"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/_/backend/(.*)",
-      "dest": "/backend/$1"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/_/backend/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/$1"
-    }
-  ],
   "env": {
     "NODE_ENV": "production",
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "CI": "true"
-  },
-  "installCommand": "cd frontend && npm ci --production",
-  "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/build",
-  "framework": "create-react-app"
+  }
 }
