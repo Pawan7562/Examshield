@@ -24,7 +24,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build --max-old-space-size=8192",
+    "build": "react-scripts build --max-old-space-size=7168",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "vercel-build": "npm run build",
