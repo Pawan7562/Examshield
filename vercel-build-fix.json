@@ -19,7 +19,7 @@
       "config": {
         "distDir": "build",
         "buildCommand": "npm run build",
-        "installCommand": "npm ci --production"
+        "installCommand": "npm install --production --no-optional"
       }
     },
     {
@@ -49,6 +49,12 @@
     "NODE_ENV": "production",
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "CI": "true"
+  },
+  "functions": {
+    "backend/**/*.js": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 30
+    }
   },
   "installCommand": "cd frontend && npm ci --production",
   "buildCommand": "cd frontend && npm run build",
