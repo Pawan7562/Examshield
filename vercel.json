@@ -42,6 +42,6 @@
     "NODE_OPTIONS": "--max-old-space-size=6144",
     "GENERATE_SOURCEMAP": "false",
     "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-    "CI": "false"
+    "CI": "false",`n    "DISABLE_ESLINT_PLUGIN": "true",`n    "TERSER_PARALLEL": "false"
   }
 }

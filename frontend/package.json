@@ -2,7 +2,7 @@
   "name": "examshield-frontend",
   "version": "1.0.0",
   "private": true,
-  "browser": {
+  "scripts": {`n    "postinstall": "echo \"Stubbing fs for face-api.js\" && sed -i 's/require('fs')/null/g' node_modules/face-api.js/build/commonjs/env/node/index.js || true",`n    "browser": {
     "fs": false,
     "path": false,
     "os": false
