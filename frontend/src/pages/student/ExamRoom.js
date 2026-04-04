@@ -96,260 +96,378 @@ export default function ExamRoom() {
     };
   }, []);
 
-  // Setup proctoring
-  const reportViolation = useCallback(async (type, description) => {
-    if (!session || submitted) return;
-    try {
-      const res = await studentAPI.reportViolation({
+  // ─── Answer Management ──────────────────────────────────────────────────
+  const handleAnswer = (questionId, answer) => {
+    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+    
+    // Save to server (optimistic)
+    const question = questions.find(q => q.id === questionId);
+    if (!question) return;
+
+    studentAPI.saveAnswer(examId, {
+      sessionId: session.id,
+      questionId,
+      ...(question.type === 'mcq' ? { selectedOption: answer } : 
+         question.type === 'coding' ? { codeSubmission: answer } : 
+         { answerText: answer }),
+    }).catch(() => {});
+  };
+
+  const handleSubmit = async (autoSubmit = false, retryCount = 0) => {
+    if (submitted) {
+      console.log('Exam already submitted, ignoring duplicate submission');
+      return;
+    }
+    
+    if (!autoSubmit && !window.confirm('Submit exam? You cannot change answers after submission.')) return;
+
+    console.log(autoSubmit ? '📤 Auto-submitting exam...' : '📤 Submitting exam...');
+    setSubmitted(true);
+    if (autoSaveRef.current) clearInterval(autoSaveRef.current);
+
+  try {
+      // Final save all answers before submission (defensive)
+      console.log('💾 Saving final answers (defensive)...');
+      try {
+        const savePromises = Object.entries(answers).map(([questionId, answer]) => {
+          const question = questions.find(q => q.id === questionId);
+          if (!question || !answer) return Promise.resolve();
+          
+          return studentAPI.saveAnswer(examId, {
+            sessionId: session.id,
+            questionId,
+            ...(question.type === 'mcq' ? { selectedOption: answer } : 
+               question.type === 'coding' ? { codeSubmission: answer } : 
+               { answerText: answer }),
+          });
+        });
+        
+        // Use allSettled so one failed save doesn't block final submission
+        await Promise.allSettled(savePromises);
+        console.log('✅ Final answer save attempted');
+      } catch (saveAllErr) {
+        console.warn('⚠️ Some final answers could not be saved, but proceeding with submission:', saveAllErr);
+      }
+
+      // Prepare submission data
+      const submissionData = {
         sessionId: session.id,
+        autoSubmit: autoSubmit,
+        violationCount: violationCount,
+        terminationReason: autoSubmit ? 'max_violations_reached' : 'manual_submission',
+        submissionTime: new Date().toISOString(),
+        answersCount: Object.keys(answers).filter(k => answers[k]).length
+      };
+
+      // Submit exam to backend with retry logic
+      console.log('📤 Submitting exam to backend...');
+      
+      let res;
+      try {
+        res = await studentAPI.submitExam(examId, submissionData);
+      } catch (fetchError) {
+        console.error('❌ Network or Server error during submission:', fetchError);
+        
+        // Retry logic for network errors
+        if (retryCount < 2 && autoSubmit) {
+          console.log(`🔄 Retrying auto-submission (${retryCount + 1}/2)...`);
+          toast.loading(`Auto-submitting... Retry ${retryCount + 1}/2`, { id: 'submit-retry' });
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          setSubmitted(false);
+          return handleSubmit(autoSubmit, retryCount + 1);
+        }
+        
+        // Extract exact server message if available
+        const serverMsg = fetchError.response?.data?.message || fetchError.error || fetchError.message;
+        throw new Error(serverMsg || 'Server error: Unable to submit exam');
+      }
+
+      // Check if response is valid
+      if (!res || !res.data) {
+        throw new Error('Invalid response from server');
+      }
+
+      console.log('✅ Exam submitted successfully:', res.data);
+      setResult(res.data);
+      setPhase('submitted');
+      
+      // Notify backend via socket
+      socketRef.current?.emit('exam-submitted', { 
+        sessionId: session.id, 
+        examId,
+        autoSubmit,
+        violationCount,
+        submissionTime: new Date().toISOString()
+      });
+      
+      toast.success(res.message || 'Exam submitted successfully!');
+
+      // Exit full screen logic...
+      const exitFullScreen = () => {
+        try {
+          if (document.fullscreenElement || document.webkitFullscreenElement) {
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+          }
+        } catch (e) {}
+      };
+      setTimeout(exitFullScreen, 1000);
+
+    } catch (err) {
+      console.error('❌ [PROFESSIONAL] Exam submission failure:', err);
+      
+      // Extract the most specific message from the server response
+      const serverMessage = err.response?.data?.message || err.message;
+      const errorMessage = serverMessage || 'An unexpected error occurred. Your answers are saved locally.';
+      
+      toast.error(errorMessage, { 
+        duration: 8000,
+        id: 'submit-error' 
+      });
+      
+      // Industrial-strength local backup
+      try {
+        const backupKey = `backup_exam_${examId}_${Date.now()}`;
+        localStorage.setItem(backupKey, JSON.stringify({
+          answers,
+          sessionId: session?.id,
+          timestamp: new Date().toISOString()
+        }));
+        console.log(`💾 [PROFESSIONAL] Local backup created: ${backupKey}`);
+      } catch (e) {
+        console.error('Failed to create local backup:', e);
+      }
+      
+      setSubmitted(false);
+    }
+  };
+
+  // ─── Violation Handling (Ref-based to avoid stale closures) ──────────────
+
+  // Refs to hold the latest versions of functions, avoiding stale closures
+  const handleSubmitRef = useRef(handleSubmit);
+  handleSubmitRef.current = handleSubmit;
+
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+
+  const submittedRef = useRef(submitted);
+  submittedRef.current = submitted;
+
+  // Track last violation time per type for cooldowns
+  const lastViolationTimeRef = useRef({});
+
+  // Shared handler for backend violation responses — updates UI state
+  const handleViolationResponse = useCallback((response) => {
+    if (!response) return;
+    // Extract actual payload whether wrapped in response.data or bare
+    const data = response.data || response;
+    const { message, violationCount: count, autoTerminate } = data;
+    
+    console.log(`📊 [PROCTORING] Backend Response: count=${count}, terminate=${autoTerminate}, msg="${message}"`);
+    setViolationCount(count || 0);
+    setWarningMsg(message || '');
+
+    if (autoTerminate) {
+      console.error('🚨 [PROCTORING] EXAM AUTO-TERMINATED BY SERVER');
+      toast.error('🚨 Exam terminated due to violations!', { duration: 8000, id: 'exam-terminated' });
+      setWarningMsg('🚨 EXAM TERMINATED: Your exam is being submitted due to policy violations.');
+      setTimeout(() => {
+        if (!submittedRef.current) {
+          handleSubmitRef.current(true);
+        }
+      }, 2000);
+    } else if (message) {
+      toast.error(message, { duration: 4000 });
+    }
+  }, []); // No deps — uses refs for latest values
+
+  // Core violation reporting function — sends to backend
+  const reportViolation = useCallback(async (type, description) => {
+    if (!sessionRef.current || submittedRef.current) {
+      console.log(`⏭️ [PROCTORING] Skipping violation (no session or submitted): ${type}`);
+      return;
+    }
+
+    // Per-type cooldown: 3 seconds between same-type violations
+    const now = Date.now();
+    const cooldown = 3000;
+    if (lastViolationTimeRef.current[type] && (now - lastViolationTimeRef.current[type]) < cooldown) {
+      console.log(`⏭️ [PROCTORING] Cooldown active for ${type}, skipping`);
+      return;
+    }
+    lastViolationTimeRef.current[type] = now;
+
+    try {
+      console.log(`📡 [PROCTORING] Reporting violation: ${type} — ${description}`);
+      const res = await studentAPI.reportViolation({
+        sessionId: sessionRef.current.id,
         examId,
         type,
         description,
       });
 
-      const { action, message, violationCount: count, autoTerminate } = res.data;
-      setViolationCount(count);
-      setWarningMsg(message);
+      // Update UI from backend response
+      if (res?.data) {
+        handleViolationResponse(res.data);
 
-      // Broadcast to admin
-      socketRef.current?.emit('violation', {
-        sessionId: session.id,
-        examId,
-        studentId: session.student_id,
-        type,
-        severity: action === 'terminate' ? 'critical' : 'warning',
-      });
-
-      if (autoTerminate) {
-        toast.error('Exam terminated due to violations!');
-        setTimeout(() => navigate('/student/exams'), 2000);
-      } else {
-        toast.error(message, { duration: 3000 });
+        // Broadcast to admin via socket
+        socketRef.current?.emit('violation', {
+          sessionId: sessionRef.current.id,
+          examId,
+          studentId: sessionRef.current.student_id,
+          type,
+          severity: res.data.autoTerminate ? 'critical' : 'warning',
+        });
       }
     } catch (error) {
-      console.error('Violation reporting failed:', error);
-    }
-  }, [session, submitted, examId, navigate]);
-
-  // Debounced violation reporting to prevent spam
-  const debouncedReportViolation = useRef(
-    debounce((type, description) => reportViolation(type, description), 2000)
-  ).current;
-
-  // Professional Tab Switching Detection System
-  useEffect(() => {
-    console.log('🎯 TAB SWITCHING DETECTION INITIALIZING:', {
-      phase: phase,
-      isProctored: examData?.is_proctored,
-      submitted: submitted
-    });
-    
-    if (phase !== 'exam' || !examData?.is_proctored) {
-      console.log('❌ Tab switching detection disabled:', {
-        reason: phase !== 'exam' ? 'Not in exam phase' : 'Exam not proctored',
-        phase: phase,
-        isProctored: examData?.is_proctored
+      console.error('❌ [PROCTORING] Violation report failed:', error.response?.data || error.message);
+      
+      // Even if backend fails, still increment local count as fallback
+      setViolationCount(prev => {
+        const newCount = prev + 1;
+        const maxV = examData?.max_violations || 3;
+        setWarningMsg(`⚠️ Warning ${newCount}/${maxV}: ${description}`);
+        toast.error(`⚠️ Warning ${newCount}/${maxV}: ${description}`, { duration: 4000 });
+        
+        if (newCount >= maxV && !submittedRef.current) {
+          setWarningMsg('🚨 EXAM TERMINATED: Maximum violations reached.');
+          setTimeout(() => handleSubmitRef.current(true), 2000);
+        }
+        return newCount;
       });
-      return;
     }
+  }, [examId, handleViolationResponse, examData]);
 
-    console.log('✅ Tab switching detection ENABLED');
+  // Ref to keep reportViolation always up-to-date for event listeners
+  const reportViolationRef = useRef(reportViolation);
+  reportViolationRef.current = reportViolation;
+
+  // ─── Professional Proctoring System: Full-Screen + Tab Detection ──────────
+  useEffect(() => {
+    if (phase !== 'exam') return;
+
+    console.log('🛡️ [PROCTORING] Full-screen + tab-switching detection ACTIVE');
     
-    let violationCount = 0;
-    const maxViolations = 3;
-    let lastViolationTime = 0;
-    let warningTimeoutId = null;
     let isTabSwitching = false;
 
-    // Professional violation handler with smooth auto-submit
-    const handleViolation = (type, description) => {
-      console.log('🚨 VIOLATION HANDLER CALLED:', {
-        type: type,
-        description: description,
-        submitted: submitted,
-        currentTime: Date.now(),
-        lastViolationTime: lastViolationTime
-      });
+    // ── Full-Screen Exit Detection ──
+    const handleFullscreenChange = () => {
+      const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
       
-      if (submitted) {
-        console.log('❌ Violation ignored - exam already submitted');
-        return;
-      }
-
-      const currentTime = Date.now();
-      
-      // Prevent duplicate violations within 2 seconds
-      if (currentTime - lastViolationTime < 2000) {
-        console.log('❌ Violation ignored - duplicate within 2 seconds');
-        return;
-      }
-      
-      lastViolationTime = currentTime;
-      violationCount++;
-      
-      console.log('📊 VIOLATION COUNT:', violationCount, '/', maxViolations);
-      
-      // Professional violation messages
-      const violationMessages = {
-        'tab_switch': `⚠️ Warning ${violationCount}/3: Please remain focused on your exam. Tab switching is not allowed.`,
-        'window_focus_lost': `⚠️ Warning ${violationCount}/3: Please keep your exam window active and focused.`,
-        'context_menu': `⚠️ Warning ${violationCount}/3: Right-click is disabled during the exam.`,
-        'keyboard_shortcut': `⚠️ Warning ${violationCount}/3: Keyboard shortcuts are disabled during the exam.`,
-        'mouse_leave_screen': `⚠️ Warning ${violationCount}/3: Please keep your mouse within the exam window.`
-      };
-
-      const message = violationMessages[type] || `⚠️ Warning ${violationCount}/3: ${description}`;
-      
-      console.log(`🚨 Exam Violation ${violationCount}/3: ${type} - ${description}`);
-      console.log('📝 Setting warning message:', message);
-      setWarningMsg(message);
-
-      // Report to backend with clean data
-      console.log('📡 Reporting violation to backend...');
-      reportViolation(type, description);
-
-      // Clear any existing warning timeout
-      if (warningTimeoutId) {
-        clearTimeout(warningTimeoutId);
-      }
-
-      // Auto-terminate after max violations
-      if (violationCount >= maxViolations) {
-        console.error('🚨 EXAM TERMINATED: Maximum violations (3) reached');
-        setWarningMsg('🚨 EXAM TERMINATED: You have reached the maximum number of violations. Your exam will be submitted automatically.');
+      if (!isFullscreen && !submittedRef.current) {
+        console.log('🚨 [PROCTORING] Full-screen exited — counting violation');
+        reportViolationRef.current('fullscreen_exit', 'Student exited full-screen mode');
         
-        // Auto-submit immediately with professional handling
+        // Re-request full-screen after a short delay
         setTimeout(() => {
-          if (!submitted) {
-            console.log('📤 Auto-submitting exam due to maximum violations...');
-            handleSubmit(true);
+          if (!submittedRef.current) {
+            const el = document.documentElement;
+            try {
+              if (el.requestFullscreen) {
+                el.requestFullscreen().catch(() => {});
+              } else if (el.webkitRequestFullscreen) {
+                el.webkitRequestFullscreen();
+              }
+            } catch (e) {}
           }
-        }, 2000);
-      } else {
-        // Clear warning after 4 seconds if no more violations
-        console.log('⏰ Setting warning timeout for 4 seconds');
-        warningTimeoutId = setTimeout(() => {
-          console.log('🧹 Clearing warning message');
-          setWarningMsg('');
-        }, 4000);
+        }, 1000);
       }
     };
 
-    // Smooth tab switching detection
+    // ── Tab Switch Detection ──
     const handleVisibilityChange = () => {
-      console.log('🔍 Visibility change detected:', {
-        documentHidden: document.hidden,
-        phase: phase,
-        submitted: submitted,
-        isTabSwitching: isTabSwitching,
-        isProctored: examData?.is_proctored
-      });
-      
-      if (document.hidden && !isTabSwitching && phase === 'exam' && !submitted && examData?.is_proctored) {
-        console.log('🚨 Tab switch detected - starting violation process');
+      if (document.hidden && !isTabSwitching && !submittedRef.current) {
         isTabSwitching = true;
-        
-        // Small delay to ensure it's a real tab switch
         setTimeout(() => {
           if (document.hidden) {
-            console.log('✅ Confirming tab switch violation');
-            handleViolation('tab_switch', 'Student switched to another tab or window');
-          } else {
-            console.log('❌ Tab switch cancelled - user returned quickly');
+            reportViolationRef.current('tab_switch', 'Student switched tabs/windows');
           }
           isTabSwitching = false;
         }, 500);
-      } else {
-        console.log('🔍 Visibility change ignored:', {
-          documentHidden: document.hidden,
-          isTabSwitching: isTabSwitching,
-          phase: phase,
-          submitted: submitted,
-          isProctored: examData?.is_proctored
-        });
       }
     };
 
-    // Professional window focus monitoring
+    // ── Window Focus ──
     const handleWindowFocus = () => {
-      // When window regains focus, clear any pending violations
-      if (warningTimeoutId && violationCount < maxViolations) {
-        clearTimeout(warningTimeoutId);
-        setWarningMsg('');
+      // Clear warning message 3 seconds after returning
+      if (!submittedRef.current) {
+        setTimeout(() => setWarningMsg(''), 3000);
       }
     };
 
-    // Context menu blocking with professional message
+    // ── Context Menu Blocking ──
     const handleContextMenu = (e) => {
-      if (phase === 'exam' && !submitted) {
+      if (!submittedRef.current) {
         e.preventDefault();
-        handleViolation('context_menu', 'Student attempted to access context menu');
+        reportViolationRef.current('context_menu', 'Right-click blocked');
         return false;
       }
     };
 
-    // Professional keyboard blocking
+    // ── Keyboard Shortcut Blocking ──
     const handleKeyDown = (e) => {
-      if (submitted) return;
+      if (submittedRef.current) return;
 
       const key = e.key.toLowerCase();
       const ctrlKey = e.ctrlKey || e.metaKey;
       const altKey = e.altKey;
 
-      // Only block specific dangerous combinations
       const dangerousCombos = [
         { ctrl: true, key: 'c', name: 'Copy' },
         { ctrl: true, key: 'v', name: 'Paste' },
         { ctrl: true, key: 'x', name: 'Cut' },
         { ctrl: true, key: 'a', name: 'Select All' },
+        { ctrl: true, key: 'u', name: 'View Source' },
+        { ctrl: true, key: 'i', name: 'DevTools' },
+        { ctrl: true, key: 's', name: 'Save Page' },
         { alt: true, key: 'tab', name: 'Alt+Tab' },
-        { key: 'f12', name: 'Developer Tools' },
-        { key: 'escape', name: 'Escape Key' }
+        { key: 'f12', name: 'DevTools' },
+        { key: 'escape', name: 'Escape' }
       ];
 
-      const isDangerous = dangerousCombos.some(combo => 
+      const matchedCombo = dangerousCombos.find(combo =>
         (combo.ctrl && ctrlKey && combo.key === key) ||
         (combo.alt && altKey && combo.key === key) ||
         (!combo.ctrl && !combo.alt && combo.key === key)
       );
 
-      if (isDangerous) {
+      if (matchedCombo) {
         e.preventDefault();
         e.stopPropagation();
         
-        const comboName = dangerousCombos.find(combo => 
-          (combo.ctrl && ctrlKey && combo.key === key) ||
-          (combo.alt && altKey && combo.key === key) ||
-          (!combo.ctrl && !combo.alt && combo.key === key)
-        ).name;
+        // Escape key: re-request fullscreen instead of counting violation
+        if (key === 'escape') {
+          const el = document.documentElement;
+          try {
+            if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+          } catch (err) {}
+          return false;
+        }
         
-        handleViolation('keyboard_shortcut', `Student attempted to use ${comboName}`);
+        reportViolationRef.current('keyboard_shortcut', `Blocked: ${matchedCombo.name}`);
         return false;
       }
     };
 
-    // Add only essential event listeners for smooth operation
-    console.log('📡 Setting up event listeners...');
+    // ── Register All Listeners ──
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleWindowFocus);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown, true);
-    console.log('✅ Event listeners setup complete');
 
-    // Cleanup function
+    // ── Cleanup ──
     return () => {
-      console.log('🧹 Cleaning up event listeners...');
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleWindowFocus);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown, true);
-      
-      if (warningTimeoutId) {
-        clearTimeout(warningTimeoutId);
-      }
-      console.log('✅ Cleanup complete');
     };
-  }, [phase, examData, submitted, reportViolation]);
+  }, [phase]); // Only re-run when phase changes — uses refs for everything else
 
   // Auto-save answers every 30 seconds
   useEffect(() => {
@@ -439,6 +557,18 @@ export default function ExamRoom() {
       // If we have basic data, proceed regardless of validation issues
       if (exam && sessionData) {
         console.log('✅ Basic data received, proceeding with exam start');
+        console.log('📋 Questions data received:', {
+          isArray: Array.isArray(questionsData),
+          length: questionsData?.length || 0,
+          firstQuestion: questionsData?.[0] ? {
+            id: questionsData[0].id,
+            type: questionsData[0].type,
+            hasText: !!questionsData[0].question_text,
+            textLength: questionsData[0].question_text?.length || 0,
+            hasOptions: !!questionsData[0].options,
+            optionsCount: questionsData[0].options?.length || 0
+          } : null
+        });
         
         // Set all data
         setExamData(exam);
@@ -446,6 +576,8 @@ export default function ExamRoom() {
         setQuestions(questionsData);
         setTimeRemaining(time || 3600); // Default to 1 hour
         setLoadingError(null);
+
+        console.log('🔄 State updated - Questions in state:', questionsData.length);
 
         // Restore saved answers
         const saved = {};
@@ -471,6 +603,23 @@ export default function ExamRoom() {
         toast.success('Exam started successfully!', { id: 'exam-start' });
         console.log('✅ Exam started successfully with', questionsData.length, 'questions');
         
+        // 🖥️ Request Full-Screen Mode after render
+        setTimeout(() => {
+          const el = document.documentElement;
+          try {
+            if (el.requestFullscreen) {
+              el.requestFullscreen().catch(err => console.warn('Fullscreen request denied:', err.message));
+            } else if (el.webkitRequestFullscreen) {
+              el.webkitRequestFullscreen();
+            } else if (el.msRequestFullscreen) {
+              el.msRequestFullscreen();
+            }
+            console.log('🖥️ Full-screen mode requested');
+          } catch (e) {
+            console.warn('Full-screen not available:', e.message);
+          }
+        }, 500);
+        
       } else {
         throw new Error('Required exam data not received');
       }
@@ -478,202 +627,16 @@ export default function ExamRoom() {
     } catch (error) {
       console.error('❌ Failed to start exam:', error);
       setIsStartingExam(false);
-      setLoadingError(error.message || 'Failed to start exam');
+      
+      const errorMessage = error.message || error.error || (typeof error === 'string' ? error : 'Failed to start exam');
+      setLoadingError(errorMessage);
       setPhase('key');
       
-      // Show error toast
-      toast.error(error.message || 'Failed to start exam. Please try again.', { 
+      // Update toast to error
+      toast.error(errorMessage, { 
         id: 'exam-start',
         duration: 5000 
       });
-    }
-  };
-
-  const handleAnswer = (questionId, value) => {
-    setAnswers(a => ({ ...a, [questionId]: value }));
-    // Save immediately
-    const question = questions.find(q => q.id === questionId);
-    if (!question || !session) return;
-    studentAPI.saveAnswer(examId, {
-      sessionId: session.id,
-      questionId,
-      ...(question.type === 'mcq' ? { selectedOption: value } : question.type === 'coding' ? { codeSubmission: value } : { answerText: value }),
-    }).catch(() => {});
-  };
-
-  const handleSubmit = async (autoSubmit = false, retryCount = 0) => {
-    if (submitted) {
-      console.log('Exam already submitted, ignoring duplicate submission');
-      return;
-    }
-    
-    if (!autoSubmit && !window.confirm('Submit exam? You cannot change answers after submission.')) return;
-
-    console.log(autoSubmit ? '📤 Auto-submitting exam...' : '📤 Submitting exam...');
-    setSubmitted(true);
-    clearInterval(autoSaveRef.current);
-
-    try {
-      // Final save all answers before submission
-      console.log('💾 Saving final answers...');
-      const savePromises = Object.entries(answers).map(([questionId, answer]) => {
-        const question = questions.find(q => q.id === questionId);
-        if (!question || !answer) return Promise.resolve();
-        
-        return studentAPI.saveAnswer(examId, {
-          sessionId: session.id,
-          questionId,
-          ...(question.type === 'mcq' ? { selectedOption: answer } : 
-            question.type === 'coding' ? { codeSubmission: answer } : 
-            { answerText: answer }),
-        });
-      });
-
-      // Wait for all saves to complete
-      await Promise.all(savePromises);
-      console.log('✅ All answers saved successfully');
-
-      // Prepare submission data
-      const submissionData = {
-        sessionId: session.id,
-        autoSubmit: autoSubmit,
-        violationCount: violationCount,
-        terminationReason: autoSubmit ? 'max_violations_reached' : 'manual_submission',
-        submissionTime: new Date().toISOString(),
-        answersCount: Object.keys(answers).filter(k => answers[k]).length
-      };
-
-      // Submit exam to backend with retry logic
-      console.log('📤 Submitting exam to backend...');
-      
-      let res;
-      try {
-        res = await studentAPI.submitExam(examId, submissionData);
-      } catch (fetchError) {
-        console.error('❌ Network error during submission:', fetchError);
-        
-        // Retry logic for network errors
-        if (retryCount < 3 && autoSubmit) {
-          console.log(`🔄 Retrying auto-submission (${retryCount + 1}/3)...`);
-          toast.loading(`Auto-submitting exam... Retry ${retryCount + 1}/3`);
-          
-          // Wait before retry with exponential backoff
-          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-          
-          // Reset submitted state for retry
-          setSubmitted(false);
-          
-          // Retry the submission
-          return handleSubmit(autoSubmit, retryCount + 1);
-        }
-        
-        throw new Error('Network error: Unable to connect to server');
-      }
-
-      // Check if response is valid
-      if (!res || !res.data) {
-        throw new Error('Invalid response from server');
-      }
-
-      console.log('✅ Exam submitted successfully:', res.data);
-      setResult(res.data);
-      setPhase('submitted');
-
-      // Notify backend with enhanced data
-      socketRef.current?.emit('exam-submitted', { 
-        sessionId: session.id, 
-        examId,
-        autoSubmit,
-        violationCount,
-        terminationReason: autoSubmit ? 'max_violations_reached' : 'manual_submission',
-        submissionTime: new Date().toISOString(),
-        answersCount: Object.keys(answers).filter(k => answers[k]).length
-      });
-      
-      toast.success(autoSubmit ? 'Exam auto-submitted due to violations!' : 'Exam submitted successfully!');
-
-      // Exit full screen and cleanup
-      const exitFullScreen = () => {
-        try {
-          // Check if document is in full screen mode before attempting to exit
-          if (document.fullscreenElement || 
-              document.webkitFullscreenElement || 
-              document.mozFullScreenElement || 
-              document.msFullscreenElement) {
-            
-            if (document.exitFullscreen) {
-              document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-              document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-              document.msExitFullscreen();
-            }
-          }
-        } catch (error) {
-          console.log('Exit full screen not needed or not possible:', error.message);
-        }
-      };
-
-      // Cleanup full screen event listeners
-      if (window.fullScreenCleanup && typeof window.fullScreenCleanup === 'function') {
-        try {
-          window.fullScreenCleanup();
-        } catch (error) {
-          console.log('Error during full screen cleanup:', error.message);
-        }
-        delete window.fullScreenCleanup;
-      }
-
-      // Exit full screen after a short delay
-      setTimeout(exitFullScreen, 1000);
-
-      // Redirect to results after showing submission message
-      setTimeout(() => {
-        if (autoSubmit) {
-          navigate('/student/exams'); // For auto-submit, go back to exams
-        }
-      }, 3000);
-
-    } catch (err) {
-      console.error('❌ Exam submission failed:', err);
-      
-      // Enhanced error handling with specific messages
-      let errorMessage = 'Submission failed! Please try again.';
-      
-      if (err.message.includes('Network error')) {
-        errorMessage = 'Network error! Please check your internet connection and try again.';
-      } else if (err.message.includes('Invalid response')) {
-        errorMessage = 'Server error! Please try again in a moment.';
-      } else if (err.message.includes('session')) {
-        errorMessage = 'Session expired! Please refresh the page and try again.';
-      } else if (autoSubmit) {
-        errorMessage = 'Auto-submission failed! Attempting to save your answers...';
-        
-        // For auto-submission failures, try to save answers locally
-        try {
-          localStorage.setItem(`exam_${examId}_answers`, JSON.stringify(answers));
-          localStorage.setItem(`exam_${examId}_session`, JSON.stringify({
-            sessionId: session.id,
-            violationCount: violationCount,
-            terminationReason: 'max_violations_reached',
-            timestamp: new Date().toISOString()
-          }));
-          errorMessage += ' Your answers have been saved locally.';
-        } catch (saveError) {
-          console.error('Failed to save answers locally:', saveError);
-        }
-      }
-      
-      toast.error(errorMessage);
-      
-      // Reset submitted state for manual retry (but not for auto-submission after max retries)
-      if (!autoSubmit || retryCount >= 3) {
-        setSubmitted(false);
-      } else {
-        // For auto-submission, try to continue without blocking
-        console.log('⚠️ Auto-submission failed, but exam will continue...');
-        setWarningMsg('Auto-submission failed, but your exam session is still active. Please submit manually when ready.');
-      }
     }
   };
 
@@ -873,18 +836,15 @@ export default function ExamRoom() {
           {timeRemaining > 0 && <Timer seconds={timeRemaining} onExpire={() => handleSubmit(true)} />}
         </div>
 
-        {/* Professional Proctoring */}
-        {examData?.is_proctored && (
+        {/* Professional Proctoring — Camera + Face Detection */}
+        {phase === 'exam' && (
           <ProfessionalProctoring 
             sessionId={session?.id}
             examId={examId}
             studentId={user?.id}
             currentQuestion={currentQ}
             totalQuestions={questions.length}
-            onViolation={(violationData) => {
-              setViolationCount(violationData.violationCount);
-              setWarningMsg(violationData.message);
-            }}
+            onViolation={handleViolationResponse}
           />
         )}
 

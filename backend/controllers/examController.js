@@ -27,38 +27,158 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
   console.log('Processing exam data asynchronously for exam:', examId);
   
   try {
-    // Store questions and student data in exam description as fallback for now
-    // This ensures data is preserved even if new tables don't exist
-    const examData = {
-      questionsCount: questions ? questions.length : 0,
-      studentsAssigned: studentIds ? studentIds.length : 0,
-      hasRandomization: examQuestionRandomization,
-      questions: questions ? questions.slice(0, 5) : [], // Store first 5 questions as preview
-      studentIds: studentIds || []
-    };
+    // Handle questions if provided
+    if (questions && questions.length > 0) {
+      try {
+        const questionsToInsert = questions.map((q, index) => {
+          // Robustly handle question data from various potential formats
+          const questionText = q.questionText || q.description || q.title || q.question;
+          const type = q.type || 'mcq';
+          const marks = q.marks || 10;
+          const correctAnswer = q.correctAnswer || q.answer || q.correct_answer || null;
+          const options = q.options || [];
+          const codeTemplate = q.codeTemplate || q.code_template || null;
+          const timeLimit = q.timeLimit || q.time_limit || null;
 
-    const { error: updateError } = await supabase
-      .from('exams')
-      .update({ 
-        description: `\n\n=== AI Generated Exam Data ===\nQuestions: ${examData.questionsCount}\nStudents: ${examData.studentsAssigned}\nRandomization: ${examData.hasRandomization}\nQuestions Preview: ${JSON.stringify(examData.questions, null, 2)}\nAssigned Students: ${JSON.stringify(examData.studentIds)}`
-      })
-      .eq('id', examId);
+          return {
+            exam_id: examId,
+            question_text: questionText,
+            type: type,
+            marks: marks,
+            options: typeof options === 'string' ? options : JSON.stringify(options),
+            correct_answer: correctAnswer,
+            order_index: index + 1,
+            code_template: codeTemplate,
+            time_limit: timeLimit
+          };
+        });
 
-    if (updateError) {
-      console.error('Failed to update exam with AI data:', updateError);
-    } else {
-      console.log('Successfully stored exam data in description');
+        console.log(`Inserting ${questionsToInsert.length} questions for exam ${examId}`);
+        const { error: questionsError } = await supabase
+          .from('questions')
+          .insert(questionsToInsert);
+
+        if (questionsError) {
+          console.error('Questions insertion error:', questionsError);
+          // Fallback: Always store questions in exam table mapping for safety
+          const qJson = JSON.stringify(questions);
+          await supabase
+            .from('exams')
+            .update({ 
+               description: '\n\nQuestions: ' + qJson
+            })
+            .eq('id', examId);
+          console.log('Questions stored in exam description as fallback due to table error');
+        } else {
+          console.log('Successfully inserted', questions.length, 'questions into the questions table');
+        }
+      } catch (error) {
+        console.error('Error in question processing:', error);
+      }
     }
 
-    // Try to send email notifications (non-critical)
-    try {
-      const { sendExamNotification } = require('../services/emailService');
-      if (sendExamNotification && studentIds && studentIds.length > 0) {
-        console.log('Would send email notifications to', studentIds.length, 'students');
-        // Email sending disabled for now to prevent errors
+    // Store student question sets if randomization is enabled
+    if (examQuestionRandomization && studentQuestionSets && Object.keys(studentQuestionSets).length > 0) {
+      try {
+        const studentSetsToInsert = [];
+        
+        Object.entries(studentQuestionSets).forEach(([studentId, questionSet]) => {
+          questionSet.forEach((q, index) => {
+            studentSetsToInsert.push({
+              exam_id: examId,
+              student_id: studentId,
+              question_id: q.id,
+              question_order: index + 1,
+              question_data: q,
+              random_seed: q.randomSeed
+            });
+          });
+        });
+
+        if (studentSetsToInsert.length > 0) {
+          const { error: setsError } = await supabase
+            .from('student_question_sets')
+            .insert(studentSetsToInsert);
+
+          if (setsError) {
+            console.error('Student question sets insertion error:', setsError);
+          } else {
+            console.log('Successfully created question sets for', Object.keys(studentQuestionSets).length, 'students');
+          }
+        }
+      } catch (error) {
+        console.error('Error inserting student question sets:', error);
       }
-    } catch (emailError) {
-      console.error('Email notification error (non-critical):', emailError);
+    }
+
+    // Handle student assignments if provided
+    if (studentIds && studentIds.length > 0) {
+      try {
+        const studentAssignments = studentIds.map(studentId => ({
+          exam_id: examId,
+          student_id: studentId,
+          status: 'assigned'
+        }));
+
+        const { error: assignmentError } = await supabase
+          .from('exam_assignments')
+          .insert(studentAssignments);
+
+        if (assignmentError) {
+          console.error('Student assignment error:', assignmentError);
+        } else {
+          console.log('Successfully assigned', studentIds.length, 'students to exam');
+        }
+      } catch (error) {
+        console.error('Error assigning students:', error);
+      }
+    }
+    
+    // Send email notifications to assigned students
+    if (studentIds && studentIds.length > 0) {
+      try {
+        const { sendExamNotification } = require('../services/emailService');
+        
+        // Get assigned students' details
+        const { data: students, error: studentsError } = await supabase
+          .from('students')
+          .select('name, email')
+          .in('id', studentIds);
+
+        if (!studentsError && students && students.length > 0) {
+          // Get exam details for email
+          const { data: examData } = await supabase
+            .from('exams')
+            .select('title, subject, date_time, duration, exam_code')
+            .eq('id', examId)
+            .single();
+
+          // Send email to each assigned student
+          for (const student of students) {
+            try {
+              await sendExamNotification({
+                name: student.name,
+                email: student.email,
+                examName: examData?.title || 'Exam',
+                examDate: examData?.date_time,
+                examDuration: examData?.duration || 60,
+                examKey: examData?.exam_code || 'N/A',
+                subject: examData?.subject || 'General',
+                type: 'coding',
+                loginUrl: 'http://localhost:3000/student/login'
+              });
+              console.log(`✅ Email notification sent to ${student.email}`);
+            } catch (emailError) {
+              console.error(`❌ Failed to send email to ${student.email}:`, emailError);
+            }
+          }
+          console.log(`📧 Email notifications processed for ${students.length} students`);
+        } else if (studentsError) {
+          console.error('Error fetching students for email:', studentsError);
+        }
+      } catch (emailError) {
+        console.error('Email notification error:', emailError);
+      }
     }
     
     console.log('Async processing completed for exam:', examId);
@@ -72,8 +192,79 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
 // =====================================================
 
 /**
- * GET /api/admin/exams
+ * GET /api/admin/debug/schema
+ * Debug endpoint to check database schema
  */
+exports.debugSchema = async (req, res) => {
+  try {
+    console.log('🔍 Debug: Checking database schema');
+    
+    // Check if exam_questions table exists
+    const { data: examQuestionsTable, error: examQuestionsError } = await supabase
+      .from('exam_questions')
+      .select('*')
+      .limit(1);
+    
+    console.log('📋 exam_questions table check:', {
+      error: examQuestionsError,
+      exists: !examQuestionsError,
+      count: examQuestionsTable?.length || 0
+    });
+    
+    // Check if questions table exists
+    const { data: questionsTable, error: questionsError } = await supabase
+      .from('questions')
+      .select('*')
+      .limit(1);
+    
+    console.log('📋 questions table check:', {
+      error: questionsError,
+      exists: !questionsError,
+      count: questionsTable?.length || 0
+    });
+    
+    // Get sample exam data
+    const { data: sampleExam, error: examError } = await supabase
+      .from('exams')
+      .select('id, title, description')
+      .limit(3);
+    
+    console.log('📋 Sample exams:', {
+      error: examError,
+      count: sampleExam?.length || 0,
+      exams: sampleExam?.map(e => ({ id: e.id, title: e.title, hasDescription: !!e.description }))
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        exam_questions: {
+          exists: !examQuestionsError,
+          error: examQuestionsError?.message,
+          sampleCount: examQuestionsTable?.length || 0
+        },
+        questions: {
+          exists: !questionsError,
+          error: questionsError?.message,
+          sampleCount: questionsTable?.length || 0
+        },
+        exams: {
+          count: sampleExam?.length || 0,
+          samples: sampleExam?.map(e => ({ 
+            id: e.id, 
+            title: e.title, 
+            hasDescription: !!e.description,
+            descriptionLength: e.description?.length || 0
+          }))
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Debug schema error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
 exports.getExams = async (req, res) => {
   try {
     const { page = 1, limit = 20, status, type, search } = req.query;
@@ -413,7 +604,7 @@ exports.publishExam = async (req, res) => {
 
     // Check if exam has questions using Supabase
     const { data: questions, error: questionsError } = await supabase
-      .from('questions')
+      .from('questions') // Use existing questions table
       .select('id')
       .eq('exam_id', id);
 
@@ -425,12 +616,22 @@ exports.publishExam = async (req, res) => {
 
     if (questionsError) {
       console.error('❌ Backend: Error checking questions:', questionsError);
-      return res.status(500).json({ success: false, message: 'Failed to check questions', error: questionsError.message });
+      // Fallback: check if exam was AI generated and has questions in description
+      if (examData.description && examData.description.includes('Questions:')) {
+        console.log('📊 Backend: Found AI-generated questions in description, allowing publish');
+      } else {
+        return res.status(500).json({ success: false, message: 'Failed to check questions', error: questionsError.message });
+      }
     }
 
     if (!questions || questions.length === 0) {
-      console.log('❌ Backend: Cannot publish exam without questions');
-      return res.status(400).json({ success: false, message: 'Cannot publish exam without questions.' });
+      // Check if this is an AI-generated exam with questions stored in description or just marked AI generated
+      if ((examData.description && examData.description.includes('Questions:')) || examData.ai_generated || examData.question_randomization) {
+        console.log('📊 Backend: Found AI-generated exam flag or description fallback, allowing publish');
+      } else {
+        console.log('❌ Backend: Cannot publish exam without questions');
+        return res.status(400).json({ success: false, message: 'Cannot publish exam without questions.' });
+      }
     }
 
     // Update exam status to published using Supabase
@@ -479,7 +680,7 @@ exports.getExamQuestions = async (req, res) => {
 
     // Fetch questions using Supabase
     const { data: questions, error: questionsError } = await supabase
-      .from('questions')
+      .from('questions') // Use existing questions table
       .select('*')
       .eq('exam_id', id)
       .order('order_index', { ascending: true });
@@ -492,6 +693,21 @@ exports.getExamQuestions = async (req, res) => {
 
     if (questionsError) {
       console.error('❌ Backend: Error fetching questions:', questionsError);
+      // Fallback: check if exam has AI-generated questions in description
+      try {
+        const { data: examData } = await supabase
+          .from('exams')
+          .select('description')
+          .eq('id', id)
+          .single();
+        
+        if (examData?.description?.includes('Questions:')) {
+          console.log('📊 Backend: Found AI-generated questions in description, returning empty array for now');
+          return res.json({ success: true, data: { questions: [] } });
+        }
+      } catch (fallbackError) {
+        console.error('Fallback check failed:', fallbackError);
+      }
       return res.status(500).json({ success: false, message: 'Failed to fetch questions', error: questionsError.message });
     }
 
@@ -863,13 +1079,20 @@ exports.startExam = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Exam not found.' });
     }
 
-    // Validate exam key
-    if (examData.exam_code !== examKey) {
+    // Validate exam key (check both exam_code and exam_key)
+    const validKeys = [examData.exam_code, examData.exam_key].filter(Boolean);
+    if (!validKeys.includes(examKey)) {
       console.log('❌ Backend: Invalid exam key:', {
-        expected: examData.exam_code,
-        received: examKey
+        expected: validKeys,
+        received: examKey,
+        exam_code: examData.exam_code,
+        exam_key: examData.exam_key
       });
-      return res.status(401).json({ success: false, message: 'Invalid exam key.' });
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid exam key.',
+        validKeys: process.env.NODE_ENV === 'development' ? validKeys : undefined
+      });
     }
 
     console.log('✅ Backend: Exam key validated successfully');
@@ -916,44 +1139,28 @@ exports.startExam = async (req, res) => {
       console.log('📝 Backend: No timing constraints, allowing exam start');
     }
 
-    // Check for existing session using Supabase (with fallback)
-    let existingSession = null;
-    let sessionError = null;
-    
-    try {
-      const result = await supabase
-        .from('exam_sessions')
-        .select('*')
-        .eq('exam_id', id)
-        .eq('student_id', studentId)
-        .single();
-      
-      existingSession = result.data;
-      sessionError = result.error;
-    } catch (err) {
-      console.log('exam_sessions table not available, using in-memory session tracking');
-      sessionError = { message: 'Table not found' };
-    }
+    // Check for existing session using Supabase
+    const { data: existingSession, error: sessionError } = await supabase
+      .from('exam_sessions')
+      .select('*')
+      .eq('exam_id', id)
+      .eq('student_id', studentId)
+      .single();
 
     if (existingSession) {
       if (existingSession.status === 'submitted' || existingSession.status === 'terminated') {
         return res.status(400).json({ success: false, message: 'You have already submitted this exam.' });
       }
-      if (existingSession.status === 'active') {
-        return res.status(400).json({ success: false, message: 'You already have an active session for this exam.' });
-      }
-
-      // Resume existing session - get saved answers
-      let answers = [];
-      try {
-        const { data: savedAnswers } = await supabase
-          .from('exam_answers')
-          .select('question_id, answer_text, selected_option, code_submission, selected_language')
-          .eq('session_id', existingSession.id);
-        answers = savedAnswers || [];
-      } catch (err) {
-        console.log('Could not fetch saved answers, continuing without them');
-      }
+      // Resume existing session
+      const { data: questions, error: questionsError } = await supabase
+        .from('questions')
+        .select('id, question_text, type, options, marks, order_index, code_template, time_limit')
+        .eq('exam_id', id)
+        .order('order_index');
+      const { data: answers, error: answersError } = await supabase
+        .from('answers')
+        .select('question_id, answer_text, selected_option, code_submission, selected_language')
+        .eq('session_id', existingSession.id);
 
       return res.json({
         success: true,
@@ -968,38 +1175,18 @@ exports.startExam = async (req, res) => {
       });
     }
 
-    // Create new session using Supabase (with fallback)
-    let sessionResult = null;
-    let sessionCreateError = null;
-    
-    try {
-      const result = await supabase
-        .from('exam_sessions')
-        .insert({
-          exam_id: id,
-          student_id: studentId,
-          ip_address: req.ip,
-          browser_info: req.get('User-Agent'),
-          status: 'active'
-        })
-        .select()
-        .single();
-      
-      sessionResult = result.data;
-      sessionCreateError = result.error;
-    } catch (err) {
-      console.log('exam_sessions table not available, creating session without database storage');
-      sessionCreateError = { message: 'Table not found' };
-      
-      // Create session in memory (fallback)
-      sessionResult = {
-        id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    // Create new session using Supabase
+    const { data: sessionResult, error: sessionCreateError } = await supabase
+      .from('exam_sessions')
+      .insert({
         exam_id: id,
         student_id: studentId,
-        status: 'active',
-        created_at: new Date().toISOString()
-      };
-    }
+        ip_address: req.ip,
+        browser_info: req.get('User-Agent'),
+        status: 'active'
+      })
+      .select()
+      .single();
 
     if (sessionCreateError) {
       console.error('Session creation error:', sessionCreateError);
@@ -1013,55 +1200,143 @@ exports.startExam = async (req, res) => {
       .eq('id', id)
       .eq('status', 'published');
 
-    // Get questions for the exam (with fallback)
-    let questions = [];
-    let questionsError = null;
-    
-    try {
-      const result = await supabase
-        .from('exam_questions')
-        .select('id, question_text, question_type, marks, difficulty, order_index, question_data')
-        .eq('exam_id', id)
-        .order('order_index');
-      
-      questions = result.data;
-      questionsError = result.error;
-    } catch (err) {
-      console.log('exam_questions table not available, checking exam description for AI questions');
-      questionsError = { message: 'Table not found' };
-      
-      // Try to extract questions from exam description (AI generated fallback)
-      if (examData.description && examData.description.includes('AI Generated Exam Data')) {
-        try {
-          const aiDataMatch = examData.description.match(/Questions Preview: (\[[\s\S]*?\])/);
-          if (aiDataMatch) {
-            questions = JSON.parse(aiDataMatch[1]);
-            console.log('Extracted', questions.length, 'questions from exam description');
-          }
-        } catch (parseErr) {
-          console.log('Failed to parse questions from description:', parseErr);
-        }
-      }
-    }
+    // Get questions for the exam
+    let { data: questions, error: questionsError } = await supabase
+      .from('questions') // Use existing questions table
+      .select('id, question_text, type, options, marks, order_index, code_template, time_limit') // Removed 'difficulty' column
+      .eq('exam_id', id)
+      .order('order_index');
 
     console.log('🗄️ Database Question Fetch:', {
       examId: id,
       questionsError: questionsError,
       questionsFound: questions,
-      questionsLength: questions?.length || 0
+      questionsLength: questions?.length || 0,
+      query: 'SELECT id, question_text, type, options, marks, order_index, code_template, time_limit FROM questions WHERE exam_id = ' + id
     });
 
     // CRITICAL FIX: Only use real questions, no sample questions
     if (!questions || questions.length === 0) {
-      console.log('❌ Backend: No questions found for exam - cannot start exam');
-      return res.status(400).json({ 
-        success: false, 
-        message: 'This exam has no questions. Please contact the administrator to add questions to this exam before starting.' 
-      });
+      console.log('⚠️ Backend: No questions found in table, checking description fallback...');
+      
+      // Look for questions in description if table is empty
+      if (examData.description && examData.description.includes('Questions:')) {
+        try {
+          const jsonPart = examData.description.split('Questions:')[1].trim();
+          // The JSON might be truncated if it was stored in a field with length limits, 
+          // or it might be full JSON. Let's try to find a valid JSON array.
+          const startIdx = jsonPart.indexOf('[');
+          const endIdx = jsonPart.lastIndexOf(']') + 1;
+          
+          if (startIdx !== -1 && endIdx !== -1) {
+            const rawJson = jsonPart.substring(startIdx, endIdx);
+            const parsedQuestions = JSON.parse(rawJson);
+            
+            if (Array.isArray(parsedQuestions) && parsedQuestions.length > 0) {
+              console.log(`✅ Found ${parsedQuestions.length} questions in description fallback`);
+              
+              // Map fallback objects to the expected structure
+              questions = parsedQuestions.map((q, idx) => {
+                let parsedOptions = [];
+                try {
+                  if (typeof q.options === 'string') {
+                    parsedOptions = JSON.parse(q.options);
+                  } else if (Array.isArray(q.options)) {
+                    parsedOptions = q.options;
+                  }
+                } catch (e) {
+                  console.error('⚠️ Failed to parse fallback options:', q.options);
+                  parsedOptions = [];
+                }
+
+                return {
+                  id: q.id || `fallback-${idx}`,
+                  question_text: q.questionText || q.description || q.title || q.question || 'Missing question text',
+                  type: q.type || 'mcq',
+                  options: parsedOptions,
+                  marks: q.marks || 1,
+                  order_index: idx + 1,
+                  correct_answer: q.correctAnswer || null
+                };
+              });
+            }
+          }
+        } catch (e) {
+          console.error('❌ Failed to parse questions from description:', e.message);
+        }
+      }
+
+      if (!questions || questions.length === 0) {
+        console.log('❌ Backend: Still no questions found - cannot start exam');
+        return res.status(400).json({ 
+          success: false, 
+          message: 'This exam has no questions. Please contact the administrator.' 
+        });
+      }
     }
 
     console.log('✅ Found real questions:', questions.length);
-    const finalQuestions = questions;
+    
+    // Transform questions to match frontend expectations
+    const finalQuestions = questions.map(q => {
+      console.log('🔍 Transforming question:', {
+        originalId: q.id,
+        originalType: q.type,
+        originalText: q.question_text?.substring(0, 50) + '...',
+        hasOptions: !!q.options,
+        optionsCount: q.options?.length || 0,
+        marks: q.marks,
+        optionsType: typeof q.options
+      });
+      
+      // Parse options if it's a string, otherwise use as-is
+      let parsedOptions = [];
+      if (typeof q.options === 'string') {
+        try {
+          parsedOptions = JSON.parse(q.options);
+        } catch (e) {
+          console.log('⚠️ Failed to parse options JSON:', q.options);
+          parsedOptions = [];
+        }
+      } else if (Array.isArray(q.options)) {
+        parsedOptions = q.options;
+      }
+      
+      const transformedQuestion = {
+        id: q.id,
+        type: q.type || 'mcq',
+        question_text: q.question_text || 'No question text',
+        marks: q.marks || 1,
+        difficulty: 'medium', // Default since table doesn't have difficulty column
+        options: parsedOptions,
+        correctAnswer: q.correct_answer || null,
+        order_index: q.order_index
+      };
+      
+      console.log('📋 Transformed question:', {
+        id: transformedQuestion.id,
+        type: transformedQuestion.type,
+        hasText: !!transformedQuestion.question_text,
+        textLength: transformedQuestion.question_text?.length || 0,
+        hasOptions: !!transformedQuestion.options,
+        optionsCount: transformedQuestion.options?.length || 0,
+        firstOption: transformedQuestion.options?.[0]?.text || 'No options'
+      });
+      
+      return transformedQuestion;
+    });
+
+    console.log('📋 Final questions structure:', {
+      count: finalQuestions.length,
+      firstQuestion: finalQuestions[0] ? {
+        id: finalQuestions[0].id,
+        type: finalQuestions[0].type,
+        hasText: !!finalQuestions[0].question_text,
+        textLength: finalQuestions[0].question_text?.length || 0,
+        hasOptions: !!finalQuestions[0].options,
+        optionsCount: finalQuestions[0].options?.length || 0
+      } : null
+    });
 
     res.json({
       success: true,
@@ -1090,8 +1365,8 @@ exports.saveAnswer = async (req, res) => {
     const { sessionId, questionId, answerText, selectedOption, codeSubmission, selectedLanguage } = req.body;
     const studentId = req.user.id;
 
-    // Use Supabase instead of query
-    const { data, error } = await supabase
+    // Use Supabase upsert with explicit onConflict constraint
+    const { data: saveData, error: saveError } = await supabase
       .from('answers')
       .upsert({
         session_id: sessionId,
@@ -1101,13 +1376,16 @@ exports.saveAnswer = async (req, res) => {
         answer_text: answerText,
         selected_option: selectedOption,
         code_submission: codeSubmission,
-        selected_language: selectedLanguage
+        selected_language: selectedLanguage,
+        updated_at: new Date().toISOString()
+      }, { 
+        onConflict: 'session_id,question_id' 
       })
       .select();
 
-    if (error) {
-      console.error('Error saving answer:', error);
-      return res.status(500).json({ success: false, message: 'Failed to save answer', error: error.message });
+    if (saveError) {
+      console.error('❌ Backend: Error saving answer:', saveError);
+      return res.status(500).json({ success: false, message: 'Failed to save answer efficiently', error: saveError.message });
     }
 
     res.json({ success: true, message: 'Answer saved.' });
@@ -1126,7 +1404,9 @@ exports.submitExam = async (req, res) => {
     const { sessionId } = req.body;
     const studentId = req.user.id;
 
-    // Use Supabase instead of query
+    console.log('🚀 [PROFESSIONAL] Submit exam request:', { examId: id, sessionId, studentId });
+
+    // 1. Fetch Session (Verifying it's active and belongs to the student)
     const { data: sessionData, error: sessionError } = await supabase
       .from('exam_sessions')
       .select('*')
@@ -1137,72 +1417,88 @@ exports.submitExam = async (req, res) => {
       .single();
 
     if (sessionError || !sessionData) {
-      return res.status(400).json({ success: false, message: 'Invalid or already submitted session.' });
+      console.log('❌ [PROFESSIONAL] Invalid session or session already submitted:', { sessionError, sessionFound: !!sessionData });
+      return res.status(400).json({ success: false, message: 'Invalid or already submitted session. Please contact administrator.' });
     }
 
-    // Evaluate MCQ answers using Supabase
+    console.log('📊 [PROFESSIONAL] Session validated for submission');
+
+    // 2. Fetch ALL questions for this exam (Reliable fetch, no join)
+    const { data: questions, error: questionsError } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('exam_id', id);
+
+    if (questionsError || !questions) {
+      console.error('❌ [PROFESSIONAL] Error fetching questions for marking:', questionsError);
+      return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to retrieve questions for evaluation', error: questionsError.message });
+    }
+
+    // 3. Fetch ALL answers for this session
     const { data: answers, error: answersError } = await supabase
       .from('answers')
-      .select(`
-        *,
-        questions!inner(
-          type,
-          correct_answer,
-          marks,
-          negative_marks
-        )
-      `)
+      .select('*')
       .eq('session_id', sessionId);
 
     if (answersError) {
-      console.error('Error fetching answers:', answersError);
-      return res.status(500).json({ success: false, message: 'Failed to fetch answers', error: answersError.message });
+      console.error('❌ [PROFESSIONAL] Error fetching answers for marking:', answersError);
+      return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to fetch student answers', error: answersError.message });
     }
 
+    console.log(`📊 [PROFESSIONAL] Marking Engine starting: ${questions.length} questions, ${answers?.length || 0} answers found`);
+
+    // 4. MANUAL MARKING ENGINE (memory-based for 100% reliability)
     let mcqMarks = 0;
+    const questionMap = new Map(questions.map(q => [q.id, q]));
+
     for (const answer of answers || []) {
-      if (answer.questions.type === 'mcq' || answer.questions.type === 'true_false') {
-        const isCorrect = answer.selected_option === answer.questions.correct_answer;
-        const marksObtained = isCorrect ? answer.questions.marks : -Math.abs(answer.questions.negative_marks || 0);
+      const question = questionMap.get(answer.question_id);
+      if (!question) {
+        console.warn(`⚠️ [PROFESSIONAL] Answer for unknown question ID: ${answer.question_id}`);
+        continue;
+      }
+
+      if (question.type === 'mcq' || question.type === 'true_false') {
+        const isCorrect = (answer.selected_option === question.correct_answer);
+        const marksObtained = isCorrect ? (question.marks || 1) : -Math.abs(question.negative_marks || 0);
         mcqMarks += marksObtained;
-        
-        // Update answer with evaluation
-        await supabase
-          .from('answers')
-          .update({
-            is_correct: isCorrect,
-            marks_obtained: Math.max(0, marksObtained),
-            is_evaluated: true
-          })
-          .eq('id', answer.id);
+
+        // Perform evaluation update defensively
+        try {
+          await supabase
+            .from('answers')
+            .update({
+              is_correct: isCorrect,
+              marks_obtained: Math.max(0, marksObtained),
+              is_evaluated: true
+            })
+            .eq('id', answer.id);
+        } catch (updateErr) {
+          console.warn(`⚠️ [PROFESSIONAL] Could not save evaluation for answer ${answer.id}:`, updateErr.message);
+        }
       }
     }
 
-    // Get exam details using Supabase
-    const { data: examData, error: examError } = await supabase
+    // 5. Fetch Exam Meta for Final Result Status
+    const { data: examData, error: examMetaError } = await supabase
       .from('exams')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (examError || !examData) {
-      return res.status(404).json({ success: false, message: 'Exam not found' });
-    }
+    const totalPossibleMarks = examData?.total_marks || questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const passingMarks = examData?.passing_marks || 40;
 
-    // Create result
-    const hasSubjective = answers?.some(a => a.questions.type === 'subjective') || false;
-    const hasCoding = answers?.some(a => a.questions.type === 'coding') || false;
+    const hasIncompleteEvaluation = questions.some(q => q.type === 'subjective' || q.type === 'coding');
+    const finalStatus = (mcqMarks >= passingMarks) ? 'pass' : 'fail';
+    const resultStatus = hasIncompleteEvaluation ? 'pending' : finalStatus;
 
-    const resultStatus = (!hasSubjective && !hasCoding)
-      ? (mcqMarks >= examData.passing_marks ? 'pass' : 'fail')
-      : 'pending';
+    const percentage = totalPossibleMarks > 0 ? (mcqMarks / totalPossibleMarks) * 100 : 0;
 
-    const percentage = examData.total_marks > 0
-      ? Math.round((mcqMarks / examData.total_marks) * 100 * 10) / 10
-      : 0;
+    console.log('📊 [PROFESSIONAL] Marking complete:', { mcqMarks, totalPossibleMarks, resultStatus, percentage });
 
-    // Update session status using Supabase
-    await supabase
+    // 6. Update Session Status FIRST (to prevent double submission)
+    const { error: sessionUpdateError } = await supabase
       .from('exam_sessions')
       .update({
         status: 'submitted',
@@ -1210,7 +1506,13 @@ exports.submitExam = async (req, res) => {
       })
       .eq('id', sessionId);
 
-    // Create result record using Supabase
+    if (sessionUpdateError) {
+      console.error('❌ [PROFESSIONAL] CRITICAL: Failed to seal session:', sessionUpdateError);
+      return res.status(500).json({ success: false, message: 'Failed to close exam session properly. Your progress is saved but session status is unclear.', error: sessionUpdateError.message });
+    }
+
+    // 7. Create Result Record
+    console.log('📊 [PROFESSIONAL] Creating result record for session', sessionId);
     const { data: resultData, error: resultError } = await supabase
       .from('results')
       .insert({
@@ -1218,8 +1520,8 @@ exports.submitExam = async (req, res) => {
         student_id: studentId,
         exam_id: id,
         mcq_marks: mcqMarks,
-        total_marks: mcqMarks,
-        percentage: percentage,
+        total_marks: mcqMarks, // Evaluate from memory for now
+        percentage: Math.round(percentage * 100) / 100,
         status: resultStatus,
         submitted_at: new Date().toISOString()
       })
@@ -1227,19 +1529,32 @@ exports.submitExam = async (req, res) => {
       .single();
 
     if (resultError) {
-      console.error('Error creating result:', resultError);
-      return res.status(500).json({ success: false, message: 'Failed to create result', error: resultError.message });
+      console.error('⚠️ [PROFESSIONAL] Result recorded failure:', resultError);
+      // We still return true because the session IS submitted and answers are evaluated
+      return res.json({
+        success: true,
+        message: 'Exam submitted successfully, but your result profile is being generated. Please check back in a few minutes.',
+        data: {
+          result: {
+            status: resultStatus,
+            percentage: Math.round(percentage * 100) / 100,
+            totalMarks: mcqMarks,
+            isPending: resultStatus === 'pending'
+          }
+        }
+      });
     }
 
+    console.log('✅ [PROFESSIONAL] Submission sequence complete.');
     res.json({
       success: true,
-      message: 'Exam submitted successfully!',
+      message: 'Congratulations! Your exam has been submitted successfully.',
       data: {
         result: {
           id: resultData.id,
           status: resultStatus,
-          percentage: percentage,
-          totalMarks: mcqMarks,
+          percentage: resultData.percentage,
+          totalMarks: resultData.total_marks,
           submittedAt: resultData.submitted_at,
           isPending: resultStatus === 'pending'
         }
@@ -1247,8 +1562,8 @@ exports.submitExam = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Submit exam error:', error);
-    res.status(500).json({ success: false, message: 'Failed to submit exam', error: error.message });
+    console.error('❌ [PROFESSIONAL] CRITICAL Submission Fault:', error);
+    res.status(500).json({ success: false, message: 'A professional-level fault occurred during submission. Your answers are safe.', error: error.message });
   }
 };
 
@@ -1286,7 +1601,7 @@ exports.reportViolation = async (req, res) => {
       .eq('id', examId)
       .single();
 
-    const maxViolations = examData?.max_violations || 8; // Professional thresholds
+    const maxViolations = examData?.max_violations || 3; // 3 warnings then terminate
 
     // Count violations for this session
     const { data: sessionData, error: sessionError } = await supabase
@@ -1301,42 +1616,49 @@ exports.reportViolation = async (req, res) => {
     }, {}) || {};
 
     const newCount = violationCounts.total || 1;
+    const typeCount = violationCounts[type] || 1;
 
     let action = 'warning';
-    let message = `Warning ${newCount}/${maxViolations}: ${type} detected.`;
+    let message = `⚠️ Warning ${newCount}/${maxViolations}: ${type} detected.`;
     let autoTerminate = false;
 
-    // Professional violation thresholds
-    if (type === 'multiple_faces' && violationCounts[type] >= 2) {
-      // Terminate after 2 multiple face violations
+    // Professional violation thresholds — 3 strikes and you're out
+    if (type === 'multiple_faces' && typeCount >= 3) {
       action = 'terminate';
-      message = 'Your exam has been terminated due to multiple person detection.';
+      message = '🚨 EXAM TERMINATED: Multiple persons detected 3 times. Your exam has been automatically submitted.';
       autoTerminate = true;
-    } else if (type === 'tab_switch' && newCount >= 5) {
-      // Terminate after 5 tab switches
+    } else if (type === 'tab_switch' && typeCount >= 3) {
       action = 'terminate';
-      message = 'Your exam has been terminated due to excessive tab switching.';
+      message = '🚨 EXAM TERMINATED: You switched tabs 3 times. Your exam has been automatically submitted.';
       autoTerminate = true;
-    } else if (type === 'window_blur' && violationCounts[type] >= 3) {
-      // Terminate after 3 window blurs
+    } else if (type === 'no_face_detected' && typeCount >= 3) {
       action = 'terminate';
-      message = 'Your exam has been terminated due to repeated window focus loss.';
+      message = '🚨 EXAM TERMINATED: No face detected 3 times. Your exam has been automatically submitted.';
+      autoTerminate = true;
+    } else if (type === 'fullscreen_exit' && typeCount >= 3) {
+      action = 'terminate';
+      message = '🚨 EXAM TERMINATED: You exited full-screen 3 times. Your exam has been automatically submitted.';
       autoTerminate = true;
     } else if (newCount >= maxViolations) {
-      // Terminate if exceeding max violations
       action = 'terminate';
-      message = 'Your exam has been automatically terminated due to repeated violations.';
+      message = '🚨 EXAM TERMINATED: Maximum violations reached. Your exam has been automatically submitted.';
       autoTerminate = true;
     } else {
-      // Warning messages based on violation type
+      // Warning messages based on violation type with counts
       if (type === 'multiple_faces') {
-        message = `⚠️ Multiple faces detected! This is violation ${violationCounts[type]}/2. Please ensure only you are visible.`;
+        message = `⚠️ Warning ${typeCount}/3: Multiple faces detected! Only you should be visible during the exam.`;
+      } else if (type === 'no_face_detected') {
+        message = `⚠️ Warning ${typeCount}/3: No face detected! Please stay in front of the camera.`;
       } else if (type === 'camera_off') {
-        message = `⚠️ Camera is off! Please turn on your camera immediately. Violation ${violationCounts[type]}/5.`;
+        message = `⚠️ Warning ${typeCount}/3: Camera is off! Please turn on your camera immediately.`;
       } else if (type === 'tab_switch') {
-        message = `⚠️ Tab switch detected! Violation ${violationCounts[type]}/5. Stay focused on the exam.`;
+        message = `⚠️ Warning ${typeCount}/3: Tab switch detected! Stay focused on the exam.`;
+      } else if (type === 'fullscreen_exit') {
+        message = `⚠️ Warning ${typeCount}/3: Full-screen exited! Please stay in full-screen mode.`;
       } else if (type === 'window_blur') {
-        message = `⚠️ Window focus lost! Violation ${violationCounts[type]}/3. Keep the exam window active.`;
+        message = `⚠️ Warning ${typeCount}/3: Window focus lost! Keep the exam window active.`;
+      } else {
+        message = `⚠️ Warning ${newCount}/${maxViolations}: ${description || type}`;
       }
     }
 

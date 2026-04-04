@@ -1,13 +1,62 @@
 import React from 'react';
 
 const MCQQuestion = ({ question, answer, onAnswer }) => {
-  if (!question || !question.options) {
+  // Normalize the answer to a string if it's an object (for comparison with finalOptions)
+  const normalizedAnswer = answer && typeof answer === 'object' 
+    ? (answer.text || answer.label || answer.value || JSON.stringify(answer))
+    : String(answer || '');
+
+  console.log('🔍 MCQQuestion received:', {
+    hasQuestion: !!question,
+    questionId: question?.id,
+    questionType: question?.type,
+    hasOptions: !!question?.options,
+    optionsCount: question?.options?.length || 0,
+    hasText: !!question?.question_text,
+    textLength: question?.question_text?.length || 0,
+    options: question?.options,
+    answer: answer,
+    normalizedAnswer: normalizedAnswer
+  });
+
+  let finalOptions = question?.options || [];
+  
+  // Defensive local parsing if options is a string (fallback safety)
+  if (typeof finalOptions === 'string') {
+    try {
+      finalOptions = JSON.parse(finalOptions);
+    } catch (e) {
+      console.error('MCQQuestion: Failed to parse options string', e);
+      finalOptions = [];
+    }
+  }
+
+  // Normalize options to ensure they are strings (handle {id, text} objects)
+  if (Array.isArray(finalOptions)) {
+    finalOptions = finalOptions.map(opt => {
+      if (opt && typeof opt === 'object') {
+        return opt.text || opt.label || opt.value || JSON.stringify(opt);
+      }
+      return String(opt);
+    });
+  }
+
+  // Final validation - must be an array
+  if (!Array.isArray(finalOptions) || finalOptions.length === 0) {
     return (
       <div style={{ color: '#a0aec0', fontSize: 14 }}>
-        <p style={{ marginBottom: 16, lineHeight: 1.7 }}>
+        <p style={{ marginBottom: 16, lineHeight: 1.7, fontSize: 16, fontWeight: 500 }}>
           {question?.question_text || 'Question not available'}
         </p>
-        <p style={{ color: '#ef4444' }}>No options available for this question.</p>
+        <div style={{ 
+          background: 'rgba(239, 68, 68, 0.1)', 
+          border: '1px solid rgba(239, 68, 68, 0.2)', 
+          borderRadius: 8, 
+          padding: 16,
+          color: '#ef4444'
+        }}>
+          ⚠️ No valid options available for this question.
+        </div>
       </div>
     );
   }
@@ -19,7 +68,7 @@ const MCQQuestion = ({ question, answer, onAnswer }) => {
       </p>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {question.options.map((option, index) => (
+        {finalOptions.map((option, index) => (
           <label
             key={index}
             style={{
@@ -27,20 +76,20 @@ const MCQQuestion = ({ question, answer, onAnswer }) => {
               alignItems: 'flex-start',
               gap: 12,
               padding: '16px',
-              background: answer === option ? 'rgba(233, 69, 96, 0.1)' : 'rgba(255, 255, 255, 0.03)',
-              border: answer === option ? '2px solid #e94560' : '1px solid rgba(255, 255, 255, 0.1)',
+              background: normalizedAnswer === option ? 'rgba(233, 69, 69, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+              border: normalizedAnswer === option ? '2px solid #e94560' : '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: 12,
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              if (answer !== option) {
+              if (normalizedAnswer !== option) {
                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
               }
             }}
             onMouseLeave={(e) => {
-              if (answer !== option) {
+              if (normalizedAnswer !== option) {
                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
               }
@@ -50,7 +99,7 @@ const MCQQuestion = ({ question, answer, onAnswer }) => {
               type="radio"
               name={`question-${question.id}`}
               value={option}
-              checked={answer === option}
+              checked={normalizedAnswer === option}
               onChange={() => onAnswer(option)}
               style={{
                 marginTop: 2,

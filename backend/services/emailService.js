@@ -10,8 +10,17 @@ const logger = winston.createLogger({
 
 // Create reusable transporter
 const createTransporter = () => {
+  console.log('🔧 Email configuration check:', {
+    hasHost: !!process.env.EMAIL_HOST,
+    hasUser: !!process.env.EMAIL_USER,
+    hasPass: !!process.env.EMAIL_PASS,
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT
+  });
+
   // Use mock transporter only if email is not configured
   if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log('⚠️ Email not configured - using mock transporter');
     return {
       sendMail: async (options) => {
         logger.info('Mock email sent', { 
@@ -19,11 +28,13 @@ const createTransporter = () => {
           subject: options.subject,
           html: options.html?.substring(0, 200) + '...' 
         });
+        console.log('📧 MOCK EMAIL - Configure EMAIL_HOST, EMAIL_USER, EMAIL_PASS in .env for real emails');
         return Promise.resolve();
       }
     };
   }
   
+  console.log('✅ Email configured - creating real transporter');
   return nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
     port: process.env.EMAIL_PORT || 587,

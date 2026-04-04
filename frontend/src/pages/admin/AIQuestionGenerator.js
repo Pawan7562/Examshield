@@ -1,37 +1,17 @@
 // src/pages/admin/AIQuestionGenerator.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import { 
   Brain, 
-  Plus, 
-  Search, 
-  Target, 
-  BarChart3, 
-  Database, 
-  Cpu, 
-  Globe, 
-  CheckCircle, 
-  RefreshCw, 
-  Sparkles, 
   Activity, 
-  Eye, 
-  Trash2, 
-  Edit3, 
-  Download, 
-  Upload, 
-  Filter, 
+  Sparkles, 
   Layers, 
   Zap, 
   AlertCircle, 
   BookOpen, 
   FileText, 
-  Code, 
-  HelpCircle, 
-  TrendingUp, 
-  Settings, 
-  Save, 
   FolderOpen, 
   Copy, 
   Share2, 
@@ -39,7 +19,23 @@ import {
   Award,
   Calendar,
   Shield,
-  Users
+  Users,
+  Database,
+  Cpu,
+  Globe,
+  Target,
+  Search,
+  BarChart3,
+  CheckCircle,
+  HelpCircle,
+  RefreshCw,
+  Code,
+  Save,
+  Download,
+  Plus,
+  Eye,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 
@@ -59,6 +55,7 @@ const AIQuestionGenerator = () => {
   const [previewQuestion, setPreviewQuestion] = useState(null);
   const [generationStats, setGenerationStats] = useState(null);
   const [savedCollections, setSavedCollections] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [currentCollection, setCurrentCollection] = useState(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [collectionName, setCollectionName] = useState('');
@@ -78,8 +75,8 @@ const AIQuestionGenerator = () => {
   const [allStudents, setAllStudents] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [isCreatingExam, setIsCreatingExam] = useState(false);
-  const [examCreationInProgress, setExamCreationInProgress] = useState(false); // Prevent multiple exam creations
-  const [generationId, setGenerationId] = useState(0); // Track current generation session
+  const [currentGeneration, setCurrentGeneration] = useState(null);
+  const currentGenerationRef = useRef(null);
   
   const navigate = useNavigate();
 
@@ -110,41 +107,50 @@ const AIQuestionGenerator = () => {
   };
 
   const generateQuestions = async () => {
-    if (!topic.trim()) {
-      toast.error('Please enter a topic for question generation');
-      return;
-    }
-
     if (selectedSources.length === 0) {
       toast.error('Please select at least one source');
       return;
     }
 
-    // Prevent multiple simultaneous generations
-    if (isGenerating) {
-      console.log('Generation already in progress');
+    if (!topic.trim()) {
+      toast.error('Please enter a topic');
       return;
     }
 
-    const currentGenerationId = Date.now();
-    setGenerationId(currentGenerationId);
+    if (!difficulty) {
+      toast.error('Please select a difficulty level');
+      return;
+    }
+
+    // Create unique generation ID
+    const generationId = Date.now().toString();
+    setCurrentGeneration(generationId);
+    currentGenerationRef.current = generationId; // Set ref immediately
     setIsGenerating(true);
-    setGeneratedQuestions([]);
-    setSelectedQuestions([]);
-    setGenerationStats(null);
+    
+    console.log('Starting question generation:', generationId);
 
     try {
-      // Simulate API calls to different platforms
+      const targetQuestionCount = parseInt(questionCount);
+      const stats = {
+        total: 0,
+        bySource: {},
+        byDifficulty: {}
+      };
       const allQuestions = [];
-      const stats = { total: 0, bySource: {}, byDifficulty: {} };
-      
-      // Distribute questions evenly across selected sources
-      const questionsPerSource = Math.ceil(questionCount / selectedSources.length);
-      let remainingQuestions = questionCount;
+      let remainingQuestions = targetQuestionCount;
+
+      // Distribute questions evenly across sources
+      const questionsPerSource = Math.ceil(targetQuestionCount / selectedSources.length);
 
       for (let i = 0; i < selectedSources.length; i++) {
+        // Check if this generation is still valid (using ref for immediate check)
+        if (currentGenerationRef.current !== generationId) {
+          console.log('Generation cancelled - newer generation started:', generationId);
+          return;
+        }
+
         const source = selectedSources[i];
-        // For the last source, only get the remaining questions needed
         const countForThisSource = i === selectedSources.length - 1 ? remainingQuestions : Math.min(questionsPerSource, remainingQuestions);
         
         const questions = await fetchQuestionsFromSource(source, topic, difficulty, countForThisSource);
@@ -160,14 +166,19 @@ const AIQuestionGenerator = () => {
         if (remainingQuestions <= 0) break;
       }
 
-      // Add randomization and unique IDs and transform to CreateExam format
+      // Check if this generation is still valid (using ref for immediate check)
+      if (currentGenerationRef.current !== generationId) {
+        console.log('Generation cancelled - newer generation started:', generationId);
+        return;
+      }
+
+      // Process and transform questions
       const processedQuestions = allQuestions.map((q, index) => {
-        // Transform AI question format to CreateExam format
         const transformedQuestion = {
           id: `ai_${Date.now()}_${index}`,
-          type: 'coding', // AI questions are coding questions
-          questionText: q.description || q.title, // Use description as question text
-          title: q.title, // Keep original title for reference
+          type: 'coding',
+          questionText: q.description || q.title,
+          title: q.title,
           marks: q.difficulty === 'easy' ? 5 : q.difficulty === 'medium' ? 10 : 15,
           difficulty: q.difficulty,
           source: sources.find(s => s.id === q.source),
@@ -180,15 +191,12 @@ const AIQuestionGenerator = () => {
           generatedAt: new Date().toISOString(),
           randomSeed: Math.random()
         };
-        
         return transformedQuestion;
       });
 
-      // Shuffle questions for randomization
+      // Shuffle and ensure exact count
       const shuffled = processedQuestions.sort(() => Math.random() - 0.5);
-      
-      // Ensure we have exactly the requested number of questions
-      const finalQuestions = shuffled.slice(0, questionCount);
+      const finalQuestions = shuffled.slice(0, targetQuestionCount);
       
       setGeneratedQuestions(finalQuestions);
       setGenerationStats(stats);
@@ -198,16 +206,18 @@ const AIQuestionGenerator = () => {
         setSelectedQuestions(finalQuestions);
         toast.success(`Generated ${finalQuestions.length} questions automatically!`);
         
-        // Auto-create exam if configuration is valid - only once
-        if (examConfig.name && examConfig.dateTime && selectedStudents.length > 0 && !examCreationInProgress) {
-          console.log('Auto-creating exam with', finalQuestions.length, 'questions for generation', currentGenerationId);
-          setTimeout(() => createExamWithQuestions(finalQuestions, currentGenerationId), 1000);
-        } else {
-          if (examCreationInProgress) {
-            console.log('Exam creation already in progress, skipping auto-creation');
+        console.log('Auto-creating exam with', finalQuestions.length, 'questions for generation', generationId);
+        
+        // Auto-create exam if configuration is valid
+        if (examConfig.name && examConfig.dateTime && selectedStudents.length > 0) {
+          // Check if this generation is still valid before creating exam (using ref)
+          if (currentGenerationRef.current === generationId) {
+            setTimeout(() => createExamWithQuestions(finalQuestions, generationId), 1000);
           } else {
-            toast.error('Please complete exam configuration and select students');
+            console.log('Skipping exam creation - newer generation in progress');
           }
+        } else {
+          toast.error('Please complete exam configuration and select students');
         }
       } else {
         toast.success(`Generated ${finalQuestions.length} questions for review`);
@@ -216,7 +226,10 @@ const AIQuestionGenerator = () => {
       console.error('Error generating questions:', error);
       toast.error('Failed to generate questions. Please try again.');
     } finally {
-      setIsGenerating(false);
+      // Only clear generation state if this is still the current generation (using ref)
+      if (currentGenerationRef.current === generationId) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -1949,13 +1962,12 @@ const AIQuestionGenerator = () => {
   };
 
   // Function to create exam with generated questions and randomization
-  const createExamWithQuestions = async (questions, genId) => {
-    // Prevent multiple exam creations and race conditions
-    if (examCreationInProgress || (genId && genId !== generationId)) {
-      console.log('Exam creation already in progress or stale generation, skipping...', { genId, generationId });
+  const createExamWithQuestions = async (questions, generationId) => {
+    // Check if this generation is still valid (using ref)
+    if (currentGenerationRef.current !== generationId) {
+      console.log('Exam creation already in progress or stale generation, skipping...', { currentGeneration: currentGenerationRef.current, generationId });
       return;
     }
-
     if (!examConfig.name || !examConfig.dateTime) {
       toast.error('Please complete exam configuration');
       return;
@@ -1966,7 +1978,6 @@ const AIQuestionGenerator = () => {
       return;
     }
 
-    setExamCreationInProgress(true);
     setIsCreatingExam(true);
     
     try {
@@ -2019,7 +2030,6 @@ const AIQuestionGenerator = () => {
       };
 
       console.log('Sending exam data:', examData);
-      console.log('Creating exam for generation ID:', genId);
       
       const res = await adminAPI.createExam(examData);
       
@@ -2063,7 +2073,6 @@ const AIQuestionGenerator = () => {
       }
     } finally {
       setIsCreatingExam(false);
-      setExamCreationInProgress(false);
     }
   };
 

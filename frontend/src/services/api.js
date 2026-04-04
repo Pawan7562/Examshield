@@ -158,6 +158,7 @@ export const studentAPI = {
   reportViolation: (data) => api.post('/student/violations', data),
   getResults: () => api.get('/student/results'),
   getExamResult: (examId) => api.get(`/student/results/${examId}`),
+  getResultByKey: (examKey) => api.get(`/student/results/by-key/${examKey}`),
   getNotifications: () => api.get('/student/notifications'),
 };
 

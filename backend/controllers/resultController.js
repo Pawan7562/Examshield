@@ -197,3 +197,38 @@ exports.getStudentExamResult = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch result', error: error.message });
   }
 };
+
+/**
+ * GET /api/student/results/by-key/:examKey
+ * Fetch detailed result data for a specific exam code
+ */
+exports.getStudentResultByKey = async (req, res) => {
+  try {
+    const { examKey } = req.params;
+    const studentId = req.user.id;
+
+    const result = await query(
+      `SELECT r.*, e.name as exam_name, e.type, e.total_marks, e.passing_marks, e.subject, e.exam_code, e.date_time as exam_date, s.name as student_name, s.student_id as student_roll_no
+       FROM results r 
+       JOIN exams e ON r.exam_id = e.id
+       JOIN students s ON r.student_id = s.id
+       WHERE e.exam_code = $1 AND r.student_id = $2`,
+      [examKey, studentId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Invalid Exam Key.' });
+    }
+
+    if (!result.rows[0].is_published) {
+      return res.status(400).json({ success: false, message: 'This exam result is pending publication by the administrator.' });
+    }
+
+    res.json({
+      success: true,
+      data: { result: result.rows[0] },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch result by key', error: error.message });
+  }
+};

@@ -11,14 +11,21 @@ import {
   Target,
   BarChart3,
   Download,
-  Eye
+  Eye,
+  FileDown,
+  Search
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import toast from 'react-hot-toast';
 import '../../components/student/StudentSidebar.css';
 
 export default function StudentResults() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedResult, setSelectedResult] = useState(null);
+  const [examKeyInput, setExamKeyInput] = useState('');
+  const [downloadingKey, setDownloadingKey] = useState(false);
 
   useEffect(() => {
     studentAPI.getResults().then(r => setResults(r.data.results || [])).catch(() => {}).finally(() => setLoading(false));
@@ -48,6 +55,100 @@ export default function StudentResults() {
     if (grade?.includes('C')) return '#f59e0b';
     if (grade?.includes('D')) return '#f97316';
     return '#ef4444';
+  };
+
+  const downloadResultPDF = (resultData) => {
+    if (!resultData) return;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Professional Header
+    doc.setFillColor(15, 23, 42); // Dark slate
+    if (resultData.status === 'fail') doc.setFillColor(185, 28, 28); // Dark red for fail
+    if (resultData.status === 'pass') doc.setFillColor(21, 128, 61); // Green for pass
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("EXAMSHIELD - RESULT CARD", pageWidth / 2, 25, { align: "center" });
+
+    // Student Information Section
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.text("Student Information", 14, 55);
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    const nameStr = resultData.student_name || resultData.name || 'Student';
+    doc.text(`Name: ${nameStr}`, 14, 65);
+    if (resultData.student_roll_no) doc.text(`Roll No: ${resultData.student_roll_no}`, 14, 72);
+
+    // Exam Details Section
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Exam Details", pageWidth / 2 + 10, 55);
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Exam Name: ${resultData.exam_name}`, pageWidth / 2 + 10, 65);
+    doc.text(`Subject: ${resultData.subject || 'N/A'}`, pageWidth / 2 + 10, 72);
+    if (resultData.exam_code) doc.text(`Exam Code: ${resultData.exam_code}`, pageWidth / 2 + 10, 79);
+    
+    const dateVal = resultData.date_time || resultData.exam_date || new Date().toISOString();
+    doc.text(`Date: ${format(new Date(dateVal), 'dd MMM yyyy')}`, pageWidth / 2 + 10, 86);
+
+    // Results Table
+    doc.autoTable({
+      startY: 100,
+      head: [['Metrics', 'Score / Status']],
+      body: [
+        ['Total Marks', (resultData.total_marks || 0).toString()],
+        ['Marks Obtained', (resultData.marks_obtained || 0).toString()],
+        ['Percentage', `${resultData.percentage || 0}%`],
+        ['Grade', resultData.grade || 'N/A'],
+        ['Result Status', (resultData.status || 'Pending').toUpperCase()]
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 12, cellPadding: 8 },
+      columnStyles: {
+        0: { fontStyle: 'bold', halign: 'left', cellWidth: 90 },
+        1: { halign: 'right' }
+      }
+    });
+
+    // Footer
+    const finalY = doc.lastAutoTable.finalY + 40;
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text('This is a system generated result document and does not require a physical signature.', pageWidth / 2, finalY, { align: 'center' });
+    doc.text('ExamShield Proctoring Systems', pageWidth / 2, finalY + 7, { align: 'center' });
+
+    doc.save(`${resultData.exam_name.replace(/[^a-zA-Z0-9]/g, '_')}_Result.pdf`);
+  };
+
+  const handleDownloadByKey = async () => {
+    if (!examKeyInput.trim()) {
+      toast.error('Please enter an Exam Key');
+      return;
+    }
+    setDownloadingKey(true);
+    const downloadId = toast.loading('Fetching your result...');
+    
+    try {
+      const response = await studentAPI.getResultByKey(examKeyInput.trim());
+      const resData = response.data.data ? response.data.data.result : response.data.result;
+      
+      toast.success('Result found! Generating PDF...', { id: downloadId });
+      downloadResultPDF(resData);
+      setExamKeyInput('');
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Result not found or not published yet.', { id: downloadId });
+    } finally {
+      setDownloadingKey(false);
+    }
   };
 
   const calculateStats = () => {
@@ -149,11 +250,55 @@ export default function StudentResults() {
         </div>
       </div>
 
+      {/* Download by Exam Key Section */}
+      <div className="content-card" style={{ marginBottom: '1.5rem', background: 'linear-gradient(to right, rgba(16, 185, 129, 0.05), rgba(59, 130, 246, 0.05))', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+          <div>
+            <h2 className="card-title" style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileDown size={20} color="#3b82f6" />
+              Download Result via Exam Key
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+              Enter the exact Exam Key given to you to directly download your professional report card.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} color="#64748b" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="text"
+                placeholder="e.g. 5G4H9J"
+                value={examKeyInput}
+                onChange={(e) => setExamKeyInput(e.target.value.toUpperCase())}
+                style={{
+                  padding: '10px 10px 10px 36px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(0,0,0,0.2)',
+                  color: 'white',
+                  width: '200px',
+                  textTransform: 'uppercase',
+                  fontWeight: 600
+                }}
+              />
+            </div>
+            <button 
+              className="btn btn-primary" 
+              onClick={handleDownloadByKey}
+              disabled={downloadingKey || !examKeyInput.trim()}
+              style={{ padding: '10px 18px', fontWeight: 600 }}
+            >
+              {downloadingKey ? 'Downloading...' : 'Generate PDF'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Results Table */}
       <div className="content-card">
         <h2 className="card-title">
           <BarChart3 size={20} />
-          Exam Results
+          Your Taken Exams
         </h2>
 
         {results.length === 0 ? (
@@ -237,14 +382,24 @@ export default function StudentResults() {
                       </span>
                     </td>
                     <td>
-                      <button 
-                        className="btn btn-secondary"
-                        onClick={() => setSelectedResult(result)}
-                        style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                      >
-                        <Eye size={14} />
-                        View
-                      </button>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          className="btn btn-secondary"
+                          onClick={() => setSelectedResult(result)}
+                          title="View Details"
+                          style={{ padding: '0.4rem', fontSize: '0.85rem' }}
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button 
+                          className="btn btn-primary"
+                          onClick={() => downloadResultPDF(result)}
+                          title="Download PDF"
+                          style={{ padding: '0.4rem', fontSize: '0.85rem', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.4)' }}
+                        >
+                          <Download size={16} color="#3b82f6" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

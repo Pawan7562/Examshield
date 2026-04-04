@@ -63,6 +63,7 @@ admin.delete('/students/:id', studentController.deleteStudent);
 // Exam management
 admin.get('/exams', adminController.getExams);
 admin.get('/exams/health-check', examController.healthCheck);
+admin.get('/debug/schema', examController.debugSchema);
 admin.post('/exams', checkSubscription, examController.createExam);
 admin.put('/exams/:id', examController.updateExam);
 admin.delete('/exams/:id', async (req, res) => {
@@ -118,6 +119,7 @@ student.post('/exams/:id/save-answer', examController.saveAnswer);
 student.post('/exams/:id/submit', examController.submitExam);
 student.post('/violations', examController.reportViolation);
 student.get('/results', resultController.getStudentResults);
+student.get('/results/by-key/:examKey', resultController.getStudentResultByKey);
 student.get('/results/:examId', resultController.getStudentExamResult);
 student.get('/notifications', async (req, res) => {
   try {
