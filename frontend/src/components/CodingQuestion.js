@@ -106,172 +106,44 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
   const difficultyBadge = getDifficultyBadge(question.difficulty);
 
   return (
-    <div style={{ color: '#e2e8f0', fontSize: 14 }}>
+    <div className="coding-view-premium">
       {/* Question Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'flex-start', 
-        marginBottom: 24,
-        paddingBottom: 16,
-        borderBottom: '1px solid rgba(255,255,255,0.1)'
-      }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <span style={{ 
-              fontSize: 16, 
-              fontWeight: 600, 
-              color: '#8b5cf6' 
-            }}>
-              {question.question_text || 'Coding Question'}
-            </span>
-            {question.difficulty && (
-              <span style={{ 
-                fontSize: 11, 
-                fontWeight: 600, 
-                padding: '4px 10px', 
-                borderRadius: 12, 
-                background: difficultyBadge.bg, 
-                color: difficultyBadge.color,
-                border: `1px solid ${difficultyBadge.border}`
-              }}>
-                {question.difficulty?.toUpperCase()}
+      <div className="premium-section" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
+        <div className="premium-header-title">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.5rem' }}>{question.title || 'Coding Question'}</h3>
+            <div className="premium-header-badges">
+              {question.difficulty && (
+                <span className={`premium-badge ${question.difficulty.toLowerCase()}`}>
+                  {question.difficulty.toUpperCase()}
+                </span>
+              )}
+              <span className="premium-badge">
+                {question.marks || 10} {question.marks === 1 ? 'mark' : 'marks'}
               </span>
-            )}
-            <span style={{ fontSize: 12, color: '#4a5568' }}>
-              {question.marks || 10} {question.marks === 1 ? 'mark' : 'marks'}
-            </span>
+            </div>
           </div>
           
           {/* Allowed Languages */}
           {question.allowedLanguages && question.allowedLanguages.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, color: '#718096' }}>Languages:</span>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {question.allowedLanguages.map(lang => {
-                  const langIcons = {
-                    javascript: '🟨',
-                    python: '🐍',
-                    java: '☕',
-                    cpp: '⚙️',
-                    c: '🔧',
-                    csharp: '🔷'
-                  };
-                  return (
-                    <span key={lang} style={{ 
-                      fontSize: 12, 
-                      padding: '2px 8px', 
-                      borderRadius: 12, 
-                      background: 'rgba(139,92,246,0.1)', 
-                      color: '#8b5cf6',
-                      border: '1px solid rgba(139,92,246,0.3)'
-                    }}>
-                      {langIcons[lang] || '📝'} {lang}
-                    </span>
-                  );
-                })}
-              </div>
+            <div className="premium-tags">
+              {question.allowedLanguages.map(lang => (
+                <span key={lang} className="premium-tag">
+                  {lang.toUpperCase()}
+                </span>
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* Problem Description */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ 
-          fontSize: 14, 
-          lineHeight: 1.7, 
-          whiteSpace: 'pre-wrap',
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: 8,
-          padding: '16px'
-        }}>
-          {question.question_text || 'Write a function that solves the given problem.'}
-        </div>
+      {/* Problem Description with HTML Fidelity */}
+      <div className="premium-section">
+        <div 
+          className="premium-description"
+          dangerouslySetInnerHTML={{ __html: question.question_text || question.description }}
+        />
       </div>
-
-      {/* Constraints */}
-      {question.constraints && (
-        <div style={{ marginBottom: 24 }}>
-          <h4 style={{ 
-            fontSize: 12, 
-            fontWeight: 600, 
-            color: '#718096', 
-            textTransform: 'uppercase', 
-            letterSpacing: 0.5,
-            marginBottom: 8 
-          }}>
-            Constraints
-          </h4>
-          <div style={{ 
-            fontSize: 13, 
-            lineHeight: 1.6,
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 8,
-            padding: '12px 16px',
-            fontFamily: 'monospace',
-            whiteSpace: 'pre-wrap'
-          }}>
-            {question.constraints}
-          </div>
-        </div>
-      )}
-
-      {/* Test Cases Preview */}
-      {question.testCases && question.testCases.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <h4 style={{ 
-            fontSize: 12, 
-            fontWeight: 600, 
-            color: '#718096', 
-            textTransform: 'uppercase', 
-            letterSpacing: 0.5,
-            marginBottom: 8 
-          }}>
-            Sample Test Cases
-          </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {question.testCases.slice(0, 2).map((testCase, i) => (
-              <div key={i} style={{ 
-                background: 'rgba(255,255,255,0.02)', 
-                border: '1px solid rgba(255,255,255,0.06)', 
-                borderRadius: 6, 
-                padding: '12px'
-              }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#8b5cf6', marginBottom: 6 }}>
-                  Sample {i + 1}
-                  {testCase.explanation && (
-                    <span style={{ marginLeft: 8, color: '#718096', fontWeight: 400 }}>
-                      ({testCase.explanation})
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 11 }}>
-                  <div>
-                    <span style={{ color: '#718096' }}>Input: </span>
-                    <span style={{ color: '#e2e8f0', fontFamily: 'monospace' }}>
-                      {testCase.input}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#718096' }}>Output: </span>
-                    <span style={{ color: '#22c55e', fontFamily: 'monospace' }}>
-                      {testCase.output}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          {question.testCases.length > 2 && (
-            <p style={{ fontSize: 11, color: '#718096', fontStyle: 'italic', marginTop: 8 }}>
-              +{question.testCases.length - 2} more test cases (hidden when you run the code)
-            </p>
-          )}
-        </div>
-      )}
 
       {/* Code Editor */}
       <CodeEditor

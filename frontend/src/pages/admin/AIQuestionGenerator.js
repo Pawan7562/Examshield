@@ -38,6 +38,7 @@ import {
   Trash2
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
+import { questionDatabase } from '../../data/questionDatabase';
 
 const AIQuestionGenerator = () => {
   const [mode, setMode] = useState('partial'); // 'partial' or 'full'
@@ -172,20 +173,76 @@ const AIQuestionGenerator = () => {
         return;
       }
 
+      // Helper to generate a complete, professional, HTML-styled problem statement
+      const generateFullProblemStatement = (q) => {
+        let fullHTML = `<div class="pro-problem-container">`;
+        
+        // Main Task
+        fullHTML += `<p class="pro-task">${q.description || q.title}</p>`;
+        
+        // Constraints
+        if (q.constraints && q.constraints.length > 0) {
+          fullHTML += `<div class="pro-section"><h4 class="pro-section-title">Constraints</h4><ul class="pro-list">`;
+          if (Array.isArray(q.constraints)) {
+            q.constraints.forEach(c => {
+              fullHTML += `<li class="pro-list-item">${c}</li>`;
+            });
+          } else {
+            fullHTML += `<li class="pro-list-item">${q.constraints}</li>`;
+          }
+          fullHTML += `</ul></div>`;
+        }
+        
+        // Examples
+        if (q.examples && q.examples.length > 0) {
+          fullHTML += `<div class="pro-section"><h4 class="pro-section-title">Sample Test Cases</h4>`;
+          q.examples.forEach((ex, idx) => {
+            fullHTML += `
+              <div class="pro-example-card">
+                <div class="pro-example-header">Example ${idx + 1}</div>
+                <div class="pro-example-body">
+                  <div class="pro-io-row"><strong>Input:</strong> <code>${ex.input}</code></div>
+                  <div class="pro-io-row"><strong>Output:</strong> <code>${ex.output}</code></div>
+                  ${ex.explanation ? `<div class="pro-explanation"><strong>Explanation:</strong> ${ex.explanation}</div>` : ''}
+                </div>
+              </div>
+            `;
+          });
+          fullHTML += `</div>`;
+        }
+        
+        // Note Section (if any)
+        if (q.solution) {
+          fullHTML += `
+            <div class="pro-section pro-note">
+              <h4 class="pro-section-title">Note / Approach</h4>
+              <p>${q.solution}</p>
+            </div>
+          `;
+        }
+        
+        fullHTML += `</div>`;
+        return fullHTML;
+      };
+
       // Process and transform questions
       const processedQuestions = allQuestions.map((q, index) => {
+        const fullHTML = generateFullProblemStatement(q);
         const transformedQuestion = {
-          id: `ai_${Date.now()}_${index}`,
+          id: q.id || `ai_${Date.now()}_${index}`,
           type: 'coding',
-          questionText: q.description || q.title,
+          questionText: fullHTML, // Main HTML description
+          question_text: fullHTML, // Student view compatibility
           title: q.title,
+          description: fullHTML, // Admin preview compatibility
           marks: q.difficulty === 'easy' ? 5 : q.difficulty === 'medium' ? 10 : 15,
           difficulty: q.difficulty,
-          source: sources.find(s => s.id === q.source),
+          source: sources.find(s => s.id === q.source) || { name: q.source, id: q.source, icon: Globe },
           tags: q.tags || [],
           timeComplexity: q.timeComplexity,
           spaceComplexity: q.spaceComplexity,
-          examples: q.examples || [],
+          examples: q.examples || [], 
+          testCases: q.examples || [], 
           constraints: q.constraints || [],
           solution: q.solution,
           generatedAt: new Date().toISOString(),
@@ -235,7 +292,7 @@ const AIQuestionGenerator = () => {
 
   const fetchQuestionsFromSource = async (source, topic, difficulty, count) => {
     // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
     
     // Comprehensive question database for production-level generation
     const questionDatabase = {
@@ -243,46 +300,14 @@ const AIQuestionGenerator = () => {
         easy: [
           {
             title: "Two Sum",
-            description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+            description: "Given an array of integers <code>nums</code> and an integer <code>target</code>, return indices of the two numbers such that they add up to <code>target</code>.<br/><br/>You may assume that each input would have <b>exactly one solution</b>, and you may not use the same element twice.",
             tags: ["array", "hash-table"],
             timeComplexity: "O(n)",
             spaceComplexity: "O(n)",
-            examples: [{ input: "[2,7,11,15], target=9", output: "[0,1]" }],
-            constraints: ["2 <= nums.length <= 10^4"],
-            solution: "Use a hash map to store complement values"
-          },
-          {
-            title: "Palindrome Number",
-            description: "Given an integer x, return true if x is a palindrome, and false otherwise.",
-            tags: ["math", "two-pointers"],
-            timeComplexity: "O(log n)",
-            spaceComplexity: "O(1)",
-            examples: [{ input: "121", output: "true" }],
-            constraints: ["-2^31 <= x <= 2^31 - 1"],
-            solution: "Reverse half of the number and compare"
-          },
-          {
-            title: "Roman to Integer",
-            description: "Given a roman numeral, convert it to an integer.",
-            tags: ["hash-table", "math"],
-            timeComplexity: "O(n)",
-            spaceComplexity: "O(1)",
-            examples: [{ input: "III", output: "3" }],
-            constraints: ["1 <= s.length <= 15"],
-            solution: "Map symbols to values and process from left to right"
-          },
-          {
-            title: "Longest Common Prefix",
-            description: "Find the longest common prefix string amongst an array of strings.",
-            tags: ["string", "trie"],
-            timeComplexity: "O(S)",
-            spaceComplexity: "O(1)",
-            examples: [{ input: "[\"flower\",\"flow\",\"flight\"]", output: "\"fl\"" }],
-            constraints: ["1 <= strs.length <= 200"],
-            solution: "Compare characters vertically across all strings"
-          },
-          {
-            title: "Valid Parentheses",
+            examples: [
+              { input: "nums = [2,7,11,15], target = 9", output: "[0,1]", explanation: "Because nums[0] + nums[1] == 9, we return [0, 1]." }
+            ],
+            constraints: ["2 <= nums.length <= 10^4", "-10^9 <= nums[i] <= 10^9", "-10^9 <= target <= 10^9", "Only one valid answer exists."],
             description: "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
             tags: ["stack", "string"],
             timeComplexity: "O(n)",
@@ -2657,67 +2682,66 @@ const AIQuestionGenerator = () => {
 
         {/* Question Preview Modal */}
         {showPreview && previewQuestion && (
-          <div className="admin-ai-preview-modal">
-            <div className="admin-ai-preview-content">
-              <div className="admin-ai-preview-header">
-                <h3>{previewQuestion.title}</h3>
+          <div className="admin-ai-preview-modal-premium">
+            <div className="premium-modal-content">
+              <div className="premium-modal-header">
+                <div className="premium-header-title">
+                  <h3>{previewQuestion.title}</h3>
+                  <div className="premium-header-badges">
+                    <span className={`premium-badge ${previewQuestion.difficulty}`}>
+                      {previewQuestion.difficulty}
+                    </span>
+                    <span className="premium-badge">
+                      <previewQuestion.source.icon size={14} />
+                      {previewQuestion.source.name}
+                    </span>
+                    {previewQuestion.tags && previewQuestion.tags.map(tag => (
+                      <span key={tag} className="premium-tag">{tag}</span>
+                    ))}
+                  </div>
+                </div>
                 <button 
                   onClick={() => setShowPreview(false)}
-                  className="admin-ai-preview-close"
+                  className="premium-modal-close"
                 >
                   ×
                 </button>
               </div>
               
-              <div className="admin-ai-preview-body">
-                <div className="admin-ai-preview-meta">
-                  <span 
-                    className="admin-ai-difficulty-badge"
-                    style={{ backgroundColor: getDifficultyColor(previewQuestion.difficulty) }}
-                  >
-                    {previewQuestion.difficulty}
-                  </span>
-                  <span className="admin-ai-source-badge">
-                    <previewQuestion.source.icon size={14} />
-                    {previewQuestion.source.name}
-                  </span>
+              <div className="premium-modal-scroll-area">
+                {/* Main Content Section using dangerouslySetInnerHTML for Real Platform Fidelity */}
+                <div className="premium-section">
+                  <div 
+                    className="premium-description"
+                    dangerouslySetInnerHTML={{ __html: previewQuestion.description }}
+                  />
                 </div>
                 
-                <div className="admin-ai-preview-section">
-                  <h4>Description</h4>
-                  <p>{previewQuestion.description}</p>
-                </div>
-                
-                <div className="admin-ai-preview-section">
-                  <h4>Examples</h4>
-                  {previewQuestion.examples.map((example, index) => (
-                    <div key={index} className="admin-ai-example">
-                      <strong>Input:</strong> {example.input}<br />
-                      <strong>Output:</strong> {example.output}
+                {/* Solution/Approach Section */}
+                {previewQuestion.solution && (
+                  <div className="premium-section">
+                    <div className="premium-section-header">
+                      <h4>Recommended Approach</h4>
+                      <div className="premium-section-line"></div>
                     </div>
-                  ))}
-                </div>
+                    <div className="premium-description">
+                      {previewQuestion.solution}
+                    </div>
+                  </div>
+                )}
                 
-                <div className="admin-ai-preview-section">
-                  <h4>Constraints</h4>
-                  <ul>
-                    {previewQuestion.constraints.map((constraint, index) => (
-                      <li key={index}>{constraint}</li>
-                    ))}
-                  </ul>
-                </div>
-                
-                <div className="admin-ai-preview-section">
-                  <h4>Solution Approach</h4>
-                  <p>{previewQuestion.solution}</p>
-                </div>
-                
-                <div className="admin-ai-preview-section">
-                  <h4>Code Template</h4>
-                  <pre className="admin-ai-code-template">
-                    <code>{previewQuestion.codeTemplate}</code>
-                  </pre>
-                </div>
+                {/* Code Template Section */}
+                {previewQuestion.codeTemplate && (
+                  <div className="premium-section">
+                    <div className="premium-section-header">
+                      <h4>Code Template</h4>
+                      <div className="premium-section-line"></div>
+                    </div>
+                    <div className="premium-code-block">
+                      <code>{previewQuestion.codeTemplate}</code>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
