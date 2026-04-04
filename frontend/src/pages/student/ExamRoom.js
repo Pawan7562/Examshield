@@ -885,54 +885,28 @@ export default function ExamRoom() {
         {phase === 'exam' && (
           <>
             {questions.length === 0 ? (
-              // Enhanced loading state with retry mechanism
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#a0aec0' }}>
-                <div style={{ 
-                  width: 50, 
-                  height: 50, 
-                  border: '3px solid rgba(233,69,96,0.2)', 
-                  borderTop: '3px solid #e94560', 
-                  borderRadius: '50%', 
-                  animation: 'spin 1s linear infinite',
-                  marginBottom: 20 
-                }}></div>
-                <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Loading Questions...</h2>
-                <p style={{ fontSize: 14, textAlign: 'center', maxWidth: 400, marginBottom: 20 }}>
-                  Please wait while we load your exam questions. This should only take a moment.
+                <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12, color: '#e94560' }}>Questions Not Found</h2>
+                <p style={{ fontSize: 14, textAlign: 'center', maxWidth: 400, marginBottom: 24, color: '#cbd5e0', lineHeight: 1.6 }}>
+                  We couldn't retrieve the questions for this exam. This might be because the exam is still being prepared by the administrator or there was a system error.
                 </p>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                  {[0, 1, 2].map(i => (
-                    <div
-                      key={i}
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: '#e94560',
-                        animation: `pulse 1.5s ease-in-out ${i * 0.2}s infinite`
-                      }}
-                    ></div>
-                  ))}
-                </div>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
                   <button
-                    onClick={() => {
-                      console.log('🔄 Manual refresh triggered');
-                      window.location.reload();
-                    }}
+                    onClick={() => window.location.reload()}
                     style={{
-                      background: 'rgba(233,69,96,0.15)',
-                      border: '1px solid rgba(233,69,96,0.3)',
+                      background: 'linear-gradient(135deg,#e94560,#c62a47)',
+                      border: 'none',
                       borderRadius: 8,
-                      padding: '10px 20px',
-                      color: '#e94560',
+                      padding: '12px 24px',
+                      color: 'white',
                       cursor: 'pointer',
                       fontFamily: 'Sora, sans-serif',
-                      fontSize: 13,
-                      fontWeight: 600
+                      fontSize: 14,
+                      fontWeight: 600,
+                      boxShadow: '0 4px 12px rgba(233,69,96,0.3)'
                     }}
                   >
-                    Refresh Page
+                    Retry Loading
                   </button>
                   <button
                     onClick={() => {
@@ -944,21 +918,37 @@ export default function ExamRoom() {
                         session: !!session,
                         examId: examId
                       });
-                      alert(`Debug Info:\nPhase: ${phase}\nQuestions: ${questions.length}\nCurrentQ: ${currentQ}\nExamData: ${!!examData}\nSession: ${!!session}`);
+                      alert(`Debug Info:\nPhase: ${phase}\nQuestions: ${questions.length}\nExamData: ${!!examData}\nSession: ${!!session}`);
                     }}
                     style={{
                       background: 'rgba(59,130,246,0.15)',
                       border: '1px solid rgba(59,130,246,0.3)',
                       borderRadius: 8,
-                      padding: '10px 20px',
+                      padding: '12px 24px',
                       color: '#3b82f6',
                       cursor: 'pointer',
                       fontFamily: 'Sora, sans-serif',
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: 600
                     }}
                   >
                     Debug Info
+                  </button>
+                  <button
+                    onClick={() => navigate('/student/dashboard')}
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 8,
+                      padding: '12px 24px',
+                      color: '#e2e8f0',
+                      cursor: 'pointer',
+                      fontFamily: 'Sora, sans-serif',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    Dashboard
                   </button>
                 </div>
               </div>

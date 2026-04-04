@@ -1201,30 +1201,65 @@ exports.startExam = async (req, res) => {
       .eq('status', 'published');
 
     // Get questions for the exam
-    let { data: questions, error: questionsError } = await supabase
-      .from('questions') // Use existing questions table
-      .select('id, question_text, type, options, marks, order_index, code_template, time_limit') // Removed 'difficulty' column
-      .eq('exam_id', id)
-      .order('order_index');
+    let questions = [];
+    let questionsError = null;
 
-    console.log('🗄️ Database Question Fetch:', {
+    // 1. Check if randomization is enabled and fetch student-specific set
+    if (examData.question_randomization) {
+      console.log('🎲 Backend: Randomization enabled, fetching student question set for:', studentId);
+      const { data: randomizedSet, error: setErr } = await supabase
+        .from('student_question_sets')
+        .select('*')
+        .eq('exam_id', id)
+        .eq('student_id', studentId)
+        .order('question_order');
+      
+      if (!setErr && randomizedSet && randomizedSet.length > 0) {
+        console.log(`✅ Backend: Found ${randomizedSet.length} randomized questions`);
+        questions = randomizedSet.map(item => {
+          const qData = item.question_data;
+          return {
+            id: qData.id || item.id,
+            question_text: qData.questionText || qData.question_text || qData.description || 'Missing text',
+            type: qData.type || qData.question_type || 'mcq',
+            options: qData.options || [],
+            marks: qData.marks || 1,
+            order_index: item.question_order,
+            code_template: qData.codeTemplate || qData.code_template,
+            time_limit: qData.timeLimit || qData.time_limit
+          };
+        });
+      } else {
+        console.log('⚠️ Backend: No randomized set found for student, falling back to master list');
+      }
+    }
+
+    // 2. Fetch from master questions table if still no questions
+    if (!questions || questions.length === 0) {
+      console.log('🗄️ Backend: Fetching questions from master table...');
+      const { data: masterQuestions, error: mErr } = await supabase
+        .from('questions')
+        .select('id, question_text, type, options, marks, order_index, code_template, time_limit')
+        .eq('exam_id', id)
+        .order('order_index');
+      
+      questions = masterQuestions;
+      questionsError = mErr;
+    }
+
+    console.log('🗄️ Database Question Fetch Result:', {
       examId: id,
-      questionsError: questionsError,
-      questionsFound: questions,
+      questionsFound: !!questions,
       questionsLength: questions?.length || 0,
-      query: 'SELECT id, question_text, type, options, marks, order_index, code_template, time_limit FROM questions WHERE exam_id = ' + id
     });
 
-    // CRITICAL FIX: Only use real questions, no sample questions
+    // 3. Fallback: Check description for AI-generated JSON if still empty
     if (!questions || questions.length === 0) {
-      console.log('⚠️ Backend: No questions found in table, checking description fallback...');
+      console.log('⚠️ Backend: No questions found anywhere, checking description fallback...');
       
-      // Look for questions in description if table is empty
       if (examData.description && examData.description.includes('Questions:')) {
         try {
           const jsonPart = examData.description.split('Questions:')[1].trim();
-          // The JSON might be truncated if it was stored in a field with length limits, 
-          // or it might be full JSON. Let's try to find a valid JSON array.
           const startIdx = jsonPart.indexOf('[');
           const endIdx = jsonPart.lastIndexOf(']') + 1;
           
@@ -1235,7 +1270,6 @@ exports.startExam = async (req, res) => {
             if (Array.isArray(parsedQuestions) && parsedQuestions.length > 0) {
               console.log(`✅ Found ${parsedQuestions.length} questions in description fallback`);
               
-              // Map fallback objects to the expected structure
               questions = parsedQuestions.map((q, idx) => {
                 let parsedOptions = [];
                 try {
@@ -1245,7 +1279,6 @@ exports.startExam = async (req, res) => {
                     parsedOptions = q.options;
                   }
                 } catch (e) {
-                  console.error('⚠️ Failed to parse fallback options:', q.options);
                   parsedOptions = [];
                 }
 
@@ -1265,14 +1298,15 @@ exports.startExam = async (req, res) => {
           console.error('❌ Failed to parse questions from description:', e.message);
         }
       }
+    }
 
-      if (!questions || questions.length === 0) {
-        console.log('❌ Backend: Still no questions found - cannot start exam');
-        return res.status(400).json({ 
-          success: false, 
-          message: 'This exam has no questions. Please contact the administrator.' 
-        });
-      }
+    // Still no questions? Error out.
+    if (!questions || questions.length === 0) {
+      console.log('❌ Backend: Still no questions found after all attempts - cannot start exam');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'This exam has no questions. Please contact the administrator.' 
+      });
     }
 
     console.log('✅ Found real questions:', questions.length);
