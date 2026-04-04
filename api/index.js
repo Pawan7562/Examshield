@@ -1,10 +1,7 @@
-// Vercel Serverless API Entry Point
-// This file handles the routing between frontend and backend
-
+// Simple Vercel API Entry Point
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 // Import backend routes
@@ -26,30 +23,27 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration for Vercel
+// CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://examshield.vercel.app', 'https://examshield-git-*.vercel.app']
-    : ['http://localhost:3000', 'http://localhost:3001'],
+    ? ['https://examshield.vercel.app']
+    : ['http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
-// Compression and rate limiting
-app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-  },
+  max: 1000,
+  message: { error: 'Too many requests from this IP' },
 });
-app.use('/api', limiter);
+app.use(limiter);
+
+// Body parsing
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -61,7 +55,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API Routes
+// API routes
 app.use('/api/admin', admin);
 app.use('/api/student', student);
 app.use('/api/auth', auth);
@@ -76,11 +70,10 @@ app.use('/api/*', (req, res) => {
   });
 });
 
-// Error handling middleware
+// Error handling
 app.use((error, req, res, next) => {
   console.error('API Error:', error);
   
-  // Don't leak error details in production
   const statusCode = error.statusCode || error.status || 500;
   const message = process.env.NODE_ENV === 'production' 
     ? 'Internal server error' 
@@ -93,5 +86,4 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Export for Vercel
 module.exports = app;
