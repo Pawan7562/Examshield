@@ -382,15 +382,17 @@ exports.studentLogin = async (req, res) => {
       collegeName = college?.name || null;
     }
 
-    // Update last login without blocking login if the timestamp update fails.
-    const { error: lastLoginError } = await supabase
+    // Update last login (Quietly fail if schema is missing the column)
+    supabase
       .from('students')
       .update({ last_login: new Date().toISOString() })
-      .eq('id', student.id);
-
-    if (lastLoginError) {
-      console.error('Student last_login update error:', lastLoginError);
-    }
+      .eq('id', student.id)
+      .then(({ error }) => {
+        if (error && !error.message.includes('column')) {
+          console.error('Student last_login update error:', error.message);
+        }
+      })
+      .catch(() => {});
 
     const tokens = generateTokens({ id: student.id, role: 'student' });
 

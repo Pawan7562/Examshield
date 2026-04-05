@@ -34,42 +34,37 @@ const createTransporter = () => {
     };
   }
   
-  console.log('✅ Email configured - creating real transporter');
+  console.log('✅ Email configured - creating professional Gmail transporter');
   
   const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT) || 465, // Default to 465 for SSL stability
-    secure: (process.env.EMAIL_PORT == 465 || !process.env.EMAIL_PORT), // True for 465
+    service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
-    },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 20000,   // 20 seconds
-    socketTimeout: 30000,     // 30 seconds
-    tls: {
-      rejectUnauthorized: false 
     }
   });
 
   return {
-    sendMail: async (options) => {
-      // Ensure 'from' is set
-      const mailOptions = {
-        ...options,
-        from: options.from || process.env.EMAIL_FROM || process.env.EMAIL_USER
-      };
+    sendMail: (options) => {
+      // Professional fire-and-forget pattern
+      setImmediate(async () => {
+        const mailOptions = {
+          ...options,
+          from: options.from || process.env.EMAIL_FROM || process.env.EMAIL_USER
+        };
+        
+        console.log(`📤 [BACKGROUND] Sending email to: ${mailOptions.to}`);
+        
+        try {
+          const info = await transporter.sendMail(mailOptions);
+          console.log('✅ [BACKGROUND] Success:', info.messageId);
+        } catch (err) {
+          console.error('❌ [BACKGROUND] Failed:', err.message);
+        }
+      });
       
-      console.log(`📤 Attempting to send email to: ${mailOptions.to} from: ${mailOptions.from}`);
-      
-      try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Email sent successfully:', info.messageId);
-        return info;
-      } catch (err) {
-        console.error('❌ Nodemailer Error:', err.message);
-        throw err;
-      }
+      // Return immediately to the caller
+      return Promise.resolve({ status: 'queued' });
     }
   };
 };

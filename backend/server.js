@@ -29,6 +29,9 @@ if (!fs.existsSync('./uploads')) fs.mkdirSync('./uploads');
 const app = express();
 const server = http.createServer(app);
 
+// Trust proxy for Render/Vercel (Must be set for express-rate-limit)
+app.set('trust proxy', 1);
+
 // =====================================================
 // SOCKET.IO for real-time monitoring
 // =====================================================
