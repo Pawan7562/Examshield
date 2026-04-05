@@ -42,7 +42,17 @@ export default function Home() {
     <PublicLayout>
       <section className="public-shell landing-hero" aria-labelledby="hero-heading">
         <div className="landing-copy">
-          <h1 id="hero-heading">AI-Based Secure Exam Monitoring System</h1>
+          <div className="landing-hero-brand">
+            <img 
+              src="/websitelogo.jpeg" 
+              alt="CollegeExam Logo" 
+              className="landing-hero-logo"
+            />
+            <div className="landing-hero-brand-text">
+              <h1 id="hero-heading">CollegeExam</h1>
+              <p>AI-Based Secure Exam Monitoring System</p>
+            </div>
+          </div>
           <p>Prevent cheating with real-time proctoring</p>
 
           <div className="landing-actions" role="group" aria-label="Primary actions">
