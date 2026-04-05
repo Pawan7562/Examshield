@@ -151,28 +151,31 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
             .from('exams')
             .select('title, subject, date_time, duration, exam_code')
             .eq('id', examId)
-            .single();
+            .maybeSingle();
+
+          const loginUrl = process.env.STUDENT_LOGIN_URL || 
+            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://examshield.vercel.app/student/login');
 
           // Send email to each assigned student
           for (const student of students) {
             try {
-              await sendExamNotification({
+              // Note: sendExamNotification is non-blocking (setImmediate)
+              sendExamNotification({
                 name: student.name,
                 email: student.email,
-                examName: examData?.title || 'Exam',
-                examDate: examData?.date_time,
+                examName: examData?.title || 'Upcoming Exam',
+                examDate: examData?.date_time || new Date(),
                 examDuration: examData?.duration || 60,
-                examKey: examData?.exam_code || 'N/A',
+                examKey: examData?.exam_code || 'TBD',
                 subject: examData?.subject || 'General',
-                type: 'coding',
-                loginUrl: 'http://localhost:3000/student/login'
+                type: 'exam',
+                loginUrl: loginUrl
               });
-              console.log(`✅ Email notification sent to ${student.email}`);
             } catch (emailError) {
-              console.error(`❌ Failed to send email to ${student.email}:`, emailError);
+              console.error(`❌ BACKGROUND: Failed to queue email to ${student.email}:`, emailError.message);
             }
           }
-          console.log(`📧 Email notifications processed for ${students.length} students`);
+          console.log(`📧 SYSTEM: Queued notification for ${students.length} students in background.`);
         } else if (studentsError) {
           console.error('Error fetching students for email:', studentsError);
         }
@@ -660,8 +663,7 @@ exports.publishExam = async (req, res) => {
         .from('exam_assignments')
         .select('student_id')
         .eq('exam_id', id);
-
-      if (assignments && assignments.length > 0) {
+    if (assignments && assignments.length > 0) {
         const studentIds = assignments.map(a => a.student_id);
         const { data: assignedStudents } = await supabase
           .from('students')
@@ -669,27 +671,25 @@ exports.publishExam = async (req, res) => {
           .in('id', studentIds);
 
         if (assignedStudents && assignedStudents.length > 0) {
+          const { sendExamNotification } = require('../services/emailService');
           const loginUrl = process.env.STUDENT_LOGIN_URL || 
-            (process.env.NODE_ENV === 'development' ? 'http://localhost:3000/student/login' : 'https://examshield.vercel.app/student/login');
+            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://examshield.vercel.app/student/login');
 
           for (const student of assignedStudents) {
-            try {
-              await sendExamNotification({
-                name: student.name,
-                email: student.email,
-                examName: examData.title,
-                examDate: examData.date_time,
-                examDuration: examData.duration,
-                examKey: examData.exam_code,
-                subject: examData.subject || 'General',
-                type: examData.type || 'mcq',
-                loginUrl: loginUrl
-              });
-            } catch (err) {
-              console.error(`❌ FAILED TO SEND EMAIL TO ${student.email}:`, err.message);
-            }
+            // Note: sendExamNotification is now non-blocking (uses setImmediate internally)
+            sendExamNotification({
+              name: student.name,
+              email: student.email,
+              examName: updatedExam?.title || 'Upcoming Exam',
+              examDate: updatedExam?.date_time || new Date(),
+              examDuration: updatedExam?.duration || 60,
+              examKey: updatedExam?.exam_code || 'N/A',
+              subject: updatedExam?.subject || 'Exam',
+              type: updatedExam?.type || 'exam',
+              loginUrl: loginUrl
+            });
           }
-          console.log(`📧 SUCCESS: Sent notification to ${assignedStudents.length} students.`);
+          console.log(`📧 SYSTEM: Queued notifications for ${assignedStudents.length} students in background.`);
         }
       }
     } catch (notifyError) {
