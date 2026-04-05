@@ -2,16 +2,15 @@
 
 .settings-container {
   min-height: 100vh;
-  background: #f8fafc;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   padding: 2rem 1rem;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #1e293b;
 }
 
 .settings-header {
   text-align: center;
   margin-bottom: 3rem;
-  color: #1e293b;
+  color: white;
 }
 
 .settings-header h1 {
@@ -125,7 +124,7 @@
   gap: 1.5rem;
   margin-bottom: 2rem;
   padding: 1.5rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 1rem;
   color: white;
 }
@@ -497,9 +496,41 @@
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
-/* Dark Mode Support (Enforcing Light on Render) */
+/* Dark mode support (optional) */
 @media (prefers-color-scheme: dark) {
   .settings-container {
-    background: #f8fafc;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  }
+  
+  .settings-card {
+    background: #1e293b;
+    border-color: #334155;
+  }
+  
+  .settings-tabs {
+    background: #0f172a;
+    border-color: #334155;
+  }
+  
+  .settings-tab {
+    color: #94a3b8;
+  }
+  
+  .settings-tab.active {
+    color: #818cf8;
+    background: rgba(129, 140, 248, 0.1);
+  }
+  
+  .settings-section-title {
+    color: #f1f5f9;
+  }
+  
+  .profile-item {
+    background: #0f172a;
+    border-color: #334155;
+  }
+  
+  .profile-item-value {
+    color: #f1f5f9;
   }
 }
