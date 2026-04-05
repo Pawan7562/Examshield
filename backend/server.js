@@ -216,7 +216,9 @@ app.get('/api/test-email', async (req, res) => {
       message: 'Email delivery failed.', 
       error: error.message,
       smtp_config: {
-        host: process.env.EMAIL_HOST,
+        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.EMAIL_PORT) || 465,
+        secure: (process.env.EMAIL_PORT == 465 || !process.env.EMAIL_PORT),
         user: process.env.EMAIL_USER,
         has_pass: !!process.env.EMAIL_PASS
       }
