@@ -129,24 +129,7 @@ export default function AdminSidebar() {
         {/* Header */}
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-logo">
-            <img 
-              src="/websitelogo.jpeg" 
-              alt="CollegeExam Logo" 
-              style={{
-                height: '32px',
-                width: 'auto',
-                maxWidth: '140px',
-                objectFit: 'contain',
-                borderRadius: '6px',
-                transition: 'transform 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                e.target.style.transform = 'scale(1.05)';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.transform = 'scale(1)';
-              }}
-            />
+            <div className="admin-sidebar-logo-text">EXAMSHIELD</div>
             <div className="admin-sidebar-logo-badge">ADMIN</div>
           </div>
           <button 

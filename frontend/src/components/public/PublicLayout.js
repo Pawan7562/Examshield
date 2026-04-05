@@ -26,27 +26,11 @@ export default function PublicLayout({ children }) {
       <header className="public-header" role="banner">
         <div className="public-shell">
           <div className="public-header-inner">
-            <Link to="/" className="landing-brand" aria-label="CollegeExam home page">
-              <img 
-                src="/websitelogo.jpeg" 
-                alt="CollegeExam Logo" 
-                style={{
-                  height: '40px',
-                  width: 'auto',
-                  maxWidth: '160px',
-                  objectFit: 'contain',
-                  borderRadius: '8px',
-                  transition: 'transform 0.3s ease, box-shadow 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 8px 20px rgba(191, 156, 53, 0.25)';
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 4px 12px rgba(191, 156, 53, 0.15)';
-                }}
-              />
+            <Link to="/" className="landing-brand" aria-label="Exam Monitoring home page">
+              <span className="landing-brand-mark" aria-hidden="true">
+                <span className="landing-brand-dot" />
+              </span>
+              <span className="landing-brand-text">Exam Monitoring</span>
             </Link>
 
             <nav className="public-nav" aria-label="Primary navigation">
