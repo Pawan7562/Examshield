@@ -121,15 +121,15 @@ const baseTemplate = (content) => `
 <body>
   <div class="container">
     <div class="header">
-      <h1>COLLEGEEXAM</h1>
+      <h1>EXAMSHIELD</h1>
       <p>SECURE ONLINE EXAMINATION PLATFORM</p>
     </div>
     <div class="body">
       ${content}
     </div>
     <div class="footer">
-      <p>This is an automated message from CollegeExam. Please do not reply to this email.</p>
-      <p>© ${new Date().getFullYear()} CollegeExam. All rights reserved.</p>
+      <p>This is an automated message from ExamShield. Please do not reply to this email.</p>
+      <p>© ${new Date().getFullYear()} ExamShield. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -158,7 +158,7 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
   const content = `
     <div class="badge">ACCOUNT CREATED</div>
     <p class="greeting">Welcome, ${name}!</p>
-    <p class="text">Your student account has been created on CollegeExam by <strong>${collegeName}</strong>. Use the credentials below to log in to your exam portal.</p>
+    <p class="text">Your student account has been created on ExamShield by <strong>${collegeName}</strong>. Use the credentials below to log in to your exam portal.</p>
     
     <div class="credentials-box">
       <div class="credential-item">
@@ -176,7 +176,7 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
     </div>
     
     <div style="text-align:center;">
-      <a href="${loginUrl}" class="btn">Login to CollegeExam →</a>
+      <a href="${loginUrl}" class="btn">Login to ExamShield →</a>
     </div>
     
     <div class="warning-box">
@@ -187,7 +187,7 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
   await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to: email,
-    subject: `Welcome to CollegeExam — Your Login Credentials`,
+    subject: `Welcome to ExamShield — Your Login Credentials`,
     html: baseTemplate(content),
   });
   
@@ -362,8 +362,8 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
   
   const content = `
     <div class="badge">WELCOME</div>
-    <p class="greeting">Welcome to CollegeExam, ${name}!</p>
-    <p class="text"><strong>${collegeName}</strong> has been successfully registered on CollegeExam. You can now start managing your students and conducting secure online examinations.</p>
+    <p class="greeting">Welcome to ExamShield, ${name}!</p>
+    <p class="text"><strong>${collegeName}</strong> has been successfully registered on ExamShield. You can now start managing your students and conducting secure online examinations.</p>
     
     <div class="exam-card">
       <h3>Getting Started</h3>
@@ -381,7 +381,7 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
   await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to: email,
-    subject: `Welcome to CollegeExam — Your College is Ready!`,
+    subject: `Welcome to ExamShield — Your College is Ready!`,
     html: baseTemplate(content),
   });
 };

@@ -62,15 +62,10 @@ export default function Register() {
 
       <div className="auth-theme-card">
         <Link to="/" className="auth-theme-brand">
-          <img 
-            src="/websitelogo.jpeg" 
-            alt="CollegeExam Logo" 
-            className="auth-theme-brand-logo"
-          />
-          <div className="auth-theme-brand-text">
-            <span className="auth-theme-brand-name">COLLEGEEXAM</span>
-            <span className="auth-theme-brand-tagline">Exam Monitoring</span>
-          </div>
+          <span className="auth-theme-brand-mark">
+            <span className="auth-theme-brand-dot" />
+          </span>
+          <span className="auth-theme-brand-text">Exam Monitoring</span>
         </Link>
 
         <h1 className="auth-theme-title">Register Your College</h1>

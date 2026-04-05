@@ -162,29 +162,14 @@
   gap: 0.75rem;
 }
 
-.sidebar-logo-image {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  object-fit: cover;
-  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.3);
-  transition: all 0.3s ease;
-}
-
-.sidebar-logo-image:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.4);
-}
-
 .sidebar-logo-text {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: white;
   background: linear-gradient(135deg, #ffffff 0%, #e0e7ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-align: center;
 }
 
 .sidebar-toggle {
