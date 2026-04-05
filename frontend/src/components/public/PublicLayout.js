@@ -26,11 +26,9 @@ export default function PublicLayout({ children }) {
       <header className="public-header" role="banner">
         <div className="public-shell">
           <div className="public-header-inner">
-            <Link to="/" className="landing-brand" aria-label="Exam Monitoring home page">
-              <span className="landing-brand-mark" aria-hidden="true">
-                <span className="landing-brand-dot" />
-              </span>
-              <span className="landing-brand-text">Exam Monitoring</span>
+            <Link to="/" className="landing-brand" aria-label="CollegeExam home page" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src={require('../../assets/logo.jpeg')} alt="CollegeExam Logo" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(233, 69, 96, 0.4)' }} />
+              <span className="landing-brand-text" style={{ fontSize: '18px', letterSpacing: '1px' }}>CollegeExam</span>
             </Link>
 
             <nav className="public-nav" aria-label="Primary navigation">
@@ -67,11 +65,9 @@ export default function PublicLayout({ children }) {
           <div className="enhanced-footer-content">
             <div className="footer-main">
               <div className="footer-brand-section">
-                <Link to="/" className="landing-brand enhanced-footer-brand" aria-label="Exam Monitoring home page">
-                  <span className="landing-brand-mark" aria-hidden="true">
-                    <span className="landing-brand-dot" />
-                  </span>
-                  <span className="landing-brand-text">Exam Monitoring</span>
+                <Link to="/" className="landing-brand enhanced-footer-brand" aria-label="CollegeExam home page" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <img src={require('../../assets/logo.jpeg')} alt="CollegeExam Logo" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(233, 69, 96, 0.4)' }} />
+                  <span className="landing-brand-text" style={{ fontSize: '18px', letterSpacing: '1px' }}>CollegeExam</span>
                 </Link>
                 <p className="enhanced-footer-description">
                   Secure online exams with live monitoring, AI alerts, screen tracking, and automated reports.
