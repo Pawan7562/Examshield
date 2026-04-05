@@ -35,15 +35,40 @@ const createTransporter = () => {
   }
   
   console.log('✅ Email configured - creating real transporter');
-  return nodemailer.createTransport({
+  
+  const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT || 587,
-    secure: process.env.EMAIL_PORT == 465,
+    port: parseInt(process.env.EMAIL_PORT) || 587,
+    secure: process.env.EMAIL_PORT == 465, // true for 465, false for 587
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    tls: {
+      rejectUnauthorized: false // Helps with some SMTP server certificate issues
+    }
   });
+
+  return {
+    sendMail: async (options) => {
+      // Ensure 'from' is set
+      const mailOptions = {
+        ...options,
+        from: options.from || process.env.EMAIL_FROM || process.env.EMAIL_USER
+      };
+      
+      console.log(`📤 Attempting to send email to: ${mailOptions.to} from: ${mailOptions.from}`);
+      
+      try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log('✅ Email sent successfully:', info.messageId);
+        return info;
+      } catch (err) {
+        console.error('❌ Nodemailer Error:', err.message);
+        throw err;
+      }
+    }
+  };
 };
 
 // Base email template
