@@ -815,23 +815,7 @@ export default function ExamRoom() {
       <aside style={{ width: 260, background: 'rgba(10,10,20,0.98)', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0, left: 0, overflowY: 'auto' }}>
         {/* Header */}
         <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <img 
-            src="/logo1.jpeg" 
-            alt="CollegeExam Logo" 
-            style={{ 
-              height: '32px', 
-              width: 'auto', 
-              maxWidth: '120px', 
-              objectFit: 'contain', 
-              marginRight: '12px',
-              filter: 'drop-shadow(0 2px 8px rgba(233, 69, 96, 0.3))',
-              borderRadius: '8px',
-              padding: '3px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(10px)'
-            }}
-          />
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#e94560', letterSpacing: 2, marginBottom: 4 }}>COLLEGEEXAM</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#e94560', letterSpacing: 2, marginBottom: 4 }}>EXAMSHIELD</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.4 }}>{examData?.name}</div>
           <div style={{ fontSize: 11, color: '#4a5568', marginTop: 4 }}>{examData?.type?.toUpperCase()}</div>
         </div>

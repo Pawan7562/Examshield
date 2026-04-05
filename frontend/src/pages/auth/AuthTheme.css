@@ -64,24 +64,6 @@
   text-decoration: none;
 }
 
-.auth-theme-brand-logo {
-  height: 40px;
-  width: auto;
-  max-width: 200px;
-  object-fit: contain;
-  transition: transform 0.3s ease;
-  filter: drop-shadow(0 2px 8px rgba(255, 198, 28, 0.15));
-  border-radius: 8px;
-  padding: 4px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.auth-theme-brand-logo:hover {
-  transform: scale(1.05);
-  filter: drop-shadow(0 4px 12px rgba(255, 180, 0, 0.25));
-  background: rgba(255, 255, 255, 1);
-}
-
 .auth-theme-brand-mark {
   width: 30px;
   height: 30px;

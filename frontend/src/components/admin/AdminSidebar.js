@@ -129,11 +129,7 @@ export default function AdminSidebar() {
         {/* Header */}
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-logo">
-            <img 
-              src="/logo1.jpeg" 
-              alt="CollegeExam Logo" 
-              className="admin-sidebar-logo-image"
-            />
+            <div className="admin-sidebar-logo-text">EXAMSHIELD</div>
             <div className="admin-sidebar-logo-badge">ADMIN</div>
           </div>
           <button 
