@@ -38,6 +38,8 @@ const allowedOrigins = [
   'http://localhost:3002',
   'https://examshield.vercel.app',
   'https://examshield.vercel.app/',
+  'https://www.pkthenexgenexam.xyz',
+  'https://pkthenexgenexam.xyz',
   process.env.FRONTEND_URL,
   process.env.APP_URL
 ].filter(Boolean);
@@ -176,13 +178,50 @@ const routes = require('./routes');
 app.use('/api', routes);
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     version: '1.0.0',
   });
+});
+
+// Diagnostic Email Route
+app.get('/api/test-email', async (req, res) => {
+  try {
+    const { sendExamNotification } = require('./services/emailService');
+    const testEmailAddress = req.query.email || process.env.EMAIL_USER;
+    
+    if (!testEmailAddress) {
+      return res.status(400).json({ success: false, message: 'No email address provided or found in EMAIL_USER.' });
+    }
+
+    await sendExamNotification({
+      name: 'Diagnostic Test',
+      email: testEmailAddress,
+      examName: 'Connection Test',
+      examDate: new Date(),
+      examDuration: 60,
+      examKey: 'TEST-123',
+      subject: 'System Check',
+      type: 'diagnostic',
+      loginUrl: 'https://examshield.vercel.app'
+    });
+    
+    res.json({ success: true, message: `Diagnostic email successfully sent to ${testEmailAddress}` });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Email delivery failed.', 
+      error: error.message,
+      smtp_config: {
+        host: process.env.EMAIL_HOST,
+        user: process.env.EMAIL_USER,
+        has_pass: !!process.env.EMAIL_PASS
+      }
+    });
+  }
 });
 
 // 404 handler
