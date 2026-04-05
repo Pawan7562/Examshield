@@ -91,15 +91,20 @@
 }
 
 .admin-sidebar-logo-image {
-  height: 32px;
+  height: 36px;
   width: auto;
-  max-width: 160px;
+  max-width: 180px;
   object-fit: contain;
   transition: transform 0.3s ease;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.15));
+  border-radius: 6px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .admin-sidebar-logo-image:hover {
-  transform: scale(1.05);
+  transform: scale(1.06);
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.25));
 }
 
 .admin-sidebar-logo-text {

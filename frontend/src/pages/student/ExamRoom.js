@@ -818,7 +818,18 @@ export default function ExamRoom() {
           <img 
             src="/logo1.jpeg" 
             alt="ExamShield Logo" 
-            style={{ height: '32px', width: 'auto', maxWidth: '120px', objectFit: 'contain', marginRight: '12px' }}
+            style={{ 
+              height: '40px', 
+              width: 'auto', 
+              maxWidth: '140px', 
+              objectFit: 'contain', 
+              marginRight: '12px',
+              filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15))',
+              borderRadius: '8px',
+              padding: '4px',
+              background: 'rgba(255, 255, 255, 0.9)',
+              transition: 'transform 0.3s ease'
+            }}
           />
           <div style={{ fontSize: 11, fontWeight: 700, color: '#e94560', letterSpacing: 2, marginBottom: 4 }}>EXAMSHIELD</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.4 }}>{examData?.name}</div>
