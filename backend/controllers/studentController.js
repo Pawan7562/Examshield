@@ -46,11 +46,19 @@ exports.getStudents = async (req, res) => {
 
     // Apply filters
     if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,roll_no.ilike.%${search}%,student_id.ilike.%${search}%`);
+      // Try searching with all columns, fallback if schema is missing roll_no
+      try {
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,roll_no.ilike.%${search}%,student_id.ilike.%${search}%`);
+      } catch (err) {
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,student_id.ilike.%${search}%`);
+      }
     }
+    
     if (isActive !== undefined) {
       query = query.eq('is_active', isActive === 'true');
     }
+    
+    // Optional filters with column existence safety
     if (department) {
       query = query.eq('department', department);
     }
@@ -61,7 +69,29 @@ exports.getStudents = async (req, res) => {
     const { data: students, error, count } = await query;
 
     if (error) {
-      console.error('Students query error:', error);
+      console.error('Students query error (Retrying without roll_no):', error);
+      // Final fallback for missing columns
+      if (error.message.includes('column') || error.message.includes('roll_no')) {
+         const retryQuery = await supabase.from('students')
+           .select('*', { count: 'exact' })
+           .eq('college_id', collegeId)
+           .or(`name.ilike.%${search || ''}%,email.ilike.%${search || ''}%`)
+           .range(offset, offset + limit - 1)
+           .order('created_at', { ascending: false });
+         
+         if (retryQuery.error) throw retryQuery.error;
+         
+         return res.json({
+           success: true,
+           data: {
+             students: retryQuery.data || [],
+             total: retryQuery.count || 0,
+             page: parseInt(page),
+             totalPages: Math.ceil((retryQuery.count || 0) / limit),
+             schema_warning: 'Some columns are missing in your database'
+           }
+         });
+      }
       throw error;
     }
 
@@ -190,25 +220,21 @@ exports.addStudent = async (req, res) => {
       });
     }
 
-    // Send credentials email (optional - can be skipped for development)
-    try {
-      await sendStudentCredentials({
-        name,
-        email,
-        studentId,
-        password,
-        collegeName: 'Test College', // You might want to get this from the college data
-        loginUrl: process.env.STUDENT_LOGIN_URL || 'http://localhost:3000/student/login'
-      });
-      console.log('Credentials email sent to:', email);
-    } catch (emailError) {
-      console.error('Email send error:', emailError);
-      // Don't fail the request if email fails
-    }
+    // Send credentials email (Background - No await to prevent timeouts)
+    sendStudentCredentials({
+      name,
+      email,
+      studentId,
+      password,
+      collegeName: req.user.name || 'Your Institution',
+      loginUrl: process.env.STUDENT_LOGIN_URL || 'https://examshield.vercel.app/student/login'
+    }).catch(emailError => {
+      console.error('❌ Background Email Error:', emailError.message);
+    });
 
     res.status(201).json({
       success: true,
-      message: 'Student added successfully',
+      message: 'Student added successfully!',
       data: {
         id: student?.id || 'unknown',
         student_id: student?.student_id || studentId,
