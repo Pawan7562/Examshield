@@ -816,7 +816,7 @@ export default function ExamRoom() {
         {/* Header */}
         <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <img 
-            src="/logo.jpeg" 
+            src="/logo1.jpeg" 
             alt="ExamShield Logo" 
             style={{ height: '32px', width: 'auto', maxWidth: '120px', objectFit: 'contain', marginRight: '12px' }}
           />

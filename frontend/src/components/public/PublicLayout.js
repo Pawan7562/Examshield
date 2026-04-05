@@ -28,7 +28,7 @@ export default function PublicLayout({ children }) {
           <div className="public-header-inner">
             <Link to="/" className="landing-brand" aria-label="Exam Monitoring home page">
               <img 
-                src="/logo.jpeg" 
+                src="/logo1.jpeg" 
                 alt="ExamShield Logo" 
                 className="landing-brand-logo"
               />

@@ -116,7 +116,7 @@ export default function StudentSidebar() {
         <div className="sidebar-header">
           <div className="sidebar-logo">
             <img 
-              src="/logo.jpeg" 
+              src="/logo1.jpeg" 
               alt="ExamShield Logo" 
               className="sidebar-logo-image"
             />
