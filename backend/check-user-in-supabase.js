@@ -5,12 +5,12 @@ async function checkUserInSupabase() {
   console.log('🔍 Checking if user exists in Supabase...');
   
   try {
-    // Check for test@examshield.com
-    console.log('\n📊 Step 1: Check test@examshield.com');
+    // Check for test@CollegeExam.com
+    console.log('\n📊 Step 1: Check test@CollegeExam.com');
     const { data: testUser, error: testError } = await supabase
       .from('colleges')
       .select('*')
-      .eq('email', 'test@examshield.com')
+      .eq('email', 'test@CollegeExam.com')
       .limit(1);
     
     if (testError) {
@@ -47,12 +47,12 @@ async function checkUserInSupabase() {
       console.log('❌ Email user NOT found in Supabase');
     }
     
-    // Check for admin@examshield.com
-    console.log('\n📊 Step 3: Check admin@examshield.com');
+    // Check for admin@CollegeExam.com
+    console.log('\n📊 Step 3: Check admin@CollegeExam.com');
     const { data: adminUser, error: adminError } = await supabase
       .from('colleges')
       .select('*')
-      .eq('email', 'admin@examshield.com')
+      .eq('email', 'admin@CollegeExam.com')
       .limit(1);
     
     if (adminError) {

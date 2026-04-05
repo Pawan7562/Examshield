@@ -1,5 +1,5 @@
 -- =====================================================
--- ExamShield - Complete SQL Schema
+-- CollegeExam - Complete SQL Schema
 -- Database: PostgreSQL
 -- Version: 1.0.0
 -- =====================================================

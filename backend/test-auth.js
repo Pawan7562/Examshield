@@ -9,7 +9,7 @@ async function testAuth() {
     const { data: college, error } = await supabase
       .from('colleges')
       .select('*')
-      .eq('email', 'test@examshield.com')
+      .eq('email', 'test@CollegeExam.com')
       .maybeSingle();
     
     console.log('College found:', college);

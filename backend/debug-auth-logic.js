@@ -8,7 +8,7 @@ async function debugAuthLogic() {
   try {
     // Test 1: Check if test user exists
     console.log('\n📊 Step 1: Check test user existence');
-    const testEmail = 'test@examshield.com';
+    const testEmail = 'test@CollegeExam.com';
     const userResult = await query('SELECT * FROM colleges WHERE email = $1', [testEmail]);
     
     if (userResult.rows.length === 0) {
@@ -53,8 +53,8 @@ async function debugAuthLogic() {
     console.log('\n📊 Step 4: Test JWT token generation');
     const jwt = require('jsonwebtoken');
     const payload = { id: user.id, role: 'college_admin' };
-    const jwtSecret = process.env.JWT_SECRET || 'examshield_jwt_secret_key_change_in_production_123456';
-    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'examshield_refresh_secret_key_change_in_production_123456';
+    const jwtSecret = process.env.JWT_SECRET || 'CollegeExam_jwt_secret_key_change_in_production_123456';
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'CollegeExam_refresh_secret_key_change_in_production_123456';
     
     try {
       const accessToken = jwt.sign(payload, jwtSecret, {

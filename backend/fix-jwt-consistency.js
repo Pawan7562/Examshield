@@ -30,7 +30,7 @@ async function fixJWTConsistency() {
     const { data: colleges } = await supabase
       .from('colleges')
       .select('*')
-      .eq('email', 'test@examshield.com')
+      .eq('email', 'test@CollegeExam.com')
       .limit(1);
     
     if (!colleges || colleges.length === 0) {
@@ -99,7 +99,7 @@ async function fixJWTConsistency() {
         }
         
         // Update or add JWT_SECRET
-        const jwtSecretLine = `JWT_SECRET=examshield_jwt_secret_key_change_in_production_123456`;
+        const jwtSecretLine = `JWT_SECRET=CollegeExam_jwt_secret_key_change_in_production_123456`;
         
         if (envContent.includes('JWT_SECRET=')) {
           envContent = envContent.replace(/JWT_SECRET=.*/g, jwtSecretLine);
@@ -113,7 +113,7 @@ async function fixJWTConsistency() {
         // Also add other required JWT secrets
         const otherSecrets = [
           'JWT_EXPIRES_IN=7d',
-          'JWT_REFRESH_SECRET=examshield_refresh_secret_key_change_in_production_123456',
+          'JWT_REFRESH_SECRET=CollegeExam_refresh_secret_key_change_in_production_123456',
           'JWT_REFRESH_EXPIRES_IN=30d'
         ];
         

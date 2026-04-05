@@ -7,7 +7,7 @@ async function testLoginEndpoint() {
   try {
     // Test the login endpoint with correct credentials
     const loginData = {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'Test@123'
     };
     

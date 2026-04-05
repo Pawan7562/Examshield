@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🚀 Setting up Supabase for ExamShield...');
+console.log('🚀 Setting up Supabase for CollegeExam...');
 
 // Create .env file if it doesn't exist
 const envPath = path.join(__dirname, '.env');
@@ -16,9 +16,9 @@ SUPABASE_URL=https://jzxvxxgsfbzqhrirnqfm.supabase.co
 SUPABASE_SERVICE_KEY=sb_publishable_y3eNbkdEjC59m67N0GiY4Q_1rOveLyL
 
 # JWT
-JWT_SECRET=examshield_jwt_secret_key_change_in_production_123456
+JWT_SECRET=CollegeExam_jwt_secret_key_change_in_production_123456
 JWT_EXPIRES_IN=7d
-JWT_REFRESH_SECRET=examshield_refresh_secret_key_change_in_production_123456
+JWT_REFRESH_SECRET=CollegeExam_refresh_secret_key_change_in_production_123456
 JWT_REFRESH_EXPIRES_IN=30d
 
 # Email (Mock for development)
@@ -26,14 +26,14 @@ EMAIL_HOST=
 EMAIL_PORT=587
 EMAIL_USER=
 EMAIL_PASS=
-EMAIL_FROM=ExamShield <noreply@examshield.com>
+EMAIL_FROM=CollegeExam <noreply@CollegeExam.com>
 
 # Platform
 PLATFORM_URL=http://localhost:3000
 STUDENT_LOGIN_URL=http://localhost:3000/student/login
 
 # Super Admin
-SUPER_ADMIN_EMAIL=admin@examshield.com
+SUPER_ADMIN_EMAIL=admin@CollegeExam.com
 SUPER_ADMIN_PASSWORD=SuperAdmin@123
 
 # File Upload
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS exams (
 
 -- Insert default super admin
 INSERT INTO super_admins (name, email, password, role)
-VALUES ('Super Admin', 'admin@examshield.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LrUpm', 'super_admin')
+VALUES ('Super Admin', 'admin@CollegeExam.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LrUpm', 'super_admin')
 ON CONFLICT (email) DO NOTHING;
 `;
 

@@ -10,7 +10,7 @@ async function debugLogin() {
     const { data: colleges, error: collegeError } = await supabase
       .from('colleges')
       .select('*')
-      .eq('email', 'test@examshield.com');
+      .eq('email', 'test@CollegeExam.com');
     
     if (collegeError) {
       console.error('❌ Error finding college:', collegeError);
@@ -59,7 +59,7 @@ async function debugLogin() {
     
     try {
       const response = await axios.post('http://localhost:5000/api/auth/college/login', {
-        email: 'test@examshield.com',
+        email: 'test@CollegeExam.com',
         password: 'Test@123'
       }, {
         headers: {

@@ -33,7 +33,7 @@ async function checkRealEmail() {
     
     const testData = {
       name: 'Real Email Test Student',
-      email: process.env.EMAIL_USER || 'test@examshield.com', // Use your email for testing
+      email: process.env.EMAIL_USER || 'test@CollegeExam.com', // Use your email for testing
       studentId: 'ES-2026-TEST001',
       password: 'RealTest123!',
       collegeName: 'Test College',
@@ -51,7 +51,7 @@ async function checkRealEmail() {
       if (process.env.EMAIL_HOST) {
         console.log('🎉 REAL EMAIL SENT!');
         console.log('📧 Check your email inbox at:', testData.email);
-        console.log('📧 Subject should be: "Welcome to ExamShield — Your Login Credentials"');
+        console.log('📧 Subject should be: "Welcome to CollegeExam — Your Login Credentials"');
         console.log('📧 Look for student credentials in the email');
       } else {
         console.log('ℹ️  MOCK EMAIL SENT (check console above for credentials)');

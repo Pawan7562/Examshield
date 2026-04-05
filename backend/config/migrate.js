@@ -28,7 +28,7 @@ async function migrate() {
       INSERT INTO super_admins (name, email, password)
       VALUES ($1, $2, $3)
       ON CONFLICT (email) DO NOTHING
-    `, ['Super Admin', process.env.SUPER_ADMIN_EMAIL || 'admin@examshield.com', hashedPassword]);
+    `, ['Super Admin', process.env.SUPER_ADMIN_EMAIL || 'admin@CollegeExam.com', hashedPassword]);
     
     console.log('✅ Super admin seeded');
     console.log('🎉 Migration complete!');

@@ -10,7 +10,7 @@ global.localStorage = {
 
 async function completeSystemTest() {
   try {
-    console.log('🚀 Complete ExamShield System Test\n');
+    console.log('🚀 Complete CollegeExam System Test\n');
     
     const api = axios.create({
       baseURL: 'http://localhost:5000/api',
@@ -31,7 +31,7 @@ async function completeSystemTest() {
     // 1. Login as college admin
     console.log('1. 🔐 College Admin Login...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     
@@ -84,7 +84,7 @@ async function completeSystemTest() {
     
     console.log('\n🌐 Access your application:');
     console.log('   Frontend: http://localhost:3000');
-    console.log('   Login with: test@examshield.com / password123');
+    console.log('   Login with: test@CollegeExam.com / password123');
     
   } catch (error) {
     console.error('❌ Test failed:', error.response?.data || error.message);

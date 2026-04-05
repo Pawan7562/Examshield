@@ -16,7 +16,7 @@ async function createTestUser() {
     // Create a new college with known password
     const result = await query('INSERT INTO colleges (name, email, password, phone, address, website, subscription_plan, subscription_expiry) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
       'Test College',
-      'test@examshield.com',
+      'test@CollegeExam.com',
       hashedPassword,
       '1234567890',
       'Test Address',
@@ -29,7 +29,7 @@ async function createTestUser() {
     
     // Test login with the new user
     console.log('\n🔍 Testing login with new user...');
-    const loginResult = await query('SELECT * FROM colleges WHERE email = $1', ['test@examshield.com']);
+    const loginResult = await query('SELECT * FROM colleges WHERE email = $1', ['test@CollegeExam.com']);
     
     if (loginResult.rows.length > 0) {
       const college = loginResult.rows[0];
@@ -38,7 +38,7 @@ async function createTestUser() {
       
       if (isMatch) {
         console.log('\n🎉 LOGIN CREDENTIALS READY:');
-        console.log('📧 Email: test@examshield.com');
+        console.log('📧 Email: test@CollegeExam.com');
         console.log('🔑 Password: Test@123');
         console.log('🌐 Login URL: http://localhost:3000/admin/login');
       }

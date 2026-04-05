@@ -32,7 +32,7 @@ async function testFrontendLogin() {
     console.log('1. Testing college login (like frontend)...');
     try {
       const response = await api.post('/auth/college/login', {
-        email: 'test@examshield.com',
+        email: 'test@CollegeExam.com',
         password: 'password123'
       });
       

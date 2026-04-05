@@ -1,5 +1,5 @@
-// Next steps guide for ExamShield
-console.log('🎯 ExamShield - Next Steps Guide\n');
+// Next steps guide for CollegeExam
+console.log('🎯 CollegeExam - Next Steps Guide\n');
 
 console.log('✅ What\'s Working:');
 console.log('   🔐 Authentication - Login/Logout working');
@@ -10,7 +10,7 @@ console.log('   💾 Database - All tables created and working');
 
 console.log('\n🚀 What You Can Do Now:');
 console.log('   1. Open http://localhost:3000 in your browser');
-console.log('   2. Login with: test@examshield.com / password123');
+console.log('   2. Login with: test@CollegeExam.com / password123');
 console.log('   3. You\'ll see the admin dashboard');
 
 console.log('\n📋 Admin Dashboard Features:');
@@ -44,5 +44,5 @@ console.log('   ✅ Authentication - JWT tokens working');
 console.log('   ✅ Real-time - Socket.IO for monitoring');
 console.log('   ✅ File Upload - CSV bulk upload ready');
 
-console.log('\n🌟 You\'re ready to use ExamShield!');
+console.log('\n🌟 You\'re ready to use CollegeExam!');
 console.log('   Start by adding students and creating your first exam.');

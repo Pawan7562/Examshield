@@ -12,7 +12,7 @@ async function testAPI() {
     console.log('URL:', baseURL + '/auth/college/login');
     
     const testData = {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     };
     

@@ -227,7 +227,7 @@ exports.addStudent = async (req, res) => {
       studentId,
       password,
       collegeName: req.user.name || 'Your Institution',
-      loginUrl: process.env.STUDENT_LOGIN_URL || 'https://examshield.vercel.app/student/login'
+      loginUrl: process.env.STUDENT_LOGIN_URL || 'https://CollegeExam.vercel.app/student/login'
     }).catch(emailError => {
       console.error('❌ Background Email Error:', emailError.message);
     });

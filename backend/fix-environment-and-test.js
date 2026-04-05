@@ -11,9 +11,9 @@ SUPABASE_URL=https://jzxvxxgsfbzqhrirnqfm.supabase.co
 SUPABASE_SERVICE_KEY=sb_publishable_Y3eNbkdEjC59m67N0GiY4Q_1rOveLyL
 
 # JWT Configuration
-JWT_SECRET=examshield_jwt_secret_key_change_in_production_123456
+JWT_SECRET=CollegeExam_jwt_secret_key_change_in_production_123456
 JWT_EXPIRES_IN=7d
-JWT_REFRESH_SECRET=examshield_refresh_secret_key_change_in_production_123456
+JWT_REFRESH_SECRET=CollegeExam_refresh_secret_key_change_in_production_123456
 JWT_REFRESH_EXPIRES_IN=30d
 
 # Server Configuration
@@ -49,7 +49,7 @@ async function testLoginWithFixedEnv() {
     const { data: colleges, error } = await supabase
       .from('colleges')
       .select('*')
-      .eq('email', 'test@examshield.com');
+      .eq('email', 'test@CollegeExam.com');
     
     if (error) {
       console.error('❌ Database error:', error);
@@ -77,7 +77,7 @@ async function testLoginWithFixedEnv() {
     
     try {
       const response = await axios.post('http://localhost:5000/api/auth/college/login', {
-        email: 'test@examshield.com',
+        email: 'test@CollegeExam.com',
         password: 'Test@123'
       }, {
         headers: { 'Content-Type': 'application/json' },
@@ -92,7 +92,7 @@ async function testLoginWithFixedEnv() {
       if (response.data.success) {
         console.log('\n🎉 LOGIN IS WORKING!');
         console.log('🌐 You can now login at: http://localhost:3000/admin/login');
-        console.log('📧 Email: test@examshield.com');
+        console.log('📧 Email: test@CollegeExam.com');
         console.log('🔑 Password: Test@123');
       }
       

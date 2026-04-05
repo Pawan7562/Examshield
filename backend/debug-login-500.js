@@ -26,10 +26,10 @@ async function debugLogin500() {
       console.error('❌ Login failed:', loginResponse.data);
     }
     
-    console.log('\n📊 Step 2: Test with test@examshield.com credentials');
+    console.log('\n📊 Step 2: Test with test@CollegeExam.com credentials');
     try {
       const testLoginResponse = await axios.post('http://localhost:5000/api/auth/college/login', {
-        email: 'test@examshield.com',
+        email: 'test@CollegeExam.com',
         password: 'Test@123'
       });
       

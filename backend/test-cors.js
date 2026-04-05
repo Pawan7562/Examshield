@@ -11,7 +11,7 @@ async function testCORS() {
     console.log('1. Testing with frontend headers...');
     try {
       const response = await axios.post(baseURL + '/auth/college/login', {
-        email: 'test@examshield.com',
+        email: 'test@CollegeExam.com',
         password: 'password123'
       }, {
         headers: {

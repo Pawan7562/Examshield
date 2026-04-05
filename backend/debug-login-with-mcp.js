@@ -10,7 +10,7 @@ async function debugLoginWithMCP() {
     console.log('Checking for missing indexes on colleges table...');
     
     // Simulate the exact login query
-    const email = 'test@examshield.com';
+    const email = 'test@CollegeExam.com';
     console.log(`🔍 Testing query: SELECT * FROM colleges WHERE email = '${email}'`);
     
     const startTime = Date.now();
@@ -79,7 +79,7 @@ async function debugLoginWithMCP() {
     try {
       const axios = require('axios');
       const response = await axios.post('http://localhost:5000/api/auth/college/login', {
-        email: 'test@examshield.com',
+        email: 'test@CollegeExam.com',
         password: 'Test@123'
       }, {
         headers: { 'Content-Type': 'application/json' },

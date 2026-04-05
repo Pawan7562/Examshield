@@ -31,7 +31,7 @@ async function debugStudentsEndpoint() {
     // 1. Login first
     console.log('1. 🔐 Getting auth token...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     

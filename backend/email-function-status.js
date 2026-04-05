@@ -40,7 +40,7 @@ console.log('');
 
 console.log('📱 TO USE IT:');
 console.log('1. Go to http://localhost:3000');
-console.log('2. Login: test@examshield.com / password123');
+console.log('2. Login: test@CollegeExam.com / password123');
 console.log('3. Add a student');
 console.log('4. Check this backend console');
 console.log('5. Copy the credentials from the console');

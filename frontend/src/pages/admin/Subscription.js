@@ -106,7 +106,7 @@ export default function Subscription() {
         amount,
         currency: 'INR',
         order_id: orderId,
-        name: 'ExamShield',
+        name: 'CollegeExam',
         description: `${planDetails.name} Plan`,
         theme: { color: '#e94560' },
         handler: async (response) => {
@@ -143,7 +143,7 @@ export default function Subscription() {
       <div className="admin-page-header">
         <div className="admin-header-content">
           <h1 className="admin-page-title">Subscription Management</h1>
-          <p className="admin-page-subtitle">Manage your ExamShield subscription and billing</p>
+          <p className="admin-page-subtitle">Manage your CollegeExam subscription and billing</p>
         </div>
         <div className="admin-header-actions">
           <Button variant="secondary" icon={CreditCard}>

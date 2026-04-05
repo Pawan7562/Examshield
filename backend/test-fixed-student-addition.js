@@ -31,7 +31,7 @@ async function testFixedStudentAddition() {
     // Login
     console.log('1. 🔐 Logging in as admin...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     
@@ -41,7 +41,7 @@ async function testFixedStudentAddition() {
     
     // Add student
     console.log('\n2. 👤 Adding student with fixed error handling...');
-    const uniqueEmail = `fixed${Date.now()}@examshield.com`;
+    const uniqueEmail = `fixed${Date.now()}@CollegeExam.com`;
     const uniqueRollNo = 'FIX' + Date.now().toString().slice(-6);
     
     try {

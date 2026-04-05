@@ -31,7 +31,7 @@ async function debugAddStudent() {
     // 1. Login first
     console.log('1. 🔐 Getting auth token...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     
@@ -54,7 +54,7 @@ async function debugAddStudent() {
     
     const studentData = {
       name: 'Test Student',
-      email: 'teststudent@examshield.com',
+      email: 'teststudent@CollegeExam.com',
       rollNo: 'STU001',
       department: 'Computer Science',
       semester: '1st',
@@ -86,7 +86,7 @@ async function debugAddStudent() {
     console.log('\n4. 🧪 Testing with minimal required data...');
     const minimalData = {
       name: 'Minimal Student',
-      email: 'minimal@examshield.com',
+      email: 'minimal@CollegeExam.com',
       rollNo: 'MIN001'
     };
     

@@ -32,11 +32,11 @@ async function sendPasswordResetEmail(email, userId, resetToken) {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
-    subject: 'ExamShield - Password Reset Request',
+    subject: 'CollegeExam - Password Reset Request',
     html: `
       <h2>Password Reset Request</h2>
       <p>Hello ${userId},</p>
-      <p>You requested to reset your password for ExamShield.</p>
+      <p>You requested to reset your password for CollegeExam.</p>
       <p>Click the link below to reset your password:</p>
       <a href="https://yourdomain.com/reset-password?token=${resetToken}&userId=${userId}">Reset Password</a>
       <p>This link will expire in 1 hour.</p>

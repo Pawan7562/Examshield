@@ -41,7 +41,7 @@ async function debugLiveLogin() {
     const testEmails = [
       'test@example.com',
       'pawankumaryadav756286976@gmail.com',
-      'admin@examshield.com'
+      'admin@CollegeExam.com'
     ];
     
     for (const email of testEmails) {

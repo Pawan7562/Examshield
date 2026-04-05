@@ -31,7 +31,7 @@ async function testRealExams() {
     // Login and get real college ID
     console.log('1. 🔐 Logging in and getting college ID...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     

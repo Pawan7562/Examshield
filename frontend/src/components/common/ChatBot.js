@@ -9,7 +9,7 @@ const ChatBot = () => {
     {
       id: 1,
       type: 'bot',
-      content: 'Hello! I\'m your ExamShield assistant. How can I help you today?',
+      content: 'Hello! I\'m your CollegeExam assistant. How can I help you today?',
       timestamp: new Date(),
       status: 'delivered'
     }
@@ -37,7 +37,7 @@ const ChatBot = () => {
       const botMessage = {
         id: Date.now() + 1,
         type: 'bot',
-        content: 'Thanks for your message! I\'m here to help you with ExamShield. What would you like to know about our exam monitoring platform?',
+        content: 'Thanks for your message! I\'m here to help you with CollegeExam. What would you like to know about our exam monitoring platform?',
         timestamp: new Date(),
         status: 'delivered'
       };
@@ -83,7 +83,7 @@ const ChatBot = () => {
                   <Bot size={20} />
                 </div>
                 <div className="chatbot-info">
-                  <h3>ExamShield Assistant</h3>
+                  <h3>CollegeExam Assistant</h3>
                   <span className="chatbot-status">
                     <span className="status-dot online"></span>
                     Online - Typically responds instantly

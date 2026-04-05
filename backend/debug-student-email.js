@@ -45,7 +45,7 @@ async function debugStudentEmail() {
       if (process.env.EMAIL_HOST) {
         console.log('🎉 REAL EMAIL SHOULD BE SENT!');
         console.log('📧 Check your email inbox at:', testData.email);
-        console.log('📧 Subject: "Welcome to ExamShield — Your Login Credentials"');
+        console.log('📧 Subject: "Welcome to CollegeExam — Your Login Credentials"');
       } else {
         console.log('ℹ️  MOCK EMAIL MODE - Check console for credentials');
       }
@@ -90,7 +90,7 @@ async function debugStudentEmail() {
     // Login
     console.log('Logging in as admin...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     
@@ -100,7 +100,7 @@ async function debugStudentEmail() {
     
     // Add student via API
     console.log('Adding student via API...');
-    const uniqueEmail = `debug${Date.now()}@examshield.com`;
+    const uniqueEmail = `debug${Date.now()}@CollegeExam.com`;
     const uniqueRollNo = 'DBG' + Date.now().toString().slice(-6);
     
     try {

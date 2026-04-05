@@ -194,12 +194,12 @@ class ChatBotService {
       },
       
       features: {
-        main: "ExamShield offers comprehensive exam monitoring features:\n\n🔍 **Live Proctoring**\nReal-time video monitoring with AI-powered alerts\n\n🤖 **Smart Detection**\nAutomated violation detection for unfair practices\n\n📊 **Advanced Analytics**\nDetailed performance insights and reports\n\n🔒 **Bank-level Security**\n256-bit encryption and GDPR compliance\n\n📱 **Multi-platform Support**\nWorks on web, mobile, and desktop\n\nWhich feature would you like to explore?",
+        main: "CollegeExam offers comprehensive exam monitoring features:\n\n🔍 **Live Proctoring**\nReal-time video monitoring with AI-powered alerts\n\n🤖 **Smart Detection**\nAutomated violation detection for unfair practices\n\n📊 **Advanced Analytics**\nDetailed performance insights and reports\n\n🔒 **Bank-level Security**\n256-bit encryption and GDPR compliance\n\n📱 **Multi-platform Support**\nWorks on web, mobile, and desktop\n\nWhich feature would you like to explore?",
         followups: ['How does AI detection work?', 'Security details?', 'Mobile app features?']
       },
       
       demo: {
-        main: "Great choice! I can help you experience ExamShield:\n\n🎮 **Interactive Demo**\nSchedule a personalized walkthrough with our team\n\n📅 **14-Day Free Trial**\nFull access to all features\n\n📹 **Video Tour**\nWatch our platform in action\n\n🎯 **Quick Start**\nBegin monitoring exams in minutes\n\nWhich option works best for you?",
+        main: "Great choice! I can help you experience CollegeExam:\n\n🎮 **Interactive Demo**\nSchedule a personalized walkthrough with our team\n\n📅 **14-Day Free Trial**\nFull access to all features\n\n📹 **Video Tour**\nWatch our platform in action\n\n🎯 **Quick Start**\nBegin monitoring exams in minutes\n\nWhich option works best for you?",
         followups: ['Schedule demo', 'Start free trial', 'Watch video tour']
       },
       
@@ -219,7 +219,7 @@ class ChatBotService {
       },
       
       integration: {
-        main: "ExamShield integrates seamlessly with popular LMS platforms:\n\n🎓 **Moodle**\nOne-click integration\nSingle sign-on support\nGrade book sync\n\n📚 **Canvas**\nNative integration\nReal-time sync\nMobile app support\n\n🏫 **Blackboard**\nEnterprise integration\nCustom workflows\nAPI access\n\n🔧 **Custom Integration**\nRESTful API\nWebhook support\nDeveloper documentation\n\nWhich LMS are you using?",
+        main: "CollegeExam integrates seamlessly with popular LMS platforms:\n\n🎓 **Moodle**\nOne-click integration\nSingle sign-on support\nGrade book sync\n\n📚 **Canvas**\nNative integration\nReal-time sync\nMobile app support\n\n🏫 **Blackboard**\nEnterprise integration\nCustom workflows\nAPI access\n\n🔧 **Custom Integration**\nRESTful API\nWebhook support\nDeveloper documentation\n\nWhich LMS are you using?",
         followups: ['Moodle setup guide', 'Canvas integration', 'Custom API docs']
       },
       
@@ -229,7 +229,7 @@ class ChatBotService {
       },
       
       mobile: {
-        main: "Yes! ExamShield works perfectly on mobile:\n\n📱 **Mobile Apps**\nAvailable on iOS App Store & Google Play\nNative performance and features\n\n💻 **Responsive Web**\nWorks on any mobile browser\nTouch-optimized interface\n\n📟 **Tablet Support**\niPad and Android tablet optimized\nSplit-screen multitasking\n\n🔔 **Push Notifications**\nExam reminders and alerts\nReal-time status updates\n\nDownload our apps and monitor on the go!",
+        main: "Yes! CollegeExam works perfectly on mobile:\n\n📱 **Mobile Apps**\nAvailable on iOS App Store & Google Play\nNative performance and features\n\n💻 **Responsive Web**\nWorks on any mobile browser\nTouch-optimized interface\n\n📟 **Tablet Support**\niPad and Android tablet optimized\nSplit-screen multitasking\n\n🔔 **Push Notifications**\nExam reminders and alerts\nReal-time status updates\n\nDownload our apps and monitor on the go!",
         followups: ['iOS app features', 'Android download', 'Web mobile guide']
       },
       
@@ -239,7 +239,7 @@ class ChatBotService {
       },
       
       general: {
-        main: "Welcome to ExamShield! I'm your AI assistant and I'm here to help you with:\n\n💰 **Pricing Plans**\n⚡ **Platform Features**\n🎮 **Demo & Trial**\n🛡️ **Security & Privacy**\n📱 **Mobile Apps**\n🔧 **Technical Support**\n📞 **Contact Information**\n\nWhat would you like to know about our exam monitoring platform?",
+        main: "Welcome to CollegeExam! I'm your AI assistant and I'm here to help you with:\n\n💰 **Pricing Plans**\n⚡ **Platform Features**\n🎮 **Demo & Trial**\n🛡️ **Security & Privacy**\n📱 **Mobile Apps**\n🔧 **Technical Support**\n📞 **Contact Information**\n\nWhat would you like to know about our exam monitoring platform?",
         followups: ['Show me pricing', 'Platform features', 'Start free trial']
       }
     };

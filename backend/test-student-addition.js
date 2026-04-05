@@ -8,7 +8,7 @@ async function testStudentAddition() {
     // Step 1: Get authentication token
     console.log('\n📊 Step 1: Get authentication token');
     const loginResponse = await axios.post('http://localhost:5000/api/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'Test@123'
     });
     
@@ -24,7 +24,7 @@ async function testStudentAddition() {
     console.log('\n📊 Step 2: Test student addition');
     const studentData = {
       name: 'Test Student',
-      email: 'teststudent@examshield.com',
+      email: 'teststudent@CollegeExam.com',
       roll_no: 'TEST001',
       department: 'Computer Science',
       batch: '2026'

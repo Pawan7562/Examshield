@@ -8,7 +8,7 @@ async function debugAuth401() {
     // Step 1: Test login with exact credentials
     console.log('\n📊 Step 1: Test login');
     const loginResponse = await axios.post('http://localhost:5000/api/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'Test@123'
     });
     

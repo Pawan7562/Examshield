@@ -1,5 +1,5 @@
-// Email Setup Guide for ExamShield
-console.log('📧 Email Setup Guide for ExamShield\n');
+// Email Setup Guide for CollegeExam
+console.log('📧 Email Setup Guide for CollegeExam\n');
 
 console.log('🔍 Current Issue:');
 console.log('Emails are in MOCK MODE (development) - only logged to console');
@@ -20,14 +20,14 @@ console.log('EMAIL_HOST=smtp.gmail.com');
 console.log('EMAIL_PORT=587');
 console.log('EMAIL_USER=your-email@gmail.com');
 console.log('EMAIL_PASS=your-app-password');
-console.log('EMAIL_FROM=ExamShield <your-email@gmail.com>');
+console.log('EMAIL_FROM=CollegeExam <your-email@gmail.com>');
 console.log('STUDENT_LOGIN_URL=http://localhost:3000/student/login\n');
 
 console.log('OPTION 3: Use Gmail App Password');
 console.log('1. Enable 2-factor authentication on Gmail');
 console.log('2. Go to Google Account settings');
 console.log('3. Security -> App passwords');
-console.log('4. Generate app password for ExamShield');
+console.log('4. Generate app password for CollegeExam');
 console.log('5. Use that password in EMAIL_PASS\n');
 
 console.log('📋 What Happens Currently:');
@@ -47,6 +47,6 @@ console.log('📝 Test Credentials Display:');
 console.log('When you add a student, you\'ll see in console:');
 console.log('Mock email sent {');
 console.log('  to: "student@email.com",');
-console.log('  subject: "Welcome to ExamShield...",');
+console.log('  subject: "Welcome to CollegeExam...",');
 console.log('  text: "...Your credentials..."');
 console.log('}');

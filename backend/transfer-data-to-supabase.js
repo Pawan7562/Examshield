@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Load local data
-const DB_FILE = path.join(__dirname, 'data', 'examshield.json');
+const DB_FILE = path.join(__dirname, 'data', 'CollegeExam.json');
 let localData = {};
 if (fs.existsSync(DB_FILE)) {
   localData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));

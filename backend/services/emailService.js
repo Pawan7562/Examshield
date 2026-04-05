@@ -95,17 +95,17 @@ const baseTemplate = (content) => `
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f7fb; color: #333; }
     .container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
     .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 32px; text-align: center; }
-    .header h1 { color: #e94560; font-size: 28px; letter-spacing: 2px; font-weight: 800; }
+    .header h1 { color: #0a74da; font-size: 28px; letter-spacing: 2px; font-weight: 800; }
     .header p { color: #a0aec0; margin-top: 4px; font-size: 13px; letter-spacing: 1px; }
     .body { padding: 40px 32px; }
     .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #1a1a2e; }
     .text { font-size: 14px; line-height: 1.7; color: #555; margin-bottom: 20px; }
-    .credentials-box { background: #f8faff; border: 2px dashed #e94560; border-radius: 8px; padding: 24px; margin: 24px 0; }
+    .credentials-box { background: #f8faff; border: 2px dashed #0a74da; border-radius: 8px; padding: 24px; margin: 24px 0; }
     .credential-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
     .credential-item:last-child { border-bottom: none; }
     .credential-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 600; }
     .credential-value { font-size: 15px; font-weight: 700; color: #1a1a2e; font-family: 'Courier New', monospace; }
-    .btn { display: inline-block; background: #e94560; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; margin: 20px 0; letter-spacing: 0.5px; }
+    .btn { display: inline-block; background: #0a74da; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; margin: 20px 0; letter-spacing: 0.5px; }
     .warning-box { background: #fff8e1; border-left: 4px solid #ffc107; padding: 16px; border-radius: 4px; margin: 20px 0; }
     .warning-box p { font-size: 13px; color: #856404; }
     .exam-card { background: #f0f7ff; border-radius: 8px; padding: 20px; margin: 20px 0; }
@@ -114,22 +114,22 @@ const baseTemplate = (content) => `
     .exam-detail strong { color: #1a1a2e; }
     .footer { background: #f8faff; padding: 24px 32px; text-align: center; border-top: 1px solid #eee; }
     .footer p { font-size: 12px; color: #aaa; line-height: 1.6; }
-    .footer a { color: #e94560; text-decoration: none; }
-    .badge { display: inline-block; background: #e94560; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
+    .footer a { color: #0a74da; text-decoration: none; }
+    .badge { display: inline-block; background: #0a74da; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>EXAMSHIELD</h1>
+      <h1>COLLEGEEXAM</h1>
       <p>SECURE ONLINE EXAMINATION PLATFORM</p>
     </div>
     <div class="body">
       ${content}
     </div>
     <div class="footer">
-      <p>This is an automated message from ExamShield. Please do not reply to this email.</p>
-      <p>© ${new Date().getFullYear()} ExamShield. All rights reserved.</p>
+      <p>This is an automated message from CollegeExam. Please do not reply to this email.</p>
+      <p>© ${new Date().getFullYear()} CollegeExam. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -158,7 +158,7 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
   const content = `
     <div class="badge">ACCOUNT CREATED</div>
     <p class="greeting">Welcome, ${name}!</p>
-    <p class="text">Your student account has been created on ExamShield by <strong>${collegeName}</strong>. Use the credentials below to log in to your exam portal.</p>
+    <p class="text">Your student account has been created on CollegeExam by <strong>${collegeName}</strong>. Use the credentials below to log in to your exam portal.</p>
     
     <div class="credentials-box">
       <div class="credential-item">
@@ -176,7 +176,7 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
     </div>
     
     <div style="text-align:center;">
-      <a href="${loginUrl}" class="btn">Login to ExamShield →</a>
+      <a href="${loginUrl}" class="btn">Login to CollegeExam →</a>
     </div>
     
     <div class="warning-box">
@@ -187,7 +187,7 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
   await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to: email,
-    subject: `Welcome to ExamShield — Your Login Credentials`,
+    subject: `Welcome to CollegeExam — Your Login Credentials`,
     html: baseTemplate(content),
   });
   
@@ -362,8 +362,8 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
   
   const content = `
     <div class="badge">WELCOME</div>
-    <p class="greeting">Welcome to ExamShield, ${name}!</p>
-    <p class="text"><strong>${collegeName}</strong> has been successfully registered on ExamShield. You can now start managing your students and conducting secure online examinations.</p>
+    <p class="greeting">Welcome to CollegeExam, ${name}!</p>
+    <p class="text"><strong>${collegeName}</strong> has been successfully registered on CollegeExam. You can now start managing your students and conducting secure online examinations.</p>
     
     <div class="exam-card">
       <h3>Getting Started</h3>
@@ -381,7 +381,7 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
   await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to: email,
-    subject: `Welcome to ExamShield — Your College is Ready!`,
+    subject: `Welcome to CollegeExam — Your College is Ready!`,
     html: baseTemplate(content),
   });
 };

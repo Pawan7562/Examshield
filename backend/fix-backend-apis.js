@@ -10,7 +10,7 @@ async function testBackendAPIs() {
     const axios = require('axios');
     
     const loginResponse = await axios.post('http://localhost:5000/api/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'Test@123'
     });
     

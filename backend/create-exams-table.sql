@@ -1,5 +1,5 @@
 -- Create exams table if it doesn't exist
--- This table stores exam information for the ExamShield system
+-- This table stores exam information for the CollegeExam system
 
 -- Drop table if it exists (for fresh start)
 DROP TABLE IF EXISTS exams CASCADE;

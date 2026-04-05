@@ -31,7 +31,7 @@ async function testExamCreation() {
     // Login
     console.log('1. 🔐 Logging in...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     

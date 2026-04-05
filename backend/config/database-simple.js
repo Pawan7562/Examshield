@@ -14,7 +14,7 @@ const memoryDB = {
     {
       id: 1,
       name: 'Super Admin',
-      email: 'admin@examshield.com',
+      email: 'admin@CollegeExam.com',
       password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LrUpm', // SuperAdmin@123
       role: 'super_admin'
     }

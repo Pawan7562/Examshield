@@ -30,14 +30,14 @@ async function createDefaultAdmin() {
     const { data, error } = await supabase
       .from('super_admins')
       .select('*')
-      .eq('email', 'admin@examshield.com');
+      .eq('email', 'admin@CollegeExam.com');
     
     if (!data || data.length === 0) {
       const { data: insertData, error: insertError } = await supabase
         .from('super_admins')
         .insert([{
           name: 'Super Admin',
-          email: 'admin@examshield.com',
+          email: 'admin@CollegeExam.com',
           password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LrUpm',
           role: 'super_admin'
         }]);
@@ -69,7 +69,7 @@ async function main() {
   await createDefaultAdmin();
   
   console.log('🎉 Supabase database setup complete!');
-  console.log('📊 You can now use the ExamShield registration system!');
+  console.log('📊 You can now use the CollegeExam registration system!');
   console.log('🌐 Test at: http://localhost:3000/admin/register');
 }
 

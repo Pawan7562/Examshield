@@ -7,7 +7,7 @@ async function testDatabase() {
   try {
     // Test 1: Check if super admin exists
     console.log('\n📊 Test 1: Check Super Admin');
-    const adminResult = await query('SELECT * FROM super_admins WHERE email = $1', ['admin@examshield.com']);
+    const adminResult = await query('SELECT * FROM super_admins WHERE email = $1', ['admin@CollegeExam.com']);
     console.log('✅ Super Admin found:', adminResult.rows.length > 0 ? 'YES' : 'NO');
     
     // Test 2: Check colleges table
@@ -38,7 +38,7 @@ async function testDatabase() {
     }
     
     console.log('\n🎉 All tests completed successfully!');
-    console.log('📊 Database file location: ./data/examshield.json');
+    console.log('📊 Database file location: ./data/CollegeExam.json');
     
   } catch (error) {
     console.error('❌ Test error:', error);

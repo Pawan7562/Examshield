@@ -29,7 +29,7 @@ app.use(helmet({
 // CORS configuration for Vercel
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://examshield.vercel.app', 'https://examshield-git-*.vercel.app']
+    ? ['https://CollegeExam.vercel.app', 'https://CollegeExam-git-*.vercel.app']
     : ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

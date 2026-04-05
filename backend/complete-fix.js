@@ -1,5 +1,5 @@
 // Complete fix for 400 error and email issues
-console.log('🔧 Complete Fix for ExamShield Issues\n');
+console.log('🔧 Complete Fix for CollegeExam Issues\n');
 
 console.log('📋 Issues Identified:');
 console.log('1. ✅ Students API works in backend tests (200 OK)');
@@ -32,7 +32,7 @@ console.log('EMAIL_HOST=smtp.gmail.com');
 console.log('EMAIL_PORT=587');
 console.log('EMAIL_USER=your-email@gmail.com');
 console.log('EMAIL_PASS=your-app-password');
-console.log('EMAIL_FROM=ExamShield <your-email@gmail.com>');
+console.log('EMAIL_FROM=CollegeExam <your-email@gmail.com>');
 console.log('STUDENT_LOGIN_URL=http://localhost:3000/student/login');
 console.log('');
 
@@ -55,7 +55,7 @@ console.log('');
 
 console.log('🔍 How to Get Student Credentials Now:');
 console.log('1. Add student via http://localhost:3000');
-console.log('2. Login as admin: test@examshield.com / password123');
+console.log('2. Login as admin: test@CollegeExam.com / password123');
 console.log('3. Go to Students section');
 console.log('4. Click "Add Student"');
 console.log('5. Fill form and submit');
@@ -66,7 +66,7 @@ console.log('');
 console.log('📝 Expected Console Output:');
 console.log('Mock email sent {');
 console.log('  to: "student@email.com",');
-console.log('  subject: "Welcome to ExamShield...",');
+console.log('  subject: "Welcome to CollegeExam...",');
 console.log('  text: "...Student ID: ES-2026-XXXXX... Password: XXXXXX..."');
 console.log('}');
 console.log('');

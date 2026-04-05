@@ -39,8 +39,8 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
-  'https://examshield.vercel.app',
-  'https://examshield.vercel.app/',
+  'https://CollegeExam.vercel.app',
+  'https://CollegeExam.vercel.app/',
   'https://www.pkthenexgenexam.xyz',
   'https://pkthenexgenexam.xyz',
   process.env.FRONTEND_URL,
@@ -209,7 +209,7 @@ app.get('/api/test-email', async (req, res) => {
       examKey: 'TEST-123',
       subject: 'System Check',
       type: 'diagnostic',
-      loginUrl: 'https://examshield.vercel.app'
+      loginUrl: 'https://CollegeExam.vercel.app'
     });
     
     res.json({ success: true, message: `Diagnostic email successfully sent to ${testEmailAddress}` });
@@ -284,7 +284,7 @@ app.use((err, req, res, next) => {
 // =====================================================
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  logger.info(`🚀 ExamShield server running on port ${PORT}`);
+  logger.info(`🚀 CollegeExam server running on port ${PORT}`);
   logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`📡 Socket.IO enabled for real-time monitoring`);
 });

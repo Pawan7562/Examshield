@@ -34,7 +34,7 @@ INSERT INTO colleges (
   subscription_expiry
 ) VALUES (
   'Test College',
-  'test@examshield.com',
+  'test@CollegeExam.com',
   '$2a$12$iGKR0au8j09EfzWhLKJPaORI.L/UhR9DqFY4EmPvQHHceOeRT/W0e',
   '1234567890',
   'Test Address',
@@ -58,7 +58,7 @@ CREATE TABLE super_admins (
 
 -- Insert super admin
 INSERT INTO super_admins (name, email, password, role)
-VALUES ('Super Admin', 'admin@examshield.com', '$2a$12$Eegqb8BbC9AM2CRAvSpJ9O/GIlft9TTk2BCbamP5KmhJ11/9EWZha', 'super_admin');
+VALUES ('Super Admin', 'admin@CollegeExam.com', '$2a$12$Eegqb8BbC9AM2CRAvSpJ9O/GIlft9TTk2BCbamP5KmhJ11/9EWZha', 'super_admin');
 
 -- Verify data
 SELECT 'Colleges table created with test data!' as status;

@@ -31,7 +31,7 @@ async function testCompleteEmailFlow() {
     // 1. Login
     console.log('1. 🔐 Logging in as admin...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     
@@ -44,7 +44,7 @@ async function testCompleteEmailFlow() {
     console.log('   This will trigger the email function...');
     console.log('   WATCH CONSOLE for credential output...\n');
     
-    const uniqueEmail = `flowtest${Date.now()}@examshield.com`;
+    const uniqueEmail = `flowtest${Date.now()}@CollegeExam.com`;
     const uniqueRollNo = 'FLOW' + Date.now().toString().slice(-6);
     
     try {

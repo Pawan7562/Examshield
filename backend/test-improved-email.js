@@ -31,7 +31,7 @@ async function testImprovedEmail() {
     // 1. Login
     console.log('1. 🔐 Logging in as admin...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     
@@ -43,7 +43,7 @@ async function testImprovedEmail() {
     console.log('\n2. 👤 Adding student - WATCH CONSOLE BELOW FOR CREDENTIALS!');
     console.log('   You will see a detailed credentials printout...');
     
-    const uniqueEmail = `student${Date.now()}@examshield.com`;
+    const uniqueEmail = `student${Date.now()}@CollegeExam.com`;
     const uniqueRollNo = 'STU' + Date.now().toString().slice(-6);
     
     try {

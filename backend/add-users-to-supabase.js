@@ -6,15 +6,15 @@ async function addUsersToSupabase() {
   console.log('🔍 Adding users to Supabase...');
   
   try {
-    // Add test@examshield.com user
-    console.log('\n📊 Step 1: Add test@examshield.com');
+    // Add test@CollegeExam.com user
+    console.log('\n📊 Step 1: Add test@CollegeExam.com');
     const testPassword = await bcrypt.hash('Test@123', 12);
     const { data: testUser, error: testError } = await supabase
       .from('colleges')
       .insert([{
         id: '176863da-7279-4ae4-afcc-6aa099d192b8',
         name: 'Test College',
-        email: 'test@examshield.com',
+        email: 'test@CollegeExam.com',
         password: testPassword,
         role: 'college_admin',
         is_active: true,
@@ -58,15 +58,15 @@ async function addUsersToSupabase() {
       console.log('✅ Email user added successfully');
     }
     
-    // Add admin@examshield.com user
-    console.log('\n📊 Step 3: Add admin@examshield.com');
+    // Add admin@CollegeExam.com user
+    console.log('\n📊 Step 3: Add admin@CollegeExam.com');
     const adminPassword = await bcrypt.hash('Admin@123', 12);
     const { data: adminUser, error: adminError } = await supabase
       .from('colleges')
       .insert([{
         id: '376863da-7279-4ae4-afcc-6aa099d192b9',
         name: 'Super Admin',
-        email: 'admin@examshield.com',
+        email: 'admin@CollegeExam.com',
         password: adminPassword,
         role: 'super_admin',
         is_active: true,
@@ -87,9 +87,9 @@ async function addUsersToSupabase() {
     console.log('\n🎯 User Addition Complete');
     console.log('\n📝 Users added to Supabase database!');
     console.log('\n🔐 You can now login with:');
-    console.log('  - test@examshield.com / Test@123');
+    console.log('  - test@CollegeExam.com / Test@123');
     console.log('  - pawankumaryadav75628697@gmail.com / Test@123');
-    console.log('  - admin@examshield.com / Admin@123');
+    console.log('  - admin@CollegeExam.com / Admin@123');
     
   } catch (error) {
     console.error('❌ Addition error:', error);

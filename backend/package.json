@@ -1,5 +1,5 @@
 {
-  "name": "examshield-backend",
+  "name": "CollegeExam-backend",
   "version": "1.0.0",
   "description": "AI-Based Online Exam Monitoring & Management System - Backend",
   "main": "server.js",

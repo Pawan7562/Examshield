@@ -63,7 +63,7 @@ async function debugEmailIssue() {
     // Login
     console.log('Logging in as admin...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     
@@ -73,7 +73,7 @@ async function debugEmailIssue() {
     
     // Add student
     console.log('Adding student via API...');
-    const uniqueEmail = `student${Date.now()}@examshield.com`;
+    const uniqueEmail = `student${Date.now()}@CollegeExam.com`;
     const uniqueRollNo = 'STU' + Date.now().toString().slice(-6);
     
     try {
@@ -111,7 +111,7 @@ async function debugEmailIssue() {
       console.log('   EMAIL_PORT=587');
       console.log('   EMAIL_USER=your-email@gmail.com');
       console.log('   EMAIL_PASS=your-app-password');
-      console.log('   EMAIL_FROM=ExamShield <your-email@gmail.com>');
+      console.log('   EMAIL_FROM=CollegeExam <your-email@gmail.com>');
       console.log('   STUDENT_LOGIN_URL=http://localhost:3000/student/login');
       console.log('3. Restart backend server');
       console.log('4. Students will receive real emails');

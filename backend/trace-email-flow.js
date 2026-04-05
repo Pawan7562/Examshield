@@ -31,7 +31,7 @@ async function traceEmailFlow() {
     // 1. Login
     console.log('1. 🔐 Logging in...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     
@@ -47,7 +47,7 @@ async function traceEmailFlow() {
     console.log('   - Any error messages');
     console.log('');
     
-    const uniqueEmail = `trace${Date.now()}@examshield.com`;
+    const uniqueEmail = `trace${Date.now()}@CollegeExam.com`;
     const uniqueRollNo = 'TRACE' + Date.now().toString().slice(-6);
     
     console.log(`Adding student: ${uniqueEmail}`);
@@ -68,7 +68,7 @@ async function traceEmailFlow() {
       console.log('✅ SUCCESS (Working):');
       console.log('Mock email sent {');
       console.log('  to: "' + uniqueEmail + '",');
-      console.log('  subject: "Welcome to ExamShield...",');
+      console.log('  subject: "Welcome to CollegeExam...",');
       console.log('  text: "...Student ID: ... Password: ..."');
       console.log('}');
       console.log('Credentials email sent to ' + uniqueEmail);
@@ -90,7 +90,7 @@ async function traceEmailFlow() {
     try {
       await sendStudentCredentials({
         name: 'Direct Test Student',
-        email: 'directtest@examshield.com',
+        email: 'directtest@CollegeExam.com',
         studentId: 'ES-2026-999999',
         password: 'DirectTest123!',
         collegeName: 'Test College',

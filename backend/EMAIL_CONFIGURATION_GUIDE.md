@@ -1,4 +1,4 @@
-# Email Configuration Guide for ExamShield
+# Email Configuration Guide for CollegeExam
 
 ## 🚨 ISSUE IDENTIFIED: Students Not Receiving Exam Emails
 
@@ -25,7 +25,7 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=your-gmail-address@gmail.com
 EMAIL_PASS=your-app-password-here
-EMAIL_FROM=ExamShield <your-gmail-address@gmail.com>
+EMAIL_FROM=CollegeExam <your-gmail-address@gmail.com>
 
 # Application Configuration
 NODE_ENV=development
@@ -38,7 +38,7 @@ STUDENT_LOGIN_URL=http://localhost:3002/student/login
 2. **Go to Google Account Settings** → Security
 3. **Generate App Password**:
    - Select "App" from app options
-   - Give it a name like "ExamShield"
+   - Give it a name like "CollegeExam"
    - Copy the 16-character password generated
 
 ### Step 3: Update Configuration

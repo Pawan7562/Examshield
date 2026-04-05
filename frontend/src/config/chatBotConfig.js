@@ -2,9 +2,9 @@
 
 export const CHATBOT_CONFIG = {
   // General Settings
-  botName: 'ExamShield Assistant',
+  botName: 'CollegeExam Assistant',
   botAvatar: '🤖',
-  welcomeMessage: 'Hello! I\'m your ExamShield assistant. How can I help you today?',
+  welcomeMessage: 'Hello! I\'m your CollegeExam assistant. How can I help you today?',
   
   // UI Settings
   position: {
@@ -135,7 +135,7 @@ export const CHATBOT_INTENTS = {
   GREETING: {
     keywords: ['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening'],
     responses: [
-      'Hello! Welcome to ExamShield. How can I assist you today?',
+      'Hello! Welcome to CollegeExam. How can I assist you today?',
       'Hi there! I\'m here to help you with our exam monitoring platform.',
       'Greetings! What can I help you with today?'
     ]
@@ -153,7 +153,7 @@ export const CHATBOT_INTENTS = {
   FEATURES: {
     keywords: ['feature', 'capability', 'what can', 'functionality', 'option', 'ability'],
     responses: [
-      'ExamShield offers comprehensive features for secure exam monitoring.',
+      'CollegeExam offers comprehensive features for secure exam monitoring.',
       'Let me tell you about our powerful features.',
       'I can explain all the capabilities of our platform.'
     ]
@@ -162,8 +162,8 @@ export const CHATBOT_INTENTS = {
   DEMO: {
     keywords: ['demo', 'trial', 'test', 'preview', 'showcase', 'experience', 'try'],
     responses: [
-      'Great choice! I can help you experience ExamShield.',
-      'I\'d love to show you what ExamShield can do!',
+      'Great choice! I can help you experience CollegeExam.',
+      'I\'d love to show you what CollegeExam can do!',
       'Let me help you get started with a demo or trial.'
     ]
   },
@@ -182,7 +182,7 @@ export const CHATBOT_INTENTS = {
     responses: [
       'I can help you with technical requirements and setup.',
       'Let me explain the technical aspects.',
-      'I can provide technical guidance for ExamShield.'
+      'I can provide technical guidance for CollegeExam.'
     ]
   },
   
@@ -198,9 +198,9 @@ export const CHATBOT_INTENTS = {
   INTEGRATION: {
     keywords: ['integration', 'lms', 'connect', 'api', 'moodle', 'canvas', 'blackboard'],
     responses: [
-      'ExamShield integrates seamlessly with popular LMS platforms.',
+      'CollegeExam integrates seamlessly with popular LMS platforms.',
       'I can help you with integration options.',
-      'Let me explain how ExamShield connects with your existing systems.'
+      'Let me explain how CollegeExam connects with your existing systems.'
     ]
   },
   
@@ -216,9 +216,9 @@ export const CHATBOT_INTENTS = {
   MOBILE: {
     keywords: ['mobile', 'app', 'phone', 'tablet', 'ios', 'android', 'smartphone'],
     responses: [
-      'Yes! ExamShield works perfectly on mobile devices.',
+      'Yes! CollegeExam works perfectly on mobile devices.',
       'I can tell you about our mobile capabilities.',
-      'ExamShield is fully mobile-optimized.'
+      'CollegeExam is fully mobile-optimized.'
     ]
   },
   

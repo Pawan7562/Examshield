@@ -1,4 +1,4 @@
--- create-tables-supabase.sql - Create all tables for ExamShield
+-- create-tables-supabase.sql - Create all tables for CollegeExam
 -- Run this in Supabase SQL Editor: https://jzxvxxgsfbzqhrirnqfm.supabase.co
 
 -- Create colleges table
@@ -73,12 +73,12 @@ CREATE TABLE IF NOT EXISTS exams (
 
 -- Insert default super admin
 INSERT INTO super_admins (name, email, password, role)
-VALUES ('Super Admin', 'admin@examshield.com', '$2a$12$Eegqb8BbC9AM2CRAvSpJ9O/GIlft9TTk2BCbamP5KmhJ11/9EWZha', 'super_admin')
+VALUES ('Super Admin', 'admin@CollegeExam.com', '$2a$12$Eegqb8BbC9AM2CRAvSpJ9O/GIlft9TTk2BCbamP5KmhJ11/9EWZha', 'super_admin')
 ON CONFLICT (email) DO NOTHING;
 
 -- Insert test college with working password
 INSERT INTO colleges (name, email, password, phone, address, website, subscription_plan, is_active)
-VALUES ('Test College', 'test@examshield.com', '$2a$12$iGKR0au8j09EfzWhLKJPaORI.L/UhR9DqFY4EmPvQHHceOeRT/W0e', '1234567890', 'Test Address', 'http://test.com', 'basic', true)
+VALUES ('Test College', 'test@CollegeExam.com', '$2a$12$iGKR0au8j09EfzWhLKJPaORI.L/UhR9DqFY4EmPvQHHceOeRT/W0e', '1234567890', 'Test Address', 'http://test.com', 'basic', true)
 ON CONFLICT (email) DO NOTHING;
 
 -- Show created tables

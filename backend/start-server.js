@@ -1,5 +1,5 @@
 // start-server.js - Simple server startup without npm dependencies
-console.log('🚀 Starting ExamShield Backend Server...');
+console.log('🚀 Starting CollegeExam Backend Server...');
 
 // Check if we have basic dependencies
 try {

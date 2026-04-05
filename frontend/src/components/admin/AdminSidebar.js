@@ -129,7 +129,8 @@ export default function AdminSidebar() {
         {/* Header */}
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-logo">
-            <div className="admin-sidebar-logo-text">EXAMSHIELD</div>
+            <img src="/logo.png" alt="CollegeExam Logo" className="admin-sidebar-logo-img" style={{ height: '32px', marginRight: '10px' }} />
+            {!isCollapsed && <div className="admin-sidebar-logo-text">COLLEGEEXAM</div>}
             <div className="admin-sidebar-logo-badge">ADMIN</div>
           </div>
           <button 

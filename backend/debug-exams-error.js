@@ -31,7 +31,7 @@ async function debugExamsError() {
     // Login
     console.log('1. 🔐 Logging in as admin...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     

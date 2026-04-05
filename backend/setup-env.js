@@ -7,9 +7,9 @@ SUPABASE_URL=https://jzxvxxgsfbzqhrirnqfm.supabase.co
 SUPABASE_SERVICE_KEY=sb_publishable_Y3eNbkdEjC59m67N0GiY4Q_1rOveLyL
 
 # JWT Configuration
-JWT_SECRET=examshield_jwt_secret_key_change_in_production_123456
+JWT_SECRET=CollegeExam_jwt_secret_key_change_in_production_123456
 JWT_EXPIRES_IN=7d
-JWT_REFRESH_SECRET=examshield_refresh_secret_key_change_in_production_123456
+JWT_REFRESH_SECRET=CollegeExam_refresh_secret_key_change_in_production_123456
 JWT_REFRESH_EXPIRES_IN=30d
 
 # Email Configuration (Optional)

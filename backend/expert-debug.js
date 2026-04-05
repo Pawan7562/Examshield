@@ -31,7 +31,7 @@ async function expertDebug() {
     // 1. Login and get token
     console.log('1. 🔐 Authentication...');
     const loginResponse = await api.post('/auth/college/login', {
-      email: 'test@examshield.com',
+      email: 'test@CollegeExam.com',
       password: 'password123'
     });
     

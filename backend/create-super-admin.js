@@ -17,13 +17,13 @@ async function createSuperAdmin() {
     if (!database.super_admins) database.super_admins = [];
     
     // Remove existing admin if any
-    database.super_admins = database.super_admins.filter(admin => admin.email !== 'admin@examshield.com');
+    database.super_admins = database.super_admins.filter(admin => admin.email !== 'admin@CollegeExam.com');
     
     // Add new super admin
     const superAdmin = {
       id: 1,
       name: 'Super Admin',
-      email: 'admin@examshield.com',
+      email: 'admin@CollegeExam.com',
       password: hashedPassword,
       role: 'super_admin',
       created_at: new Date().toISOString()
@@ -34,13 +34,13 @@ async function createSuperAdmin() {
     // Save database
     const fs = require('fs');
     const path = require('path');
-    const DB_FILE = path.join(__dirname, 'data', 'examshield.json');
+    const DB_FILE = path.join(__dirname, 'data', 'CollegeExam.json');
     fs.writeFileSync(DB_FILE, JSON.stringify(database, null, 2));
     
     console.log('✅ Super admin created:', superAdmin);
     
     console.log('\n🎉 SUPER ADMIN CREDENTIALS:');
-    console.log('📧 Email: admin@examshield.com');
+    console.log('📧 Email: admin@CollegeExam.com');
     console.log('🔑 Password: Admin@123');
     console.log('🌐 Login URL: http://localhost:3000/admin/login');
     

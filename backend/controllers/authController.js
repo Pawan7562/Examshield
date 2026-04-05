@@ -10,8 +10,8 @@ const { sendCollegeWelcome } = require('../services/emailService');
  * Generate JWT tokens
  */
 const generateTokens = (payload) => {
-  const jwtSecret = process.env.JWT_SECRET || 'examshield_jwt_secret_key_change_in_production_123456';
-  const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'examshield_refresh_secret_key_change_in_production_123456';
+  const jwtSecret = process.env.JWT_SECRET || 'CollegeExam_jwt_secret_key_change_in_production_123456';
+  const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'CollegeExam_refresh_secret_key_change_in_production_123456';
   
   const accessToken = jwt.sign(payload, jwtSecret, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
@@ -428,7 +428,7 @@ exports.refreshToken = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Refresh token required.' });
     }
 
-    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'examshield_refresh_secret_key_change_in_production_123456';
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'CollegeExam_refresh_secret_key_change_in_production_123456';
     const decoded = jwt.verify(refreshToken, jwtRefreshSecret);
     const tokens = generateTokens({ id: decoded.id, role: decoded.role });
 

@@ -32,7 +32,7 @@ async function debugCurrentIssues() {
     console.log('1. 🔐 Testing authentication...');
     try {
       const loginResponse = await api.post('/auth/college/login', {
-        email: 'test@examshield.com',
+        email: 'test@CollegeExam.com',
         password: 'password123'
       });
       
@@ -67,7 +67,7 @@ async function debugCurrentIssues() {
     // 3. Test student addition
     console.log('\n3. ➕ Testing student addition...');
     const uniqueRollNo = 'TEST' + Date.now().toString().slice(-6);
-    const uniqueEmail = `student${Date.now()}@examshield.com`;
+    const uniqueEmail = `student${Date.now()}@CollegeExam.com`;
     
     try {
       const addResponse = await api.post('/admin/students', {

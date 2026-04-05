@@ -46,7 +46,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       <div style={loadingStyles.page}>
         <div style={loadingStyles.card}>
           <div style={loadingStyles.spinner} />
-          <p style={loadingStyles.text}>Loading Exam Monitoring...</p>
+          <p style={loadingStyles.text}>Loading CollegeExam Proctoring...</p>
         </div>
       </div>
     );
@@ -70,7 +70,7 @@ function App() {
             style: {
               background: '#fffdf8',
               color: '#2d3138',
-              border: '1px solid rgba(255, 184, 0, 0.25)',
+              border: '1px solid rgba(13, 110, 253, 0.25)',
               fontFamily: 'Manrope, sans-serif',
             },
             success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
@@ -187,8 +187,8 @@ const loadingStyles = {
     padding: 32,
     borderRadius: 18,
     background: 'rgba(255,255,255,0.94)',
-    border: '1px solid rgba(255,184,0,0.18)',
-    boxShadow: '0 16px 38px rgba(191,156,53,0.16)',
+    border: '1px solid rgba(13, 110, 253, 0.18)',
+    boxShadow: '0 16px 38px rgba(13, 110, 253, 0.16)',
     textAlign: 'center',
     fontFamily: 'Manrope, sans-serif',
   },
@@ -196,8 +196,8 @@ const loadingStyles = {
     width: 34,
     height: 34,
     margin: '0 auto',
-    border: '3px solid rgba(255,184,0,0.2)',
-    borderTopColor: '#ffb400',
+    border: '3px solid rgba(13, 110, 253, 0.2)',
+    borderTopColor: '#0d6efd',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },
@@ -205,7 +205,7 @@ const loadingStyles = {
     margin: 0,
     fontSize: 72,
     lineHeight: 1,
-    color: '#ffb400',
+    color: '#0d6efd',
     fontWeight: 900,
   },
   text: {

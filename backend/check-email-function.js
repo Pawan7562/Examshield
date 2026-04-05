@@ -11,7 +11,7 @@ async function checkEmailFunction() {
     // Test with sample data
     const testData = {
       name: 'Test Student',
-      email: 'teststudent@examshield.com',
+      email: 'teststudent@CollegeExam.com',
       studentId: 'ES-2026-999999',
       password: 'TestPass123!',
       collegeName: 'Test College',

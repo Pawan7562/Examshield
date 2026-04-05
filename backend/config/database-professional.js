@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-const DB_FILE = path.join(__dirname, '..', 'data', 'examshield.json');
+const DB_FILE = path.join(__dirname, '..', 'data', 'CollegeExam.json');
 
 // Ensure data directory exists
 const dataDir = path.dirname(DB_FILE);
@@ -145,7 +145,7 @@ function initializeDatabase() {
     database.super_admins = [{
       id: 1,
       name: 'Super Admin',
-      email: 'admin@examshield.com',
+      email: 'admin@CollegeExam.com',
       password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LrUpm',
       role: 'super_admin',
       created_at: new Date().toISOString()

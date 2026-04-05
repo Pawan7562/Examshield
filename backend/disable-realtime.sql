@@ -1,4 +1,4 @@
--- disable-realtime.sql - Disable realtime for all ExamShield tables
+-- disable-realtime.sql - Disable realtime for all CollegeExam tables
 -- Run this in Supabase SQL Editor: https://jzxvxxgsfbzqhrirnqfm.supabase.co
 
 -- Disable realtime for colleges table

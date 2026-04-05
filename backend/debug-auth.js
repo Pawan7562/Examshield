@@ -23,7 +23,7 @@ async function debugAuth() {
     const { data: college, error: collegeError } = await supabase
       .from('colleges')
       .select('*')
-      .eq('email', 'test@examshield.com')
+      .eq('email', 'test@CollegeExam.com')
       .maybeSingle();
     
     if (collegeError) {
@@ -44,7 +44,7 @@ async function debugAuth() {
     const { data: admin, error: adminError } = await supabase
       .from('super_admins')
       .select('*')
-      .eq('email', 'admin@examshield.com')
+      .eq('email', 'admin@CollegeExam.com')
       .maybeSingle();
     
     if (adminError) {
@@ -92,7 +92,7 @@ async function debugAuth() {
     console.log('ALTER TABLE colleges DISABLE ROW LEVEL SECURITY;');
     console.log('');
     console.log('INSERT INTO colleges (name, email, password, phone, address, website, subscription_plan, is_active, subscription_expiry)');
-    console.log('VALUES (\'Test College\', \'test@examshield.com\', \'$2a$12$iGKR0au8j09EfzWhLKJPaORI.L/UhR9DqFY4EmPvQHHceOeRT/W0e\', \'1234567890\', \'Test Address\', \'http://test.com\', \'basic\', true, NOW() + INTERVAL \'14 days\');');
+    console.log('VALUES (\'Test College\', \'test@CollegeExam.com\', \'$2a$12$iGKR0au8j09EfzWhLKJPaORI.L/UhR9DqFY4EmPvQHHceOeRT/W0e\', \'1234567890\', \'Test Address\', \'http://test.com\', \'basic\', true, NOW() + INTERVAL \'14 days\');');
     console.log('');
     console.log('CREATE TABLE super_admins (');
     console.log('  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),');
@@ -104,7 +104,7 @@ async function debugAuth() {
     console.log(');');
     console.log('');
     console.log('INSERT INTO super_admins (name, email, password, role)');
-    console.log('VALUES (\'Super Admin\', \'admin@examshield.com\', \'$2a$12$Eegqb8BbC9AM2CRAvSpJ9O/GIlft9TTk2BCbamP5KmhJ11/9EWZha\', \'super_admin\');');
+    console.log('VALUES (\'Super Admin\', \'admin@CollegeExam.com\', \'$2a$12$Eegqb8BbC9AM2CRAvSpJ9O/GIlft9TTk2BCbamP5KmhJ11/9EWZha\', \'super_admin\');');
     
   } catch (error) {
     console.error('❌ Debug failed:', error);
