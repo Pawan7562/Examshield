@@ -64,6 +64,18 @@
   text-decoration: none;
 }
 
+.auth-theme-brand-logo {
+  height: 40px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.auth-theme-brand-logo:hover {
+  transform: scale(1.05);
+}
+
 .auth-theme-brand-mark {
   width: 30px;
   height: 30px;

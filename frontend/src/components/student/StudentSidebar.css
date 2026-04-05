@@ -162,6 +162,18 @@
   gap: 0.75rem;
 }
 
+.sidebar-logo-image {
+  height: 32px;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.sidebar-logo-image:hover {
+  transform: scale(1.05);
+}
+
 .sidebar-logo-text {
   font-size: 1.25rem;
   font-weight: 800;
