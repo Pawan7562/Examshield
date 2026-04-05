@@ -37,9 +37,9 @@ const createTransporter = () => {
   console.log('✅ Email configured - creating real transporter');
   
   const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: process.env.EMAIL_PORT == 465, // true for 465, false for 587
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT) || 465, // Default to 465 for SSL stability
+    secure: (process.env.EMAIL_PORT == 465 || !process.env.EMAIL_PORT), // True for 465
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
