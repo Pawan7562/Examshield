@@ -135,13 +135,15 @@ app.set('io', io);
 // =====================================================
 // MIDDLEWARE
 // =====================================================
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(compression());
+// 1. CORS - MUST be first to handle preflight requests correctly in production
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
 }));
+
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(compression());
 
 // Rate limiting
 const limiter = rateLimit({

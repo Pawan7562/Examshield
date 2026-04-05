@@ -27,9 +27,8 @@ class WebSocketService {
         console.log('🔗 Attempting WebSocket connection to backend...');
 
         // Connect to backend WebSocket server with professional configuration
-        const wsUrl = process.env.NODE_ENV === 'development' 
-          ? 'http://localhost:5000' 
-          : window.location.origin + '/_/backend'; // Use experimental services route in production
+        const wsUrl = process.env.REACT_APP_WS_URL || 
+          (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-d5i2.onrender.com');
         
         this.socket = io(wsUrl, {
           auth: {

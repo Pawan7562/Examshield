@@ -3,12 +3,11 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 
 // Use direct backend URL for both development and production
-const developmentApiBaseURL = 'http://localhost:5000/api';  // Direct URL in development
-const productionApiBaseURL = '/_/backend/api';  // Experimental services route for Vercel
+const developmentApiBaseURL = 'http://localhost:5000/api';
+const productionApiBaseURL = process.env.REACT_APP_API_URL || 'https://examshield-d5i2.onrender.com/api';
 
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === 'development' ? developmentApiBaseURL : productionApiBaseURL);
+  process.env.NODE_ENV === 'development' ? developmentApiBaseURL : productionApiBaseURL;
 
 console.log('API Base URL:', API_BASE_URL);
 
