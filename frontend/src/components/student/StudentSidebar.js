@@ -115,7 +115,12 @@ export default function StudentSidebar() {
         {/* Header */}
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <div className="sidebar-logo-text">EXAMSHIELD</div>
+            <img 
+              src="/websitelogo.jpeg" 
+              alt="CollegeExam Logo" 
+              className="sidebar-logo-image"
+            />
+            <div className="sidebar-logo-text">COLLEGEEXAM</div>
           </div>
           <button 
             className="sidebar-toggle"

@@ -58,37 +58,55 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   width: 100%;
   margin-bottom: 24px;
   text-decoration: none;
-}
-
-.auth-theme-logo-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 8px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 184, 0, 0.2);
-  box-shadow: 0 8px 32px rgba(255, 184, 0, 0.15);
   transition: all 0.3s ease;
 }
 
-.auth-theme-logo-container:hover {
+.auth-theme-brand:hover {
+  background: rgba(255, 255, 255, 0.8);
   transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(255, 184, 0, 0.25);
-  border-color: rgba(255, 184, 0, 0.4);
 }
 
-.auth-theme-logo {
-  width: 180px;
-  height: auto;
-  max-height: 60px;
-  object-fit: contain;
-  border-radius: 8px;
+.auth-theme-brand-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 4px 16px rgba(233, 69, 96, 0.25);
   transition: all 0.3s ease;
+}
+
+.auth-theme-brand-logo:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(233, 69, 96, 0.35);
+}
+
+.auth-theme-brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.auth-theme-brand-name {
+  color: #2d3138;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.auth-theme-brand-tagline {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .auth-theme-title {
@@ -303,14 +321,5 @@
 
   .auth-theme-button-row {
     flex-direction: column;
-  }
-
-  .auth-theme-logo {
-    width: 140px;
-    max-height: 45px;
-  }
-
-  .auth-theme-logo-container {
-    padding: 6px;
   }
 }

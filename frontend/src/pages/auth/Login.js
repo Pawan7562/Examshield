@@ -42,12 +42,14 @@ const Login = ({ role }) => {
 
       <div className="auth-theme-card">
         <Link to="/" className="auth-theme-brand">
-          <div className="auth-theme-logo-container">
-            <img 
-              src="/logo.jpeg" 
-              alt="CollegeExam Logo" 
-              className="auth-theme-logo"
-            />
+          <img 
+            src="/websitelogo.jpeg" 
+            alt="CollegeExam Logo" 
+            className="auth-theme-brand-logo"
+          />
+          <div className="auth-theme-brand-text">
+            <span className="auth-theme-brand-name">COLLEGEEXAM</span>
+            <span className="auth-theme-brand-tagline">Exam Monitoring</span>
           </div>
         </Link>
 

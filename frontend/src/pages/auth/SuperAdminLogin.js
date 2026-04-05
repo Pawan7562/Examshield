@@ -34,10 +34,15 @@ export default function SuperAdminLogin() {
       <div className="auth-theme-card" style={{ maxWidth: 420 }}>
         <div className="auth-theme-icon-top">A</div>
         <Link to="/" className="auth-theme-brand">
-          <span className="auth-theme-brand-mark">
-            <span className="auth-theme-brand-dot" />
-          </span>
-          <span className="auth-theme-brand-text">Exam Monitoring</span>
+          <img 
+            src="/websitelogo.jpeg" 
+            alt="CollegeExam Logo" 
+            className="auth-theme-brand-logo"
+          />
+          <div className="auth-theme-brand-text">
+            <span className="auth-theme-brand-name">COLLEGEEXAM</span>
+            <span className="auth-theme-brand-tagline">Super Admin</span>
+          </div>
         </Link>
 
         <h1 className="auth-theme-title">Super Admin Login</h1>
