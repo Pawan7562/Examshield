@@ -1,6 +1,6 @@
 const { supabase } = require('../config/supabase');
 const crypto = require('crypto');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 // Generate random token
 function generateResetToken() {
