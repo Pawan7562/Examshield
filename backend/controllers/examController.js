@@ -655,6 +655,18 @@ exports.publishExam = async (req, res) => {
       return res.status(500).json({ success: false, message: 'Failed to publish exam', error: updateError.message });
     }
 
+    // Get the complete exam data including exam_code for email notifications
+    const { data: completeExamData, error: completeExamError } = await supabase
+      .from('exams')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (completeExamError) {
+      console.error('❌ Backend: Error retrieving complete exam data:', completeExamError);
+      return res.status(500).json({ success: false, message: 'Failed to retrieve exam data', error: completeExamError.message });
+    }
+
     console.log('✅ Backend: Exam published successfully');
 
     // Notify assigned students
@@ -663,7 +675,7 @@ exports.publishExam = async (req, res) => {
         .from('exam_assignments')
         .select('student_id')
         .eq('exam_id', id);
-    if (assignments && assignments.length > 0) {
+      if (assignments && assignments.length > 0) {
         const studentIds = assignments.map(a => a.student_id);
         const { data: assignedStudents } = await supabase
           .from('students')
@@ -675,21 +687,29 @@ exports.publishExam = async (req, res) => {
           const loginUrl = process.env.STUDENT_LOGIN_URL || 
             (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://examshield.vercel.app/student/login');
 
+          console.log('📧 Backend: Sending exam notifications to students:', {
+            totalStudents: assignedStudents.length,
+            examCode: completeExamData?.exam_code,
+            examTitle: completeExamData?.title
+          });
+
           for (const student of assignedStudents) {
             // Note: sendExamNotification is now non-blocking (uses setImmediate internally)
             sendExamNotification({
               name: student.name,
               email: student.email,
-              examName: updatedExam?.title || 'Upcoming Exam',
-              examDate: updatedExam?.date_time || new Date(),
-              examDuration: updatedExam?.duration || 60,
-              examKey: updatedExam?.exam_code || 'N/A',
-              subject: updatedExam?.subject || 'Exam',
-              type: updatedExam?.type || 'exam',
+              examName: completeExamData?.title || 'Upcoming Exam',
+              examDate: completeExamData?.date_time || new Date(),
+              examDuration: completeExamData?.duration || 60,
+              examKey: completeExamData?.exam_code || 'N/A',
+              subject: completeExamData?.subject || 'Exam',
+              type: completeExamData?.type || 'exam',
               loginUrl: loginUrl
             });
           }
           console.log(`📧 SYSTEM: Queued notifications for ${assignedStudents.length} students in background.`);
+        } else {
+          console.log('⚠️ Backend: No students assigned to this exam');
         }
       }
     } catch (notifyError) {

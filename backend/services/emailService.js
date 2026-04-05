@@ -186,6 +186,12 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
 const sendExamNotification = async ({ name, email, examName, examDate, examDuration, examKey, subject, type, loginUrl }) => {
   const transporter = createTransporter();
   
+  // Validate required fields
+  if (!examKey || examKey === 'N/A') {
+    console.error('❌ Email Service: No valid exam key provided', { examKey, examName });
+    throw new Error('Valid exam key is required for email notification');
+  }
+  
   const formattedDate = new Date(examDate).toLocaleString('en-IN', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
@@ -218,18 +224,42 @@ const sendExamNotification = async ({ name, email, examName, examDate, examDurat
     </div>
     
     <div class="warning-box">
-      <p>⚠️ Ensure you have a stable internet connection, a working webcam, and a quiet environment. Log in at least 10 minutes before the exam starts.</p>
+      <p>⚠️ Ensure you have a stable internet connection, a working webcam, and a quiet environment. Log in at least 10 minutes before exam starts.</p>
     </div>
   `;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+  console.log('📧 Email Service: Sending exam notification:', {
     to: email,
-    subject: `Exam Scheduled: ${examName} — ${formattedDate}`,
-    html: baseTemplate(content),
+    examName,
+    examKey,
+    hasValidKey: !!examKey && examKey !== 'N/A'
   });
-  
-  logger.info(`Exam notification sent to ${email} for exam ${examName}`);
+
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: `Exam Scheduled: ${examName} — ${formattedDate}`,
+      html: baseTemplate(content),
+    });
+    
+    console.log('✅ Email Service: Exam notification sent successfully:', {
+      to: email,
+      messageId: info.messageId,
+      examKey
+    });
+    
+    logger.info(`Exam notification sent to ${email} for exam ${examName} with key ${examKey}`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error('❌ Email Service: Failed to send exam notification:', {
+      to: email,
+      error: err.message,
+      examKey
+    });
+    logger.error(`Failed to send exam notification to ${email}: ${err.message}`);
+    throw err;
+  }
 };
 
 /**
