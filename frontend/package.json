@@ -1,5 +1,5 @@
 {
-  "name": "examshield-frontend",
+  "name": "COLLEGEEXAM-frontend",
   "version": "1.0.0",
   "private": true,
   "dependencies": {
@@ -32,7 +32,7 @@
     "vercel-build": "CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
     "build:prod": "npm run build"
   },
-  "homepage": "https://examshield.vercel.app",
+  "homepage": "https://COLLEGEEXAM.vercel.app",
   "eslintConfig": {
     "extends": [
       "react-app"

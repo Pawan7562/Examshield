@@ -65,7 +65,7 @@ export default function LiveMonitor() {
 
   const setupSocket = () => {
     const token = localStorage.getItem('accessToken');
-    const wsUrl = process.env.REACT_APP_WS_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-d5i2.onrender.com');
+    const wsUrl = process.env.REACT_APP_WS_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://COLLEGEEXAM-d5i2.onrender.com');
     const socket = io(wsUrl, { auth: { token } });
     socketRef.current = socket;
 

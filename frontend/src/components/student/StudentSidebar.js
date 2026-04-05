@@ -114,9 +114,25 @@ export default function StudentSidebar() {
       <aside className={`student-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobile ? 'mobile-sidebar' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
         {/* Header */}
         <div className="sidebar-header">
-          <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src={require('../../assets/logo.jpeg')} alt="CollegeExam Logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(233, 69, 96, 0.4)' }} />
-            <div className="sidebar-logo-text" style={{ fontSize: '16px', letterSpacing: '1px' }}>CollegeExam</div>
+          <div className="sidebar-logo">
+            <img 
+              src="/websitelogo.jpeg" 
+              alt="CollegeExam Logo" 
+              style={{
+                height: '32px',
+                width: 'auto',
+                maxWidth: '140px',
+                objectFit: 'contain',
+                borderRadius: '6px',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.transform = 'scale(1.05)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.transform = 'scale(1)';
+              }}
+            />
           </div>
           <button 
             className="sidebar-toggle"

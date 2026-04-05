@@ -197,6 +197,33 @@ const PasswordReset = () => {
       <div className="password-reset-container">
         <div className="password-reset-wrapper">
           <div className="password-reset-card">
+            {/* Professional Logo */}
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <Link to="/" style={{ display: 'inline-block' }}>
+                <img 
+                  src="/websitelogo.jpeg" 
+                  alt="CollegeExam Logo" 
+                  style={{
+                    height: '45px',
+                    width: 'auto',
+                    maxWidth: '180px',
+                    objectFit: 'contain',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(191, 156, 53, 0.15)',
+                    transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.transform = 'translateY(-2px)';
+                    e.target.style.boxShadow = '0 8px 20px rgba(191, 156, 53, 0.25)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 4px 12px rgba(191, 156, 53, 0.15)';
+                  }}
+                />
+              </Link>
+            </div>
+            
             {step === 'request' ? (
               <>
                 <div className="password-reset-header">
@@ -285,6 +312,33 @@ const PasswordReset = () => {
               </>
             ) : (
               <>
+                {/* Professional Logo */}
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                  <Link to="/" style={{ display: 'inline-block' }}>
+                    <img 
+                      src="/websitelogo.jpeg" 
+                      alt="CollegeExam Logo" 
+                      style={{
+                        height: '45px',
+                        width: 'auto',
+                        maxWidth: '180px',
+                        objectFit: 'contain',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(191, 156, 53, 0.15)',
+                        transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.target.style.transform = 'translateY(-2px)';
+                        e.target.style.boxShadow = '0 8px 20px rgba(191, 156, 53, 0.25)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.target.style.transform = 'translateY(0)';
+                        e.target.style.boxShadow = '0 4px 12px rgba(191, 156, 53, 0.15)';
+                      }}
+                    />
+                  </Link>
+                </div>
+                
                 <div className="password-reset-header">
                   <div className="password-reset-icon">
                     <Lock className="w-8 h-8" />

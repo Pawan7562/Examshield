@@ -1,4 +1,4 @@
-# 🚀 ExamShield Project - RUNNING STATUS
+# 🚀 COLLEGEEXAM Project - RUNNING STATUS
 
 ## ✅ **SYSTEM STATUS - ALL SYSTEMS OPERATIONAL**
 
@@ -152,7 +152,7 @@
 
 ## 🎊 **PROJECT READY!**
 
-**ExamShield is fully operational with enhanced debugging for tab switching detection!**
+**COLLEGEEXAM is fully operational with enhanced debugging for tab switching detection!**
 
 ### **What's Ready:**
 - ✅ **Backend Running**: Port 5000, Socket.IO connected
@@ -171,6 +171,6 @@
 
 ---
 
-**🎊 EXAMSHIELD PROJECT - FULLY OPERATIONAL WITH DEBUGGING! 🎊**
+**🎊 COLLEGEEXAM PROJECT - FULLY OPERATIONAL WITH DEBUGGING! 🎊**
 
 **✅ Backend Running + Frontend Running + Enhanced Debugging = Complete Testing System! ✅**

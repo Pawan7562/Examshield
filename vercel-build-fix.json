@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "examshield",
+  "name": "COLLEGEEXAM",
   "experimentalServices": {
     "frontend": {
       "entrypoint": "frontend",

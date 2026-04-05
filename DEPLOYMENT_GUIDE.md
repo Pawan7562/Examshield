@@ -1,4 +1,4 @@
-# ExamShield Vercel Deployment Guide
+# COLLEGEEXAM Vercel Deployment Guide
 
 ## 🚀 Quick Deployment Instructions
 
@@ -11,7 +11,7 @@
 1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
 2. Click "Add New Project"
 3. Import your GitHub repository
-4. Select the `examshield` folder as root directory
+4. Select the `COLLEGEEXAM` folder as root directory
 
 ### Step 2: Configure Environment Variables
 In Vercel Dashboard → Settings → Environment Variables, add:
@@ -160,11 +160,11 @@ If you encounter issues:
 
 ## 🎉 Success!
 
-Once deployed, your ExamShield application will be fully functional with:
+Once deployed, your COLLEGEEXAM application will be fully functional with:
 - ✅ Secure user authentication
 - ✅ AI-powered question generation
 - ✅ Real-time exam monitoring
 - ✅ Professional UI/UX
 - ✅ Scalable infrastructure
 
-Enjoy your deployed ExamShield application! 🚀
+Enjoy your deployed COLLEGEEXAM application! 🚀

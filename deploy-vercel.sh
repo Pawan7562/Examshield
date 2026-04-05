@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Professional ExamShield Deployment Script for Vercel (Windows Compatible)
+# Professional COLLEGEEXAM Deployment Script for Vercel (Windows Compatible)
 # This script bypasses CLI authentication issues
 
-echo "🚀 Starting ExamShield deployment to Vercel..."
+echo "🚀 Starting COLLEGEEXAM deployment to Vercel..."
 
 # Navigate to project directory
-cd "c:/Users/Pawan kumar/Downloads/examshield-saas/examshield"
+cd "c:/Users/Pawan kumar/Downloads/COLLEGEEXAM-saas/COLLEGEEXAM"
 
 # Build the frontend
 echo "📦 Building frontend for production..."
@@ -27,7 +27,7 @@ if %ERRORLEVEL% EQU 0; then
         echo "🌐 Visit Vercel dashboard to upload manually: https://vercel.com/dashboard"
     else
         echo "🎉 Deployment completed successfully!"
-        echo "🌐 Your app should be live at: https://examshield-[hash].vercel.app"
+        echo "🌐 Your app should be live at: https://COLLEGEEXAM-[hash].vercel.app"
     endif
 
 else

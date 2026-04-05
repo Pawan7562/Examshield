@@ -71,7 +71,7 @@ export const CHATBOT_CONFIG = {
   // Storage Settings
   storage: {
     enabled: true,
-    key: 'examshield_chatbot',
+    key: 'COLLEGEEXAM_chatbot',
     persistHistory: true,
     persistUserProfile: true,
     maxStorageSize: 1024 * 1024 // 1MB

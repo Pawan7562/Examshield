@@ -58,37 +58,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   width: 100%;
   margin-bottom: 24px;
   text-decoration: none;
 }
 
-.auth-theme-brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #ffd75c, #f6ae00);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 7px 18px rgba(246, 174, 0, 0.24);
+.auth-theme-logo {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(191, 156, 53, 0.15);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.auth-theme-brand-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #1f2430;
-  box-shadow:
-    -6px 1px 0 -4px rgba(255, 255, 255, 0.96),
-    6px -2px 0 -4px rgba(255, 255, 255, 0.96);
-}
-
-.auth-theme-brand-text {
-  color: #2d3138;
-  font-size: 1rem;
-  font-weight: 800;
+.auth-theme-logo:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(191, 156, 53, 0.25);
 }
 
 .auth-theme-title {

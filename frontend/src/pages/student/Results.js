@@ -71,7 +71,7 @@ export default function StudentResults() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text("COLLEGEEXAM - RESULT CARD", pageWidth / 2, 25, { align: "center" });
+    doc.text("EXAMSHIELD - RESULT CARD", pageWidth / 2, 25, { align: "center" });
 
     // Student Information Section
     doc.setTextColor(0, 0, 0);
@@ -123,7 +123,7 @@ export default function StudentResults() {
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     doc.text('This is a system generated result document and does not require a physical signature.', pageWidth / 2, finalY, { align: 'center' });
-    doc.text('CollegeExam Proctoring Systems', pageWidth / 2, finalY + 7, { align: 'center' });
+    doc.text('ExamShield Proctoring Systems', pageWidth / 2, finalY + 7, { align: 'center' });
 
     doc.save(`${resultData.exam_name.replace(/[^a-zA-Z0-9]/g, '_')}_Result.pdf`);
   };

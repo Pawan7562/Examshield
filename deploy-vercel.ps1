@@ -1,10 +1,10 @@
-# Professional ExamShield Deployment Script for Vercel (PowerShell)
+# Professional COLLEGEEXAM Deployment Script for Vercel (PowerShell)
 # This script bypasses CLI authentication issues
 
-Write-Host "🚀 Starting ExamShield deployment to Vercel..."
+Write-Host "🚀 Starting COLLEGEEXAM deployment to Vercel..."
 
 # Navigate to project directory
-Set-Location "c:/Users/Pawan kumar/Downloads/examshield-saas/examshield"
+Set-Location "c:/Users/Pawan kumar/Downloads/COLLEGEEXAM-saas/COLLEGEEXAM"
 
 # Build the frontend
 Write-Host "📦 Building frontend for production..."
@@ -25,7 +25,7 @@ if ($LASTEXITCODE -eq 0) {
         Write-Host "🌐 Visit Vercel dashboard to upload manually: https://vercel.com/dashboard"
     } else {
         Write-Host "🎉 Deployment completed successfully!"
-        Write-Host "🌐 Your app should be live at: https://examshield-[hash].vercel.app"
+        Write-Host "🌐 Your app should be live at: https://COLLEGEEXAM-[hash].vercel.app"
     }
 } else {
     Write-Host "❌ Build failed! Check npm run build output."

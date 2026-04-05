@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "examshield",
+  "name": "COLLEGEEXAM",
   "builds": [
     {
       "src": "frontend/package.json",
