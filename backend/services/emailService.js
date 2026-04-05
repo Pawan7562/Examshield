@@ -20,21 +20,34 @@ const createTransporter = () => {
 
   // Use mock transporter only if email is not configured
   if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log('⚠️ Email not configured - using mock transporter');
+    console.log('⚠️ EMAIL NOT CONFIGURED - Using mock transporter');
+    console.log('📧 MISSING ENVIRONMENT VARIABLES:');
+    console.log('   EMAIL_HOST:', process.env.EMAIL_HOST || 'NOT SET');
+    console.log('   EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
+    console.log('   EMAIL_PASS:', process.env.EMAIL_PASS ? '***SET***' : 'NOT SET');
+    console.log('');
+    console.log('🔧 SOLUTION: Create .env file with email configuration');
+    console.log('📧 See EMAIL_CONFIGURATION_GUIDE.md for instructions');
+    console.log('');
+    
     return {
       sendMail: async (options) => {
-        logger.info('Mock email sent', { 
+        logger.info('🚨 MOCK EMAIL - No real email sent', { 
           to: options.to, 
           subject: options.subject,
           html: options.html?.substring(0, 200) + '...' 
         });
-        console.log('📧 MOCK EMAIL - Configure EMAIL_HOST, EMAIL_USER, EMAIL_PASS in .env for real emails');
-        return Promise.resolve();
+        console.log('📧 MOCK EMAIL WOULD BE SENT TO:', options.to);
+        console.log('📧 SUBJECT:', options.subject);
+        console.log('🔧 CONFIGURE EMAIL_HOST, EMAIL_USER, EMAIL_PASS in .env for real emails');
+        return Promise.resolve({ status: 'mock', message: 'Email not configured - using mock mode' });
       }
     };
   }
   
   console.log('✅ Email configured - creating professional Gmail transporter');
+  console.log('📧 Using Gmail SMTP:', process.env.EMAIL_HOST);
+  console.log('📧 From email:', process.env.EMAIL_FROM || process.env.EMAIL_USER);
   
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -53,17 +66,18 @@ const createTransporter = () => {
           from: options.from || process.env.EMAIL_FROM || process.env.EMAIL_USER
         };
         
-        console.log(`📤 [BACKGROUND] Sending email to: ${mailOptions.to}`);
+        console.log(`📤 [REAL EMAIL] Sending to: ${mailOptions.to}`);
+        console.log(`📧 [REAL EMAIL] Subject: ${mailOptions.subject}`);
         
         try {
           const info = await transporter.sendMail(mailOptions);
-          console.log('✅ [BACKGROUND] Success:', info.messageId);
+          console.log('✅ [REAL EMAIL] Success:', info.messageId);
         } catch (err) {
-          console.error('❌ [BACKGROUND] Failed:', err.message);
+          console.error('❌ [REAL EMAIL] Failed:', err.message);
         }
       });
       
-      // Return immediately to the caller
+      // Return immediately to caller
       return Promise.resolve({ status: 'queued' });
     }
   };
