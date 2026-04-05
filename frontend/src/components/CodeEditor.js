@@ -37,7 +37,7 @@ const CodeEditor = ({
         setCode(lang.defaultCode);
       }
     }
-  }, [language, answer]);
+  }, [language, answer, programmingLanguages]);
 
   const handleLanguageChange = (newLanguage) => {
     const lang = programmingLanguages.find(l => l.id === newLanguage);

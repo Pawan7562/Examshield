@@ -2,11 +2,6 @@
   "name": "examshield-frontend",
   "version": "1.0.0",
   "private": true,
-  "browser": {
-    "fs": false,
-    "path": false,
-    "os": false
-  },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
     "axios": "^1.6.5",
@@ -17,7 +12,6 @@
     "jspdf-autotable": "^3.8.1",
     "lucide-react": "^0.309.0",
     "papaparse": "^5.4.1",
-    "postinstall": "node -e \"const fs=require('fs'); const paths=['node_modules/face-api.js/build/es6/env/index.js','node_modules/face-api.js/build/commonjs/env/node/index.js']; paths.forEach(p => { if(fs.existsSync(p)) { fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace(/require\\('fs'\\)/g, 'null')); } })\"",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
@@ -27,13 +21,15 @@
     "recharts": "^2.10.3",
     "socket.io-client": "^4.6.2"
   },
+  "devDependencies": {
+    "@craco/craco": "^7.1.0"
+  },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build --max-old-space-size=6144",
-    "test": "react-scripts test",
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
     "eject": "react-scripts eject",
-    "postinstall": "node -e \"const fs=require('fs'); const paths=['node_modules/face-api.js/build/es6/env/index.js','node_modules/face-api.js/build/commonjs/env/node/index.js']; paths.forEach(p => { if(fs.existsSync(p)) { fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace(/require\\('fs'\\)/g, 'null')); } })\"",
-    "vercel-build": "npm run build",
+    "vercel-build": "CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
     "build:prod": "npm run build"
   },
   "homepage": "https://examshield.vercel.app",

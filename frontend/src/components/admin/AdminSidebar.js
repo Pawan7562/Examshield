@@ -13,16 +13,8 @@ import {
   LogOut,
   ChevronRight,
   ChevronLeft,
-  BarChart3,
-  Shield,
-  BookOpen,
-  Activity,
-  Database,
-  Bell,
-  TrendingUp,
   Menu,
-  Brain,
-  Sparkles
+  Brain
 } from 'lucide-react';
 import './AdminSidebar.css';
 

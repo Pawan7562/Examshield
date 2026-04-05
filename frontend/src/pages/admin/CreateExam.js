@@ -14,7 +14,6 @@ import {
   Clock, 
   Calendar, 
   Settings, 
-  Eye, 
   Edit3, 
   Trash2, 
   Code, 
@@ -22,24 +21,7 @@ import {
   BookOpen,
   Award,
   Shield,
-  AlertCircle,
-  Bot,
-  Zap,
-  Database,
-  Globe,
-  Cpu,
-  Layers,
-  RefreshCw,
-  Download,
-  Upload,
-  Filter,
-  Search,
-  Sparkles,
-  Brain,
-  Target,
-  TrendingUp,
-  BarChart3,
-  Activity
+  AlertCircle
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 

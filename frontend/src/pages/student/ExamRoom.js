@@ -12,18 +12,6 @@ import CodingQuestion from '../../components/CodingQuestion';
 import Timer from '../../components/Timer';
 import ExamKeyModal from '../../components/ExamKeyModal';
 
-// Simple debounce function
-const debounce = (func, wait) => {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
 
 // ─── Main ExamRoom Component ──────────────────────────────────────────────────
 export default function ExamRoom() {
@@ -42,7 +30,7 @@ export default function ExamRoom() {
   const [warningMsg, setWarningMsg] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
-  const [loadingError, setLoadingError] = useState(null);
+  const [, setLoadingError] = useState(null);
   const [isStartingExam, setIsStartingExam] = useState(false);
 
   const socketRef = useRef(null);
