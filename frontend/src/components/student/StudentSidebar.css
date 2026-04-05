@@ -1,17 +1,16 @@
-/* Professional Sidebar Navigation CSS */
+/* Professional Sidebar Navigation CSS - Matching Admin Theme */
 .student-layout {
   display: flex;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f8fafc;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Sidebar Styles */
 .student-sidebar {
   width: 280px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  background: #ffffff;
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -36,6 +35,7 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 100vh;
   width: calc(100% - 280px);
+  background: #f8fafc;
 }
 
 .student-main-content.expanded {
@@ -150,7 +150,7 @@
 /* Sidebar Header */
 .sidebar-header {
   padding: 2rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -200,7 +200,7 @@
 /* User Profile Section */
 .sidebar-user-profile {
   padding: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   text-align: center;
 }
 
@@ -208,7 +208,7 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #e94560 0%, #9b2335 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -216,15 +216,18 @@
   font-weight: 700;
   color: white;
   margin: 0 auto 1rem;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+  border: 3px solid rgba(233, 69, 96, 0.2);
+  box-shadow: 0 8px 25px rgba(233, 69, 96, 0.3);
 }
 
 .user-name {
   font-size: 1rem;
   font-weight: 600;
-  color: white;
+  color: #1e293b;
   margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-role {
@@ -276,10 +279,13 @@
   margin-bottom: 0.5rem;
   border-radius: 12px;
   text-decoration: none;
-  color: rgba(255, 255, 255, 0.8);
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .nav-item:hover {
@@ -289,9 +295,9 @@
 }
 
 .nav-item.active {
-  background: rgba(59, 130, 246, 0.3);
-  color: white;
-  border-left: 3px solid #3b82f6;
+  background: rgba(233, 69, 96, 0.15);
+  color: #e94560;
+  border-left: 3px solid #e94560;
 }
 
 .nav-item-icon {
@@ -307,6 +313,7 @@
 .nav-item-text {
   font-size: 0.9rem;
   font-weight: 500;
+  color: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -353,12 +360,11 @@
 
 /* Page Content Styles */
 .content-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 20px;
   padding: 2rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
   animation: fadeInUp 0.6s ease-out;
   margin-bottom: 2rem;
@@ -366,12 +372,12 @@
 
 .content-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
 }
 
 /* Button Styles */
 .btn {
-  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #e94560 0%, #9b2335 100%);
   border: none;
   color: white;
   padding: 0.75rem 1.5rem;
@@ -388,7 +394,7 @@
 
 .btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 8px 25px rgba(233, 69, 96, 0.3);
 }
 
 .btn-secondary {
@@ -428,15 +434,15 @@
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
-  color: white;
+  color: #1e293b;
   font-size: 1rem;
   transition: all 0.3s ease;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  border-color: #e94560;
+  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
   background: rgba(255, 255, 255, 0.15);
 }
 
@@ -1171,6 +1177,14 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.user-role {
+  font-size: 0.85rem;
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 0.5rem;
