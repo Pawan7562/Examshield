@@ -27,10 +27,11 @@ export default function PublicLayout({ children }) {
         <div className="public-shell">
           <div className="public-header-inner">
             <Link to="/" className="landing-brand" aria-label="Exam Monitoring home page">
-              <span className="landing-brand-mark" aria-hidden="true">
-                <span className="landing-brand-dot" />
-              </span>
-              <span className="landing-brand-text">Exam Monitoring</span>
+              <img 
+                src="/logo.jpeg" 
+                alt="ExamShield Logo" 
+                className="landing-brand-logo"
+              />
             </Link>
 
             <nav className="public-nav" aria-label="Primary navigation">

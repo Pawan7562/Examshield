@@ -96,8 +96,20 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 1rem;
-  font-weight: 800;
+}
+
+.landing-brand-logo {
+  height: 48px;
+  width: auto;
+  max-width: 240px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+.landing-brand-logo:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.25));
 }
 
 .landing-brand-mark {
@@ -123,6 +135,9 @@ body {
 
 .landing-brand-text {
   white-space: nowrap;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--landing-text);
 }
 
 .public-nav {
