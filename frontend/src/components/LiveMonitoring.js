@@ -16,7 +16,10 @@ const LiveMonitoring = ({ examId, examName }) => {
 
   useEffect(() => {
     // Initialize WebSocket connection for real-time monitoring
-    const newSocket = io('http://localhost:5000', {
+    const wsUrl = process.env.REACT_APP_WS_URL || 
+      (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-d5i2.onrender.com');
+
+    const newSocket = io(wsUrl, {
       auth: {
         token: localStorage.getItem('accessToken'),
         role: 'admin'

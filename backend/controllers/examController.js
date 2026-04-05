@@ -654,11 +654,52 @@ exports.publishExam = async (req, res) => {
 
     console.log('✅ Backend: Exam published successfully');
 
-    // For now, skip student notification and return success
-    // In production, you would want to implement email notifications with Supabase
+    // Notify assigned students
+    try {
+      const { data: assignments } = await supabase
+        .from('exam_assignments')
+        .select('student_id')
+        .eq('exam_id', id);
+
+      if (assignments && assignments.length > 0) {
+        const studentIds = assignments.map(a => a.student_id);
+        const { data: assignedStudents } = await supabase
+          .from('students')
+          .select('name, email')
+          .in('id', studentIds);
+
+        if (assignedStudents && assignedStudents.length > 0) {
+          const loginUrl = process.env.STUDENT_LOGIN_URL || 
+            (process.env.NODE_ENV === 'development' ? 'http://localhost:3000/student/login' : 'https://examshield.vercel.app/student/login');
+
+          for (const student of assignedStudents) {
+            try {
+              await sendExamNotification({
+                name: student.name,
+                email: student.email,
+                examName: examData.title,
+                examDate: examData.date_time,
+                examDuration: examData.duration,
+                examKey: examData.exam_code,
+                subject: examData.subject || 'General',
+                type: examData.type || 'mcq',
+                loginUrl: loginUrl
+              });
+            } catch (err) {
+              console.error(`❌ FAILED TO SEND EMAIL TO ${student.email}:`, err.message);
+            }
+          }
+          console.log(`📧 SUCCESS: Sent notification to ${assignedStudents.length} students.`);
+        }
+      }
+    } catch (notifyError) {
+      console.error('❌ NOTIFICATION ERROR:', notifyError.message);
+      // We don't return 500 here because the exam itself IS published.
+    }
+
     res.json({
       success: true,
-      message: `Exam published successfully. ${questions.length} questions available.`,
+      message: `Exam published successfully. ${questions.length} questions available. Assigned students have been notified.`,
     });
 
   } catch (error) {
