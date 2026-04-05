@@ -91,20 +91,23 @@
 }
 
 .admin-sidebar-logo-image {
-  height: 36px;
+  height: 32px;
   width: auto;
-  max-width: 180px;
+  max-width: 160px;
   object-fit: contain;
   transition: transform 0.3s ease;
-  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.15));
-  border-radius: 6px;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
   padding: 3px;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .admin-sidebar-logo-image:hover {
-  transform: scale(1.06);
-  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.25));
+  transform: scale(1.05);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(0, 0, 0, 0.1);
 }
 
 .admin-sidebar-logo-text {

@@ -99,20 +99,23 @@ body {
 }
 
 .landing-brand-logo {
-  height: 56px;
+  height: 48px;
   width: auto;
-  max-width: 280px;
+  max-width: 240px;
   object-fit: contain;
   transition: transform 0.3s ease;
-  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.25));
+  filter: drop-shadow(0 4px 12px rgba(255, 198, 28, 0.15));
   border-radius: 12px;
   padding: 6px;
   background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 198, 28, 0.2);
 }
 
 .landing-brand-logo:hover {
-  transform: scale(1.08);
-  filter: drop-shadow(0 15px 40px rgba(0, 0, 0, 0.35));
+  transform: scale(1.05);
+  filter: drop-shadow(0 6px 16px rgba(255, 180, 0, 0.25));
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(255, 180, 0, 0.3);
 }
 
 .landing-brand-mark {

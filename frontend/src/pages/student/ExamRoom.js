@@ -817,21 +817,21 @@ export default function ExamRoom() {
         <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <img 
             src="/logo1.jpeg" 
-            alt="ExamShield Logo" 
+            alt="CollegeExam Logo" 
             style={{ 
-              height: '40px', 
+              height: '32px', 
               width: 'auto', 
-              maxWidth: '140px', 
+              maxWidth: '120px', 
               objectFit: 'contain', 
               marginRight: '12px',
-              filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15))',
+              filter: 'drop-shadow(0 2px 8px rgba(233, 69, 96, 0.3))',
               borderRadius: '8px',
-              padding: '4px',
-              background: 'rgba(255, 255, 255, 0.9)',
-              transition: 'transform 0.3s ease'
+              padding: '3px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)'
             }}
           />
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#e94560', letterSpacing: 2, marginBottom: 4 }}>EXAMSHIELD</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#e94560', letterSpacing: 2, marginBottom: 4 }}>COLLEGEEXAM</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.4 }}>{examData?.name}</div>
           <div style={{ fontSize: 11, color: '#4a5568', marginTop: 4 }}>{examData?.type?.toUpperCase()}</div>
         </div>

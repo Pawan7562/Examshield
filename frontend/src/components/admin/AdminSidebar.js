@@ -131,7 +131,7 @@ export default function AdminSidebar() {
           <div className="admin-sidebar-logo">
             <img 
               src="/logo1.jpeg" 
-              alt="ExamShield Logo" 
+              alt="CollegeExam Logo" 
               className="admin-sidebar-logo-image"
             />
             <div className="admin-sidebar-logo-badge">ADMIN</div>
