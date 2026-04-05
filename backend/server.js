@@ -36,6 +36,8 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
+  'https://examshield.vercel.app',
+  'https://examshield.vercel.app/',
   process.env.FRONTEND_URL,
   process.env.APP_URL
 ].filter(Boolean);
@@ -139,6 +141,7 @@ app.set('io', io);
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,
+  optionsSuccessStatus: 200, 
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
 }));
 
