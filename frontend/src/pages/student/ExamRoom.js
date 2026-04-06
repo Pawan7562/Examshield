@@ -1,4 +1,4 @@
-// src/pages/student/ExamRoom.js
+// src/pages/student/ExamRoom.js - Professional Full-Screen Exam System
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
@@ -11,15 +11,14 @@ import SubjectiveQuestion from '../../components/SubjectiveQuestion';
 import CodingQuestion from '../../components/CodingQuestion';
 import Timer from '../../components/Timer';
 import ExamKeyModal from '../../components/ExamKeyModal';
-import { FullScreenExamManager } from '../../utils/FullScreenExamManager';
 
-
-// ─── Main ExamRoom Component ──────────────────────────────────────────────────
+// ─── Professional Exam Room Component ──────────────────────────────────────────
 export default function ExamRoom() {
   const { examId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // State Management
   const [phase, setPhase] = useState('key'); // key | loading | exam | submitted
   const [examData, setExamData] = useState(null);
   const [session, setSession] = useState(null);
@@ -33,64 +32,146 @@ export default function ExamRoom() {
   const [result, setResult] = useState(null);
   const [, setLoadingError] = useState(null);
   const [isStartingExam, setIsStartingExam] = useState(false);
-  const [fullScreenStatus, setFullScreenStatus] = useState(null);
 
+  // Professional State Management
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [lastVisibility, setLastVisibility] = useState('visible');
+  const [examStartTime, setExamStartTime] = useState(null);
+
+  // Refs for professional tracking
   const socketRef = useRef(null);
   const autoSaveRef = useRef(null);
   const violationRef = useRef(violationCount);
-  const fullScreenManagerRef = useRef(null);
+  const tabSwitchTimeoutRef = useRef(null);
   violationRef.current = violationCount;
 
-  // Setup Socket
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    const wsUrl = process.env.REACT_APP_WS_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://COLLEGEEXAM-d5i2.onrender.com');
-    const socket = io(wsUrl, { auth: { token } });
-    socketRef.current = socket;
-    
-    // Initialize full-screen manager
-    if (!fullScreenManagerRef.current) {
-      fullScreenManagerRef.current = new FullScreenExamManager();
-      fullScreenManagerRef.current.init({
-        onEnter: () => {
-          console.log('✅ Full-screen exam mode entered');
-          setFullScreenStatus('active');
-        },
-        onExit: () => {
-          console.log('🚪 Full-screen exam mode exited');
-          setFullScreenStatus('exited');
-          setViolationCount(prev => prev + 1);
-        },
-        onViolation: (violation) => {
-          console.warn('⚠️ Exam violation:', violation);
-          setViolationCount(violation.count);
-          
-          // Handle critical violations
-          if (violation.critical) {
-            toast.error('Maximum violations reached. Exam may be terminated.');
-            // Optionally auto-submit exam
-            // handleSubmitExam();
-          } else {
-            toast.error(`Violation ${violation.count}: ${violation.type}`);
-          }
-        }
-      });
-    }
-    
-    return () => {
-      socket.disconnect();
-      if (fullScreenManagerRef.current) {
-        fullScreenManagerRef.current.cleanup();
-        fullScreenManagerRef.current = null;
+  // ─── Professional Full-Screen Management ──────────────────────────────────────────
+  const enterFullScreen = useCallback(() => {
+    try {
+      const element = document.documentElement;
+      if (element.requestFullscreen) {
+        element.requestFullscreen().catch(err => {
+          console.warn('Fullscreen request denied:', err.message);
+          toast.error('Please enable full-screen mode for secure exam environment');
+        });
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
       }
-    };
+      setIsFullscreen(true);
+      console.log('🖥️ Full-screen mode activated');
+    } catch (error) {
+      console.error('Fullscreen error:', error);
+      toast.error('Failed to enter full-screen mode');
+    }
   }, []);
 
-  // ─── Answer Management ──────────────────────────────────────────────────
-  const handleAnswer = (questionId, answer) => {
+  const exitFullScreen = useCallback(() => {
+    try {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+      setIsFullscreen(false);
+      console.log('📱 Exited full-screen mode');
+    } catch (error) {
+      console.error('Exit fullscreen error:', error);
+    }
+  }, []);
+
+  const checkFullscreenStatus = useCallback(() => {
+    const isCurrentlyFullscreen = !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.msFullscreenElement
+    );
+    setIsFullscreen(isCurrentlyFullscreen);
+    return isCurrentlyFullscreen;
+  }, []);
+
+  // ─── Professional Tab Switch Detection ──────────────────────────────────────────
+  const handleVisibilityChange = useCallback(() => {
+    const currentVisibility = document.visibilityState;
+    
+    if (lastVisibility === 'visible' && currentVisibility === 'hidden') {
+      // Tab switch detected
+      const newTabSwitchCount = tabSwitchCount + 1;
+      setTabSwitchCount(newTabSwitchCount);
+      
+      console.log(`🚨 Tab switch detected! Count: ${newTabSwitchCount}`);
+      
+      // Report violation
+      if (socketRef.current && session && !submitted) {
+        socketRef.current.emit('violation', {
+          sessionId: session.id,
+          type: 'tab_switch',
+          details: `Tab switched - Count: ${newTabSwitchCount}`,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      // Show warning
+      if (newTabSwitchCount === 1) {
+        toast.warning('⚠️ Tab switching detected! This may affect your exam score.');
+      } else if (newTabSwitchCount === 2) {
+        toast.error('🚨 Multiple tab switches detected! Final warning.');
+      } else if (newTabSwitchCount >= 3) {
+        toast.error('💀 Exam terminated! Too many tab switches.');
+        // Auto-submit exam due to security violation
+        handleSubmit(true);
+        return;
+      }
+    }
+    
+    setLastVisibility(currentVisibility);
+  }, [lastVisibility, tabSwitchCount, session, submitted, socketRef]);
+
+  // ─── Professional Window Focus Management ──────────────────────────────────────────
+  const handleWindowFocus = useCallback(() => {
+    if (document.visibilityState === 'visible') {
+      console.log('📱 Window focused - resuming full-screen check');
+      // Re-check fullscreen status when window regains focus
+      setTimeout(() => {
+        checkFullscreenStatus();
+      }, 100);
+    }
+  }, [checkFullscreenStatus]);
+
+  // ─── Professional Context Menu Prevention ──────────────────────────────────────────
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toast.error('🚫 Right-click disabled during exam');
+    return false;
+  }, []);
+
+  // ─── Professional Keyboard Shortcuts Prevention ──────────────────────────────────────
+  const handleKeyDown = useCallback((e) => {
+    // Prevent common keyboard shortcuts
+    const blockedKeys = [
+      'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+      'Escape', 'Tab', 'Alt', 'Ctrl', 'Shift', 'Meta', 'Command',
+      'c', 'v', 'x', 'a', 's', 'r', 'n', 't', 'w', 'i', 'p', 'o'
+    ];
+    
+    if (blockedKeys.includes(e.key) && (e.ctrlKey || e.metaKey || e.altKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      toast.error(`🚫 Keyboard shortcut "${e.key}" disabled during exam`);
+      return false;
+    }
+  }, []);
+
+  // ─── Answer Management ─────────────────────────────────────────────────────────────
+  const handleAnswer = useCallback((questionId, answer) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     
-    // Save to server (optimistic)
+    // Auto-save answer
     const question = questions.find(q => q.id === questionId);
     if (!question) return;
 
@@ -101,1003 +182,525 @@ export default function ExamRoom() {
          question.type === 'coding' ? { codeSubmission: answer } : 
          { answerText: answer }),
     }).catch(() => {});
-  };
+  }, [questions, session, examId]);
 
-  const handleSubmit = async (autoSubmit = false, retryCount = 0) => {
+  // ─── Professional Exam Submission ─────────────────────────────────────────────────
+  const handleSubmit = useCallback(async (autoSubmit = false, retryCount = 0) => {
     if (submitted) {
-      console.log('Exam already submitted, ignoring duplicate submission');
+      console.log('📋 Exam already submitted, ignoring duplicate submission');
       return;
     }
     
-    if (!autoSubmit && !window.confirm('Submit exam? You cannot change answers after submission.')) return;
+    if (!autoSubmit && !window.confirm('Submit exam? You cannot change answers after submission.')) {
+      return;
+    }
 
-    console.log(autoSubmit ? '📤 Auto-submitting exam...' : '📤 Submitting exam...');
+    console.log(autoSubmit ? '🤖 Auto-submitting exam...' : '📤 Submitting exam...');
     setSubmitted(true);
     if (autoSaveRef.current) clearInterval(autoSaveRef.current);
 
-  try {
-      // Final save all answers before submission (defensive)
-      console.log('💾 Saving final answers (defensive)...');
-      try {
-        const savePromises = Object.entries(answers).map(([questionId, answer]) => {
-          const question = questions.find(q => q.id === questionId);
-          if (!question || !answer) return Promise.resolve();
-          
-          return studentAPI.saveAnswer(examId, {
-            sessionId: session.id,
-            questionId,
-            ...(question.type === 'mcq' ? { selectedOption: answer } : 
-               question.type === 'coding' ? { codeSubmission: answer } : 
-               { answerText: answer }),
-          });
-        });
+    try {
+      // Final save all answers before submission
+      console.log('💾 Saving final answers...');
+      const savePromises = Object.entries(answers).map(([questionId, answer]) => {
+        const question = questions.find(q => q.id === questionId);
+        if (!question || !answer) return Promise.resolve();
         
-        // Use allSettled so one failed save doesn't block final submission
-        await Promise.allSettled(savePromises);
-        console.log('✅ Final answer save attempted');
-      } catch (saveAllErr) {
-        console.warn('⚠️ Some final answers could not be saved, but proceeding with submission:', saveAllErr);
-      }
+        return studentAPI.saveAnswer(examId, {
+          sessionId: session.id,
+          questionId,
+          ...(question.type === 'mcq' ? { selectedOption: answer } : 
+             question.type === 'coding' ? { codeSubmission: answer } : 
+             { answerText: answer }),
+        });
+      });
+      
+      await Promise.allSettled(savePromises);
+      console.log('✅ Final answers saved');
 
       // Prepare submission data
       const submissionData = {
         sessionId: session.id,
         autoSubmit: autoSubmit,
         violationCount: violationCount,
-        terminationReason: autoSubmit ? 'max_violations_reached' : 'manual_submission',
+        tabSwitchCount: tabSwitchCount,
+        terminationReason: autoSubmit ? 
+          (tabSwitchCount >= 3 ? 'excessive_tab_switches' : 
+           violationCount >= 3 ? 'excessive_violations' : 'max_violations_reached') : 
+          'manual_submission',
         submissionTime: new Date().toISOString(),
-        answersCount: Object.keys(answers).filter(k => answers[k]).length
+        answersCount: Object.keys(answers).filter(k => answers[k]).length,
+        examDuration: examStartTime ? Math.floor((Date.now() - examStartTime) / 1000) : 0
       };
 
-      // Submit exam to backend with retry logic
-      console.log('📤 Submitting exam to backend...');
+      const response = await studentAPI.submitExam(examId, submissionData);
       
-      let res;
-      try {
-        res = await studentAPI.submitExam(examId, submissionData);
-      } catch (fetchError) {
-        console.error('❌ Network or Server error during submission:', fetchError);
+      if (response.success) {
+        toast.success('Exam submitted successfully!');
+        setResult(response.data);
+        setPhase('submitted');
         
-        // Retry logic for network errors
-        if (retryCount < 2 && autoSubmit) {
-          console.log(`🔄 Retrying auto-submission (${retryCount + 1}/2)...`);
-          toast.loading(`Auto-submitting... Retry ${retryCount + 1}/2`, { id: 'submit-retry' });
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          setSubmitted(false);
-          return handleSubmit(autoSubmit, retryCount + 1);
-        }
-        
-        // Extract exact server message if available
-        const serverMsg = fetchError.response?.data?.message || fetchError.error || fetchError.message;
-        throw new Error(serverMsg || 'Server error: Unable to submit exam');
+        // Exit fullscreen
+        setTimeout(() => {
+          exitFullScreen();
+        }, 2000);
+      } else {
+        throw new Error(response.message || 'Submission failed');
       }
-
-      // Check if response is valid
-      if (!res || !res.data) {
-        throw new Error('Invalid response from server');
-      }
-
-      console.log('✅ Exam submitted successfully:', res.data);
-      setResult(res.data);
-      setPhase('submitted');
-      
-      // Notify backend via socket
-      socketRef.current?.emit('exam-submitted', { 
-        sessionId: session.id, 
-        examId,
-        autoSubmit,
-        violationCount,
-        submissionTime: new Date().toISOString()
-      });
-      
-      toast.success(res.message || 'Exam submitted successfully!');
-
-      // Exit full screen logic...
-      const exitFullScreen = () => {
-        try {
-          if (document.fullscreenElement || document.webkitFullscreenElement) {
-            if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-          }
-        } catch (e) {}
-      };
-      setTimeout(exitFullScreen, 1000);
-
     } catch (err) {
       console.error('❌ [PROFESSIONAL] Exam submission failure:', err);
-      
-      // Extract the most specific message from the server response
-      const serverMessage = err.response?.data?.message || err.message;
-      const errorMessage = serverMessage || 'An unexpected error occurred. Your answers are saved locally.';
-      
-      toast.error(errorMessage, { 
-        duration: 8000,
-        id: 'submit-error' 
-      });
-      
-      // Industrial-strength local backup
-      try {
-        const backupKey = `backup_exam_${examId}_${Date.now()}`;
-        localStorage.setItem(backupKey, JSON.stringify({
-          answers,
-          sessionId: session?.id,
-          timestamp: new Date().toISOString()
-        }));
-        console.log(`💾 [PROFESSIONAL] Local backup created: ${backupKey}`);
-      } catch (e) {
-        console.error('Failed to create local backup:', e);
-      }
-      
+      toast.error('Exam submission failed. Please try again.');
       setSubmitted(false);
     }
-  };
+  }, [answers, session, examId, violationCount, tabSwitchCount, examStartTime, questions, exitFullScreen]);
 
-  // ─── Violation Handling (Ref-based to avoid stale closures) ──────────────
-
-  // Refs to hold the latest versions of functions, avoiding stale closures
-  const handleSubmitRef = useRef(handleSubmit);
-  handleSubmitRef.current = handleSubmit;
-
-  const sessionRef = useRef(session);
-  sessionRef.current = session;
-
-  const submittedRef = useRef(submitted);
-  submittedRef.current = submitted;
-
-  // Track last violation time per type for cooldowns
-  const lastViolationTimeRef = useRef({});
-
-  // Shared handler for backend violation responses — updates UI state
-  const handleViolationResponse = useCallback((response) => {
-    if (!response) return;
-    // Extract actual payload whether wrapped in response.data or bare
-    const data = response.data || response;
-    const { message, violationCount: count, autoTerminate } = data;
-    
-    console.log(`📊 [PROCTORING] Backend Response: count=${count}, terminate=${autoTerminate}, msg="${message}"`);
-    setViolationCount(count || 0);
-    setWarningMsg(message || '');
-
-    if (autoTerminate) {
-      console.error('🚨 [PROCTORING] EXAM AUTO-TERMINATED BY SERVER');
-      toast.error('🚨 Exam terminated due to violations!', { duration: 8000, id: 'exam-terminated' });
-      setWarningMsg('🚨 EXAM TERMINATED: Your exam is being submitted due to policy violations.');
-      setTimeout(() => {
-        if (!submittedRef.current) {
-          handleSubmitRef.current(true);
-        }
-      }, 2000);
-    } else if (message) {
-      toast.error(message, { duration: 4000 });
-    }
-  }, []); // No deps — uses refs for latest values
-
-  // Core violation reporting function — sends to backend
-  const reportViolation = useCallback(async (type, description) => {
-    if (!sessionRef.current || submittedRef.current) {
-      console.log(`⏭️ [PROCTORING] Skipping violation (no session or submitted): ${type}`);
+  // ─── Professional Exam Key Validation ─────────────────────────────────────────────
+  const handleExamKey = useCallback(async (key) => {
+    if (!key || key.trim() === '') {
+      toast.error('Please enter a valid exam key');
       return;
     }
 
-    // Per-type cooldown: 3 seconds between same-type violations
-    const now = Date.now();
-    const cooldown = 3000;
-    if (lastViolationTimeRef.current[type] && (now - lastViolationTimeRef.current[type]) < cooldown) {
-      console.log(`⏭️ [PROCTORING] Cooldown active for ${type}, skipping`);
-      return;
-    }
-    lastViolationTimeRef.current[type] = now;
+    setIsStartingExam(true);
+    console.log('🔑 Validating exam key:', key);
 
     try {
-      console.log(`📡 [PROCTORING] Reporting violation: ${type} — ${description}`);
-      const res = await studentAPI.reportViolation({
-        sessionId: sessionRef.current.id,
-        examId,
-        type,
-        description,
-      });
-
-      // Update UI from backend response
-      if (res?.data) {
-        handleViolationResponse(res.data);
-
-        // Broadcast to admin via socket
-        socketRef.current?.emit('violation', {
-          sessionId: sessionRef.current.id,
-          examId,
-          studentId: sessionRef.current.student_id,
-          type,
-          severity: res.data.autoTerminate ? 'critical' : 'warning',
-        });
+      const response = await studentAPI.validateExamKey(examId, key);
+      
+      if (response.success) {
+        toast.success('Exam key validated! Starting exam...');
+        setSession(response.data.session);
+        setQuestions(response.data.questions || []);
+        setPhase('exam');
+        setExamStartTime(Date.now());
+        
+        // Auto-enter fullscreen
+        setTimeout(() => {
+          enterFullScreen();
+        }, 1000);
+        
+      } else {
+        toast.error(response.message || 'Invalid exam key');
       }
     } catch (error) {
-      console.error('❌ [PROCTORING] Violation report failed:', error.response?.data || error.message);
-      
-      // Even if backend fails, still increment local count as fallback
-      setViolationCount(prev => {
-        const newCount = prev + 1;
-        const maxV = examData?.max_violations || 3;
-        setWarningMsg(`⚠️ Warning ${newCount}/${maxV}: ${description}`);
-        toast.error(`⚠️ Warning ${newCount}/${maxV}: ${description}`, { duration: 4000 });
-        
-        if (newCount >= maxV && !submittedRef.current) {
-          setWarningMsg('🚨 EXAM TERMINATED: Maximum violations reached.');
-          setTimeout(() => handleSubmitRef.current(true), 2000);
-        }
-        return newCount;
-      });
+      console.error('❌ Exam key validation error:', error);
+      toast.error('Failed to validate exam key');
+    } finally {
+      setIsStartingExam(false);
     }
-  }, [examId, handleViolationResponse, examData]);
+  }, [examId]);
 
-  // Ref to keep reportViolation always up-to-date for event listeners
-  const reportViolationRef = useRef(reportViolation);
-  reportViolationRef.current = reportViolation;
-
-  // ─── Professional Proctoring System: Full-Screen + Tab Detection ──────────
+  // ─── Socket.IO Setup ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'exam') return;
-
-    console.log('🛡️ [PROCTORING] Full-screen + tab-switching detection ACTIVE');
+    const token = localStorage.getItem('accessToken');
+    const wsUrl = process.env.REACT_APP_WS_URL || 
+      (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-d5i2.onrender.com');
     
-    let isTabSwitching = false;
+    const socket = io(wsUrl, { auth: { token } });
+    socketRef.current = socket;
 
-    // ── Full-Screen Exit Detection ──
+    socket.on('connect', () => {
+      console.log('🔗 Connected to proctoring server');
+    });
+
+    socket.on('violation_update', (data) => {
+      if (data.sessionId === session?.id) {
+        setViolationCount(data.violationCount);
+        toast.warning(`⚠️ Violation detected: ${data.type}`);
+      }
+    });
+
+    socket.on('exam_terminated', (data) => {
+      if (data.sessionId === session?.id) {
+        toast.error(`🚨 Exam terminated: ${data.reason}`);
+        handleSubmit(true);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [examId, session]);
+
+  // ─── Professional Event Listeners Setup ───────────────────────────────────────────
+  useEffect(() => {
+    // Fullscreen change detection
     const handleFullscreenChange = () => {
-      const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+      const isCurrentlyFullscreen = checkFullscreenStatus();
       
-      if (!isFullscreen && !submittedRef.current) {
-        console.log('🚨 [PROCTORING] Full-screen exited — counting violation');
-        reportViolationRef.current('fullscreen_exit', 'Student exited full-screen mode');
-        
-        // Re-request full-screen after a short delay
-        setTimeout(() => {
-          if (!submittedRef.current) {
-            const el = document.documentElement;
-            try {
-              if (el.requestFullscreen) {
-                el.requestFullscreen().catch(() => {});
-              } else if (el.webkitRequestFullscreen) {
-                el.webkitRequestFullscreen();
-              }
-            } catch (e) {}
-          }
-        }, 1000);
-      }
-    };
-
-    // ── Tab Switch Detection ──
-    const handleVisibilityChange = () => {
-      if (document.hidden && !isTabSwitching && !submittedRef.current) {
-        isTabSwitching = true;
-        setTimeout(() => {
-          if (document.hidden) {
-            reportViolationRef.current('tab_switch', 'Student switched tabs/windows');
-          }
-          isTabSwitching = false;
-        }, 500);
-      }
-    };
-
-    // ── Window Focus ──
-    const handleWindowFocus = () => {
-      // Clear warning message 3 seconds after returning
-      if (!submittedRef.current) {
-        setTimeout(() => setWarningMsg(''), 3000);
-      }
-    };
-
-    // ── Context Menu Blocking ──
-    const handleContextMenu = (e) => {
-      if (!submittedRef.current) {
-        e.preventDefault();
-        reportViolationRef.current('context_menu', 'Right-click blocked');
-        return false;
-      }
-    };
-
-    // ── Keyboard Shortcut Blocking ──
-    const handleKeyDown = (e) => {
-      if (submittedRef.current) return;
-
-      const key = e.key.toLowerCase();
-      const ctrlKey = e.ctrlKey || e.metaKey;
-      const altKey = e.altKey;
-
-      const dangerousCombos = [
-        { ctrl: true, key: 'c', name: 'Copy' },
-        { ctrl: true, key: 'v', name: 'Paste' },
-        { ctrl: true, key: 'x', name: 'Cut' },
-        { ctrl: true, key: 'a', name: 'Select All' },
-        { ctrl: true, key: 'u', name: 'View Source' },
-        { ctrl: true, key: 'i', name: 'DevTools' },
-        { ctrl: true, key: 's', name: 'Save Page' },
-        { alt: true, key: 'tab', name: 'Alt+Tab' },
-        { key: 'f12', name: 'DevTools' },
-        { key: 'escape', name: 'Escape' }
-      ];
-
-      const matchedCombo = dangerousCombos.find(combo =>
-        (combo.ctrl && ctrlKey && combo.key === key) ||
-        (combo.alt && altKey && combo.key === key) ||
-        (!combo.ctrl && !combo.alt && combo.key === key)
-      );
-
-      if (matchedCombo) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Escape key: re-request fullscreen instead of counting violation
-        if (key === 'escape') {
-          const el = document.documentElement;
-          try {
-            if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-          } catch (err) {}
-          return false;
+      if (!isCurrentlyFullscreen && phase === 'exam' && !submitted) {
+        console.log('🚨 Full-screen exited - counting violation');
+        if (socketRef.current && session) {
+          socketRef.current.emit('violation', {
+            sessionId: session.id,
+            type: 'fullscreen_exit',
+            details: 'Student exited full-screen mode',
+            timestamp: new Date().toISOString()
+          });
         }
-        
-        reportViolationRef.current('keyboard_shortcut', `Blocked: ${matchedCombo.name}`);
-        return false;
+        toast.warning('⚠️ Please return to full-screen mode');
       }
     };
 
-    // ── Register All Listeners ──
+    // Add all event listeners
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('focus', handleWindowFocus);
     document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDown);
 
-    // ── Cleanup ──
     return () => {
+      // Cleanup all event listeners
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('focus', handleWindowFocus);
       document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [phase]); // Only re-run when phase changes — uses refs for everything else
+  }, [handleVisibilityChange, handleWindowFocus, handleContextMenu, handleKeyDown, checkFullscreenStatus, phase, session, submitted, socketRef]);
 
-  // Auto-save answers every 30 seconds
+  // ─── Auto-save Setup ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'exam' || !session) return;
-    autoSaveRef.current = setInterval(() => {
-      Object.entries(answers).forEach(([questionId, answer]) => {
-        const question = questions.find(q => q.id === questionId);
-        if (!question || !answer) return;
-        studentAPI.saveAnswer(examId, {
-          sessionId: session.id,
-          questionId,
-          ...(question.type === 'mcq' ? { selectedOption: answer } : question.type === 'coding' ? { codeSubmission: answer } : { answerText: answer }),
-        }).catch(() => {});
-      });
-    }, 30000);
-    return () => clearInterval(autoSaveRef.current);
-  }, [phase, session, answers, questions, examId]);
-
-  const handleStartExam = async (examKey) => {
-    try {
-      console.log('🚀 Starting exam with key:', examKey);
-      setIsStartingExam(true);
-      setLoadingError(null);
-      setPhase('loading');
-      
-      // Show loading toast
-      toast.loading('Starting your exam...', { id: 'exam-start' });
-
-      const res = await studentAPI.startExam(examId, { examKey });
-      console.log('📋 Exam start response:', res.data);
-      
-      // SIMPLIFIED: Direct data extraction without complex validation
-      const responseData = res.data;
-      
-      console.log('🔍 Response structure analysis:', {
-        hasSuccess: 'success' in responseData,
-        success: responseData.success,
-        hasData: 'data' in responseData,
-        hasDirectData: 'exam' in responseData,
-        keys: Object.keys(responseData)
-      });
-      
-      // Extract data from response - try multiple patterns
-      let exam, sessionData, questionsData, savedAnswers, time;
-      
-      if (responseData.data && responseData.data.exam) {
-        // Pattern 1: { success: true, data: { exam, session, questions, ... } }
-        console.log('📊 Using Pattern 1: data.exam structure');
-        exam = responseData.data.exam;
-        sessionData = responseData.data.session;
-        questionsData = responseData.data.questions || [];
-        savedAnswers = responseData.data.savedAnswers || [];
-        time = responseData.data.timeRemaining;
-      } else if (responseData.exam) {
-        // Pattern 2: { exam, session, questions, ... } directly
-        console.log('📊 Using Pattern 2: direct exam structure');
-        exam = responseData.exam;
-        sessionData = responseData.session;
-        questionsData = responseData.questions || [];
-        savedAnswers = responseData.savedAnswers || [];
-        time = responseData.timeRemaining;
-      } else {
-        // Pattern 3: Fallback - try to extract whatever we can
-        console.log('📊 Using Pattern 3: fallback extraction');
-        exam = responseData.exam || responseData;
-        sessionData = responseData.session;
-        questionsData = responseData.questions || [];
-        savedAnswers = responseData.savedAnswers || [];
-        time = responseData.timeRemaining;
-      }
-      
-      console.log('📊 Extracted data:', {
-        hasExam: !!exam,
-        hasSession: !!sessionData,
-        hasQuestions: !!questionsData,
-        questionsCount: questionsData?.length || 0,
-        examName: exam?.name || 'Unknown',
-        sessionId: sessionData?.id || 'Unknown'
-      });
-      
-      // CRITICAL: Force questions to be an array and ensure we have data
-      if (!questionsData || !Array.isArray(questionsData)) {
-        console.warn('⚠️ Questions data is invalid, creating empty array');
-        questionsData = [];
-      }
-      
-      // If we have basic data, proceed regardless of validation issues
-      if (exam && sessionData) {
-        console.log('✅ Basic data received, proceeding with exam start');
-        console.log('📋 Questions data received:', {
-          isArray: Array.isArray(questionsData),
-          length: questionsData?.length || 0,
-          firstQuestion: questionsData?.[0] ? {
-            id: questionsData[0].id,
-            type: questionsData[0].type,
-            hasText: !!questionsData[0].question_text,
-            textLength: questionsData[0].question_text?.length || 0,
-            hasOptions: !!questionsData[0].options,
-            optionsCount: questionsData[0].options?.length || 0
-          } : null
-        });
-        
-        // Set all data
-        setExamData(exam);
-        setSession(sessionData);
-        setQuestions(questionsData);
-        setTimeRemaining(time || 3600); // Default to 1 hour
-        setLoadingError(null);
-
-        console.log('🔄 State updated - Questions in state:', questionsData.length);
-
-        // Restore saved answers
-        const saved = {};
-        if (Array.isArray(savedAnswers)) {
-          savedAnswers.forEach(a => {
-            saved[a.question_id] = a.selected_option || a.answer_text || a.code_submission || '';
+    if (phase === 'exam' && session && !submitted) {
+      autoSaveRef.current = setInterval(() => {
+        const currentAnswers = Object.keys(answers).filter(k => answers[k]);
+        if (currentAnswers.length > 0) {
+          console.log('💾 Auto-saving answers...');
+          Object.entries(answers).forEach(([questionId, answer]) => {
+            const question = questions.find(q => q.id === questionId);
+            if (question && answer) {
+              studentAPI.saveAnswer(examId, {
+                sessionId: session.id,
+                questionId,
+                ...(question.type === 'mcq' ? { selectedOption: answer } : 
+                   question.type === 'coding' ? { codeSubmission: answer } : 
+                   { answerText: answer }),
+              }).catch(() => {});
+            }
           });
         }
-        setAnswers(saved);
-        
-        console.log('💾 Saved answers restored:', Object.keys(saved).length);
-        
-        // Set current question to first question
-        if (questionsData.length > 0) {
-          setCurrentQ(0);
-        }
-        
-        // CRITICAL: Force phase change to exam
-        setPhase('exam');
-        setIsStartingExam(false);
-        
-        // Update toast to success
-        toast.success('Exam started successfully!', { id: 'exam-start' });
-        console.log('✅ Exam started successfully with', questionsData.length, 'questions');
-        
-        // 🖥️ Request Professional Full-Screen Mode after render
-        setTimeout(async () => {
-          if (fullScreenManagerRef.current) {
-            console.log('🖥️ Requesting professional full-screen exam mode...');
-            const success = await fullScreenManagerRef.current.requestFullScreen();
-            if (!success) {
-              console.warn('⚠️ Full-screen mode not activated, exam continues with violations tracked');
-            }
-          }
-        }, 1000);
-        
-      } else {
-        throw new Error('Required exam data not received');
-      }
-
-    } catch (error) {
-      console.error('❌ Failed to start exam:', error);
-      setIsStartingExam(false);
-      
-      const errorMessage = error.message || error.error || (typeof error === 'string' ? error : 'Failed to start exam');
-      setLoadingError(errorMessage);
-      setPhase('key');
-      
-      // Update toast to error
-      toast.error(errorMessage, { 
-        id: 'exam-start',
-        duration: 5000 
-      });
+      }, 30000); // Auto-save every 30 seconds
+    } else if (autoSaveRef.current) {
+      clearInterval(autoSaveRef.current);
+      autoSaveRef.current = null;
     }
-  };
+  }, [phase, session, submitted, answers, questions, examId]);
 
-  const q = questions[currentQ];
-  const answered = Object.keys(answers).filter(k => answers[k]).length;
+  // ─── Fetch Exam Data ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchExamData = async () => {
+      try {
+        const response = await studentAPI.getExamDetails(examId);
+        if (response.success) {
+          setExamData(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch exam data:', error);
+        toast.error('Failed to load exam data');
+      }
+    };
 
-  // Debug logging for question display issues
-  console.log('🔍 Question Debug:', {
-    questionsLength: questions.length,
-    currentQ: currentQ,
-    q: q ? {
-      id: q.id,
-      type: q.type,
-      questionText: q.question_text?.substring(0, 50) + '...'
-    } : null,
-    phase: phase,
-    hasQuestions: questions.length > 0,
-    hasCurrentQuestion: !!q,
-    currentQInBounds: currentQ >= 0 && currentQ < questions.length
-  });
+    if (examId && phase === 'key') {
+      fetchExamData();
+    }
+  }, [examId, phase]);
 
-  // ─── Exam Key Entry Phase ────────────────────────────────────────────────────
-  if (phase === 'key') {
-    return <ExamKeyModal examName={examData?.name || 'Loading...'} onStart={handleStartExam} disabled={isStartingExam} />;
-  }
-
-  // ─── Loading Phase ─────────────────────────────────────────────────────────
-  if (phase === 'loading') {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        background: '#0a0a0f', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        fontFamily: 'Sora, sans-serif'
-      }}>
-        <div style={{ textAlign: 'center', maxWidth: 400, padding: 32 }}>
-          <div style={{ 
-            width: 60, 
-            height: 60, 
-            border: '3px solid rgba(233,69,96,0.2)', 
-            borderTop: '3px solid #e94560', 
-            borderRadius: '50%', 
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 24px'
-          }}></div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>
-            Starting Your Exam...
-          </h2>
-          <p style={{ fontSize: 14, color: '#718096', lineHeight: 1.6, marginBottom: 20 }}>
-            We're preparing your exam questions and setting up your session. This will only take a moment.
-          </p>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            gap: 8,
-            marginBottom: 16
-          }}>
-            {[0, 1, 2].map(i => (
-              <div
-                key={i}
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: '#e94560',
-                  animation: `pulse 1.5s ease-in-out ${i * 0.2}s infinite`
-                }}
-              ></div>
-            ))}
-          </div>
-          <p style={{ fontSize: 12, color: '#4a5568' }}>
-            Please wait while we load your exam...
-          </p>
-        </div>
-        
-        <style>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-          @keyframes pulse {
-            0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-            40% { opacity: 1; transform: scale(1); }
-          }
-        `}</style>
-      </div>
-    );
-  }
-
-  // ─── Submitted Phase ─────────────────────────────────────────────────────────
-  if (phase === 'submitted' && result) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Sora, sans-serif' }}>
-        <div style={{ textAlign: 'center', maxWidth: 440, padding: 32 }}>
-          <div style={{ fontSize: 60, marginBottom: 16 }}>{result.status === 'pass' ? '🎉' : result.isPending ? '⏳' : '😔'}</div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#e2e8f0', marginBottom: 8 }}>
-            {result.isPending ? 'Exam Submitted!' : result.status === 'pass' ? 'Congratulations!' : 'Exam Completed'}
-          </h1>
-          {result.isPending ? (
-            <p style={{ color: '#718096', marginBottom: 24 }}>Your answers are submitted. Results will be published after evaluation.</p>
-          ) : (
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 24, marginBottom: 24 }}>
-              {[
-                ['Marks Obtained', `${result.marksObtained} / ${result.totalMarks}`],
-                ['Percentage', `${result.percentage}%`],
-                ['Grade', result.grade],
-                ['Status', result.status?.toUpperCase()],
-              ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontSize: 13, color: '#718096' }}>{k}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: result.status === 'pass' ? '#22c55e' : '#e94560' }}>{v}</span>
-                </div>
-              ))}
+  // ─── Professional Render ─────────────────────────────────────────────────────
+  const renderKeyPhase = () => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-slate-200">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-full mb-4">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v3m0 0l-3-3 3-3 3-3h6l-3 3-3 3 3v6m-9-9h6l3-3-3-3 3a9 9 0 018 0z" />
+              </svg>
             </div>
-          )}
-          <button onClick={() => navigate('/student/dashboard')} style={{ background: 'linear-gradient(135deg,#e94560,#c62a47)', border: 'none', borderRadius: 10, padding: '12px 28px', color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'Sora, sans-serif' }}>
-            Back to Dashboard
-          </button>
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">ExamShield</h1>
+            <p className="text-slate-600 mb-6">Enter your exam key to begin</p>
+          </div>
+
+          {/* Exam Key Input */}
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="examKey" className="block text-sm font-medium text-slate-700 mb-2">
+                Exam Key
+              </label>
+              <input
+                id="examKey"
+                type="text"
+                value=""
+                onChange={(e) => setExamData(prev => prev ? { ...prev, examKey: e.target.value } : { examKey: e.target.value })}
+                placeholder="Enter your exam key"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                disabled={isStartingExam}
+              />
+            </div>
+
+            <button
+              onClick={() => {
+                const input = document.getElementById('examKey');
+                if (input && input.value) {
+                  handleExamKey(input.value.trim());
+                } else {
+                  toast.error('Please enter a valid exam key');
+                }
+              }}
+              disabled={isStartingExam}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-medium transition duration-200"
+            >
+              {isStartingExam ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  </svg>
+                  Validating Key...
+                </>
+              ) : (
+                'Start Exam'
+              )}
+            </button>
+          </div>
+
+          {/* Instructions */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h3 className="font-semibold text-blue-800 mb-2">📋 Exam Instructions</h3>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Enter exam key provided by your institution</li>
+              <li>• Ensure you have a stable internet connection</li>
+              <li>• Allow full-screen mode when prompted</li>
+              <li>• Do not switch tabs during exam</li>
+              <li>• Complete exam in one sitting</li>
+            </ul>
+          </div>
         </div>
       </div>
-    );
-  }
-
-  // ─── Main Exam UI ─────────────────────────────────────────────────────────────
-  return (
-    <div data-exam-container style={{ minHeight: '100vh', background: '#080810', fontFamily: 'Sora, sans-serif', display: 'flex' }}>
-      {/* Professional Warning Banner */}
-      {warningMsg && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          background: warningMsg.includes('🚨') ? '#dc2626' : warningMsg.includes('Warning 3') ? '#dc2626' : warningMsg.includes('Warning 2') ? '#f59e0b' : '#ef4444', 
-          padding: '14px 20px', 
-          textAlign: 'center', 
-          fontWeight: 600, 
-          fontSize: 15, 
-          color: 'white', 
-          zIndex: 9999, 
-          animation: 'slideDown 0.3s ease',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-          fontFamily: 'Sora, sans-serif'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px' }}>
-            <span style={{ fontSize: '20px', marginRight: '5px' }}>⚠️</span>
-            <span style={{ flex: 1, textAlign: 'left' }}>{warningMsg}</span>
-            {warningMsg.includes('Warning') && (
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', marginRight: '5px', opacity: 0.9 }}>Violations:</span>
-                {[1, 2, 3].map(num => {
-                  const currentWarning = parseInt(warningMsg.match(/Warning (\d)/)?.[1] || '0');
-                  const isActive = currentWarning >= num;
-                  return (
-                    <div 
-                      key={num}
-                      style={{ 
-                        width: '14px', 
-                        height: '14px', 
-                        borderRadius: '50%', 
-                        background: isActive ? '#ffffff' : 'rgba(255,255,255,0.3)',
-                        border: '2px solid #ffffff',
-                        animation: isActive ? 'pulse 1.5s infinite' : 'none',
-                        transition: 'all 0.3s ease'
-                      }} 
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Professional Full Screen Status Indicator */}
-      {phase === 'exam' && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 10, 
-          left: 10, 
-          background: fullScreenStatus === 'active' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)', 
-          padding: '12px 20px', 
-          borderRadius: '12px', 
-          fontSize: 13, 
-          fontWeight: 600, 
-          color: 'white', 
-          zIndex: 9998, 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '10px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(10px)',
-          border: `1px solid ${fullScreenStatus === 'active' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-        }}>
-          <span style={{ fontSize: '16px' }}>
-            {fullScreenStatus === 'active' ? '🖥️' : '⚠️'}
-          </span>
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: 700, lineHeight: 1.2 }}>
-              {fullScreenStatus === 'active' ? 'FULL SCREEN MODE' : 'VIOLATION DETECTED'}
-            </div>
-            <div style={{ fontSize: '10px', opacity: 0.9, lineHeight: 1.2 }}>
-              {fullScreenStatus === 'active' ? 'Secure exam environment' : `Violations: ${violationCount}/3`}
-            </div>
-          </div>
-          <div style={{ 
-            width: '10px', 
-            height: '10px', 
-            borderRadius: '50%', 
-            background: 'white', 
-            animation: 'pulse 2s infinite' 
-          }} />
-        </div>
-      )}
-
-      {/* Sidebar */}
-      <aside style={{ width: 260, background: 'rgba(10,10,20,0.98)', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0, left: 0, overflowY: 'auto' }}>
-        {/* Header */}
-        <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#e94560', letterSpacing: 2, marginBottom: 4 }}>COLLEGEEXAM</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.4 }}>{examData?.name}</div>
-          <div style={{ fontSize: 11, color: '#4a5568', marginTop: 4 }}>{examData?.type?.toUpperCase()}</div>
-        </div>
-
-        {/* Timer */}
-        <div style={{ padding: '16px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 10, color: '#4a5568', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Time Remaining</div>
-          {timeRemaining > 0 && <Timer seconds={timeRemaining} onExpire={() => handleSubmit(true)} />}
-        </div>
-
-        {/* Professional Proctoring — Camera + Face Detection */}
-        {phase === 'exam' && (
-          <ProfessionalProctoring 
-            sessionId={session?.id}
-            examId={examId}
-            studentId={user?.id}
-            currentQuestion={currentQ}
-            totalQuestions={questions.length}
-            onViolation={handleViolationResponse}
-          />
-        )}
-
-        {/* Violations */}
-        {violationCount > 0 && (
-          <div style={{ margin: '0 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 12px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444' }}>
-              ⚠ Violations: {violationCount}/{examData?.max_violations || 3}
-            </div>
-          </div>
-        )}
-
-        {/* Progress */}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 'auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#4a5568', marginBottom: 6 }}>
-            <span>Progress</span>
-            <span>{answered}/{questions.length}</span>
-          </div>
-          <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
-            <div style={{ height: '100%', background: '#e94560', borderRadius: 2, width: `${(answered / questions.length) * 100}%`, transition: 'width 0.3s' }} />
-          </div>
-
-          {/* Question grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, marginTop: 12 }}>
-            {questions.map((q, i) => (
-              <button key={q.id} onClick={() => setCurrentQ(i)} style={{
-                width: '100%', aspectRatio: '1', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 700,
-                background: i === currentQ ? '#e94560' : answers[q.id] ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.06)',
-                color: i === currentQ ? 'white' : answers[q.id] ? '#22c55e' : '#4a5568',
-              }}>{i + 1}</button>
-            ))}
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{ flex: 1, marginLeft: 260, padding: '32px 36px', overflowY: 'auto' }}>
-        {phase === 'exam' && (
-          <>
-            {questions.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#a0aec0' }}>
-                <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12, color: '#e94560' }}>Questions Not Found</h2>
-                <p style={{ fontSize: 14, textAlign: 'center', maxWidth: 400, marginBottom: 24, color: '#cbd5e0', lineHeight: 1.6 }}>
-                  We couldn't retrieve the questions for this exam. This might be because the exam is still being prepared by the administrator or there was a system error.
-                </p>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  <button
-                    onClick={() => window.location.reload()}
-                    style={{
-                      background: 'linear-gradient(135deg,#e94560,#c62a47)',
-                      border: 'none',
-                      borderRadius: 8,
-                      padding: '12px 24px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontFamily: 'Sora, sans-serif',
-                      fontSize: 14,
-                      fontWeight: 600,
-                      boxShadow: '0 4px 12px rgba(233,69,96,0.3)'
-                    }}
-                  >
-                    Retry Loading
-                  </button>
-                  <button
-                    onClick={() => {
-                      console.log('🔍 Debug info:', {
-                        phase: phase,
-                        questionsLength: questions.length,
-                        currentQ: currentQ,
-                        examData: !!examData,
-                        session: !!session,
-                        examId: examId
-                      });
-                      alert(`Debug Info:\nPhase: ${phase}\nQuestions: ${questions.length}\nExamData: ${!!examData}\nSession: ${!!session}`);
-                    }}
-                    style={{
-                      background: 'rgba(59,130,246,0.15)',
-                      border: '1px solid rgba(59,130,246,0.3)',
-                      borderRadius: 8,
-                      padding: '12px 24px',
-                      color: '#3b82f6',
-                      cursor: 'pointer',
-                      fontFamily: 'Sora, sans-serif',
-                      fontSize: 14,
-                      fontWeight: 600
-                    }}
-                  >
-                    Debug Info
-                  </button>
-                  <button
-                    onClick={() => navigate('/student/dashboard')}
-                    style={{
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: 8,
-                      padding: '12px 24px',
-                      color: '#e2e8f0',
-                      cursor: 'pointer',
-                      fontFamily: 'Sora, sans-serif',
-                      fontSize: 14,
-                      fontWeight: 600
-                    }}
-                  >
-                    Dashboard
-                  </button>
-                </div>
-              </div>
-            ) : !q || currentQ >= questions.length ? (
-              // Enhanced error state with recovery options
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#a0aec0' }}>
-                <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-                <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Question Not Available</h2>
-                <p style={{ fontSize: 14, textAlign: 'center', maxWidth: 400, marginBottom: 20 }}>
-                  {currentQ >= questions.length 
-                    ? `You've reached the end of the exam. You have ${questions.length} questions in total.`
-                    : 'There seems to be an issue loading this question. Please try the options below.'
-                  }
-                </p>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  <button 
-                    onClick={() => setCurrentQ(0)}
-                    style={{ 
-                      background: 'rgba(233,69,96,0.15)', 
-                      border: '1px solid rgba(233,69,96,0.3)', 
-                      borderRadius: 8, 
-                      padding: '10px 20px', 
-                      color: '#e94560', 
-                      cursor: 'pointer', 
-                      fontFamily: 'Sora, sans-serif', 
-                      fontSize: 13,
-                      fontWeight: 600
-                    }}
-                  >
-                    Go to First Question
-                  </button>
-                  <button 
-                    onClick={() => setCurrentQ(Math.max(0, currentQ - 1))}
-                    style={{ 
-                      background: 'rgba(59,130,246,0.15)', 
-                      border: '1px solid rgba(59,130,246,0.3)', 
-                      borderRadius: 8, 
-                      padding: '10px 20px', 
-                      color: '#3b82f6', 
-                      cursor: 'pointer', 
-                      fontFamily: 'Sora, sans-serif', 
-                      fontSize: 13,
-                      fontWeight: 600
-                    }}
-                  >
-                    Previous Question
-                  </button>
-                  <button 
-                    onClick={() => window.location.reload()}
-                    style={{ 
-                      background: 'rgba(107,114,128,0.15)', 
-                      border: '1px solid rgba(107,114,128,0.3)', 
-                      borderRadius: 8, 
-                      padding: '10px 20px', 
-                      color: '#6b7280', 
-                      cursor: 'pointer', 
-                      fontFamily: 'Sora, sans-serif', 
-                      fontSize: 13,
-                      fontWeight: 600
-                    }}
-                  >
-                    Refresh Exam
-                  </button>
-                </div>
-              </div>
-            ) : (
-              // Normal question display
-              <div style={{ maxWidth: 700 }}>
-                {/* Question header with enhanced info */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ background: 'rgba(233,69,96,0.15)', border: '1px solid rgba(233,69,96,0.3)', color: '#e94560', fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20 }}>
-                      Q{currentQ + 1} / {questions.length}
-                    </span>
-                    <span style={{ fontSize: 11, color: '#4a5568' }}>{q.marks || 0} {q.marks === 1 ? 'mark' : 'marks'}</span>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: q.type === 'mcq' ? 'rgba(233,69,96,0.1)' : q.type === 'coding' ? 'rgba(34,197,94,0.1)' : 'rgba(139,92,246,0.1)', color: q.type === 'mcq' ? '#e94560' : q.type === 'coding' ? '#22c55e' : '#8b5cf6' }}>
-                      {q.type ? q.type.toUpperCase() : 'UNKNOWN'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#4a5568' }}>
-                    {answers[q.id] ? <span style={{ color: '#22c55e' }}>✓ Answered</span> : 'Not answered'}
-                  </div>
-                </div>
-
-                {/* Question Content */}
-                {q.type === 'mcq' ? (
-                  <MCQQuestion question={q} answer={answers[q.id]} onAnswer={(v) => handleAnswer(q.id, v)} />
-                ) : q.type === 'subjective' ? (
-                  <SubjectiveQuestion question={q} answer={answers[q.id]} onAnswer={(v) => handleAnswer(q.id, v)} />
-                ) : q.type === 'coding' ? (
-                  <CodingQuestion question={q} answer={answers[q.id]} onAnswer={(v) => handleAnswer(q.id, v)} />
-                ) : (
-                  <div style={{ color: '#a0aec0', fontSize: 14 }}>
-                    <p style={{ marginBottom: 16, lineHeight: 1.7 }}>{q.question_text}</p>
-                    <textarea value={answers[q.id] || ''} onChange={e => handleAnswer(q.id, e.target.value)}
-                      placeholder="Write your code here..."
-                      rows={14}
-                  style={{ width: '100%', background: '#0d0d14', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '14px 16px', color: '#22c55e', fontSize: 13, fontFamily: "'JetBrains Mono', monospace", resize: 'vertical' }} />
-                  </div>
-                )}
-
-                {/* Navigation */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32 }}>
-                  <button onClick={() => setCurrentQ(q => Math.max(0, q - 1))} disabled={currentQ === 0}
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 20px', color: '#a0aec0', cursor: currentQ === 0 ? 'default' : 'pointer', fontFamily: 'Sora, sans-serif', fontSize: 13, opacity: currentQ === 0 ? 0.4 : 1 }}>
-                    ← Previous
-                  </button>
-
-                  <button onClick={() => handleSubmit(false)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 8, padding: '10px 20px', color: '#ef4444', cursor: 'pointer', fontWeight: 700, fontSize: 13, fontFamily: 'Sora, sans-serif' }}>
-                    Submit Exam
-                  </button>
-
-                  <button onClick={() => setCurrentQ(q => Math.min(questions.length - 1, q + 1))} disabled={currentQ === questions.length - 1}
-                    style={{ background: 'rgba(233,69,96,0.12)', border: '1px solid rgba(233,69,96,0.3)', borderRadius: 8, padding: '10px 20px', color: '#e94560', cursor: currentQ === questions.length - 1 ? 'default' : 'pointer', fontFamily: 'Sora, sans-serif', fontSize: 13, fontWeight: 600, opacity: currentQ === questions.length - 1 ? 0.4 : 1 }}>
-                    Next →
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </main>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
-        * { box-sizing: border-box; }
-        textarea:focus, input:focus { outline: none; border-color: #e94560 !important; }
-        textarea::placeholder { color: #2d3748; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.7} }
-        @keyframes slideDown { from{transform:translateY(-100%)} to{transform:none} }
-      `}</style>
     </div>
   );
+
+  const renderLoadingPhase = () => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
+          <svg className="w-8 h-8 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v16l8-8 8-8 8-8H4z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-2">Loading Exam...</h2>
+        <p className="text-blue-200">Please wait while we prepare your exam</p>
+      </div>
+    </div>
+  );
+
+  const renderExamPhase = () => (
+    <div className="min-h-screen bg-slate-50">
+      {/* Professional Header */}
+      <div className="bg-white shadow-sm border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${isFullscreen ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm font-medium text-slate-700">
+                  {isFullscreen ? '🖥️ Full-Screen Active' : '📱 Enter Full-Screen'}
+                </span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full mr-2 bg-blue-500"></div>
+                <span className="text-sm font-medium text-slate-700">
+                  Tab Switches: {tabSwitchCount}/3
+                </span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${violationCount < 2 ? 'bg-green-500' : violationCount < 3 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm font-medium text-slate-700">
+                  Violations: {violationCount}/3
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <Timer 
+                timeRemaining={timeRemaining} 
+                onTimeUp={() => handleSubmit(true)} 
+              />
+              <button
+                onClick={() => handleSubmit(false)}
+                disabled={submitted}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitted ? 'Submitted' : 'Submit Exam'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Professional Proctoring Component */}
+      <ProfessionalProctoring 
+        socket={socketRef.current}
+        sessionId={session?.id}
+        violationCount={violationCount}
+        tabSwitchCount={tabSwitchCount}
+      />
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Question Panel */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-slate-800">
+                  Question {currentQ + 1} of {questions.length}
+                </h2>
+                <span className="text-sm text-slate-500">
+                  {questions[currentQ]?.marks || 0} marks
+                </span>
+              </div>
+
+              {/* Question Rendering */}
+              {questions[currentQ] && (
+                <div className="space-y-4">
+                  {questions[currentQ].type === 'mcq' && (
+                    <MCQQuestion
+                      question={questions[currentQ]}
+                      selectedOption={answers[questions[currentQ].id]?.selectedOption}
+                      onSelect={(option) => handleAnswer(questions[currentQ].id, option)}
+                      disabled={submitted}
+                    />
+                  )}
+                  
+                  {questions[currentQ].type === 'subjective' && (
+                    <SubjectiveQuestion
+                      question={questions[currentQ]}
+                      answer={answers[questions[currentQ].id]?.answerText || ''}
+                      onChange={(answer) => handleAnswer(questions[currentQ].id, answer)}
+                      disabled={submitted}
+                    />
+                  )}
+                  
+                  {questions[currentQ].type === 'coding' && (
+                    <CodingQuestion
+                      question={questions[currentQ]}
+                      code={answers[questions[currentQ].id]?.codeSubmission || ''}
+                      onChange={(code) => handleAnswer(questions[currentQ].id, code)}
+                      disabled={submitted}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="flex justify-between items-center mt-6">
+                <button
+                  onClick={() => setCurrentQ(Math.max(0, currentQ - 1))}
+                  disabled={currentQ === 0 || submitted}
+                  className="px-4 py-2 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ← Previous
+                </button>
+                
+                <button
+                  onClick={() => setCurrentQ(Math.min(questions.length - 1, currentQ + 1))}
+                  disabled={currentQ === questions.length - 1 || submitted}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Instructions Panel */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow-lg p-6 sticky top-8">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">📋 Exam Instructions</h3>
+              <div className="space-y-3 text-sm text-slate-600">
+                <p>• Read each question carefully before answering</p>
+                <p>• You can navigate between questions using Previous/Next buttons</p>
+                <p>• Answers are auto-saved every 30 seconds</p>
+                <p>• Submit exam when you have answered all questions</p>
+                <div className="mt-4 p-3 bg-yellow-50 rounded border border-yellow-200">
+                  <p className="font-medium text-yellow-800">⚠️ Important:</p>
+                  <ul className="list-disc list-inside space-y-1 mt-2">
+                    <li>Stay in full-screen mode throughout the exam</li>
+                    <li>Do not switch tabs (max 3 switches allowed)</li>
+                    <li>Each violation may affect your final score</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSubmittedPhase = () => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
+          <div className="mb-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 2 2-2 2-2H9z" />
+              </svg>
+            </div>
+          </div>
+          
+          <h1 className="text-3xl font-bold text-green-600 mb-4">Exam Submitted Successfully!</h1>
+          <p className="text-slate-600 mb-6">Your exam has been submitted and is being graded.</p>
+          
+          {result && (
+            <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">📊 Exam Results</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Total Marks:</span>
+                  <span className="font-medium text-slate-800">{result.totalMarks || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Your Score:</span>
+                  <span className="font-medium text-slate-800">{result.score || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Percentage:</span>
+                  <span className="font-medium text-slate-800">{result.percentage || 0}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Status:</span>
+                  <span className={`font-medium ${
+                    result.percentage >= 40 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {result.percentage >= 40 ? '✅ Passed' : '❌ Failed'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="mt-6">
+            <button
+              onClick={() => navigate('/student/dashboard')}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── Phase Renderer ─────────────────────────────────────────────────────
+  if (phase === 'key') return renderKeyPhase();
+  if (phase === 'loading') return renderLoadingPhase();
+  if (phase === 'exam') return renderExamPhase();
+  if (phase === 'submitted') return renderSubmittedPhase();
+  
+  return renderLoadingPhase();
 }
