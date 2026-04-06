@@ -10,7 +10,7 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-// Create reusable transporter
+// Create reusable transporter with timeout fixes
 const createTransporter = () => {
   console.log('🔧 Email configuration check:', {
     hasHost: !!process.env.EMAIL_HOST,
@@ -51,12 +51,24 @@ const createTransporter = () => {
   console.log('📧 Using Gmail SMTP:', process.env.EMAIL_HOST);
   console.log('📧 From email:', process.env.EMAIL_FROM || process.env.EMAIL_USER);
   
+  // Enhanced Gmail transporter with timeout fixes
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT || 587,
+    secure: false,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
-    }
+    },
+    tls: {
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 30000,  // 30 seconds
+    greetingTimeout: 10000,   // 10 seconds
+    socketTimeout: 10000,     // 10 seconds
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
   });
 
   return {
