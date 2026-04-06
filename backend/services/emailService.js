@@ -252,7 +252,7 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
       <p>⚠️ <strong>Important:</strong> Please change your password after your first login. Keep your credentials secure and do not share them with anyone.</p>
     </div>
   `;
-
+  
   await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to: email,
@@ -261,6 +261,101 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
   });
   
   logger.info(`Credentials email sent to ${email}`);
+};
+
+/**
+ * Send bulk student credentials emails for CSV uploads
+ */
+const sendBulkStudentCredentials = async (students, collegeName, loginUrl) => {
+  const transporter = createTransporter();
+  
+  console.log('\n📧 Sending bulk credentials emails...');
+  console.log(`📧 Total students: ${students.length}`);
+  
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: []
+  };
+  
+  // Send emails in batches to prevent overwhelming
+  const batchSize = 5;
+  for (let i = 0; i < students.length; i += batchSize) {
+    const batch = students.slice(i, i + batchSize);
+    
+    console.log(`📧 Sending batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(students.length/batchSize)} (${batch.length} students)`);
+    
+    const promises = batch.map(async (student) => {
+      try {
+        await transporter.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: student.email,
+          subject: `Welcome to ExamShield — Your Login Credentials`,
+          html: baseTemplate(`
+            <div class="badge">ACCOUNT CREATED</div>
+            <p class="greeting">Welcome, ${student.name}!</p>
+            <p class="text">Your student account has been created on ExamShield by <strong>${collegeName}</strong>. Use the credentials below to log in to your exam portal.</p>
+            
+            <div class="credentials-box">
+              <div class="credential-item">
+                <span class="credential-label">Student ID</span>
+                <span class="credential-value">${student.student_id}</span>
+              </div>
+              <div class="credential-item">
+                <span class="credential-label">Email</span>
+                <span class="credential-value">${student.email}</span>
+              </div>
+              <div class="credential-item">
+                <span class="credential-label">Password</span>
+                <span class="credential-value">${student.password}</span>
+              </div>
+            </div>
+            
+            <div style="text-align:center;">
+              <a href="${loginUrl}" class="btn">Login to ExamShield →</a>
+            </div>
+            
+            <div class="warning-box">
+              <p>⚠️ <strong>Important:</strong> Please change your password after your first login. Keep your credentials secure and do not share them with anyone.</p>
+            </div>
+          `),
+        });
+        
+        console.log(`✅ Credentials email sent to: ${student.email}`);
+        logger.info(`Credentials email sent to ${student.email}`);
+        return { success: true, email: student.email };
+        
+      } catch (error) {
+        console.error(`❌ Failed to send email to ${student.email}:`, error.message);
+        logger.error(`Failed to send credentials to ${student.email}: ${error.message}`);
+        results.errors.push(`Email failed for ${student.email}: ${error.message}`);
+        return { success: false, email: student.email, error: error.message };
+      }
+    });
+    
+    // Wait for batch to complete before sending next batch
+    const batchResults = await Promise.allSettled(promises);
+    
+    batchResults.forEach(result => {
+      if (result.status === 'fulfilled' && result.value.success) {
+        results.success++;
+      } else {
+        results.failed++;
+      }
+    });
+    
+    // Small delay between batches
+    if (i + batchSize < students.length) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  
+  console.log(`\n📊 Bulk email results:`);
+  console.log(`✅ Successful: ${results.success}`);
+  console.log(`❌ Failed: ${results.failed}`);
+  console.log(`📧 Total processed: ${students.length}`);
+  
+  return results;
 };
 
 /**
@@ -457,6 +552,7 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
 
 module.exports = {
   sendStudentCredentials,
+  sendBulkStudentCredentials,
   sendExamNotification,
   sendExamReminder,
   sendResultNotification,
