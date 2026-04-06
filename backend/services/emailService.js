@@ -64,11 +64,12 @@ const createTransporter = () => {
   console.log('📧 From email:', process.env.EMAIL_FROM || process.env.EMAIL_USER);
   console.log('📧 Environment:', process.env.NODE_ENV);
   
-  // Enhanced transporter configuration for production
+  // Enhanced transporter configuration for production (Render/Vercel compatible)
   const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT || 587,
-    secure: false, // true for 465, false for other ports
+    service: 'gmail', // Use Gmail service instead of custom host
+    host: 'smtp.gmail.com',
+    port: 465, // Use SSL port for better compatibility
+    secure: true, // Use SSL for port 465
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -76,14 +77,17 @@ const createTransporter = () => {
     tls: {
       rejectUnauthorized: false, // Allow self-signed certificates
     },
-    connectionTimeout: 60000, // 60 seconds
-    greetingTimeout: 30000, // 30 seconds
-    socketTimeout: 60000, // 60 seconds
+    connectionTimeout: 30000, // 30 seconds (reduced from 60)
+    greetingTimeout: 15000, // 15 seconds (reduced from 30)
+    socketTimeout: 30000, // 30 seconds (reduced from 60)
+    pool: true, // Use connection pooling
+    maxConnections: 5, // Limit concurrent connections
+    maxMessages: 100, // Limit messages per connection
   });
 
   return {
     sendMail: (options) => {
-      // Professional fire-and-forget pattern
+      // Professional fire-and-forget pattern with retry logic
       setImmediate(async () => {
         const mailOptions = {
           ...options,
@@ -93,11 +97,52 @@ const createTransporter = () => {
         console.log(`📤 [REAL EMAIL] Sending to: ${mailOptions.to}`);
         console.log(`📧 [REAL EMAIL] Subject: ${mailOptions.subject}`);
         
-        try {
-          const info = await transporter.sendMail(mailOptions);
-          console.log('✅ [REAL EMAIL] Success:', info.messageId);
-        } catch (err) {
-          console.error('❌ [REAL EMAIL] Failed:', err.message);
+        // Retry logic for connection timeouts
+        const maxRetries = 3;
+        const retryDelay = 2000; // 2 seconds
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            // Verify connection before sending
+            await transporter.verify();
+            console.log(`🔗 [REAL EMAIL] Connection verified (attempt ${attempt})`);
+            
+            const info = await transporter.sendMail(mailOptions);
+            console.log('✅ [REAL EMAIL] Success:', info.messageId);
+            logger.info(`Email sent successfully to ${mailOptions.to}`, { 
+              messageId: info.messageId,
+              attempts: attempt 
+            });
+            return; // Success, exit retry loop
+            
+          } catch (err) {
+            console.error(`❌ [REAL EMAIL] Failed (attempt ${attempt}/${maxRetries}):`, err.message);
+            
+            // Log specific error types
+            if (err.code === 'ETIMEDOUT' || err.code === 'ECONNECTION') {
+              console.log(`🔄 [REAL EMAIL] Connection timeout, retrying in ${retryDelay}ms...`);
+            } else if (err.code === 'EAUTH') {
+              console.error('🔐 [REAL EMAIL] Authentication failed - check EMAIL_USER and EMAIL_PASS');
+              logger.error(`Email authentication failed: ${err.message}`);
+              return; // Don't retry auth errors
+            } else {
+              console.error('💥 [REAL EMAIL] Unexpected error:', err);
+            }
+            
+            // If this is the last attempt, log final failure
+            if (attempt === maxRetries) {
+              console.error(`🚫 [REAL EMAIL] All ${maxRetries} attempts failed`);
+              logger.error(`Email failed after ${maxRetries} attempts`, {
+                to: mailOptions.to,
+                error: err.message,
+                code: err.code
+              });
+              return;
+            }
+            
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
         }
       });
       
