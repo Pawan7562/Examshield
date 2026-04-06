@@ -1,6 +1,15 @@
 // services/emailService.js
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+// Load environment variables for both local and production
+if (process.env.NODE_ENV === 'production') {
+  // In production (Vercel), environment variables are already loaded
+  require('dotenv').config();
+} else {
+  // In development, load from .env file
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+}
+
 const nodemailer = require('nodemailer');
 const winston = require('winston');
 
@@ -17,7 +26,8 @@ const createTransporter = () => {
     hasUser: !!process.env.EMAIL_USER,
     hasPass: !!process.env.EMAIL_PASS,
     host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT
+    port: process.env.EMAIL_PORT,
+    nodeEnv: process.env.NODE_ENV
   });
 
   // Use mock transporter only if email is not configured
@@ -27,9 +37,10 @@ const createTransporter = () => {
     console.log('   EMAIL_HOST:', process.env.EMAIL_HOST || 'NOT SET');
     console.log('   EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
     console.log('   EMAIL_PASS:', process.env.EMAIL_PASS ? '***SET***' : 'NOT SET');
+    console.log('   NODE_ENV:', process.env.NODE_ENV || 'NOT SET');
     console.log('');
-    console.log('🔧 SOLUTION: Create .env file with email configuration');
-    console.log('📧 See EMAIL_CONFIGURATION_GUIDE.md for instructions');
+    console.log('🔧 SOLUTION: Add environment variables in production');
+    console.log('📧 For Vercel: Set environment variables in dashboard');
     console.log('');
     
     return {
@@ -37,11 +48,12 @@ const createTransporter = () => {
         logger.info('🚨 MOCK EMAIL - No real email sent', { 
           to: options.to, 
           subject: options.subject,
-          html: options.html?.substring(0, 200) + '...' 
+          html: options.html?.substring(0, 200) + '...',
+          nodeEnv: process.env.NODE_ENV
         });
         console.log('📧 MOCK EMAIL WOULD BE SENT TO:', options.to);
         console.log('📧 SUBJECT:', options.subject);
-        console.log('🔧 CONFIGURE EMAIL_HOST, EMAIL_USER, EMAIL_PASS in .env for real emails');
+        console.log('🔧 CONFIGURE EMAIL_HOST, EMAIL_USER, EMAIL_PASS in production');
         return Promise.resolve({ status: 'mock', message: 'Email not configured - using mock mode' });
       }
     };
@@ -50,13 +62,23 @@ const createTransporter = () => {
   console.log('✅ Email configured - creating professional Gmail transporter');
   console.log('📧 Using Gmail SMTP:', process.env.EMAIL_HOST);
   console.log('📧 From email:', process.env.EMAIL_FROM || process.env.EMAIL_USER);
+  console.log('📧 Environment:', process.env.NODE_ENV);
   
+  // Enhanced transporter configuration for production
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT || 587,
+    secure: false, // true for 465, false for other ports
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
-    }
+    },
+    tls: {
+      rejectUnauthorized: false, // Allow self-signed certificates
+    },
+    connectionTimeout: 60000, // 60 seconds
+    greetingTimeout: 30000, // 30 seconds
+    socketTimeout: 60000, // 60 seconds
   });
 
   return {
