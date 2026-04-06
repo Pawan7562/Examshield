@@ -37,7 +37,6 @@ import Settings from './pages/student/Settings';
 import SuperAdminLayout from './components/admin/SuperAdminLayout';
 import SuperAdminDashboard from './pages/super-admin/Dashboard';
 import CollegeManagement from './pages/super-admin/CollegeManagement';
-import NotFoundPage from './pages/NotFound';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -92,12 +91,15 @@ function App() {
           <Route path="/student/password-reset" element={<PasswordReset />} />
           <Route path="/super-admin/login" element={<SuperAdminLogin />} />
 
-          <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['college_admin']}>
-              <AdminLayout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<AdminDashboard />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['college_admin']}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="students" element={<StudentManagement />} />
             <Route path="exams" element={<ExamManagement />} />
@@ -119,14 +121,22 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<StudentDashboard />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="exams" element={<ExamList />} />
             <Route path="results" element={<StudentResults />} />
             <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="exam/:examId" element={<ExamRoom />} />
           </Route>
+
+          <Route
+            path="/student/exam/:examId"
+            element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <ExamRoom />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/super-admin"
