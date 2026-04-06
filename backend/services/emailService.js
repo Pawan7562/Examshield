@@ -77,9 +77,9 @@ const createTransporter = () => {
     tls: {
       rejectUnauthorized: false, // Allow self-signed certificates
     },
-    connectionTimeout: 30000, // 30 seconds (reduced from 60)
-    greetingTimeout: 15000, // 15 seconds (reduced from 30)
-    socketTimeout: 30000, // 30 seconds (reduced from 60)
+    connectionTimeout: 60000, // 30 seconds (reduced from 60)
+    greetingTimeout: 30000, // 15 seconds (reduced from 30)
+    socketTimeout: 60000, // 30 seconds (reduced from 60)
     pool: true, // Use connection pooling
     maxConnections: 5, // Limit concurrent connections
     maxMessages: 100, // Limit messages per connection
@@ -98,8 +98,8 @@ const createTransporter = () => {
         console.log(`📧 [REAL EMAIL] Subject: ${mailOptions.subject}`);
         
         // Retry logic for connection timeouts
-        const maxRetries = 3;
-        const retryDelay = 2000; // 2 seconds
+        const maxRetries = 5;
+        const retryDelay = 5000; // 2 seconds
         
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {
