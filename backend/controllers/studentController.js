@@ -221,15 +221,19 @@ exports.addStudent = async (req, res) => {
     }
 
     // Send credentials email (Background - No await to prevent timeouts)
+    console.log('📧 Sending student credentials email to:', email);
     sendStudentCredentials({
       name,
       email,
       studentId,
       password,
       collegeName: req.user.name || 'Your Institution',
-      loginUrl: process.env.STUDENT_LOGIN_URL || 'https://CollegeExam.vercel.app/student/login'
+      loginUrl: process.env.STUDENT_LOGIN_URL || 'https://examshield.onrender.com/student/login'
+    }).then(() => {
+      console.log('✅ Student credentials email sent successfully to:', email);
     }).catch(emailError => {
       console.error('❌ Background Email Error:', emailError.message);
+      // Don't fail the request, just log the error
     });
 
     res.status(201).json({
@@ -690,6 +694,19 @@ exports.bulkUploadStudents = async (req, res) => {
                 results.push({
                   ...student[0],
                   password: password
+                });
+                
+                // Send credentials email (Background - No await to prevent timeouts)
+                sendStudentCredentials({
+                  name: studentData.name,
+                  email: studentData.email,
+                  studentId: studentId,
+                  password: password,
+                  collegeName: req.user.name || 'Your Institution',
+                  loginUrl: process.env.STUDENT_LOGIN_URL || 'https://examshield.onrender.com/student/login'
+                }).catch(emailError => {
+                  console.error(`❌ Background Email Error for ${studentData.email}:`, emailError.message);
+                  errors.push(`Email failed for ${studentData.email}: ${emailError.message}`);
                 });
               }
             } catch (err) {
