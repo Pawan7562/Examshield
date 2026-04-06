@@ -9,7 +9,8 @@
     "build": "echo 'Backend is serverless - no build step needed'",
     "migrate": "node config/migrate.js",
     "seed": "node config/seed.js",
-    "check": "node start-backend.js"
+    "check": "node start-backend.js",
+    "start:prod": "NODE_ENV=production node server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
@@ -36,5 +37,9 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=8.0.0"
   }
 }
