@@ -57,30 +57,52 @@ export default function Home() {
         </div>
 
         <div className="landing-visual" aria-hidden="true">
-          <div className="landing-hero-photo-card">
-            <div className="landing-hero-photo" role="img" aria-label="Student taking exam with monitoring" />
-
-            <div className="landing-detection-card">
-              <div className="landing-detection-chip">Face Detected</div>
-              <div className="landing-detection-shot" role="img" aria-label="Face detection preview" />
+          <div className="hero-abstract-ui">
+            <div className="hero-ui-main-card">
+               <div className="hero-ui-header">
+                  <div className="mac-dots">
+                     <span className="dot red"></span>
+                     <span className="dot yellow"></span>
+                     <span className="dot green"></span>
+                  </div>
+                  <div className="header-title">AI Proctor Active</div>
+               </div>
+               <div className="hero-ui-body">
+                  <div className="ai-scanner-container">
+                     <div className="ai-scanner-grid"></div>
+                     <div className="ai-scanning-line"></div>
+                     <div className="ai-face-wrapper">
+                        <ScanFace size={64} className="ai-face-icon" strokeWidth={1.5} />
+                     </div>
+                  </div>
+                  <div className="hero-stats-row">
+                     <div className="hero-stat-card">
+                        <ShieldAlert size={20} className="stat-icon" />
+                        <div>
+                           <div className="stat-value">99.9%</div>
+                           <div className="stat-label">Security Score</div>
+                        </div>
+                     </div>
+                     <div className="hero-stat-card">
+                        <Eye size={20} className="stat-icon info" />
+                        <div>
+                           <div className="stat-value">12.5k</div>
+                           <div className="stat-label">Exams Monitored</div>
+                        </div>
+                     </div>
+                  </div>
+               </div>
             </div>
-
-            <div className="landing-alert-stack">
-              <div className="landing-alert-badge" role="alert">
-                <BadgeAlert size={14} aria-hidden="true" />
-                <span>Warning: Multiple Faces Detected</span>
-              </div>
-              <div className="landing-alert-badge" role="alert">
-                <ScanFace size={14} aria-hidden="true" />
-                <span>Alert: Looking Away</span>
-              </div>
+            
+            <div className="hero-floater floater-1">
+               <Monitor size={18} className="floater-icon" />
+               <span>Screen Capture</span>
+               <div className="pulse-dot green"></div>
             </div>
-
-            <div className="landing-thumb-row">
-              <div className="landing-thumb landing-thumb-one" role="img" aria-label="Monitoring thumbnail 1" />
-              <div className="landing-thumb landing-thumb-two" role="img" aria-label="Monitoring thumbnail 2" />
-              <div className="landing-thumb landing-thumb-three" role="img" aria-label="Monitoring thumbnail 3" />
-              <div className="landing-thumb landing-thumb-four" role="img" aria-label="Monitoring thumbnail 4" />
+            <div className="hero-floater floater-2">
+               <Mic size={18} className="floater-icon" />
+               <span>Audio Analysis</span>
+               <div className="pulse-dot green"></div>
             </div>
           </div>
         </div>
