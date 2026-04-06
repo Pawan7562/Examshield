@@ -2,7 +2,7 @@
 
 .settings-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #ffffff;
   padding: 2rem 1rem;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -10,47 +10,59 @@
 .settings-header {
   text-align: center;
   margin-bottom: 3rem;
-  color: white;
+  color: #1e293b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
 }
 
 .settings-header h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 2.75rem;
+  font-weight: 800;
+  margin-bottom: 0.75rem;
+  color: #1e293b;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
 .settings-header p {
-  font-size: 1.1rem;
-  opacity: 0.9;
-  font-weight: 400;
+  font-size: 1.25rem;
+  color: #64748b;
+  font-weight: 500;
+  opacity: 1;
 }
 
 .settings-card {
-  background: white;
-  border-radius: 1rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   overflow: hidden;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 2.5rem;
+  margin-bottom: 2rem;
 }
 
 .settings-tabs {
   display: flex;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 0.5rem;
   overflow-x: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .settings-tab {
   flex: 1;
-  padding: 1.25rem 1.5rem;
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #64748b;
+  color: #374151;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
@@ -59,23 +71,31 @@
   gap: 0.5rem;
   min-width: 120px;
   white-space: nowrap;
+  margin: 0.25rem;
 }
 
 .settings-tab:hover {
-  color: #475569;
-  background: rgba(99, 102, 241, 0.05);
+  background: #ffffff;
+  border-color: #3b82f6;
+  color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 .settings-tab.active {
-  color: #6366f1;
-  border-bottom-color: #6366f1;
-  background: rgba(99, 102, 241, 0.05);
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+  font-weight: 700;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .settings-tab-icon {
   width: 1.25rem;
   height: 1.25rem;
   transition: transform 0.2s ease;
+  color: #64748b;
 }
 
 .settings-tab:hover .settings-tab-icon {
@@ -84,6 +104,7 @@
 
 .settings-tab.active .settings-tab-icon {
   transform: scale(1.1);
+  color: #ffffff;
 }
 
 .settings-content {
@@ -124,23 +145,24 @@
   gap: 1.5rem;
   margin-bottom: 2rem;
   padding: 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 1rem;
-  color: white;
+  color: #1e293b;
 }
 
 .profile-avatar {
   width: 5rem;
   height: 5rem;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 2rem;
   font-weight: 700;
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  border: 3px solid #e2e8f0;
   transition: transform 0.3s ease;
 }
 
@@ -152,11 +174,13 @@
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.25rem;
+  color: #1e293b;
 }
 
 .profile-info p {
-  opacity: 0.9;
+  color: #64748b;
   font-size: 0.95rem;
+  opacity: 1;
 }
 
 .profile-grid {

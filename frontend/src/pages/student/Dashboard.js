@@ -18,6 +18,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import '../../components/student/StudentSidebar.css';
+import './Dashboard.css';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -86,7 +87,7 @@ export default function StudentDashboard() {
   }
 
   return (
-    <div>
+    <div className="student-dashboard-container">
       {/* Welcome Section */}
       <div className="content-card">
         <div className="welcome-section">
@@ -109,72 +110,64 @@ export default function StudentDashboard() {
 
       {/* Statistics Cards */}
       <div className="grid-4">
-        <div className="content-card">
-          <div className="stat-card">
-            <div className="stat-header">
-              <div>
-                <div className="stat-value">{totalExams}</div>
-                <div className="stat-label">Total Exams</div>
-              </div>
-              <div className="stat-icon exams">
-                <BookOpen size={24} />
-              </div>
+        <div className="stat-card">
+          <div className="stat-header">
+            <div>
+              <div className="stat-value">{totalExams}</div>
+              <div className="stat-label">Total Exams</div>
+            </div>
+            <div className="stat-icon exams">
+              <BookOpen size={24} />
+            </div>
+          </div>
+          {averageScore > 0 && (
+            <div className="stat-change">
+              <ArrowRight size={12} />
+              {averageScore >= 70 ? 'Excellent' : averageScore >= 50 ? 'Good' : 'Needs Improvement'}
+            </div>
+          )}
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-header">
+            <div>
+              <div className="stat-value">{completedExams}</div>
+              <div className="stat-label">Completed</div>
+            </div>
+            <div className="stat-icon results">
+              <Trophy size={24} />
             </div>
           </div>
         </div>
 
-        <div className="content-card">
-          <div className="stat-card">
-            <div className="stat-header">
-              <div>
-                <div className="stat-value">{completedExams}</div>
-                <div className="stat-label">Completed</div>
-              </div>
-              <div className="stat-icon results">
-                <Trophy size={24} />
-              </div>
+        <div className="stat-card">
+          <div className="stat-header">
+            <div>
+              <div className="stat-value">{averageScore}%</div>
+              <div className="stat-label">Average Score</div>
+            </div>
+            <div className="stat-icon average">
+              <TrendingUp size={24} />
             </div>
           </div>
         </div>
 
-        <div className="content-card">
-          <div className="stat-card">
-            <div className="stat-header">
-              <div>
-                <div className="stat-value">{averageScore}%</div>
-                <div className="stat-label">Average Score</div>
-              </div>
-              <div className="stat-icon average">
-                <TrendingUp size={24} />
-              </div>
+        <div className="stat-card">
+          <div className="stat-header">
+            <div>
+              <div className="stat-value">{passRate}%</div>
+              <div className="stat-label">Pass Rate</div>
             </div>
-            {averageScore > 0 && (
-              <div className="stat-change">
-                <ArrowRight size={12} />
-                {averageScore >= 70 ? 'Excellent' : averageScore >= 50 ? 'Good' : 'Needs Improvement'}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="content-card">
-          <div className="stat-card">
-            <div className="stat-header">
-              <div>
-                <div className="stat-value">{passRate}%</div>
-                <div className="stat-label">Pass Rate</div>
-              </div>
-              <div className="stat-icon streak">
-                <Target size={24} />
-              </div>
+            <div className="stat-icon streak">
+              <Target size={24} />
             </div>
-            {passRate > 0 && (
-              <div className="stat-change">
-                <ArrowRight size={12} />
-                {passRate >= 80 ? 'Outstanding' : passRate >= 60 ? 'Good' : 'Keep Trying'}
-              </div>
-            )}
           </div>
+          {passRate > 0 && (
+            <div className="stat-change">
+              <ArrowRight size={12} />
+              {passRate >= 80 ? 'Outstanding' : passRate >= 60 ? 'Good' : 'Keep Trying'}
+            </div>
+          )}
         </div>
       </div>
 

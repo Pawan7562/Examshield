@@ -15,6 +15,7 @@ import {
   XCircle
 } from 'lucide-react';
 import '../../components/student/StudentSidebar.css';
+import './ExamList.css';
 
 const statusConfig = {
   published: { label: 'UPCOMING', color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' },
@@ -60,7 +61,7 @@ export default function ExamList() {
 
   if (loading) {
     return (
-      <div className="student-pages-container">
+      <div className="student-exams-container">
         <div className="loading-container">
           <div className="loading-spinner"></div>
           <div className="loading-text">Loading your exams...</div>
@@ -70,29 +71,26 @@ export default function ExamList() {
   }
 
   return (
-    <div>
+    <div className="student-exams-container">
       {/* Header */}
-      <div className="content-card">
-        <div className="card-header">
-          <h1>My Exams</h1>
-          <div className="header-actions">
-            <Filter size={20} />
-            <select 
-              value={filter} 
-              onChange={(e) => setFilter(e.target.value)}
-              className="form-input"
-              style={{ width: 'auto', padding: '0.5rem 1rem' }}
-            >
-              <option value="all">All Exams</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
+      <div className="exams-header">
+        <h1>My Exams</h1>
+        <div className="header-actions">
+          <Filter size={20} />
+          <select 
+            value={filter} 
+            onChange={(e) => setFilter(e.target.value)}
+            className="filter-dropdown"
+          >
+            <option value="all">All Exams</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="completed">Completed</option>
+          </select>
         </div>
       </div>
 
       {/* Content */}
-      <div className="content-card">
+      <div className="exams-content-card">
         {filtered.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">
@@ -111,7 +109,7 @@ export default function ExamList() {
               const st = getStatus(exam);
               const startable = canStart(exam);
               return (
-                <div key={exam.id} className="list-item">
+                <div key={exam.id} className="exam-item">
                   <div className="exam-content">
                     <div className="exam-header">
                       <div className="exam-title-section">
@@ -165,7 +163,7 @@ export default function ExamList() {
 
                     {exam.result_status && exam.result_status !== 'pending' && (
                       <div className="result-section">
-                        <div className="result-badge">
+                        <div className={`result-badge ${exam.result_status}`}>
                           {exam.result_status === 'pass' ? (
                             <>
                               <CheckCircle size={16} />
