@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const csv = require('csv-parser');
 const fs = require('fs');
 const { supabase } = require('../config/supabase');
-const { sendStudentCredentials, sendBulkStudentCredentials } = require('../services/emailService');
+const { sendStudentCredentials } = require('../services/emailService');
 
 /**
  * Generate unique student ID: ES-YYYY-timestamp
@@ -696,22 +696,33 @@ exports.bulkUploadStudents = async (req, res) => {
                   password: password
                 });
                 
-                // Clean up uploaded file
+                // Send credentials email (Background - No await to prevent timeouts)
+                sendStudentCredentials({
+                  name: studentData.name,
+                  email: studentData.email,
+                  studentId: studentId,
+                  password: password,
+                  collegeName: req.user.name || 'Your Institution',
+                  loginUrl: process.env.STUDENT_LOGIN_URL || 'https://examshield.onrender.com/student/login'
+                }).catch(emailError => {
+                  console.error(`❌ Background Email Error for ${studentData.email}:`, emailError.message);
+                  errors.push(`Email failed for ${studentData.email}: ${emailError.message}`);
+                });
+              }
+            } catch (err) {
+              errors.push(`Failed to process ${studentData.email}: ${err.message}`);
+            }
+          }
+
+          // Clean up uploaded file
           fs.unlinkSync(req.file.path);
-          
-          // Send bulk credentials emails after all students are processed
-          console.log('\n📧 Sending bulk credentials emails to all students...');
-          const emailResults = await sendBulkStudentCredentials(results, req.user.name || 'Your Institution', process.env.STUDENT_LOGIN_URL || 'https://examshield.onrender.com/student/login');
-          
-          console.log(`📊 Email Results: ${emailResults.success} successful, ${emailResults.failed} failed`);
-          
+
           res.json({
             success: true,
-            message: `Bulk upload completed. ${results.length} students added, ${errors.length} errors. ${emailResults.success} emails sent successfully.`,
+            message: `Bulk upload completed. ${results.length} students added, ${errors.length} errors.`,
             data: {
               uploaded: results,
-              errors: errors,
-              emailResults: emailResults
+              errors: errors
             }
           });
 

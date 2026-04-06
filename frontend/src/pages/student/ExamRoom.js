@@ -11,6 +11,7 @@ import SubjectiveQuestion from '../../components/SubjectiveQuestion';
 import CodingQuestion from '../../components/CodingQuestion';
 import Timer from '../../components/Timer';
 import ExamKeyModal from '../../components/ExamKeyModal';
+import { FullScreenExamManager } from '../../utils/FullScreenExamManager';
 
 
 // ─── Main ExamRoom Component ──────────────────────────────────────────────────
@@ -32,10 +33,12 @@ export default function ExamRoom() {
   const [result, setResult] = useState(null);
   const [, setLoadingError] = useState(null);
   const [isStartingExam, setIsStartingExam] = useState(false);
+  const [fullScreenStatus, setFullScreenStatus] = useState(null);
 
   const socketRef = useRef(null);
   const autoSaveRef = useRef(null);
   const violationRef = useRef(violationCount);
+  const fullScreenManagerRef = useRef(null);
   violationRef.current = violationCount;
 
   // Setup Socket
@@ -45,44 +48,41 @@ export default function ExamRoom() {
     const socket = io(wsUrl, { auth: { token } });
     socketRef.current = socket;
     
-    // Cleanup full screen on component unmount
+    // Initialize full-screen manager
+    if (!fullScreenManagerRef.current) {
+      fullScreenManagerRef.current = new FullScreenExamManager();
+      fullScreenManagerRef.current.init({
+        onEnter: () => {
+          console.log('✅ Full-screen exam mode entered');
+          setFullScreenStatus('active');
+        },
+        onExit: () => {
+          console.log('🚪 Full-screen exam mode exited');
+          setFullScreenStatus('exited');
+          setViolationCount(prev => prev + 1);
+        },
+        onViolation: (violation) => {
+          console.warn('⚠️ Exam violation:', violation);
+          setViolationCount(violation.count);
+          
+          // Handle critical violations
+          if (violation.critical) {
+            toast.error('Maximum violations reached. Exam may be terminated.');
+            // Optionally auto-submit exam
+            // handleSubmitExam();
+          } else {
+            toast.error(`Violation ${violation.count}: ${violation.type}`);
+          }
+        }
+      });
+    }
+    
     return () => {
       socket.disconnect();
-      
-      // Exit full screen and cleanup
-      const exitFullScreen = () => {
-        try {
-          // Check if document is in full screen mode before attempting to exit
-          if (document.fullscreenElement || 
-              document.webkitFullscreenElement || 
-              document.mozFullScreenElement || 
-              document.msFullscreenElement) {
-            
-            if (document.exitFullscreen) {
-              document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-              document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-              document.msExitFullscreen();
-            }
-          }
-        } catch (error) {
-          console.log('Exit full screen not needed or not possible:', error.message);
-        }
-      };
-
-      // Cleanup full screen event listeners
-      if (window.fullScreenCleanup && typeof window.fullScreenCleanup === 'function') {
-        try {
-          window.fullScreenCleanup();
-        } catch (error) {
-          console.log('Error during full screen cleanup:', error.message);
-        }
-        delete window.fullScreenCleanup;
+      if (fullScreenManagerRef.current) {
+        fullScreenManagerRef.current.cleanup();
+        fullScreenManagerRef.current = null;
       }
-
-      // Exit full screen
-      exitFullScreen();
     };
   }, []);
 
@@ -593,22 +593,16 @@ export default function ExamRoom() {
         toast.success('Exam started successfully!', { id: 'exam-start' });
         console.log('✅ Exam started successfully with', questionsData.length, 'questions');
         
-        // 🖥️ Request Full-Screen Mode after render
-        setTimeout(() => {
-          const el = document.documentElement;
-          try {
-            if (el.requestFullscreen) {
-              el.requestFullscreen().catch(err => console.warn('Fullscreen request denied:', err.message));
-            } else if (el.webkitRequestFullscreen) {
-              el.webkitRequestFullscreen();
-            } else if (el.msRequestFullscreen) {
-              el.msRequestFullscreen();
+        // 🖥️ Request Professional Full-Screen Mode after render
+        setTimeout(async () => {
+          if (fullScreenManagerRef.current) {
+            console.log('🖥️ Requesting professional full-screen exam mode...');
+            const success = await fullScreenManagerRef.current.requestFullScreen();
+            if (!success) {
+              console.warn('⚠️ Full-screen mode not activated, exam continues with violations tracked');
             }
-            console.log('🖥️ Full-screen mode requested');
-          } catch (e) {
-            console.warn('Full-screen not available:', e.message);
           }
-        }, 500);
+        }, 1000);
         
       } else {
         throw new Error('Required exam data not received');
@@ -803,11 +797,44 @@ export default function ExamRoom() {
         </div>
       )}
 
-      {/* Full Screen Indicator */}
+      {/* Professional Full Screen Status Indicator */}
       {phase === 'exam' && (
-        <div style={{ position: 'fixed', top: 10, left: 10, background: 'rgba(34, 197, 94, 0.9)', padding: '8px 16px', borderRadius: '20px', fontSize: 12, fontWeight: 700, color: 'white', zIndex: 9998, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          🖥️ FULL SCREEN MODE ACTIVE
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white', animation: 'pulse 2s infinite' }} />
+        <div style={{ 
+          position: 'fixed', 
+          top: 10, 
+          left: 10, 
+          background: fullScreenStatus === 'active' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)', 
+          padding: '12px 20px', 
+          borderRadius: '12px', 
+          fontSize: 13, 
+          fontWeight: 600, 
+          color: 'white', 
+          zIndex: 9998, 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '10px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+          backdropFilter: 'blur(10px)',
+          border: `1px solid ${fullScreenStatus === 'active' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+        }}>
+          <span style={{ fontSize: '16px' }}>
+            {fullScreenStatus === 'active' ? '🖥️' : '⚠️'}
+          </span>
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 700, lineHeight: 1.2 }}>
+              {fullScreenStatus === 'active' ? 'FULL SCREEN MODE' : 'VIOLATION DETECTED'}
+            </div>
+            <div style={{ fontSize: '10px', opacity: 0.9, lineHeight: 1.2 }}>
+              {fullScreenStatus === 'active' ? 'Secure exam environment' : `Violations: ${violationCount}/3`}
+            </div>
+          </div>
+          <div style={{ 
+            width: '10px', 
+            height: '10px', 
+            borderRadius: '50%', 
+            background: 'white', 
+            animation: 'pulse 2s infinite' 
+          }} />
         </div>
       )}
 
