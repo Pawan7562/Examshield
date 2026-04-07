@@ -1142,7 +1142,7 @@ exports.getExamDetails = async (req, res) => {
       .from('questions')
       .select(`
         id, question_text, type, options, correct_answer,
-        marks, explanation
+        marks, order_index
       `)
       .eq('exam_id', id)
       .order('created_at', { ascending: true });

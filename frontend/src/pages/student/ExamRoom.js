@@ -416,7 +416,7 @@ export default function ExamRoom() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-full mb-4">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="d" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v3m0 0l-3-3 3-3 3-3h6l-3 3-3 3 3v6m-9-9h6l3-3-3-3 3a9 9 0 018 0z" />
               </svg>
             </div>
             <h1 className="text-3xl font-bold text-slate-800 mb-2">ExamShield</h1>
