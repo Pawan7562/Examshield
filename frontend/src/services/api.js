@@ -151,6 +151,7 @@ export const studentAPI = {
   getProfile: () => api.get('/student/profile'),
   changePassword: (data) => api.post('/student/change-password', data),
   getExams: () => api.get('/student/exams'),
+  getExamDetails: (examId) => api.get(`/student/exams/${examId}`),
   startExam: (id, data) => api.post(`/student/exams/${id}/start`, data),
   saveAnswer: (examId, data) => api.post(`/student/exams/${examId}/save-answer`, data),
   submitExam: (examId, data) => api.post(`/student/exams/${examId}/submit`, data),
