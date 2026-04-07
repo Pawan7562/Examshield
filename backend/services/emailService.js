@@ -66,7 +66,8 @@ const createTransporter = () => {
   
   // Enhanced transporter configuration for production (Render/Vercel compatible)
   // Add connection warmup for Render
-  const transporter = nodemailer.createTransport({
+  // Connection warmup for Render
+    const transporter = nodemailer.createTransport({
     service: 'gmail', // Use Gmail service instead of custom host
     host: 'smtp.gmail.com',
     port: 465, // Use SSL port for better compatibility
@@ -81,7 +82,9 @@ const createTransporter = () => {
     connectionTimeout: 60000, // 30 seconds (reduced from 60)
     greetingTimeout: 30000, // 15 seconds (reduced from 30)
     socketTimeout: 60000, // 30 seconds (reduced from 60)
-    pool: true, // Use connection pooling
+    pool: true,
+    connectionPool: true,
+    connectionPoolSize: 3, // Use connection pooling
     maxConnections: 3, // Limit concurrent connections
     maxMessages: 100, // Limit messages per connection
   });
