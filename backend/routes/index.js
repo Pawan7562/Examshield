@@ -114,6 +114,7 @@ student.use(authenticate, authorize('student'));
 student.get('/profile', studentController.getStudentProfile);
 student.post('/change-password', studentController.changePassword);
 student.get('/exams', examController.getStudentExams);
+student.get('/exams/:id', examController.getExamDetails);
 student.post('/exams/:id/start', examController.startExam);
 student.post('/exams/:id/save-answer', examController.saveAnswer);
 student.post('/exams/:id/submit', examController.submitExam);

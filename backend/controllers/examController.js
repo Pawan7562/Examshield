@@ -1105,6 +1105,91 @@ exports.getStudentExams = async (req, res) => {
 };
 
 /**
+ * GET /api/student/exams/:id
+ * Get specific exam details for student
+ */
+exports.getExamDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const studentId = req.user.id;
+    const collegeId = req.user.college_id;
+
+    console.log('📊 Backend: Getting exam details:', { examId: id, studentId, collegeId });
+
+    // Get exam details
+    const { data: exam, error: examError } = await supabase
+      .from('exams')
+      .select(`
+        id, title, type, subject, date_time, duration, total_marks,
+        passing_marks, status, is_proctored, instructions,
+        max_violations, created_at, updated_at
+      `)
+      .eq('id', id)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (examError) {
+      console.error('Exam details error:', examError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch exam details',
+        error: examError.message
+      });
+    }
+
+    // Get exam questions for this exam
+    const { data: questions, error: questionsError } = await supabase
+      .from('questions')
+      .select(`
+        id, question_text, question_type, options, correct_answer,
+        marks, difficulty, explanation
+      `)
+      .eq('exam_id', id)
+      .order('created_at', { ascending: true });
+
+    if (questionsError) {
+      console.error('Exam questions error:', questionsError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch exam questions',
+        error: questionsError.message
+      });
+    }
+
+    // Check if student has access to this exam
+    const { data: assignments, error: assignmentError } = await supabase
+      .from('exam_assignments')
+      .select('student_id')
+      .eq('exam_id', id)
+      .eq('student_id', studentId);
+
+    let hasAccess = false;
+    if (!assignmentError && assignments && assignments.length > 0) {
+      hasAccess = true;
+    }
+
+    console.log('📊 Backend: Exam access check:', { hasAccess, examId: id, studentId });
+
+    res.json({
+      success: true,
+      data: {
+        exam: exam,
+        questions: questions || [],
+        hasAccess: hasAccess
+      }
+    });
+
+  } catch (error) {
+    console.error('Get exam details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch exam details',
+      error: error.message
+    });
+  }
+};
+
+/**
  * POST /api/student/exams/:id/start
  * Start exam (validate exam key, create session)
  */
