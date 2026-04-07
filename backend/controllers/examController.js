@@ -1141,7 +1141,7 @@ exports.getExamDetails = async (req, res) => {
     const { data: questions, error: questionsError } = await supabase
       .from('questions')
       .select(`
-        id, question_text, question_type, options, correct_answer,
+        id, question_text, type, options, correct_answer,
         marks, difficulty, explanation
       `)
       .eq('exam_id', id)
