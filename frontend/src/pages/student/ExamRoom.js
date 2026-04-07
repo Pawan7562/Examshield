@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { studentAPI } from '../../services/api';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import ProfessionalProctoring from '../../components/ProfessionalProctoring';
 import MCQQuestion from '../../components/MCQQuestion';
