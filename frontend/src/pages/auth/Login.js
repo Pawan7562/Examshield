@@ -29,7 +29,57 @@ const Login = ({ role }) => {
       toast.success('Login successful!');
       navigate(isStudent ? '/student/dashboard' : '/admin/dashboard');
     } catch (err) {
-      toast.error(err.message || 'Login failed');
+      if (!isStudent && err.message?.includes('Unauthorized: No active administrator account')) {
+        toast.custom((t) => (
+          <div style={{
+            background: '#0f172a', border: '1px solid #334155', borderRadius: '16px',
+            padding: '28px', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', textAlign: 'center', maxWidth: '380px',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)', fontFamily: "'Inter', sans-serif",
+            animation: t.visible ? 'er-enter 0.3s ease-out' : 'er-leave 0.3s ease-in forwards'
+          }}>
+            <div style={{
+              width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px',
+              border: '1px solid rgba(239, 68, 68, 0.2)'
+            }}>
+              <span style={{ fontSize: '24px' }}>🔒</span>
+            </div>
+            <h3 style={{ margin: '0 0 10px', color: '#f87171', fontSize: '19px', fontWeight: '800', letterSpacing: '-0.3px' }}>Access Denied</h3>
+            <p style={{ margin: '0 0 24px', color: '#94a3b8', fontSize: '13.5px', lineHeight: '1.6', fontWeight: '500' }}>
+              No active administrator account was found with this email. If you are a student, please use the correct portal.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+              <button 
+                type="button"
+                onClick={() => { toast.dismiss(t.id); navigate('/student/login'); }}
+                style={{ 
+                  flex: 1, padding: '12px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                  color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer',
+                  fontSize: '13px', transition: 'opacity 0.2s'
+                }}
+              >
+                Student Login
+              </button>
+              <button 
+                type="button"
+                onClick={() => toast.dismiss(t.id)}
+                style={{ 
+                  flex: 1, padding: '12px', background: 'rgba(255,255,255,0.03)', color: '#cbd5e1', 
+                  border: '1px solid #334155', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+                  fontSize: '13px', transition: 'background 0.2s'
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ), { duration: 8000 });
+      } else {
+        toast.error(err.message || 'Login failed', {
+          style: { background: '#1e293b', color: '#f87171', border: '1px solid #334155' }
+        });
+      }
     } finally {
       setLoading(false);
     }
