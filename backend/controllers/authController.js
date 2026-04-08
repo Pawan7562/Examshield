@@ -281,7 +281,7 @@ exports.collegeLogin = async (req, res) => {
           success: false,
           message: college
             ? 'Invalid email or password.'
-            : 'No college account was found in the app database. If you only created a user in Supabase, register through /admin/register or add the user to public.colleges.',
+            : 'Unauthorized: No active administrator account was found with this email. If you are a student, please return and use the Student Login portal.',
         });
       }
 
