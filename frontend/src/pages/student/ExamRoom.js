@@ -466,15 +466,25 @@ export default function ExamRoom() {
         setPhase('exam');
         notify.success('✅ Exam started! Good luck!');
       } else {
-        exitFullScreen(); // Exits if it failed
-        setPhase('key');
-        notify.error(response.message || 'Invalid exam key. Please try again.');
+        // If the backend says we're still early (clock sync or timezone issue), stay in waiting, no fast loop
+        if (response.message && response.message.includes('Exam accessible from')) {
+            // Signal a failure to the user but don't reset to key
+            notify.error('Waiting for server authorization... retrying shortly.');
+        } else {
+            exitFullScreen(); // Exits if it failed
+            setPhase('key');
+            notify.error(response.message || 'Invalid exam key. Please try again.');
+        }
       }
     } catch (err) {
-      exitFullScreen(); // Exits if it failed
-      setPhase('key');
-      console.error('Start exam error:', err);
-      notify.error(err?.message || 'Failed to start exam. Check your key and try again.');
+      if (err?.message && err.message.includes('Exam accessible from')) {
+         notify.error('Waiting for server authorization... retrying shortly.');
+      } else {
+         exitFullScreen(); // Exits if it failed
+         setPhase('key');
+         console.error('Start exam error:', err);
+         notify.error(err?.message || 'Failed to start exam. Check your key and try again.');
+      }
     } finally {
       setIsStartingExam(false);
     }
@@ -501,16 +511,24 @@ export default function ExamRoom() {
 
   // Waiting Room Auto-Start Effect
   useEffect(() => {
-    if (phase !== 'waiting' || !examData?.exam?.date_time) return;
+    if (phase !== 'waiting' || !examData?.exam?.date_time || isStartingExam) return;
+    
+    // Timezone safe target parsing
     const targetTime = new Date(examData.exam.date_time).getTime();
-    const interval = setInterval(() => {
-      if (Date.now() >= targetTime) {
-        clearInterval(interval);
+    
+    const checkAndTrigger = () => {
+      // Trigger if local browser clock has reached the scheduled time
+      if (Date.now() >= targetTime + 1000) {
         triggerBackendStart(examKey.trim());
       }
-    }, 1000);
+    };
+    
+    // Attempt every 5 seconds instead of 1 second to completely eradicate API loop flooding
+    const interval = setInterval(checkAndTrigger, 5000);
+    checkAndTrigger(); // Check immediately once
+
     return () => clearInterval(interval);
-  }, [phase, examData, examKey, triggerBackendStart]);
+  }, [phase, examData, examKey, triggerBackendStart, isStartingExam]);
 
   // ─── Security Status Colors ───────────────────────────────────────────────────
   const answeredCount = questions.filter(q => !!answers[q.id]).length;
