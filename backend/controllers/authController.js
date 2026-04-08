@@ -281,7 +281,7 @@ exports.collegeLogin = async (req, res) => {
           success: false,
           message: college
             ? 'Invalid email or password.'
-            : 'Unauthorized: No active administrator account was found with this email. If you are a student, please return and use the Student Login portal.',
+            : 'No administrator account found with this email. Please verify your credentials.',
         });
       }
 
