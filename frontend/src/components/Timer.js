@@ -1,58 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const Timer = ({ seconds, onExpire }) => {
   const [timeLeft, setTimeLeft] = useState(seconds);
+  const onExpireRef = useRef(onExpire);
+  const firedRef = useRef(false);
 
+  // Keep callback ref fresh
+  useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
+
+  // Reset when seconds prop changes
   useEffect(() => {
     setTimeLeft(seconds);
+    firedRef.current = false;
   }, [seconds]);
 
+  // Single stable interval
   useEffect(() => {
-    if (timeLeft <= 0) {
-      onExpire();
-      return;
-    }
+    if (seconds <= 0) return;
 
-    const timer = setInterval(() => {
+    const interval = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          onExpire();
+          clearInterval(interval);
+          if (!firedRef.current) {
+            firedRef.current = true;
+            onExpireRef.current?.();
+          }
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [timeLeft, onExpire]);
+    return () => clearInterval(interval);
+  }, [seconds]); // Only re-run if initial seconds changes
 
-  const formatTime = (totalSeconds) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const secs = totalSeconds % 60;
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  const formatTime = (total) => {
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const getTimeColor = () => {
-    if (timeLeft <= 300) return '#ef4444'; // Red for last 5 minutes
-    if (timeLeft <= 600) return '#f59e0b'; // Yellow for last 10 minutes
-    return '#22c55e'; // Green for normal time
-  };
+  const isUrgent = timeLeft <= 300;
+  const isWarning = timeLeft <= 600 && timeLeft > 300;
+  const color = isUrgent ? '#ef4444' : isWarning ? '#f59e0b' : '#22c55e';
 
   return (
-    <div style={{ 
-      fontSize: 24, 
-      fontWeight: '700', 
-      color: getTimeColor(),
-      fontFamily: 'Sora, sans-serif',
-      textShadow: timeLeft <= 300 ? '0 0 10px rgba(239, 68, 68, 0.5)' : 'none',
-      animation: timeLeft <= 300 ? 'pulse 1s infinite' : 'none'
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '6px 14px',
+      background: isUrgent ? 'rgba(239,68,68,0.1)' : isWarning ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.08)',
+      border: `1px solid ${color}30`,
+      borderRadius: 20,
+      transition: 'all 0.5s ease',
     }}>
-      {formatTime(timeLeft)}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+      <span style={{
+        fontSize: 16,
+        fontWeight: 800,
+        color,
+        fontFamily: "'Inter', monospace",
+        letterSpacing: '0.5px',
+        textShadow: isUrgent ? `0 0 12px ${color}60` : 'none',
+        animation: isUrgent ? 'pulse-dot 1s infinite' : 'none',
+      }}>
+        {formatTime(timeLeft)}
+      </span>
     </div>
   );
 };
