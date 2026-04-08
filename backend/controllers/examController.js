@@ -1249,7 +1249,16 @@ exports.startExam = async (req, res) => {
 
     // Check if exam is active (within time window)
     const now = new Date();
-    const examStart = new Date(examData.date_time);
+    
+    // Postgres timestamp without timezone causes Render (UTC) to drift by 5.5 hours from India.
+    let dateStr = examData.date_time;
+    if (dateStr) {
+      dateStr = dateStr.replace(' ', 'T');
+      if (!dateStr.endsWith('Z') && !dateStr.includes('+')) {
+        dateStr = `${dateStr}+05:30`;
+      }
+    }
+    const examStart = new Date(dateStr);
     const examEnd = new Date(examStart.getTime() + examData.duration * 60000);
 
     console.log('⏰ Backend: Exam timing check:', {

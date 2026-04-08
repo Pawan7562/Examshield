@@ -499,7 +499,11 @@ export default function ExamRoom() {
     
     // Automatic waiting room hook
     if (examData?.exam?.date_time) {
-      const startTime = new Date(examData.exam.date_time).getTime();
+      let dateStr = examData.exam.date_time.replace(' ', 'T');
+      if (!dateStr.endsWith('Z') && !dateStr.includes('+')) {
+        dateStr = `${dateStr}+05:30`;
+      }
+      const startTime = new Date(dateStr).getTime();
       if (Date.now() < startTime) {
         setPhase('waiting');
         return;
@@ -513,8 +517,12 @@ export default function ExamRoom() {
   useEffect(() => {
     if (phase !== 'waiting' || !examData?.exam?.date_time || isStartingExam) return;
     
-    // Timezone safe target parsing
-    const targetTime = new Date(examData.exam.date_time).getTime();
+    // Timezone safe target parsing exactly matching the IST +05:30 configuration
+    let dateStr = examData.exam.date_time.replace(' ', 'T');
+    if (!dateStr.endsWith('Z') && !dateStr.includes('+')) {
+      dateStr = `${dateStr}+05:30`;
+    }
+    const targetTime = new Date(dateStr).getTime();
     
     const checkAndTrigger = () => {
       // Trigger if local browser clock has reached the scheduled time
@@ -643,7 +651,11 @@ export default function ExamRoom() {
   // ─── PHASE: WAITING ROOM ──────────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════════
   if (phase === 'waiting') {
-    const scheduledTime = examData?.exam?.date_time ? new Date(examData.exam.date_time) : new Date();
+    let dateStr = examData?.exam?.date_time ? examData.exam.date_time.replace(' ', 'T') : null;
+    if (dateStr && !dateStr.endsWith('Z') && !dateStr.includes('+')) {
+      dateStr = `${dateStr}+05:30`;
+    }
+    const scheduledTime = dateStr ? new Date(dateStr) : new Date();
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
