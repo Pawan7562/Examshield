@@ -1226,15 +1226,19 @@ exports.startExam = async (req, res) => {
     }
 
     // Validate exam key (check both exam_code and exam_key)
-    const validKeys = [examData.exam_code, examData.exam_key].filter(Boolean);
-    if (!validKeys.includes(examKey)) {
+    const validKeys = [examData.exam_code, examData.exam_key]
+      .filter(Boolean)
+      .map(k => String(k).toUpperCase());
+      
+    if (!validKeys.includes(String(examKey).toUpperCase())) {
       console.log('❌ Backend: Invalid exam key:', {
         expected: validKeys,
         received: examKey,
         exam_code: examData.exam_code,
-        exam_key: examData.exam_key
+        exam_key: examData.exam_key,
+        returning: '400 ERROR INVALID KEY'
       });
-      return res.status(401).json({ 
+      return res.status(400).json({ 
         success: false, 
         message: 'Invalid exam key.',
         validKeys: process.env.NODE_ENV === 'development' ? validKeys : undefined
@@ -1258,12 +1262,10 @@ exports.startExam = async (req, res) => {
 
     console.log('✅ Backend: Exam timing validated');
 
-    // For testing purposes, make timing validation very flexible
-    // In production, you might want stricter validation
-    const timeWindowStart = new Date(examStart.getTime() - 24 * 60 * 60000); // 24 hours before
-    const timeWindowEnd = new Date(examStart.getTime() + examData.duration * 60000 + 24 * 60 * 60000); // 24 hours after
+    const timeWindowStart = examStart;
+    const timeWindowEnd = new Date(examStart.getTime() + examData.duration * 60000);
 
-    console.log('⏰ Backend: Flexible timing check:', {
+    console.log('⏰ Backend: Strict timing check:', {
       timeWindowStart: timeWindowStart.toISOString(),
       timeWindowEnd: timeWindowEnd.toISOString(),
       now: now.toISOString(),
@@ -1273,12 +1275,12 @@ exports.startExam = async (req, res) => {
     // Only enforce timing validation if the exam has specific timing requirements
     if (examData.date_time && examData.duration) {
       if (now < timeWindowStart) {
-        console.log('❌ Backend: Exam not accessible yet');
+        console.log('❌ Backend: Exam not accessible yet. Returning 400 ERROR.');
         return res.status(400).json({ success: false, message: `Exam accessible from ${timeWindowStart.toLocaleString()}.` });
       }
 
       if (now > timeWindowEnd) {
-        console.log('❌ Backend: Exam access window closed');
+        console.log('❌ Backend: Exam access window closed. Returning 400 ERROR.');
         return res.status(400).json({ success: false, message: 'Exam access period has ended.' });
       }
     } else {
@@ -1295,6 +1297,7 @@ exports.startExam = async (req, res) => {
 
     if (existingSession) {
       if (existingSession.status === 'submitted' || existingSession.status === 'terminated') {
+        console.log('❌ Backend: Session already submitted or terminated. Returning 400 ERROR.');
         return res.status(400).json({ success: false, message: 'You have already submitted this exam.' });
       }
       // Resume existing session
@@ -1448,7 +1451,7 @@ exports.startExam = async (req, res) => {
 
     // Still no questions? Error out.
     if (!questions || questions.length === 0) {
-      console.log('❌ Backend: Still no questions found after all attempts - cannot start exam');
+      console.log('❌ Backend: Still no questions found after all attempts - cannot start exam. Returning 400 ERROR NO QUESTIONS.');
       return res.status(400).json({ 
         success: false, 
         message: 'This exam has no questions. Please contact the administrator.' 

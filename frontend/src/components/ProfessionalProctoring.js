@@ -1,6 +1,6 @@
 // ProfessionalProctoring.js — Production-Grade AI Face Detection Proctoring
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import * as faceapi from 'face-api.js';
+import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
 import toast from 'react-hot-toast';
 import { studentAPI } from '../services/api';
 
@@ -28,18 +28,29 @@ const notify = {
 };
 
 // ─── Model loading state (module-level singleton — only load once) ────────────
+let faceDetectorGlobal = null;
 let modelsLoadedGlobal = false;
 let modelLoadingPromise = null;
 
 async function loadFaceModels() {
-  if (modelsLoadedGlobal) return true;
+  if (modelsLoadedGlobal && faceDetectorGlobal) return true;
   if (modelLoadingPromise) return modelLoadingPromise;
 
   modelLoadingPromise = (async () => {
     try {
-      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+      );
+      faceDetectorGlobal = await FaceDetector.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+          delegate: "GPU"
+        },
+        runningMode: "VIDEO",
+        minDetectionConfidence: 0.5
+      });
       modelsLoadedGlobal = true;
-      console.log('✅ [Proctoring] Face detection model loaded');
+      console.log('✅ [Proctoring] MediaPipe Face detection model loaded');
       return true;
     } catch (err) {
       console.error('❌ [Proctoring] Model load failed:', err);
@@ -209,16 +220,30 @@ const ProfessionalProctoring = ({
       if (!video || video.readyState < 2 || video.paused || video.ended) return;
 
       try {
-        const rawDetections = await faceapi.detectAllFaces(
-          video,
-          new faceapi.TinyFaceDetectorOptions({
-            inputSize: 224,       // better accuracy than 160
-            scoreThreshold: 0.4,  // balanced threshold to prevent misses while avoiding false positives
-          })
-        );
+        if (!faceDetectorGlobal) return;
+        
+        const timestampMs = performance.now();
+        const results = faceDetectorGlobal.detectForVideo(video, timestampMs);
+        
+        // Map MediaPipe boundingBoxes to the old box format so NMS still works seamlessly
+        const rawDetections = results.detections.map(det => ({
+          box: {
+            x: det.boundingBox.originX,
+            y: det.boundingBox.originY,
+            width: det.boundingBox.width,
+            height: det.boundingBox.height
+          }
+        }));
+
+        // Set canvas to exact video intrinsic size
+        if (canvas) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
 
         // ── Advanced NMS and Size Filtering to prevent false positives ──
-        let validDetections = rawDetections.filter(det => det.box.width > 40 && det.box.height > 40);
+        // Filter out absurdly small boxes (e.g., smaller than 30px on screen)
+        let validDetections = rawDetections.filter(det => det.box.width >= 30 && det.box.height >= 30);
 
         if (validDetections.length > 1) {
           // Sort by area (largest first)
@@ -243,7 +268,9 @@ const ProfessionalProctoring = ({
               const xB = Math.min(current.box.x + current.box.width, keep.box.x + keep.box.width);
               const yB = Math.min(current.box.y + current.box.height, keep.box.y + keep.box.height);
 
-              const intersection = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+              const w = Math.max(0, xB - xA);
+              const h = Math.max(0, yB - yA);
+              const intersection = w * h;
               
               // If the smaller box is more than 30% inside the larger box, it's a duplicate
               if (intersection / currentArea > 0.3) {
@@ -259,20 +286,16 @@ const ProfessionalProctoring = ({
           validDetections = filtered;
         }
 
-        const detections = validDetections;
-        const faces = detections.length;
+        const faces = validDetections.length;
         setFaceCount(faces);
 
         // ── Draw detection boxes ──
         if (canvas && video) {
           try {
-            const displaySize = { width: video.videoWidth, height: video.videoHeight };
-            faceapi.matchDimensions(canvas, displaySize);
-            const resized = faceapi.resizeResults(detections, displaySize);
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            resized.forEach((det, idx) => {
+            validDetections.forEach((det, idx) => {
               const box = det.box;
               const isExtra = faces > 1;
               const color = isExtra ? '#ef4444' : '#22c55e';
@@ -319,11 +342,13 @@ const ProfessionalProctoring = ({
           setNoFaceCount(0);
         }
       } catch (err) {
+        console.error('❌ [Proctoring] Face detection loop error:', err);
         // Silently swallow individual detection frame errors
       }
     };
 
-    // Run immediately then every 2 seconds
+    // Run initially and then periodically
+    // Use requestAnimationFrame for smoother processing or setInterval. Still using 2000ms.
     detect();
     detectionIntervalRef.current = setInterval(detect, 2000);
 

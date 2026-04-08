@@ -43,20 +43,17 @@ const allowedOrigins = [
   'https://CollegeExam.vercel.app',
   'https://www.pkthenexgenexam.xyz',
   'https://pkthenexgenexam.xyz',
-  'https://examshield.vercel.app',
   process.env.FRONTEND_URL,
   process.env.APP_URL
 ].filter(Boolean);
 
-// CORS origin checker function (more robust than static array)
+// CORS origin validation function — used by both Express CORS and Socket.IO
 const corsOriginFn = (origin, callback) => {
-  // Allow requests with no origin (server-to-server, curl, Postman, mobile apps)
+  // Allow requests with no origin (mobile apps, curl, Postman, server-to-server)
   if (!origin) return callback(null, true);
-  if (allowedOrigins.indexOf(origin) !== -1) {
-    return callback(null, true);
-  }
-  logger.warn(`CORS blocked origin: ${origin}`);
-  return callback(new Error(`CORS policy: origin ${origin} not allowed`), false);
+  if (allowedOrigins.includes(origin)) return callback(null, true);
+  logger.warn(`CORS blocked request from origin: ${origin}`);
+  callback(new Error(`Origin ${origin} is not allowed by CORS policy`));
 };
 
 const io = new Server(server, {
@@ -64,6 +61,7 @@ const io = new Server(server, {
     origin: corsOriginFn,
     methods: ['GET', 'POST'],
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
   },
 });
 
@@ -154,22 +152,20 @@ app.set('io', io);
 // =====================================================
 // MIDDLEWARE
 // =====================================================
-// 1. CORS - MUST be first. Explicit OPTIONS handler ensures preflight never fails.
-app.options('*', cors({
+// 1. CORS - MUST be first, before rate-limiters, to handle preflight OPTIONS correctly
+const corsOptions = {
   origin: corsOriginFn,
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-}));
+  exposedHeaders: ['X-Total-Count'],
+};
+app.use(cors(corsOptions));
 
-app.use(cors({
-  origin: corsOriginFn,
-  credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-}));
+// Explicitly handle OPTIONS preflight for ALL routes BEFORE rate limiters.
+// Without this, rate-limiters can intercept OPTIONS and return 429 without CORS headers.
+app.options('*', cors(corsOptions));
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
@@ -208,12 +204,8 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
   });
 });
-
-// Wake-up ping endpoint (for keep-alive services like UptimeRobot)
-app.get('/ping', (req, res) => res.send('pong'));
 
 // Diagnostic Email Route
 app.get('/api/test-email', async (req, res) => {

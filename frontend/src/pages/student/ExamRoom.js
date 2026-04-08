@@ -451,17 +451,10 @@ export default function ExamRoom() {
     }).catch(() => {});
   }, [questions, session, examId]);
 
-  // ─── Start Exam ───────────────────────────────────────────────────────────────
-  const handleStartExam = useCallback(async () => {
-    const key = examKey.trim();
-    if (!key) { notify.warn('Please enter your exam key'); return; }
-    
-    // Call enterFullScreen SYNCHRONOUSLY here to prevent browser blocking it
-    enterFullScreen();
-    
+  const triggerBackendStart = useCallback(async (keyToUse) => {
     setIsStartingExam(true);
     try {
-      const response = await studentAPI.startExam(examId, { examKey: key });
+      const response = await studentAPI.startExam(examId, { examKey: keyToUse });
       if (response.success) {
         const data = response.data || response;
         setSession(data.session);
@@ -474,16 +467,50 @@ export default function ExamRoom() {
         notify.success('✅ Exam started! Good luck!');
       } else {
         exitFullScreen(); // Exits if it failed
+        setPhase('key');
         notify.error(response.message || 'Invalid exam key. Please try again.');
       }
     } catch (err) {
       exitFullScreen(); // Exits if it failed
+      setPhase('key');
       console.error('Start exam error:', err);
       notify.error(err?.message || 'Failed to start exam. Check your key and try again.');
     } finally {
       setIsStartingExam(false);
     }
-  }, [examKey, examId, enterFullScreen, exitFullScreen]);
+  }, [examId, exitFullScreen]);
+
+  // ─── Start Exam ───────────────────────────────────────────────────────────────
+  const handleStartExam = useCallback(() => {
+    const key = examKey.trim();
+    if (!key) { notify.warn('Please enter your exam key'); return; }
+    
+    enterFullScreen();
+    
+    // Automatic waiting room hook
+    if (examData?.exam?.date_time) {
+      const startTime = new Date(examData.exam.date_time).getTime();
+      if (Date.now() < startTime) {
+        setPhase('waiting');
+        return;
+      }
+    }
+    
+    triggerBackendStart(key);
+  }, [examKey, examData, enterFullScreen, triggerBackendStart]);
+
+  // Waiting Room Auto-Start Effect
+  useEffect(() => {
+    if (phase !== 'waiting' || !examData?.exam?.date_time) return;
+    const targetTime = new Date(examData.exam.date_time).getTime();
+    const interval = setInterval(() => {
+      if (Date.now() >= targetTime) {
+        clearInterval(interval);
+        triggerBackendStart(examKey.trim());
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [phase, examData, examKey, triggerBackendStart]);
 
   // ─── Security Status Colors ───────────────────────────────────────────────────
   const answeredCount = questions.filter(q => !!answers[q.id]).length;
@@ -595,6 +622,44 @@ export default function ExamRoom() {
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
+  // ─── PHASE: WAITING ROOM ──────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
+  if (phase === 'waiting') {
+    const scheduledTime = examData?.exam?.date_time ? new Date(examData.exam.date_time) : new Date();
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: `radial-gradient(ellipse at 50% 0%, rgba(245,158,11,0.06) 0%, ${C.bg} 70%)`,
+        fontFamily: C.fontFamily, padding: '1rem',
+      }}>
+        <div className="er-enter" style={{
+          background: C.surface, border: `1px solid ${C.border}`,
+          borderRadius: 20, padding: 44, width: '100%', maxWidth: 520,
+          textAlign: 'center', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: C.yellow, marginBottom: 8 }}>Waiting to Start</h1>
+          <p style={{ fontSize: 14, color: C.muted, marginBottom: 24, lineHeight: 1.6 }}>
+            You have successfully joined the room. The exam will begin automatically when the scheduled time arrives. Please do not close or refresh this window.
+          </p>
+          <div style={{
+            background: 'rgba(255,255,255,0.03)', border: `2px solid rgba(245,158,11,0.3)`,
+            borderRadius: 12, padding: '20px', display: 'inline-block'
+          }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: C.yellow, fontWeight: 700, marginBottom: 6 }}>Scheduled Start</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#f1f5f9' }}>
+               {scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, color: C.muted }}>
+               Waiting for the clock...
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
   // ─── PHASE: SUBMITTED ────────────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════════
   if (phase === 'submitted') {
@@ -628,8 +693,8 @@ export default function ExamRoom() {
               {[
                 { label: 'Your Score', value: result.score ?? '—' },
                 { label: 'Total Marks', value: result.totalMarks ?? '—' },
-                { label: 'Percentage', value: `${pct}%`, color: passed ? C.green : C.red },
-                { label: 'Result', value: passed ? '✅ Passed' : '❌ Failed', color: passed ? C.green : C.red },
+                { label: 'Percentage', value: `${pct}%`, color: passed ? C.green : '#f59e0b' },
+                { label: 'Status', value: passed ? '✅ Passed' : '⏱️ Completed', color: passed ? C.green : '#94a3b8' },
               ].map((item, i) => (
                 <div key={i} style={{
                   background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
