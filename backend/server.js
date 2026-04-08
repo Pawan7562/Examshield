@@ -39,17 +39,29 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
+  'https://collegeexam.vercel.app',
   'https://CollegeExam.vercel.app',
-  'https://CollegeExam.vercel.app/',
   'https://www.pkthenexgenexam.xyz',
   'https://pkthenexgenexam.xyz',
+  'https://examshield.vercel.app',
   process.env.FRONTEND_URL,
   process.env.APP_URL
 ].filter(Boolean);
 
+// CORS origin checker function (more robust than static array)
+const corsOriginFn = (origin, callback) => {
+  // Allow requests with no origin (server-to-server, curl, Postman, mobile apps)
+  if (!origin) return callback(null, true);
+  if (allowedOrigins.indexOf(origin) !== -1) {
+    return callback(null, true);
+  }
+  logger.warn(`CORS blocked origin: ${origin}`);
+  return callback(new Error(`CORS policy: origin ${origin} not allowed`), false);
+};
+
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: corsOriginFn,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -142,12 +154,21 @@ app.set('io', io);
 // =====================================================
 // MIDDLEWARE
 // =====================================================
-// 1. CORS - MUST be first to handle preflight requests correctly in production
-app.use(cors({
-  origin: allowedOrigins,
+// 1. CORS - MUST be first. Explicit OPTIONS handler ensures preflight never fails.
+app.options('*', cors({
+  origin: corsOriginFn,
   credentials: true,
-  optionsSuccessStatus: 200, 
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
+
+app.use(cors({
+  origin: corsOriginFn,
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -187,8 +208,12 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
   });
 });
+
+// Wake-up ping endpoint (for keep-alive services like UptimeRobot)
+app.get('/ping', (req, res) => res.send('pong'));
 
 // Diagnostic Email Route
 app.get('/api/test-email', async (req, res) => {
