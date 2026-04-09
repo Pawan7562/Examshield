@@ -691,6 +691,18 @@ exports.bulkUploadStudents = async (req, res) => {
                   ...student[0],
                   password: password
                 });
+
+                // Send credentials email (fire-and-forget, same as manual upload)
+                sendStudentCredentials({
+                  name: studentData.name,
+                  email: studentData.email,
+                  studentId,
+                  password,
+                  collegeName: req.user.name || 'Your Institution',
+                  loginUrl: process.env.STUDENT_LOGIN_URL || 'https://CollegeExam.vercel.app/student/login'
+                }).catch(emailError => {
+                  console.error(`❌ Bulk Upload Email Error for ${studentData.email}:`, emailError.message);
+                });
               }
             } catch (err) {
               errors.push(`Failed to process ${studentData.email}: ${err.message}`);
