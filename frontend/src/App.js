@@ -24,6 +24,7 @@ import LiveMonitor from './pages/admin/LiveMonitor';
 import Results from './pages/admin/Results';
 import EvaluateResult from './pages/admin/EvaluateResult';
 import Subscription from './pages/admin/Subscription';
+import AdminSettings from './pages/admin/Settings';
 
 import StudentLayout from './components/student/StudentLayout';
 import StudentDashboard from './pages/student/Dashboard';
@@ -111,6 +112,7 @@ function App() {
             <Route path="results" element={<Results />} />
             <Route path="results/:id/evaluate" element={<EvaluateResult />} />
             <Route path="subscription" element={<Subscription />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
 
           <Route
