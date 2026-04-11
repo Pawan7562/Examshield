@@ -207,42 +207,50 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Diagnostic Email Route
+// Diagnostic Email Route — verifies SMTP connection then sends a real test email
 app.get('/api/test-email', async (req, res) => {
-  try {
-    const { sendExamNotification } = require('./services/emailService');
-    const testEmailAddress = req.query.email || process.env.EMAIL_USER;
-    
-    if (!testEmailAddress) {
-      return res.status(400).json({ success: false, message: 'No email address provided or found in EMAIL_USER.' });
-    }
+  const nodemailer = require('nodemailer');
+  const to = req.query.email || process.env.EMAIL_USER;
 
-    await sendExamNotification({
-      name: 'Diagnostic Test',
-      email: testEmailAddress,
-      examName: 'Connection Test',
-      examDate: new Date(),
-      examDuration: 60,
-      examKey: 'TEST-123',
-      subject: 'System Check',
-      type: 'diagnostic',
-      loginUrl: 'https://CollegeExam.vercel.app'
+  const config = {
+    EMAIL_HOST: process.env.EMAIL_HOST || 'NOT SET',
+    EMAIL_PORT: process.env.EMAIL_PORT || 'NOT SET',
+    EMAIL_USER: process.env.EMAIL_USER || 'NOT SET',
+    EMAIL_PASS: process.env.EMAIL_PASS ? '***SET***' : 'NOT SET',
+    EMAIL_FROM: process.env.EMAIL_FROM || 'NOT SET',
+    NODE_ENV: process.env.NODE_ENV,
+  };
+
+  if (!to) {
+    return res.status(400).json({ success: false, message: 'Provide ?email=<address> or set EMAIL_USER env var.', config });
+  }
+
+  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    return res.status(500).json({ success: false, message: 'Email env vars not configured on this server.', config });
+  }
+
+  try {
+    const port = parseInt(process.env.EMAIL_PORT) || 587;
+    const transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port,
+      secure: port === 465,
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
     });
-    
-    res.json({ success: true, message: `Diagnostic email successfully sent to ${testEmailAddress}` });
+
+    await transporter.verify();
+    const info = await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to,
+      subject: '✅ ExamShield — SMTP Diagnostic',
+      text: `SMTP is working correctly. Server: ${process.env.EMAIL_HOST}:${port}`,
+    });
+    res.json({ success: true, message: `Diagnostic email sent to ${to}`, messageId: info.messageId, config });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: 'Email delivery failed.', 
-      error: error.message,
-      smtp_config: {
-        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.EMAIL_PORT) || 465,
-        secure: (process.env.EMAIL_PORT == 465 || !process.env.EMAIL_PORT),
-        user: process.env.EMAIL_USER,
-        has_pass: !!process.env.EMAIL_PASS
-      }
-    });
+    res.status(500).json({ success: false, message: 'SMTP test failed.', error: error.message, code: error.code, config });
   }
 });
 

@@ -1,14 +1,5 @@
 // services/emailService.js
-const path = require('path');
-
-// Load environment variables for both local and production
-if (process.env.NODE_ENV === 'production') {
-  // In production (Vercel), environment variables are already loaded
-  require('dotenv').config();
-} else {
-  // In development, load from .env file
-  require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-}
+require('dotenv').config();
 
 const nodemailer = require('nodemailer');
 const winston = require('winston');
@@ -19,144 +10,108 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-// Create reusable transporter
-const createTransporter = () => {
-  console.log('🔧 Email configuration check:', {
-    hasHost: !!process.env.EMAIL_HOST,
-    hasUser: !!process.env.EMAIL_USER,
-    hasPass: !!process.env.EMAIL_PASS,
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    nodeEnv: process.env.NODE_ENV
+// ─────────────────────────────────────────────────────────────
+// Singleton transporter — created once at module load time
+// so every sendMail call reuses the same SMTP connection pool
+// ─────────────────────────────────────────────────────────────
+let _transporter = null;
+
+const getTransporter = () => {
+  if (_transporter) return _transporter;
+
+  const { EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_PORT } = process.env;
+
+  console.log('🔧 Email config check:', {
+    EMAIL_HOST: EMAIL_HOST || 'NOT SET',
+    EMAIL_USER: EMAIL_USER || 'NOT SET',
+    EMAIL_PASS: EMAIL_PASS ? '***SET***' : 'NOT SET',
+    EMAIL_PORT: EMAIL_PORT || 'NOT SET',
+    NODE_ENV: process.env.NODE_ENV,
   });
 
-  // Use mock transporter only if email is not configured
-  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log('⚠️ EMAIL NOT CONFIGURED - Using mock transporter');
-    console.log('📧 MISSING ENVIRONMENT VARIABLES:');
-    console.log('   EMAIL_HOST:', process.env.EMAIL_HOST || 'NOT SET');
-    console.log('   EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
-    console.log('   EMAIL_PASS:', process.env.EMAIL_PASS ? '***SET***' : 'NOT SET');
-    console.log('   NODE_ENV:', process.env.NODE_ENV || 'NOT SET');
-    console.log('');
-    console.log('🔧 SOLUTION: Add environment variables in production');
-    console.log('📧 For Vercel: Set environment variables in dashboard');
-    console.log('');
-    
-    return {
-      sendMail: async (options) => {
-        logger.info('🚨 MOCK EMAIL - No real email sent', { 
-          to: options.to, 
-          subject: options.subject,
-          html: options.html?.substring(0, 200) + '...',
-          nodeEnv: process.env.NODE_ENV
-        });
-        console.log('📧 MOCK EMAIL WOULD BE SENT TO:', options.to);
-        console.log('📧 SUBJECT:', options.subject);
-        console.log('🔧 CONFIGURE EMAIL_HOST, EMAIL_USER, EMAIL_PASS in production');
-        return Promise.resolve({ status: 'mock', message: 'Email not configured - using mock mode' });
-      }
+  if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
+    console.warn('⚠️  Email NOT configured — falling back to mock transporter.');
+    console.warn('   Set EMAIL_HOST, EMAIL_USER, EMAIL_PASS in your production env vars.');
+    _transporter = {
+      sendMail: async (opts) => {
+        console.log('📧 [MOCK] Would send to:', opts.to, '| Subject:', opts.subject);
+        return { status: 'mock' };
+      },
     };
+    return _transporter;
   }
-  
-  console.log('✅ Email configured - creating professional Gmail transporter');
-  console.log('📧 Using Gmail SMTP:', process.env.EMAIL_HOST);
-  console.log('📧 From email:', process.env.EMAIL_FROM || process.env.EMAIL_USER);
-  console.log('📧 Environment:', process.env.NODE_ENV);
-  
-  // Enhanced transporter configuration for production (Render/Vercel compatible)
-  // Add connection warmup for Render
-  // Connection warmup for Render
-    const transporter = nodemailer.createTransport({
-    service: 'gmail', // Use Gmail service instead of custom host
-    host: 'smtp.gmail.com',
-    port: 465, // Use SSL port for better compatibility
-    secure: true, // Use SSL for port 465
+
+  // PORT 587 + STARTTLS is the most reliable option across all cloud platforms
+  // (Render, Railway, Fly.io, etc.). Port 465 (SSL) is often blocked by egress firewalls.
+  const port = parseInt(EMAIL_PORT) || 587;
+  const secure = port === 465; // true only for SSL; 587 uses STARTTLS
+
+  console.log(`✅ Creating real SMTP transporter — host: ${EMAIL_HOST}, port: ${port}, secure: ${secure}`);
+
+  _transporter = nodemailer.createTransport({
+    host: EMAIL_HOST,   // smtp.gmail.com from env
+    port,
+    secure,             // false for 587 (STARTTLS), true for 465
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
     },
     tls: {
-      rejectUnauthorized: false, // Allow self-signed certificates
+      rejectUnauthorized: false, // allow self-signed certs on some hosts
     },
-    connectionTimeout: 60000, // 30 seconds (reduced from 60)
-    greetingTimeout: 30000, // 15 seconds (reduced from 30)
-    socketTimeout: 60000, // 30 seconds (reduced from 60)
+    // Connection pool settings (valid nodemailer options only)
     pool: true,
-    connectionPool: true,
-    connectionPoolSize: 3, // Use connection pooling
-    maxConnections: 3, // Limit concurrent connections
-    maxMessages: 100, // Limit messages per connection
+    maxConnections: 3,
+    maxMessages: 100,
+    connectionTimeout: 30000,  // 30 s
+    greetingTimeout: 15000,    // 15 s
+    socketTimeout: 30000,      // 30 s
   });
 
-  return {
-    sendMail: (options) => {
-      // Professional fire-and-forget pattern with retry logic
-      setImmediate(async () => {
-        const mailOptions = {
-          ...options,
-          from: options.from || process.env.EMAIL_FROM || process.env.EMAIL_USER
-        };
-        
-        console.log(`📤 [REAL EMAIL] Sending to: ${mailOptions.to}`);
-        console.log(`📧 [REAL EMAIL] Subject: ${mailOptions.subject}`);
-        
-        // Retry logic for connection timeouts
-        const maxRetries = 3;
-        const retryDelay = 10000; // 2 seconds
-        
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            // Verify connection before sending
-            await transporter.verify();
-            console.log(`🔗 [REAL EMAIL] Connection verified (attempt ${attempt})`);
-            
-            const info = await transporter.sendMail(mailOptions);
-            console.log('✅ [REAL EMAIL] Success:', info.messageId);
-            logger.info(`Email sent successfully to ${mailOptions.to}`, { 
-              messageId: info.messageId,
-              attempts: attempt 
-            });
-            return; // Success, exit retry loop
-            
-          } catch (err) {
-            console.error(`❌ [REAL EMAIL] Failed (attempt ${attempt}/${maxRetries}):`, err.message);
-            
-            // Log specific error types
-            if (err.code === 'ETIMEDOUT' || err.code === 'ECONNECTION') {
-              console.log(`🔄 [REAL EMAIL] Connection timeout, retrying in ${retryDelay}ms...`);
-            } else if (err.code === 'EAUTH') {
-              console.error('🔐 [REAL EMAIL] Authentication failed - check EMAIL_USER and EMAIL_PASS');
-              logger.error(`Email authentication failed: ${err.message}`);
-              return; // Don't retry auth errors
-            } else {
-              console.error('💥 [REAL EMAIL] Unexpected error:', err);
-            }
-            
-            // If this is the last attempt, log final failure
-            if (attempt === maxRetries) {
-              console.error(`🚫 [REAL EMAIL] All ${maxRetries} attempts failed`);
-              logger.error(`Email failed after ${maxRetries} attempts`, {
-                to: mailOptions.to,
-                error: err.message,
-                code: err.code
-              });
-              return;
-            }
-            
-            // Wait before retrying
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-          }
-        }
-      });
-      
-      // Return immediately to caller
-      return Promise.resolve({ status: 'queued' });
-    }
-  };
+  return _transporter;
 };
 
-// Base email template
+// ─────────────────────────────────────────────────────────────
+// Internal helper: send with retry
+// ─────────────────────────────────────────────────────────────
+const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) => {
+  const transporter = getTransporter();
+  const from =
+    mailOptions.from ||
+    process.env.EMAIL_FROM ||
+    `ExamShield <${process.env.EMAIL_USER}>`;
+
+  const opts = { ...mailOptions, from };
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`📤 [Email] Attempt ${attempt}/${maxRetries} → ${opts.to} | ${opts.subject}`);
+      const info = await transporter.sendMail(opts);
+      console.log(`✅ [Email] Sent! MessageId: ${info.messageId}`);
+      logger.info('Email sent', { to: opts.to, subject: opts.subject, messageId: info.messageId });
+      return info;
+    } catch (err) {
+      console.error(`❌ [Email] Attempt ${attempt} failed: ${err.message} (code: ${err.code})`);
+      // Auth errors won't be fixed by retrying
+      if (err.code === 'EAUTH') {
+        logger.error('Email auth failed — check EMAIL_USER and EMAIL_PASS', { error: err.message });
+        throw err;
+      }
+      if (attempt === maxRetries) {
+        logger.error('Email failed after all retries', { to: opts.to, error: err.message });
+        throw err;
+      }
+      // Reset the singleton so the next attempt creates a fresh connection
+      _transporter = null;
+      console.log(`🔄 [Email] Retrying in ${retryDelayMs / 1000}s…`);
+      await new Promise((r) => setTimeout(r, retryDelayMs));
+    }
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// HTML base template
+// ─────────────────────────────────────────────────────────────
 const baseTemplate = (content) => `
 <!DOCTYPE html>
 <html lang="en">
@@ -209,30 +164,24 @@ const baseTemplate = (content) => `
 </html>
 `;
 
+// ─────────────────────────────────────────────────────────────
+// Public API
+// ─────────────────────────────────────────────────────────────
+
 /**
  * Send student credentials email
+ * NOTE: This is intentionally awaitable so callers can catch real errors.
+ * Use .catch() in fire-and-forget contexts.
  */
 const sendStudentCredentials = async ({ name, email, studentId, password, collegeName, loginUrl }) => {
-  const transporter = createTransporter();
-  
-  // Log credentials for development
-  console.log('\n🎓 STUDENT CREDENTIALS GENERATED:');
-  console.log('===============================');
-  console.log('Name:', name);
-  console.log('Email:', email);
-  console.log('Student ID:', studentId);
-  console.log('Password:', password);
-  console.log('College:', collegeName);
-  console.log('Login URL:', loginUrl);
-  console.log('===============================');
-  console.log('📧 These credentials were sent to:', email);
-  console.log('');
-  
+  console.log('\n🎓 STUDENT CREDENTIALS:');
+  console.log('  Name:', name, '| Email:', email, '| ID:', studentId, '| College:', collegeName);
+
   const content = `
     <div class="badge">ACCOUNT CREATED</div>
     <p class="greeting">Welcome, ${name}!</p>
     <p class="text">Your student account has been created on ExamShield by <strong>${collegeName}</strong>. Use the credentials below to log in to your exam portal.</p>
-    
+
     <div class="credentials-box">
       <div class="credential-item">
         <span class="credential-label">Student ID</span>
@@ -247,23 +196,22 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
         <span class="credential-value">${password}</span>
       </div>
     </div>
-    
+
     <div style="text-align:center;">
       <a href="${loginUrl}" class="btn">Login to ExamShield →</a>
     </div>
-    
+
     <div class="warning-box">
       <p>⚠️ <strong>Important:</strong> Please change your password after your first login. Keep your credentials secure and do not share them with anyone.</p>
     </div>
   `;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+  await sendWithRetry({
     to: email,
     subject: `Welcome to ExamShield — Your Login Credentials`,
     html: baseTemplate(content),
   });
-  
+
   logger.info(`Credentials email sent to ${email}`);
 };
 
@@ -271,122 +219,91 @@ const sendStudentCredentials = async ({ name, email, studentId, password, colleg
  * Send exam notification to student
  */
 const sendExamNotification = async ({ name, email, examName, examDate, examDuration, examKey, subject, type, loginUrl }) => {
-  const transporter = createTransporter();
-  
-  // Validate required fields
   if (!examKey || examKey === 'N/A') {
-    console.error('❌ Email Service: No valid exam key provided', { examKey, examName });
     throw new Error('Valid exam key is required for email notification');
   }
-  
+
   const formattedDate = new Date(examDate).toLocaleString('en-IN', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
   });
-  
+
   const content = `
     <div class="badge">EXAM SCHEDULED</div>
     <p class="greeting">Hello, ${name}</p>
     <p class="text">You have been registered for an upcoming examination. Please review the details below.</p>
-    
+
     <div class="exam-card">
       <h3>📝 ${examName}</h3>
       <p class="exam-detail"><strong>Subject:</strong> ${subject || 'N/A'}</p>
       <p class="exam-detail"><strong>Type:</strong> ${type.toUpperCase()}</p>
-      <p class="exam-detail"><strong>Date & Time:</strong> ${formattedDate} (IST)</p>
+      <p class="exam-detail"><strong>Date &amp; Time:</strong> ${formattedDate} (IST)</p>
       <p class="exam-detail"><strong>Duration:</strong> ${examDuration} minutes</p>
     </div>
-    
+
     <div class="credentials-box">
       <div class="credential-item">
         <span class="credential-label">Exam Key</span>
         <span class="credential-value">${examKey}</span>
       </div>
     </div>
-    
+
     <p class="text">You will need this exam key to start your exam. <strong>Do not share this key.</strong></p>
-    
+
     <div style="text-align:center;">
       <a href="${loginUrl}" class="btn">Go to Exam Portal →</a>
     </div>
-    
+
     <div class="warning-box">
       <p>⚠️ Ensure you have a stable internet connection, a working webcam, and a quiet environment. Log in at least 10 minutes before exam starts.</p>
     </div>
   `;
 
-  console.log('📧 Email Service: Sending exam notification:', {
+  const info = await sendWithRetry({
     to: email,
-    examName,
-    examKey,
-    hasValidKey: !!examKey && examKey !== 'N/A'
+    subject: `Exam Scheduled: ${examName} — ${formattedDate}`,
+    html: baseTemplate(content),
   });
 
-  try {
-    const info = await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: email,
-      subject: `Exam Scheduled: ${examName} — ${formattedDate}`,
-      html: baseTemplate(content),
-    });
-    
-    console.log('✅ Email Service: Exam notification sent successfully:', {
-      to: email,
-      messageId: info.messageId,
-      examKey
-    });
-    
-    logger.info(`Exam notification sent to ${email} for exam ${examName} with key ${examKey}`);
-    return { success: true, messageId: info.messageId };
-  } catch (err) {
-    console.error('❌ Email Service: Failed to send exam notification:', {
-      to: email,
-      error: err.message,
-      examKey
-    });
-    logger.error(`Failed to send exam notification to ${email}: ${err.message}`);
-    throw err;
-  }
+  logger.info(`Exam notification sent to ${email} for exam ${examName}`);
+  return { success: true, messageId: info?.messageId };
 };
 
 /**
  * Send exam reminder (1 hour before)
  */
 const sendExamReminder = async ({ name, email, examName, examDate, examDuration, examKey }) => {
-  const transporter = createTransporter();
-  
   const formattedDate = new Date(examDate).toLocaleString('en-IN', {
     hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
   });
-  
+
   const content = `
     <div class="badge">EXAM REMINDER</div>
     <p class="greeting">⏰ Reminder: Exam in 1 Hour!</p>
     <p class="text">Hi ${name}, this is a reminder that your exam <strong>${examName}</strong> is starting at <strong>${formattedDate} IST</strong> — just 1 hour from now.</p>
-    
+
     <div class="exam-card">
       <h3>Pre-Exam Checklist</h3>
       <p class="exam-detail">✅ Stable internet connection</p>
-      <p class="exam-detail">✅ Working webcam & microphone</p>
+      <p class="exam-detail">✅ Working webcam &amp; microphone</p>
       <p class="exam-detail">✅ Quiet environment</p>
       <p class="exam-detail">✅ Full-screen mode ready</p>
       <p class="exam-detail">✅ No other browser tabs open</p>
     </div>
-    
+
     <div class="credentials-box">
       <div class="credential-item">
         <span class="credential-label">Your Exam Key</span>
         <span class="credential-value">${examKey}</span>
       </div>
     </div>
-    
+
     <div style="text-align:center;">
       <a href="${process.env.STUDENT_LOGIN_URL}" class="btn">Login Now →</a>
     </div>
   `;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+  await sendWithRetry({
     to: email,
     subject: `⏰ Exam Reminder: ${examName} starts in 1 hour!`,
     html: baseTemplate(content),
@@ -397,15 +314,13 @@ const sendExamReminder = async ({ name, email, examName, examDate, examDuration,
  * Send result to student
  */
 const sendResultNotification = async ({ name, email, examName, marksObtained, totalMarks, percentage, grade, status }) => {
-  const transporter = createTransporter();
-  
   const statusColor = status === 'pass' ? '#22c55e' : '#ef4444';
-  
+
   const content = `
     <div class="badge">RESULT PUBLISHED</div>
     <p class="greeting">Your Result is Available!</p>
     <p class="text">Hi ${name}, the results for <strong>${examName}</strong> have been published. Here's your performance summary:</p>
-    
+
     <div class="exam-card">
       <h3>${examName}</h3>
       <p class="exam-detail"><strong>Marks Obtained:</strong> ${marksObtained} / ${totalMarks}</p>
@@ -413,14 +328,13 @@ const sendResultNotification = async ({ name, email, examName, marksObtained, to
       <p class="exam-detail"><strong>Grade:</strong> ${grade}</p>
       <p class="exam-detail"><strong>Status:</strong> <span style="color:${statusColor};font-weight:700;">${status.toUpperCase()}</span></p>
     </div>
-    
+
     <div style="text-align:center;">
       <a href="${process.env.STUDENT_LOGIN_URL}" class="btn">View Detailed Result →</a>
     </div>
   `;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+  await sendWithRetry({
     to: email,
     subject: `Result Published: ${examName}`,
     html: baseTemplate(content),
@@ -431,13 +345,11 @@ const sendResultNotification = async ({ name, email, examName, marksObtained, to
  * Send college welcome email
  */
 const sendCollegeWelcome = async ({ name, email, collegeName }) => {
-  const transporter = createTransporter();
-  
   const content = `
     <div class="badge">WELCOME</div>
     <p class="greeting">Welcome to ExamShield, ${name}!</p>
     <p class="text"><strong>${collegeName}</strong> has been successfully registered on ExamShield. You can now start managing your students and conducting secure online examinations.</p>
-    
+
     <div class="exam-card">
       <h3>Getting Started</h3>
       <p class="exam-detail">1. Log in to your Admin Dashboard</p>
@@ -445,14 +357,13 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
       <p class="exam-detail">3. Create your first exam</p>
       <p class="exam-detail">4. Monitor students in real-time</p>
     </div>
-    
+
     <div style="text-align:center;">
       <a href="${process.env.PLATFORM_URL}/admin/login" class="btn">Go to Admin Dashboard →</a>
     </div>
   `;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+  await sendWithRetry({
     to: email,
     subject: `Welcome to ExamShield — Your College is Ready!`,
     html: baseTemplate(content),
