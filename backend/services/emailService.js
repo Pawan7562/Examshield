@@ -116,7 +116,42 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) =
     }
   }
 
-  // Fallback to Nodemailer SMTP
+  // Use Vercel Microservice Relay if in Production (to bypass Render SMTP block)
+  // Vercel Serverless functions do not block SMTP outbound.
+  if (process.env.NODE_ENV === 'production') {
+    const relayUrl = `${process.env.PLATFORM_URL || 'https://examshield.vercel.app'}/api/send-email`;
+    console.log(`📤 [Vercel Relay] Attempting to send to ${opts.to} via ${relayUrl}`);
+
+    try {
+      const response = await fetch(relayUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          internalSecret: 'examshield-secure-relay-9921',
+          host: process.env.EMAIL_HOST,
+          port: process.env.EMAIL_PORT,
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+          mailOptions: opts
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || data.message || 'Vercel Relay rejected the request');
+      }
+
+      console.log(`✅ [Vercel Relay] Delivered successfully! MessageId: ${data.messageId}`);
+      logger.info('Email sent successfully via Vercel Relay', { to: opts.to, messageId: data.messageId });
+      return data;
+    } catch (err) {
+      console.error(`❌ [Vercel Relay] Failed: ${err.message}`);
+      console.log('🔄 Falling back to standard SMTP (which may timeout on Render but works locally)...');
+    }
+  }
+
+  // Fallback to Nodemailer SMTP (works for local development)
   const transporter = getTransporter();
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
