@@ -145,6 +145,10 @@ export const adminAPI = {
   publishResults: (examId) => api.post(`/admin/results/exam/${examId}/publish`),
 
   getNotifications: () => api.get('/admin/notifications'),
+
+  // AI Question Generation
+  getAIStatus: () => api.get('/admin/ai/status'),
+  generateAIQuestions: (data) => api.post('/admin/ai/generate-questions', data, { timeout: 180000 }),
 };
 
 // Student APIs

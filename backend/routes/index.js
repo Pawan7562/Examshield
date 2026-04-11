@@ -13,6 +13,7 @@ const examController = require('../controllers/examController');
 const resultController = require('../controllers/resultController');
 const subscriptionController = require('../controllers/subscriptionController');
 const studentPasswordController = require('../controllers/studentPasswordController');
+const aiQuestionController = require('../controllers/aiQuestionController');
 
 // Student password routes
 const studentPasswordRoutes = require('./studentPasswordRoutes');
@@ -102,6 +103,10 @@ admin.get('/dashboard', adminController.getDashboard);
 
 // Notifications
 admin.get('/notifications', adminController.getNotifications);
+
+// AI Question Generation
+admin.get('/ai/status', aiQuestionController.getStatus);
+admin.post('/ai/generate-questions', aiQuestionController.generateQuestions);
 
 router.use('/admin', admin);
 

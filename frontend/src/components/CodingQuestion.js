@@ -34,7 +34,7 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         setTestResults(result.data);
       } else {
@@ -71,7 +71,7 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         setTestResults(result.data);
       } else {
@@ -123,7 +123,7 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
               </span>
             </div>
           </div>
-          
+
           {/* Allowed Languages */}
           {question.allowedLanguages && question.allowedLanguages.length > 0 && (
             <div className="premium-tags">

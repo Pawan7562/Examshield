@@ -209,9 +209,9 @@ export default function ExamRoom() {
       if (fn) {
         fn.call(el)
           .then(() => setIsFullscreen(true))
-          .catch(() => {}); // Silently ignore — user may deny fullscreen
+          .catch(() => { }); // Silently ignore — user may deny fullscreen
       }
-    } catch (_) {}
+    } catch (_) { }
   }, []);
 
   const exitFullScreen = useCallback(() => {
@@ -225,9 +225,9 @@ export default function ExamRoom() {
       const fn = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
       try {
         if (fn) {
-          fn.call(document).catch(() => {}); // catch async Promise rejection
+          fn.call(document).catch(() => { }); // catch async Promise rejection
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     setIsFullscreen(false);
   }, []);
@@ -367,7 +367,7 @@ export default function ExamRoom() {
     if (phase !== 'exam') return;
     const onCtx = (e) => { e.preventDefault(); return false; };
     const onKey = (e) => {
-      const blocked = ['c','v','x','a','s','r','n','t','w','i','p','u','j','k'];
+      const blocked = ['c', 'v', 'x', 'a', 's', 'r', 'n', 't', 'w', 'i', 'p', 'u', 'j', 'k'];
       if ((e.ctrlKey || e.metaKey) && blocked.includes(e.key.toLowerCase())) {
         e.preventDefault();
         notify.warn(`Keyboard shortcut "${e.key.toUpperCase()}" is disabled during exam`);
@@ -421,9 +421,9 @@ export default function ExamRoom() {
         studentAPI.saveAnswer(examId, {
           sessionId: session.id, questionId,
           ...(q.type === 'mcq' ? { selectedOption: answer } :
-             q.type === 'coding' ? { codeSubmission: answer } :
-             { answerText: answer }),
-        }).catch(() => {});
+            q.type === 'coding' ? { codeSubmission: answer } :
+              { answerText: answer }),
+        }).catch(() => { });
       });
     }, 30000);
     return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
@@ -434,7 +434,7 @@ export default function ExamRoom() {
     if (examId && phase === 'key') {
       studentAPI.getExamDetails(examId)
         .then(r => { if (r.success) setExamData(r.data); })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [examId, phase]);
 
@@ -446,9 +446,9 @@ export default function ExamRoom() {
     studentAPI.saveAnswer(examId, {
       sessionId: session.id, questionId,
       ...(q.type === 'mcq' ? { selectedOption: answer } :
-         q.type === 'coding' ? { codeSubmission: answer } :
-         { answerText: answer }),
-    }).catch(() => {});
+        q.type === 'coding' ? { codeSubmission: answer } :
+          { answerText: answer }),
+    }).catch(() => { });
   }, [questions, session, examId]);
 
   const triggerBackendStart = useCallback(async (keyToUse) => {
@@ -468,22 +468,22 @@ export default function ExamRoom() {
       } else {
         // If the backend says we're still early (clock sync or timezone issue), stay in waiting, no fast loop
         if (response.message && response.message.includes('Exam accessible from')) {
-            // Signal a failure to the user but don't reset to key
-            notify.error('Waiting for server authorization... retrying shortly.');
+          // Signal a failure to the user but don't reset to key
+          notify.error('Waiting for server authorization... retrying shortly.');
         } else {
-            exitFullScreen(); // Exits if it failed
-            setPhase('key');
-            notify.error(response.message || 'Invalid exam key. Please try again.');
+          exitFullScreen(); // Exits if it failed
+          setPhase('key');
+          notify.error(response.message || 'Invalid exam key. Please try again.');
         }
       }
     } catch (err) {
       if (err?.message && err.message.includes('Exam accessible from')) {
-         notify.error('Waiting for server authorization... retrying shortly.');
+        notify.error('Waiting for server authorization... retrying shortly.');
       } else {
-         exitFullScreen(); // Exits if it failed
-         setPhase('key');
-         console.error('Start exam error:', err);
-         notify.error(err?.message || 'Failed to start exam. Check your key and try again.');
+        exitFullScreen(); // Exits if it failed
+        setPhase('key');
+        console.error('Start exam error:', err);
+        notify.error(err?.message || 'Failed to start exam. Check your key and try again.');
       }
     } finally {
       setIsStartingExam(false);
@@ -494,9 +494,9 @@ export default function ExamRoom() {
   const handleStartExam = useCallback(() => {
     const key = examKey.trim();
     if (!key) { notify.warn('Please enter your exam key'); return; }
-    
+
     enterFullScreen();
-    
+
     // Automatic waiting room hook
     if (examData?.exam?.date_time) {
       let dateStr = examData.exam.date_time.replace(' ', 'T');
@@ -509,28 +509,28 @@ export default function ExamRoom() {
         return;
       }
     }
-    
+
     triggerBackendStart(key);
   }, [examKey, examData, enterFullScreen, triggerBackendStart]);
 
   // Waiting Room Auto-Start Effect
   useEffect(() => {
     if (phase !== 'waiting' || !examData?.exam?.date_time || isStartingExam) return;
-    
+
     // Timezone safe target parsing exactly matching the IST +05:30 configuration
     let dateStr = examData.exam.date_time.replace(' ', 'T');
     if (!dateStr.endsWith('Z') && !dateStr.includes('+')) {
       dateStr = `${dateStr}+05:30`;
     }
     const targetTime = new Date(dateStr).getTime();
-    
+
     const checkAndTrigger = () => {
       // Trigger if local browser clock has reached the scheduled time
       if (Date.now() >= targetTime + 1000) {
         triggerBackendStart(examKey.trim());
       }
     };
-    
+
     // Attempt every 5 seconds instead of 1 second to completely eradicate API loop flooding
     const interval = setInterval(checkAndTrigger, 5000);
     checkAndTrigger(); // Check immediately once
@@ -678,10 +678,10 @@ export default function ExamRoom() {
           }}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: C.yellow, fontWeight: 700, marginBottom: 6 }}>Scheduled Start</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: '#f1f5f9' }}>
-               {scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </div>
             <div style={{ marginTop: 10, fontSize: 12, color: C.muted }}>
-               Waiting for the clock...
+              Waiting for the clock...
             </div>
           </div>
         </div>
@@ -756,7 +756,15 @@ export default function ExamRoom() {
   const currentQuestion = questions[currentQ];
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: C.fontFamily, color: C.text }}>
+    <div style={{
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      background: C.bg,
+      fontFamily: C.fontFamily,
+      color: C.text,
+    }}>
 
       {/* ── Tab Switch Warning Overlay ── */}
       {showTabWarning && (
@@ -872,196 +880,273 @@ export default function ExamRoom() {
       </div>
 
       {/* ── Body ── */}
-      <div style={{
-        maxWidth: 1440,
-        margin: '0 auto',
-        padding: '20px 24px',
-        display: 'grid',
-        gridTemplateColumns: '220px 1fr 220px',
-        gap: 20,
-        alignItems: 'start',
-      }}>
-        {/* ── Left: Question Navigator ── */}
-        <div style={{
-          background: C.surface, border: `1px solid ${C.border}`,
-          borderRadius: 14, padding: 16,
-          position: 'sticky', top: 80,
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '1.2px', marginBottom: 14 }}>
-            Questions ({questions.length})
+      {currentQuestion?.type === 'coding' ? (
+        // ── CODING: Full-width split-pane layout ──────────────────────────────
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+          {/* Slim top bar: question navigator + status */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '8px 20px',
+            background: 'rgba(8,8,16,0.8)',
+            borderBottom: `1px solid ${C.border}`,
+            flexShrink: 0, flexWrap: 'wrap',
+          }}>
+            {/* Question pills */}
+            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+              {questions.map((q, i) => {
+                const isCur = i === currentQ;
+                const isAns = !!answers[q.id];
+                return (
+                  <button
+                    key={q.id || i}
+                    onClick={() => setCurrentQ(i)}
+                    title={`Q${i + 1}: ${q.title || q.type}`}
+                    style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      border: isCur
+                        ? '2px solid #e94560'
+                        : isAns ? '1.5px solid rgba(34,197,94,0.5)' : `1.5px solid ${C.border}`,
+                      background: isCur
+                        ? 'rgba(233,69,96,0.15)'
+                        : isAns ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.02)',
+                      color: isCur ? '#e94560' : isAns ? '#22c55e' : '#475569',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: 'inherit', transition: 'all 0.15s',
+                    }}
+                  >{i + 1}</button>
+                );
+              })}
+            </div>
+
+            {/* Spacer */}
+            <div style={{ flex: 1 }} />
+
+            {/* Answered count */}
+            <span style={{ fontSize: 11, color: C.muted }}>
+              {answeredCount}/{questions.length} answered
+            </span>
+
+            {/* Prev / Next */}
+            <button
+              onClick={() => setCurrentQ(q => Math.max(0, q - 1))}
+              disabled={currentQ === 0}
+              style={{
+                padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: currentQ === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${currentQ === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)'}`,
+                color: currentQ === 0 ? '#334155' : '#94a3b8',
+                cursor: currentQ === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+              }}
+            >← Prev</button>
+            <button
+              onClick={() => setCurrentQ(q => Math.min(questions.length - 1, q + 1))}
+              disabled={currentQ === questions.length - 1}
+              style={{
+                padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: currentQ === questions.length - 1 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${currentQ === questions.length - 1 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)'}`,
+                color: currentQ === questions.length - 1 ? '#334155' : '#94a3b8',
+                cursor: currentQ === questions.length - 1 ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+              }}
+            >Next →</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 5, marginBottom: 16 }}>
-            {questions.map((q, i) => {
-              const isCur = i === currentQ;
-              const isAns = !!answers[q.id];
-              return (
-                <button
-                  key={q.id || i}
-                  onClick={() => setCurrentQ(i)}
-                  title={`Q${i + 1}`}
-                  style={{
-                    aspectRatio: '1',
-                    border: isCur
-                      ? '2px solid #e94560'
-                      : isAns ? '1.5px solid rgba(34,197,94,0.5)' : `1.5px solid ${C.border}`,
-                    borderRadius: 7,
-                    background: isCur
-                      ? 'rgba(233,69,96,0.15)'
-                      : isAns ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.02)',
-                    color: isCur ? '#e94560' : isAns ? '#22c55e' : '#475569',
-                    fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'inherit', padding: 0,
-                    transition: 'all 0.15s',
-                  }}
-                >{i + 1}</button>
-              );
-            })}
-          </div>
-          {/* Legend */}
-          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[
-              { color: 'rgba(233,69,96,0.15)', border: '2px solid #e94560', label: 'Current' },
-              { color: 'rgba(34,197,94,0.1)', border: '1.5px solid rgba(34,197,94,0.5)', label: `Answered (${answeredCount})` },
-              { color: 'rgba(255,255,255,0.02)', border: `1.5px solid ${C.border}`, label: 'Skipped' },
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: C.muted }}>
-                <div style={{ width: 10, height: 10, borderRadius: 3, background: item.color, border: item.border, flexShrink: 0 }} />
-                {item.label}
-              </div>
-            ))}
+
+          {/* Full-width split-pane coding IDE */}
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            {currentQuestion && (
+              <CodingQuestion
+                question={currentQuestion}
+                answer={answers[currentQuestion.id] || ''}
+                onAnswer={(code) => handleAnswer(currentQuestion.id, code)}
+              />
+            )}
           </div>
         </div>
-
-        {/* ── Center: Question ── */}
-        <div>
-          {currentQuestion ? (
-            <div key={currentQ} className="er-enter" style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 16, padding: '28px 32px',
-              position: 'relative', overflow: 'hidden',
-            }}>
-              {/* Top accent bar */}
-              <div style={{
-                position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-                background: 'linear-gradient(90deg, #e94560, #7c3aed)',
-              }} />
-
-              {/* Question header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 38, height: 38, borderRadius: 10,
-                    background: 'rgba(233,69,96,0.12)', border: '1.5px solid rgba(233,69,96,0.25)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 14, fontWeight: 800, color: C.accent, flexShrink: 0,
-                  }}>{currentQ + 1}</div>
-                  <div style={{ fontSize: 13, color: C.muted }}>
-                    Question {currentQ + 1} of {questions.length}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <span style={{
-                    padding: '3px 10px', background: 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${C.border}`, borderRadius: 20,
-                    fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase',
-                  }}>
-                    {currentQuestion.type === 'mcq' ? 'MCQ' : currentQuestion.type === 'subjective' ? 'Descriptive' : 'Coding'}
-                  </span>
-                  <span style={{
-                    padding: '3px 10px', background: 'rgba(124,58,237,0.08)',
-                    border: '1px solid rgba(124,58,237,0.2)', borderRadius: 20,
-                    fontSize: 11, color: '#a78bfa', fontWeight: 700,
-                  }}>
-                    {currentQuestion.marks || 1} {currentQuestion.marks === 1 ? 'Mark' : 'Marks'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Question body */}
-              {currentQuestion.type === 'mcq' && (
-                <MCQQuestion
-                  question={currentQuestion}
-                  answer={answers[currentQuestion.id] || ''}
-                  onAnswer={(opt) => handleAnswer(currentQuestion.id, opt)}
-                />
-              )}
-              {currentQuestion.type === 'subjective' && (
-                <SubjectiveQuestion
-                  question={currentQuestion}
-                  answer={answers[currentQuestion.id] || ''}
-                  onAnswer={(text) => handleAnswer(currentQuestion.id, text)}
-                />
-              )}
-              {currentQuestion.type === 'coding' && (
-                <CodingQuestion
-                  question={currentQuestion}
-                  answer={answers[currentQuestion.id] || ''}
-                  onAnswer={(code) => handleAnswer(currentQuestion.id, code)}
-                />
-              )}
-
-              {/* Navigation */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 28 }}>
-                <button
-                  onClick={() => setCurrentQ(q => Math.max(0, q - 1))}
-                  disabled={currentQ === 0}
-                  style={navArrowStyle(currentQ === 0)}
-                >← Previous</button>
-                <span style={{ fontSize: 12, color: '#334155' }}>
-                  {answeredCount} / {questions.length} answered
-                </span>
-                <button
-                  onClick={() => setCurrentQ(q => Math.min(questions.length - 1, q + 1))}
-                  disabled={currentQ === questions.length - 1}
-                  style={navArrowStyle(currentQ === questions.length - 1)}
-                >Next →</button>
-              </div>
-            </div>
-          ) : (
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 16, padding: '60px 32px', textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 48 }}>📋</div>
-              <p style={{ color: C.muted, marginTop: 12 }}>No questions available for this exam.</p>
-            </div>
-          )}
-        </div>
-
-        {/* ── Right: Proctoring ── */}
+      ) : (
+        // ── MCQ / SUBJECTIVE: 3-column layout ────────────────────────────────
         <div style={{
-          background: C.surface, border: `1px solid ${C.border}`,
-          borderRadius: 14, position: 'sticky', top: 80, overflow: 'hidden',
+          flex: 1, overflowY: 'auto',
+          padding: '20px 24px',
         }}>
           <div style={{
-            padding: '10px 14px',
-            borderBottom: `1px solid ${C.border}`,
-            fontSize: 10, fontWeight: 700, color: '#334155',
-            textTransform: 'uppercase', letterSpacing: '1px',
-            display: 'flex', alignItems: 'center', gap: 6,
+            maxWidth: 1440, margin: '0 auto',
+            display: 'grid', gridTemplateColumns: '220px 1fr 220px',
+            gap: 20, alignItems: 'start',
           }}>
+            {/* Left: Question Navigator */}
             <div style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: C.green, animation: 'er-pulse 2s infinite',
-            }} />
-            Live Proctoring
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 14, padding: 16,
+              position: 'sticky', top: 80,
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '1.2px', marginBottom: 14 }}>
+                Questions ({questions.length})
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 5, marginBottom: 16 }}>
+                {questions.map((q, i) => {
+                  const isCur = i === currentQ;
+                  const isAns = !!answers[q.id];
+                  return (
+                    <button
+                      key={q.id || i}
+                      onClick={() => setCurrentQ(i)}
+                      title={`Q${i + 1}`}
+                      style={{
+                        aspectRatio: '1',
+                        border: isCur
+                          ? '2px solid #e94560'
+                          : isAns ? '1.5px solid rgba(34,197,94,0.5)' : `1.5px solid ${C.border}`,
+                        borderRadius: 7,
+                        background: isCur
+                          ? 'rgba(233,69,96,0.15)'
+                          : isAns ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.02)',
+                        color: isCur ? '#e94560' : isAns ? '#22c55e' : '#475569',
+                        fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontFamily: 'inherit', padding: 0, transition: 'all 0.15s',
+                      }}
+                    >{i + 1}</button>
+                  );
+                })}
+              </div>
+              {/* Legend */}
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  { color: 'rgba(233,69,96,0.15)', border: '2px solid #e94560', label: 'Current' },
+                  { color: 'rgba(34,197,94,0.1)', border: '1.5px solid rgba(34,197,94,0.5)', label: `Answered (${answeredCount})` },
+                  { color: 'rgba(255,255,255,0.02)', border: `1.5px solid ${C.border}`, label: 'Skipped' },
+                ].map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: C.muted }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: item.color, border: item.border, flexShrink: 0 }} />
+                    {item.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Center: Question */}
+            <div>
+              {currentQuestion ? (
+                <div key={currentQ} className="er-enter" style={{
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 16, padding: '28px 32px',
+                  position: 'relative', overflow: 'hidden',
+                }}>
+                  {/* Top accent bar */}
+                  <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                    background: 'linear-gradient(90deg, #e94560, #7c3aed)',
+                  }} />
+
+                  {/* Question header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{
+                        width: 38, height: 38, borderRadius: 10,
+                        background: 'rgba(233,69,96,0.12)', border: '1.5px solid rgba(233,69,96,0.25)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 14, fontWeight: 800, color: C.accent, flexShrink: 0,
+                      }}>{currentQ + 1}</div>
+                      <div style={{ fontSize: 13, color: C.muted }}>
+                        Question {currentQ + 1} of {questions.length}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <span style={{
+                        padding: '3px 10px', background: 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${C.border}`, borderRadius: 20,
+                        fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase',
+                      }}>
+                        {currentQuestion.type === 'mcq' ? 'MCQ' : 'Descriptive'}
+                      </span>
+                      <span style={{
+                        padding: '3px 10px', background: 'rgba(124,58,237,0.08)',
+                        border: '1px solid rgba(124,58,237,0.2)', borderRadius: 20,
+                        fontSize: 11, color: '#a78bfa', fontWeight: 700,
+                      }}>
+                        {currentQuestion.marks || 1} {currentQuestion.marks === 1 ? 'Mark' : 'Marks'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Question body */}
+                  {currentQuestion.type === 'mcq' && (
+                    <MCQQuestion
+                      question={currentQuestion}
+                      answer={answers[currentQuestion.id] || ''}
+                      onAnswer={(opt) => handleAnswer(currentQuestion.id, opt)}
+                    />
+                  )}
+                  {currentQuestion.type === 'subjective' && (
+                    <SubjectiveQuestion
+                      question={currentQuestion}
+                      answer={answers[currentQuestion.id] || ''}
+                      onAnswer={(text) => handleAnswer(currentQuestion.id, text)}
+                    />
+                  )}
+
+                  {/* Navigation */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 28 }}>
+                    <button
+                      onClick={() => setCurrentQ(q => Math.max(0, q - 1))}
+                      disabled={currentQ === 0}
+                      style={navArrowStyle(currentQ === 0)}
+                    >← Previous</button>
+                    <span style={{ fontSize: 12, color: '#334155' }}>
+                      {answeredCount} / {questions.length} answered
+                    </span>
+                    <button
+                      onClick={() => setCurrentQ(q => Math.min(questions.length - 1, q + 1))}
+                      disabled={currentQ === questions.length - 1}
+                      style={navArrowStyle(currentQ === questions.length - 1)}
+                    >Next →</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 16, padding: '60px 32px', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 48 }}>📋</div>
+                  <p style={{ color: C.muted, marginTop: 12 }}>No questions available for this exam.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Proctoring */}
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 14, position: 'sticky', top: 80, overflow: 'hidden',
+            }}>
+              <div style={{
+                padding: '10px 14px', borderBottom: `1px solid ${C.border}`,
+                fontSize: 10, fontWeight: 700, color: '#334155',
+                textTransform: 'uppercase', letterSpacing: '1px',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, animation: 'er-pulse 2s infinite' }} />
+                Live Proctoring
+              </div>
+              <ProfessionalProctoring
+                sessionId={session?.id}
+                examId={examId}
+                studentId={user?.id}
+                onViolation={handleFaceViolation}
+                currentQuestion={currentQ + 1}
+                totalQuestions={questions.length}
+              />
+            </div>
           </div>
-          <ProfessionalProctoring
-            sessionId={session?.id}
-            examId={examId}
-            studentId={user?.id}
-            onViolation={handleFaceViolation}
-            currentQuestion={currentQ + 1}
-            totalQuestions={questions.length}
-          />
         </div>
-      </div>
+      )}
+
     </div>
   );
 }
 
 // ─── StatusChip helper ──────────────────────────────────────────────────────────
+
 function StatusChip({ color, label, pulse }) {
   return (
     <div style={{
