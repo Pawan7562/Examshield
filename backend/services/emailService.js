@@ -3,6 +3,7 @@ require('dotenv').config();
 
 const nodemailer = require('nodemailer');
 const winston = require('winston');
+const { Resend } = require('resend');
 
 const logger = winston.createLogger({
   level: 'info',
@@ -19,19 +20,26 @@ let _transporter = null;
 const getTransporter = () => {
   if (_transporter) return _transporter;
 
-  const { EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_PORT } = process.env;
+  const { EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_PORT, RESEND_API_KEY } = process.env;
+
+  if (RESEND_API_KEY) {
+     console.log('✅ Resend API Key detected — SMTP transporter will be bypassed.');
+  }
 
   console.log('🔧 Email config check:', {
     EMAIL_HOST: EMAIL_HOST || 'NOT SET',
     EMAIL_USER: EMAIL_USER || 'NOT SET',
     EMAIL_PASS: EMAIL_PASS ? '***SET***' : 'NOT SET',
     EMAIL_PORT: EMAIL_PORT || 'NOT SET',
+    RESEND_API_KEY: RESEND_API_KEY ? '***SET***' : 'NOT SET',
     NODE_ENV: process.env.NODE_ENV,
   });
 
   if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
-    console.warn('⚠️  Email NOT configured — falling back to mock transporter.');
-    console.warn('   Set EMAIL_HOST, EMAIL_USER, EMAIL_PASS in your production env vars.');
+    if (!RESEND_API_KEY) {
+      console.warn('⚠️  Email NOT configured — falling back to mock transporter.');
+      console.warn('   Set EMAIL_HOST/USER/PASS or RESEND_API_KEY in your env vars.');
+    }
     _transporter = {
       sendMail: async (opts) => {
         console.log('📧 [MOCK] Would send to:', opts.to, '| Subject:', opts.subject);
@@ -75,23 +83,51 @@ const getTransporter = () => {
 // Internal helper: send with retry
 // ─────────────────────────────────────────────────────────────
 const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) => {
-  const transporter = getTransporter();
   const from =
     mailOptions.from ||
     process.env.EMAIL_FROM ||
-    `ExamShield <${process.env.EMAIL_USER}>`;
+    `ExamShield <${process.env.EMAIL_USER || 'noreply@examshield.com'}>`;
 
   const opts = { ...mailOptions, from };
 
+  // Prioritize Resend over SMTP if API key exists. Render FREE blocks SMTP completely.
+  if (process.env.RESEND_API_KEY) {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    console.log(`📤 [Resend] Attempting to send to ${opts.to} | Subject: ${opts.subject}`);
+
+    try {
+      const { data, error } = await resend.emails.send({
+        from: opts.from,
+        to: opts.to,
+        subject: opts.subject,
+        html: opts.html,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      console.log(`✅ [Resend] Delivered via HTTPS. MessageId: ${data?.id}`);
+      logger.info('Email sent successfully via Resend API', { to: opts.to, id: data?.id });
+      return { messageId: data?.id };
+    } catch (err) {
+      console.error(`❌ [Resend] Failed via API: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // Fallback to Nodemailer SMTP
+  const transporter = getTransporter();
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`📤 [Email] Attempt ${attempt}/${maxRetries} → ${opts.to} | ${opts.subject}`);
+      console.log(`📤 [SMTP] Attempt ${attempt}/${maxRetries} → ${opts.to} | ${opts.subject}`);
       const info = await transporter.sendMail(opts);
-      console.log(`✅ [Email] Sent! MessageId: ${info.messageId}`);
-      logger.info('Email sent', { to: opts.to, subject: opts.subject, messageId: info.messageId });
+      console.log(`✅ [SMTP] Sent! MessageId: ${info.messageId}`);
+      logger.info('Email sent via SMTP', { to: opts.to, subject: opts.subject, messageId: info.messageId });
       return info;
     } catch (err) {
-      console.error(`❌ [Email] Attempt ${attempt} failed: ${err.message} (code: ${err.code})`);
+      console.error(`❌ [SMTP] Attempt ${attempt} failed: ${err.message} (code: ${err.code})`);
       // Auth errors won't be fixed by retrying
       if (err.code === 'EAUTH') {
         logger.error('Email auth failed — check EMAIL_USER and EMAIL_PASS', { error: err.message });
@@ -103,7 +139,7 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) =
       }
       // Reset the singleton so the next attempt creates a fresh connection
       _transporter = null;
-      console.log(`🔄 [Email] Retrying in ${retryDelayMs / 1000}s…`);
+      console.log(`🔄 [SMTP] Retrying in ${retryDelayMs / 1000}s…`);
       await new Promise((r) => setTimeout(r, retryDelayMs));
     }
   }

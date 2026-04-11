@@ -207,12 +207,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Diagnostic Email Route — verifies SMTP connection then sends a real test email
+// Diagnostic Email Route — verifies SMTP/Resend connection then sends a real test email
 app.get('/api/test-email', async (req, res) => {
   const nodemailer = require('nodemailer');
+  const { Resend } = require('resend');
   const to = req.query.email || process.env.EMAIL_USER;
 
   const config = {
+    RESEND_API_KEY: process.env.RESEND_API_KEY ? '***SET***' : 'NOT SET',
     EMAIL_HOST: process.env.EMAIL_HOST || 'NOT SET',
     EMAIL_PORT: process.env.EMAIL_PORT || 'NOT SET',
     EMAIL_USER: process.env.EMAIL_USER || 'NOT SET',
@@ -225,32 +227,47 @@ app.get('/api/test-email', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Provide ?email=<address> or set EMAIL_USER env var.', config });
   }
 
-  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    return res.status(500).json({ success: false, message: 'Email env vars not configured on this server.', config });
-  }
-
   try {
-    const port = parseInt(process.env.EMAIL_PORT) || 587;
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port,
-      secure: port === 465,
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      tls: { rejectUnauthorized: false },
-      connectionTimeout: 15000,
-      greetingTimeout: 10000,
-    });
+    if (process.env.RESEND_API_KEY) {
+      // Test Resend API
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const { data, error } = await resend.emails.send({
+        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+        to,
+        subject: '✅ ExamShield — Resend API Diagnostic',
+        text: 'Resend API is working correctly.',
+      });
 
-    await transporter.verify();
-    const info = await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-      to,
-      subject: '✅ ExamShield — SMTP Diagnostic',
-      text: `SMTP is working correctly. Server: ${process.env.EMAIL_HOST}:${port}`,
-    });
-    res.json({ success: true, message: `Diagnostic email sent to ${to}`, messageId: info.messageId, config });
+      if (error) throw new Error(error.message);
+      return res.json({ success: true, message: `Diagnostic email sent via Resend to ${to}`, messageId: data?.id, config });
+    } else {
+      // Test SMTP
+      if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        return res.status(500).json({ success: false, message: 'Email env vars not configured on this server.', config });
+      }
+
+      const port = parseInt(process.env.EMAIL_PORT) || 587;
+      const transporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST,
+        port,
+        secure: port === 465,
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 15000,
+        greetingTimeout: 10000,
+      });
+
+      await transporter.verify();
+      const info = await transporter.sendMail({
+        from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+        to,
+        subject: '✅ ExamShield — SMTP Diagnostic',
+        text: `SMTP is working correctly. Server: ${process.env.EMAIL_HOST}:${port}`,
+      });
+      return res.json({ success: true, message: `Diagnostic email sent to ${to}`, messageId: info.messageId, config });
+    }
   } catch (error) {
-    res.status(500).json({ success: false, message: 'SMTP test failed.', error: error.message, code: error.code, config });
+    res.status(500).json({ success: false, message: 'Email test failed.', error: error.message, code: error.code, config });
   }
 });
 
