@@ -1,5 +1,5 @@
-// src/components/admin/AdminSidebar.js
-import React, { useEffect } from 'react';
+// src/components/admin/AdminSidebar.js — Institutional College Admin Sidebar
+import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
@@ -14,7 +14,9 @@ import {
   ChevronRight,
   ChevronLeft,
   Menu,
-  Brain
+  Brain,
+  ShieldCheck,
+  Radio
 } from 'lucide-react';
 import './AdminSidebar.css';
 
@@ -24,81 +26,82 @@ export default function AdminSidebar() {
   const navigate = useNavigate();
   const { isCollapsed, isMobile, isMobileOpen, toggleSidebar, closeMobileSidebar } = useSidebar();
 
-  const menuItems = [
+  const menuSections = [
     {
-      section: 'Main',
+      title: 'Command Center',
       items: [
         {
           id: 'dashboard',
-          label: 'Dashboard',
+          label: 'Dashboard Overview',
           icon: LayoutDashboard,
           path: '/admin/dashboard',
-          badge: null
+        },
+        {
+          id: 'live-monitoring',
+          label: 'Live Monitoring',
+          icon: Radio,
+          path: '/admin/monitoring',
+          badge: 'LIVE',
+          isLiveBadge: true
         }
       ]
     },
     {
-      section: 'Management',
+      title: 'Academic & Candidates',
       items: [
         {
           id: 'students',
-          label: 'Students',
+          label: 'Candidate Registry',
           icon: Users,
           path: '/admin/students',
-          badge: null
         },
         {
           id: 'exams',
-          label: 'Exams',
+          label: 'Examinations Center',
           icon: FileText,
           path: '/admin/exams',
-          badge: null
         },
         {
           id: 'results',
-          label: 'Results',
+          label: 'Gradebook & Audits',
           icon: Trophy,
           path: '/admin/results',
-          badge: null
         }
       ]
     },
     {
-      section: 'AI Tools',
+      title: 'AI Intelligence',
       items: [
         {
           id: 'ai-questions',
-          label: 'AI Question Generator',
+          label: 'AI Question Studio',
           icon: Brain,
           path: '/admin/ai-questions',
-          badge: null,
-          highlight: true
+          badge: 'AI v2'
         }
       ]
     },
     {
-      section: 'System',
+      title: 'Institutional Control',
       items: [
         {
           id: 'subscription',
-          label: 'Subscription',
+          label: 'License & Quotas',
           icon: CreditCard,
           path: '/admin/subscription',
-          badge: null
         },
         {
           id: 'settings',
-          label: 'Settings',
+          label: 'Proctoring Rules & College',
           icon: Settings,
           path: '/admin/settings',
-          badge: null
         }
       ]
     }
   ];
 
   const isActivePath = (path) => {
-    return location.pathname === path || location.pathname.startsWith(path + '/');
+    return location.pathname === path || (path !== '/admin/dashboard' && location.pathname.startsWith(path));
   };
 
   const handleLogout = () => {
@@ -108,94 +111,128 @@ export default function AdminSidebar() {
 
   const handleNavClick = (path) => {
     navigate(path);
-    closeMobileSidebar();
+    if (isMobile) closeMobileSidebar();
   };
+
+  const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : 'AD';
 
   return (
     <>
-      {/* Mobile Menu Toggle */}
+      {/* Mobile Menu Toggle Floating Bar */}
       {isMobile && (
         <button 
-          className="admin-mobile-menu-toggle"
+          className="admin-mobile-toggle-btn"
           onClick={toggleSidebar}
+          aria-label="Toggle Navigation Menu"
         >
-          <Menu size={24} />
-          <span>Menu</span>
+          <Menu size={22} />
+          <span>Admin Portal</span>
         </button>
       )}
 
-      {/* Sidebar */}
-      <aside className={`admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobile ? 'mobile-sidebar' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
-        {/* Header */}
-        <div className="admin-sidebar-header">
-          <div className="admin-sidebar-logo">
-            <div className="admin-sidebar-logo-text">EXAMSHIELD</div>
-            <div className="admin-sidebar-logo-badge">ADMIN</div>
+      {/* Backdrop for mobile */}
+      {isMobile && isMobileOpen && (
+        <div 
+          className="admin-sidebar-backdrop" 
+          onClick={closeMobileSidebar} 
+        />
+      )}
+
+      <aside className={`admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobile ? 'mobile' : ''} ${isMobileOpen ? 'open' : ''}`}>
+        {/* Brand Header */}
+        <div className="admin-sidebar-brand">
+          <div className="admin-brand-icon-wrap" onClick={() => navigate('/admin/dashboard')}>
+            <ShieldCheck size={26} color="#38bdf8" />
           </div>
+
+          {!isCollapsed && (
+            <div className="admin-brand-info" onClick={() => navigate('/admin/dashboard')}>
+              <div className="admin-brand-title">
+                EXAM<span>SHIELD</span>
+              </div>
+              <div className="admin-brand-tag">COLLEGE ADMIN</div>
+            </div>
+          )}
+
           <button 
-            className="admin-sidebar-toggle"
+            className="admin-sidebar-collapse-btn"
             onClick={toggleSidebar}
+            title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
-            {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
 
-        {/* User Profile Section */}
+        {/* Live Proctoring Status Pill */}
         {!isCollapsed && (
-          <div className="admin-sidebar-user-profile">
-            <div className="admin-user-avatar">
-              {user?.name?.charAt(0) || 'A'}
+          <div className="admin-proctor-pill">
+            <span className="admin-proctor-dot" />
+            <span className="admin-proctor-text">AI Proctor Core Active</span>
+          </div>
+        )}
+
+        {/* Institution / Admin Identity Chip */}
+        {!isCollapsed && (
+          <div className="admin-identity-chip">
+            <div className="admin-avatar-box">
+              {initials}
             </div>
-            <div className="admin-user-info">
-              <div className="admin-user-name">{user?.name}</div>
-              <div className="admin-user-role">College Admin</div>
-              <div className="admin-user-plan">
-                {(user?.subscriptionPlan || 'Basic').toUpperCase()}
-              </div>
+            <div className="admin-identity-text">
+              <span className="admin-name">{user?.name || 'Administrator'}</span>
+              <span className="admin-college-label">
+                {user?.collegeName || user?.college_name || 'Partner Institution'}
+              </span>
+              <span className="admin-sidebar-tier-badge">
+                {(user?.subscriptionPlan || 'Enterprise').toUpperCase()} TIER
+              </span>
             </div>
           </div>
         )}
 
-        {/* Navigation Menu */}
-        <nav className="admin-sidebar-nav">
-          {menuItems.map((section, sectionIndex) => (
-            <div key={sectionIndex} className="admin-nav-section">
-              <div className="admin-nav-section-title">
-                {!isCollapsed && section.section}
-              </div>
-              
-              {section.items.map((item) => (
-                <a
-                  key={item.id}
-                  href={item.path}
-                  className={`admin-nav-item ${isActivePath(item.path) ? 'active' : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleNavClick(item.path);
-                  }}
-                  title={isCollapsed ? item.label : ''}
-                >
-                  <item.icon className="admin-nav-item-icon" />
-                  {!isCollapsed && (
-                    <span className="admin-nav-item-text">{item.label}</span>
-                  )}
-                  {item.badge && (
-                    <span className="admin-nav-item-badge">{item.badge}</span>
-                  )}
-                </a>
-              ))}
+        {/* Navigation Sections */}
+        <div className="admin-nav-scroll">
+          {menuSections.map((section, sIdx) => (
+            <div key={sIdx} className="admin-nav-group">
+              {!isCollapsed && (
+                <div className="admin-nav-group-title">{section.title}</div>
+              )}
+
+              {section.items.map((item) => {
+                const active = isActivePath(item.path);
+                const IconComponent = item.icon;
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNavClick(item.path)}
+                    className={`admin-nav-link ${active ? 'active' : ''}`}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <span className="admin-link-icon">
+                      <IconComponent size={19} />
+                    </span>
+                    {!isCollapsed && (
+                      <span className="admin-link-text">{item.label}</span>
+                    )}
+                    {!isCollapsed && item.badge && (
+                      <span className={`admin-link-badge ${item.isLiveBadge ? 'live-badge' : ''}`}>{item.badge}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ))}
-        </nav>
+        </div>
 
-        {/* Logout Button */}
-        <div style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        {/* Footer / Quick Sign Out */}
+        <div className="admin-sidebar-footer">
           <button 
-            className="admin-nav-item admin-logout-btn"
+            className="admin-logout-button"
             onClick={handleLogout}
+            title={isCollapsed ? 'Sign Out Admin' : undefined}
           >
-            <LogOut size={20} className="admin-nav-item-icon" />
-            {!isCollapsed && <span className="admin-nav-item-text">Logout</span>}
+            <LogOut size={18} />
+            {!isCollapsed && <span>Sign Out Administrator</span>}
           </button>
         </div>
       </aside>

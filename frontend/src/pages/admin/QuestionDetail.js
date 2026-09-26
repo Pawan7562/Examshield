@@ -123,7 +123,7 @@ export default function QuestionDetail() {
             <span style={{ 
               fontSize: 12, 
               fontWeight: 700, 
-              color: question.type === 'mcq' ? '#e94560' : question.type === 'subjective' ? '#8b5cf6' : question.type === 'coding' ? '#06b6d4' : '#10b981' 
+              color: question.type === 'mcq' ? '#0a74da' : question.type === 'subjective' ? '#8b5cf6' : question.type === 'coding' ? '#06b6d4' : '#10b981' 
             }}>
               {question.type?.toUpperCase()} · {question.marks || 1} marks
             </span>

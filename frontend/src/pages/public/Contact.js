@@ -1,181 +1,331 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ArrowRight, Mail, Phone, MessageCircle, MapPin, Clock, CheckCircle2, Building2, Users, Sparkles, ShieldCheck, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Mail, MessageCircle, Phone, MapPin, Clock } from 'lucide-react';
 import PublicLayout from '../../components/public/PublicLayout';
 import './Contact.css';
 
+const contactReasons = [
+  { value: '', label: 'Select a reason' },
+  { value: 'institutional-trial', label: 'Start Institutional Trial' },
+  { value: 'demo', label: 'Schedule a Campus Demo' },
+  { value: 'lms-integration', label: 'LMS Integration Support' },
+  { value: 'technical', label: 'Technical Support' },
+  { value: 'enterprise', label: 'Enterprise / Large Campus Inquiry' },
+  { value: 'partnership', label: 'Partnership Opportunity' },
+  { value: 'general', label: 'General Inquiry' },
+];
+
+const teamCards = [
+  {
+    icon: Building2,
+    name: 'Institutional Sales',
+    description: 'For university registrars, exam controllers, and academic IT teams exploring ExamShield for their campus.',
+    contact: 'sales@examshield.io',
+    response: 'Within 4 business hours',
+    color: 'green',
+  },
+  {
+    icon: Users,
+    name: 'Technical Support',
+    description: 'For existing institutional admins, faculty invigilators, or IT teams with integration or platform questions.',
+    contact: 'support@examshield.io',
+    response: '24/7 · Within 2 hours',
+    color: 'blue',
+  },
+  {
+    icon: ShieldCheck,
+    name: 'Enterprise & Compliance',
+    description: 'For data protection officers, legal teams, and enterprise buyers requiring FERPA, GDPR, and ISO compliance documentation.',
+    contact: 'enterprise@examshield.io',
+    response: 'Within 1 business day',
+    color: 'orange',
+  },
+];
+
+const officeLocations = [
+  {
+    city: 'Bangalore',
+    country: 'India (HQ)',
+    address: '12th Floor, Prestige Tech Park,\nOuter Ring Road, Bangalore — 560103',
+    phone: '+91 80 4567 8900',
+    hours: 'Mon–Fri: 9AM–7PM IST',
+  },
+  {
+    city: 'Singapore',
+    country: 'Asia-Pacific',
+    address: 'Level 30, Ocean Financial Centre,\n10 Collyer Quay, Singapore — 049315',
+    phone: '+65 6801 2345',
+    hours: 'Mon–Fri: 9AM–6PM SGT',
+  },
+];
+
 export default function Contact() {
+  const [formState, setFormState] = useState({
+    name: '', email: '', phone: '', institution: '', role: '', reason: '', message: '', newsletter: false,
+  });
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormState(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setSubmitted(true);
+  };
+
   return (
     <PublicLayout>
-      <section className="public-shell contact-hero-section" aria-labelledby="contact-hero-heading">
-        <div className="contact-hero-content">
-          <h1 id="contact-hero-heading">Get in Touch</h1>
-          <p>Have questions about our exam monitoring platform? We're here to help you secure your online examinations with confidence.</p>
-          <div className="contact-hero-stats">
-            <div className="hero-stat">
-              <strong>24/7</strong>
-              <span>Support Available</span>
-            </div>
-            <div className="hero-stat">
-              <strong>&lt;2hr</strong>
-              <span>Response Time</span>
-            </div>
-            <div className="hero-stat">
-              <strong>10,000+</strong>
-              <span>Happy Institutions</span>
-            </div>
+      {/* Hero */}
+      <section className="contact-hero-section public-shell" aria-labelledby="contact-hero-h1">
+        <div className="contact-hero-eyebrow">
+          <Sparkles size={14} aria-hidden="true" />
+          <span>Enterprise Sales & Support</span>
+        </div>
+        <h1 id="contact-hero-h1">
+          Talk to the ExamShield<br /><span>institutional team</span>
+        </h1>
+        <p className="contact-hero-sub">
+          Whether you're a university registrar exploring our platform, an IT administrator setting up LMS integration, or a compliance officer reviewing our data governance posture — the right team is waiting.
+        </p>
+        <div className="contact-hero-trust">
+          <div className="contact-trust-item">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            <span>No-pressure evaluation</span>
+          </div>
+          <div className="contact-trust-item">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            <span>Response within 4 hours</span>
+          </div>
+          <div className="contact-trust-item">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            <span>Dedicated onboarding engineer</span>
           </div>
         </div>
       </section>
 
-      <section className="public-shell contact-main-section" aria-labelledby="contact-main-heading">
+      {/* Team Contact Cards */}
+      <section className="public-shell contact-teams-section" aria-labelledby="contact-teams-heading">
+        <p className="contact-kicker">WHO SHOULD YOU CONTACT?</p>
+        <h2 id="contact-teams-heading">Connect with the right team directly</h2>
+        <div className="contact-teams-grid" role="list">
+          {teamCards.map(team => {
+            const Icon = team.icon;
+            return (
+              <article key={team.name} className={`contact-team-card contact-team-${team.color}`} role="listitem">
+                <div className={`contact-team-icon contact-icon-${team.color}`} aria-hidden="true">
+                  <Icon size={24} strokeWidth={2} />
+                </div>
+                <h3>{team.name}</h3>
+                <p>{team.description}</p>
+                <a href={`mailto:${team.contact}`} className={`contact-team-email contact-email-${team.color}`}>
+                  <Mail size={14} aria-hidden="true" />
+                  {team.contact}
+                </a>
+                <div className="contact-team-response">
+                  <Clock size={13} aria-hidden="true" />
+                  <span>{team.response}</span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Main Content: Form + Info */}
+      <section className="public-shell contact-main-section" aria-labelledby="contact-form-heading">
         <div className="contact-content-grid">
-          <div className="contact-info-section">
-            <h2 id="contact-main-heading">Ways to Reach Us</h2>
-            <p>Choose the most convenient way to connect with our team.</p>
-            
-            <div className="contact-methods">
-              <div className="contact-method">
-                <div className="contact-method-icon">
-                  <Mail size={32} />
-                </div>
-                <div className="contact-method-content">
-                  <h3>Email Support</h3>
-                  <p>support@exammonitoring.com</p>
-                  <span className="contact-response-time">Response within 24 hours</span>
-                  <Link to="mailto:support@exammonitoring.com" className="contact-action-link">
-                    Send Email
-                    <ArrowRight size={16} />
-                  </Link>
-                </div>
-              </div>
+          {/* Info Column */}
+          <div className="contact-info-col">
+            <h2 id="contact-form-heading">Send us a detailed inquiry</h2>
+            <p>Our institutional team will route your message to the right specialist and respond within one business day.</p>
 
-              <div className="contact-method">
-                <div className="contact-method-icon">
-                  <Phone size={32} />
+            <div className="contact-methods-list">
+              <a href="tel:+918045678900" className="contact-method-row" aria-label="Call ExamShield support">
+                <div className="contact-method-icon-wrap green" aria-hidden="true">
+                  <Phone size={18} />
                 </div>
-                <div className="contact-method-content">
-                  <h3>Phone Support</h3>
-                  <p>+91 98765 43210</p>
-                  <span className="contact-response-time">Mon-Fri, 9AM-6PM IST</span>
-                  <Link to="tel:+919876543210" className="contact-action-link">
-                    Call Now
-                    <ArrowRight size={16} />
-                  </Link>
+                <div>
+                  <strong>Phone Support</strong>
+                  <span>+91 80 4567 8900</span>
+                  <small>Mon–Fri, 9AM–7PM IST</small>
                 </div>
-              </div>
-
-              <div className="contact-method">
-                <div className="contact-method-icon">
-                  <MessageCircle size={32} />
+                <ChevronRight size={16} className="contact-method-arrow" aria-hidden="true" />
+              </a>
+              <a href="mailto:hello@examshield.io" className="contact-method-row" aria-label="Email ExamShield">
+                <div className="contact-method-icon-wrap blue" aria-hidden="true">
+                  <Mail size={18} />
                 </div>
-                <div className="contact-method-content">
-                  <h3>Live Chat</h3>
-                  <p>Instant support with our team</p>
-                  <span className="contact-response-time">Available 24/7</span>
-                  <button className="contact-action-link">
-                    Start Chat
-                    <ArrowRight size={16} />
-                  </button>
+                <div>
+                  <strong>Email Sales</strong>
+                  <span>hello@examshield.io</span>
+                  <small>Response within 4 hours</small>
                 </div>
-              </div>
+                <ChevronRight size={16} className="contact-method-arrow" aria-hidden="true" />
+              </a>
+              <button className="contact-method-row" aria-label="Start live chat">
+                <div className="contact-method-icon-wrap orange" aria-hidden="true">
+                  <MessageCircle size={18} />
+                </div>
+                <div>
+                  <strong>Live Chat</strong>
+                  <span>Instant response</span>
+                  <small>Available 24 / 7</small>
+                </div>
+                <ChevronRight size={16} className="contact-method-arrow" aria-hidden="true" />
+              </button>
             </div>
 
-            <div className="contact-office-info">
-              <div className="office-card">
-                <div className="office-icon">
-                  <MapPin size={24} />
+            {/* Office Locations */}
+            <div className="contact-offices-section">
+              <h3>Our Offices</h3>
+              {officeLocations.map(office => (
+                <div key={office.city} className="contact-office-card">
+                  <div className="contact-office-header">
+                    <MapPin size={16} aria-hidden="true" />
+                    <div>
+                      <strong>{office.city}</strong>
+                      <span>{office.country}</span>
+                    </div>
+                  </div>
+                  <p className="contact-office-address">{office.address}</p>
+                  <div className="contact-office-meta">
+                    <span><Phone size={12} /> {office.phone}</span>
+                    <span><Clock size={12} /> {office.hours}</span>
+                  </div>
                 </div>
-                <div className="office-details">
-                  <h4>Head Office</h4>
-                  <p>123 Tech Park, Bangalore<br />Karnataka 560001, India</p>
-                </div>
-              </div>
-              
-              <div className="office-card">
-                <div className="office-icon">
-                  <Clock size={24} />
-                </div>
-                <div className="office-details">
-                  <h4>Business Hours</h4>
-                  <p>Monday - Friday: 9AM - 6PM<br />Saturday: 10AM - 2PM<br />Sunday: Closed</p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          <div className="contact-form-section">
-            <div className="contact-form-card">
-              <h2>Send us a Message</h2>
-              <p>Fill out the form below and we'll get back to you as soon as possible.</p>
-              
-              <form className="contact-form">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="name">Full Name *</label>
-                    <input type="text" id="name" name="name" placeholder="Enter your full name" required />
+          {/* Form Column */}
+          <div className="contact-form-col">
+            {submitted ? (
+              <div className="contact-success-card">
+                <div className="contact-success-icon" aria-hidden="true">
+                  <CheckCircle2 size={48} />
+                </div>
+                <h3>Message received!</h3>
+                <p>Our institutional team will reach out within 4 business hours. Meanwhile, feel free to explore our platform.</p>
+                <Link to="/features" className="feat-cta-primary" style={{ marginTop: '16px', display: 'inline-flex' }}>
+                  Explore Features
+                  <ArrowRight size={15} />
+                </Link>
+              </div>
+            ) : (
+              <form className="contact-pro-form" onSubmit={handleSubmit} noValidate>
+                <div className="contact-form-header">
+                  <h3>Inquiry Form</h3>
+                  <p>Fields marked <span className="required-star">*</span> are required</p>
+                </div>
+
+                <div className="form-row-2">
+                  <div className="form-field">
+                    <label htmlFor="c-name">Full Name <span className="required-star">*</span></label>
+                    <input
+                      id="c-name" name="name" type="text"
+                      placeholder="Dr. Jane Smith"
+                      value={formState.name} onChange={handleChange} required
+                    />
                   </div>
-                  <div className="form-group">
-                    <label htmlFor="email">Email Address *</label>
-                    <input type="email" id="email" name="email" placeholder="your@email.com" required />
+                  <div className="form-field">
+                    <label htmlFor="c-email">Official Email <span className="required-star">*</span></label>
+                    <input
+                      id="c-email" name="email" type="email"
+                      placeholder="jane@university.edu"
+                      value={formState.email} onChange={handleChange} required
+                    />
                   </div>
                 </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="phone">Phone Number</label>
-                    <input type="tel" id="phone" name="phone" placeholder="+91 98765 43210" />
+
+                <div className="form-row-2">
+                  <div className="form-field">
+                    <label htmlFor="c-institution">Institution Name <span className="required-star">*</span></label>
+                    <input
+                      id="c-institution" name="institution" type="text"
+                      placeholder="Apex University"
+                      value={formState.institution} onChange={handleChange} required
+                    />
                   </div>
-                  <div className="form-group">
-                    <label htmlFor="institution">Institution Name</label>
-                    <input type="text" id="institution" name="institution" placeholder="Your institution name" />
+                  <div className="form-field">
+                    <label htmlFor="c-role">Your Role</label>
+                    <input
+                      id="c-role" name="role" type="text"
+                      placeholder="Dean / Exam Controller / IT Admin"
+                      value={formState.role} onChange={handleChange}
+                    />
                   </div>
                 </div>
-                
-                <div className="form-group">
-                  <label htmlFor="subject">Subject *</label>
-                  <select id="subject" name="subject" required>
-                    <option value="">Select a subject</option>
-                    <option value="general">General Inquiry</option>
-                    <option value="demo">Request Demo</option>
-                    <option value="support">Technical Support</option>
-                    <option value="billing">Billing Question</option>
-                    <option value="partnership">Partnership Opportunity</option>
-                  </select>
+
+                <div className="form-row-2">
+                  <div className="form-field">
+                    <label htmlFor="c-phone">Phone Number</label>
+                    <input
+                      id="c-phone" name="phone" type="tel"
+                      placeholder="+91 98765 43210"
+                      value={formState.phone} onChange={handleChange}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="c-reason">Reason for Contact <span className="required-star">*</span></label>
+                    <select
+                      id="c-reason" name="reason"
+                      value={formState.reason} onChange={handleChange} required
+                    >
+                      {contactReasons.map(r => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                
-                <div className="form-group">
-                  <label htmlFor="message">Message *</label>
-                  <textarea id="message" name="message" rows="6" placeholder="Tell us about your exam monitoring needs or questions..." required></textarea>
+
+                <div className="form-field">
+                  <label htmlFor="c-message">Message <span className="required-star">*</span></label>
+                  <textarea
+                    id="c-message" name="message" rows={5}
+                    placeholder="Tell us about your institution's exam setup, scale, current challenges, and what you'd like to achieve with ExamShield..."
+                    value={formState.message} onChange={handleChange} required
+                  />
                 </div>
-                
-                <div className="form-checkbox">
-                  <input type="checkbox" id="newsletter" name="newsletter" />
-                  <label htmlFor="newsletter">I'd like to receive updates about Exam Monitoring</label>
-                </div>
-                
-                <button type="submit" className="contact-submit-button">
-                  Send Message
-                  <ArrowRight size={16} />
+
+                <label className="contact-newsletter-check">
+                  <input
+                    type="checkbox" name="newsletter"
+                    checked={formState.newsletter} onChange={handleChange}
+                  />
+                  <span>Receive platform updates, new feature announcements, and academic integrity insights</span>
+                </label>
+
+                <button type="submit" className="contact-submit-btn">
+                  Send Inquiry
+                  <ArrowRight size={16} aria-hidden="true" />
                 </button>
+
+                <p className="contact-form-privacy">
+                  <ShieldCheck size={13} aria-hidden="true" />
+                  Your data is protected under GDPR and FERPA. We never share institutional details with third parties.
+                </p>
               </form>
-            </div>
+            )}
           </div>
         </div>
       </section>
 
-      <section className="public-shell contact-cta-section" aria-labelledby="contact-cta-heading">
-        <div className="contact-cta-content">
-          <h2 id="contact-cta-heading">Ready to Get Started?</h2>
-          <p>Join thousands of institutions using our secure exam monitoring platform.</p>
-          <div className="contact-cta-actions">
-            <Link to="/admin/register" className="contact-cta-primary">
-              Start Free Trial
-              <ArrowRight size={16} />
+      {/* Final CTA */}
+      <section className="public-shell contact-final-cta" aria-labelledby="contact-final-cta-heading">
+        <div className="contact-final-inner">
+          <h2 id="contact-final-cta-heading">Prefer to start immediately?</h2>
+          <p>Register your institution and configure your first exam in under 15 minutes — no sales call required.</p>
+          <div className="contact-final-actions">
+            <Link to="/admin/register" className="feat-cta-primary">
+              <Building2 size={16} aria-hidden="true" />
+              Start Institutional Trial
+              <ArrowRight size={16} aria-hidden="true" />
             </Link>
-            <Link to="/pricing" className="contact-cta-secondary">
-              View Pricing
-              <ArrowRight size={16} />
+            <Link to="/features" className="feat-cta-secondary">
+              Explore Platform Features
+              <ChevronRight size={16} aria-hidden="true" />
             </Link>
           </div>
         </div>

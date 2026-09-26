@@ -2,6 +2,7 @@
 const { supabase } = require('../config/supabase-clean');
 const { sendExamNotification, sendExamReminder } = require('../services/emailService');
 const { v4: uuidv4 } = require('uuid');
+const { parseToIST, toISTISOString, formatIST, getExamWindowStatus } = require('../utils/timezone');
 
 /**
  * Generate unique exam code
@@ -22,6 +23,99 @@ const generateExamCode = () => {
   return code;
 };
 
+/**
+ * Format and normalize question for student exam room
+ * Guarantees all coding metadata (problem statement, input/output format, constraints, examples, test cases)
+ * are thoroughly unpacked and accessible.
+ */
+const formatQuestionForStudent = (q) => {
+  if (!q) return null;
+  let parsedOptions = q.options;
+  let meta = {};
+
+  if (typeof parsedOptions === 'string') {
+    try {
+      const parsed = JSON.parse(parsedOptions);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        meta = parsed;
+        parsedOptions = [];
+      } else if (Array.isArray(parsed)) {
+        parsedOptions = parsed;
+      }
+    } catch (e) {
+      parsedOptions = [];
+    }
+  } else if (parsedOptions && typeof parsedOptions === 'object') {
+    if (Array.isArray(parsedOptions)) {
+      parsedOptions = parsedOptions;
+    } else {
+      meta = parsedOptions;
+      parsedOptions = [];
+    }
+  }
+
+  let parsedTestCases = q.test_cases || q.testCases || meta.testCases || meta.test_cases || [];
+  if (typeof parsedTestCases === 'string') {
+    try {
+      parsedTestCases = JSON.parse(parsedTestCases);
+    } catch (e) {
+      parsedTestCases = [];
+    }
+  }
+
+  let parsedExamples = q.examples || meta.examples || [];
+  if (typeof parsedExamples === 'string') {
+    try {
+      parsedExamples = JSON.parse(parsedExamples);
+    } catch (e) {
+      parsedExamples = [];
+    }
+  }
+
+  // Cross-pollinate: if no test cases but examples exist, use examples as test cases; if no examples, use test cases
+  if ((!parsedTestCases || parsedTestCases.length === 0) && Array.isArray(parsedExamples) && parsedExamples.length > 0) {
+    parsedTestCases = parsedExamples;
+  }
+  if ((!parsedExamples || parsedExamples.length === 0) && Array.isArray(parsedTestCases) && parsedTestCases.length > 0) {
+    parsedExamples = parsedTestCases;
+  }
+
+  const isCoding = q.type === 'coding' ||
+    !!q.problemStatement ||
+    !!meta.problemStatement ||
+    (Array.isArray(parsedTestCases) && parsedTestCases.length > 0) ||
+    (Array.isArray(parsedExamples) && parsedExamples.length > 0);
+
+  const cleanTitle = q.title || meta.title ||
+    (q.question_text ? q.question_text.split('\n')[0].replace(/^#+\s*/, '').replace(/^[Q0-9:.-]+\s*/, '') : 'Coding Challenge');
+
+  const problemStatement = q.problemStatement || meta.problemStatement || q.question_text || 'Problem Statement';
+
+  return {
+    id: q.id,
+    title: cleanTitle,
+    question_text: q.question_text || problemStatement,
+    problemStatement: problemStatement,
+    inputFormat: q.inputFormat || meta.inputFormat || '',
+    outputFormat: q.outputFormat || meta.outputFormat || '',
+    constraints: Array.isArray(q.constraints) ? q.constraints : (meta.constraints || []),
+    examples: parsedExamples,
+    testCases: parsedTestCases,
+    hints: Array.isArray(q.hints) ? q.hints : (meta.hints || []),
+    solutionApproach: q.solutionApproach || meta.solutionApproach || '',
+    timeComplexity: q.timeComplexity || meta.timeComplexity || '',
+    spaceComplexity: q.spaceComplexity || meta.spaceComplexity || '',
+    allowedLanguages: q.allowedLanguages || meta.allowedLanguages || ['javascript', 'python', 'java', 'cpp'],
+    type: isCoding ? 'coding' : (q.type || 'mcq'),
+    options: parsedOptions,
+    marks: q.marks || (isCoding ? 10 : 1),
+    order_index: q.order_index,
+    code_template: q.code_template || q.codeTemplate || meta.codeTemplate || null,
+    time_limit: q.time_limit || q.timeLimit || meta.timeLimit || 2000,
+    difficulty: q.difficulty || meta.difficulty || 'medium'
+  };
+};
+
 // Async function to process exam data without blocking the response
 const processExamDataAsync = async (examId, questions, studentQuestionSets, studentIds, examQuestionRandomization) => {
   console.log('Processing exam data asynchronously for exam:', examId);
@@ -31,25 +125,61 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
     if (questions && questions.length > 0) {
       try {
         const questionsToInsert = questions.map((q, index) => {
-          // Robustly handle question data from various potential formats
-          const questionText = q.questionText || q.description || q.title || q.question;
-          const type = q.type || 'mcq';
-          const marks = q.marks || 10;
+          // Robustly detect coding questions vs MCQ
+          const isCoding = q.type === 'coding' || !!q.problemStatement || !!q.problem_statement ||
+            (Array.isArray(q.testCases) && q.testCases.length > 0) ||
+            (Array.isArray(q.test_cases) && q.test_cases.length > 0) ||
+            (Array.isArray(q.examples) && q.examples.length > 0);
+          const type = isCoding ? 'coding' : (q.type || 'mcq');
+          const marks = q.marks || (type === 'coding' ? 10 : 1);
           const correctAnswer = q.correctAnswer || q.answer || q.correct_answer || null;
-          const options = q.options || [];
-          const codeTemplate = q.codeTemplate || q.code_template || null;
-          const timeLimit = q.timeLimit || q.time_limit || null;
+          const codeTemplate = q.codeTemplate || q.code_template || q.solutionCode || null;
+          const timeLimit = q.timeLimit || q.time_limit || (type === 'coding' ? 2000 : null);
+          const difficulty = q.difficulty || 'medium';
+
+          // Extract primary question text
+          const questionText = q.problemStatement || q.problem_statement || q.questionText || q.question_text || q.description || q.title || q.question || 'Coding Problem';
+
+          // Test cases payload
+          const rawTestCases = q.testCases || q.test_cases || q.examples || [];
+          const testCasesJson = Array.isArray(rawTestCases) && rawTestCases.length > 0
+            ? JSON.stringify(rawTestCases)
+            : (typeof rawTestCases === 'string' ? rawTestCases : null);
+
+          // Rich options payload (stores structured coding fields for pristine rendering)
+          let optionsPayload;
+          if (isCoding) {
+            optionsPayload = JSON.stringify({
+              title: q.title || '',
+              problemStatement: q.problemStatement || q.problem_statement || questionText,
+              inputFormat: q.inputFormat || q.input_format || '',
+              outputFormat: q.outputFormat || q.output_format || '',
+              constraints: Array.isArray(q.constraints) ? q.constraints : (q.constraints ? [q.constraints] : []),
+              examples: Array.isArray(q.examples) ? q.examples : [],
+              testCases: Array.isArray(q.testCases) ? q.testCases : (Array.isArray(q.test_cases) ? q.test_cases : []),
+              hints: Array.isArray(q.hints) ? q.hints : [],
+              solutionApproach: q.solutionApproach || q.solution_approach || '',
+              timeComplexity: q.timeComplexity || '',
+              spaceComplexity: q.spaceComplexity || '',
+              allowedLanguages: q.allowedLanguages || ['javascript', 'python', 'java', 'cpp']
+            });
+          } else {
+            const options = q.options || [];
+            optionsPayload = typeof options === 'string' ? options : JSON.stringify(options);
+          }
 
           return {
             exam_id: examId,
             question_text: questionText,
             type: type,
             marks: marks,
-            options: typeof options === 'string' ? options : JSON.stringify(options),
+            options: optionsPayload,
             correct_answer: correctAnswer,
             order_index: index + 1,
             code_template: codeTemplate,
-            time_limit: timeLimit
+            time_limit: timeLimit,
+            difficulty: difficulty,
+            test_cases: testCasesJson
           };
         });
 
@@ -386,7 +516,7 @@ exports.createExam = async (req, res) => {
 
     // Set default values for missing required fields
     const examType = type || 'mcq';
-    const examDateTime = dateTime || new Date().toISOString();
+    const examDateTime = dateTime ? toISTISOString(dateTime) : toISTISOString(new Date());
     const examDuration = duration || 60;
     const examTotalMarks = totalMarks || 100;
     const examSubject = subject || 'General';
@@ -536,7 +666,7 @@ exports.updateExam = async (req, res) => {
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (subject !== undefined) updateData.subject = subject;
-    if (dateTime !== undefined) updateData.date_time = dateTime;
+    if (dateTime !== undefined) updateData.date_time = toISTISOString(dateTime);
     if (duration !== undefined) updateData.duration = duration;
     if (totalMarks !== undefined) updateData.total_marks = totalMarks;
     if (passingMarks !== undefined) updateData.passing_marks = passingMarks;
@@ -812,15 +942,21 @@ exports.addQuestions = async (req, res) => {
     console.log('📊 Backend: Existing questions count:', existingQuestionCount);
 
     // Prepare questions for Supabase insertion (only using existing columns)
-    const questionsToInsert = questions.map((q, i) => ({
-      exam_id: id,
-      question_text: q.questionText,
-      type: q.type,
-      options: q.options ? JSON.stringify(q.options) : null,
-      correct_answer: q.correctAnswer,
-      marks: q.marks || 1,
-      order_index: i
-    }));
+    const questionsToInsert = questions.map((q, i) => {
+      let qType = (q.type || q.questionType || q.question_type || 'mcq').toLowerCase();
+      if (qType === 'multiple_choice' || qType === 'multiple-choice') qType = 'mcq';
+      if (!['mcq', 'subjective', 'coding', 'true_false'].includes(qType)) qType = 'mcq';
+
+      return {
+        exam_id: id,
+        question_text: q.questionText || q.question_text || q.text,
+        type: qType,
+        options: q.options ? (typeof q.options === 'string' ? q.options : JSON.stringify(q.options)) : null,
+        correct_answer: q.correctAnswer || q.correct_answer || '',
+        marks: q.marks || 1,
+        order_index: q.orderIndex || q.order_index || i
+      };
+    });
 
     console.log('📝 Backend: Prepared questions for insertion:', questionsToInsert.length);
 
@@ -1082,7 +1218,7 @@ exports.getStudentExams = async (req, res) => {
       .from('exams')
       .select(`
         id, title, type, subject, date_time, duration, total_marks,
-        status, is_proctored, instructions, created_at
+        status, is_proctored, instructions, created_at, exam_code, exam_key
       `)
       .eq('college_id', collegeId)
       .in('status', ['draft', 'published', 'active', 'completed'])
@@ -1122,7 +1258,7 @@ exports.getExamDetails = async (req, res) => {
       .select(`
         id, title, type, subject, date_time, duration, total_marks,
         passing_marks, status, is_proctored, instructions,
-        max_violations, created_at, updated_at
+        max_violations, created_at, updated_at, exam_code, exam_key
       `)
       .eq('id', id)
       .eq('college_id', collegeId)
@@ -1228,9 +1364,9 @@ exports.startExam = async (req, res) => {
     // Validate exam key (check both exam_code and exam_key)
     const validKeys = [examData.exam_code, examData.exam_key]
       .filter(Boolean)
-      .map(k => String(k).toUpperCase());
+      .map(k => String(k).trim().toUpperCase());
       
-    if (!validKeys.includes(String(examKey).toUpperCase())) {
+    if (!validKeys.includes(String(examKey || '').trim().toUpperCase())) {
       console.log('❌ Backend: Invalid exam key:', {
         expected: validKeys,
         received: examKey,
@@ -1247,53 +1383,46 @@ exports.startExam = async (req, res) => {
 
     console.log('✅ Backend: Exam key validated successfully');
 
-    // Check if exam is active (within time window)
-    const now = new Date();
-    
-    // Postgres timestamp without timezone causes Render (UTC) to drift by 5.5 hours from India.
-    let dateStr = examData.date_time;
-    if (dateStr) {
-      dateStr = dateStr.replace(' ', 'T');
-      if (!dateStr.endsWith('Z') && !dateStr.includes('+')) {
-        dateStr = `${dateStr}+05:30`;
-      }
-    }
-    const examStart = new Date(dateStr);
-    const examEnd = new Date(examStart.getTime() + examData.duration * 60000);
+    // Check if exam is active (within time window) strictly evaluated in IST
+    const windowStatus = getExamWindowStatus(examData.date_time, examData.duration || 60, 15);
 
-    console.log('⏰ Backend: Exam timing check:', {
-      now: now.toISOString(),
-      examStart: examStart.toISOString(),
-      examEnd: examEnd.toISOString(),
-      isBeforeStart: now < examStart,
-      isAfterEnd: now > examEnd
+    console.log('⏰ Backend: Exam timing check (IST):', {
+      nowIST: formatIST(windowStatus.now, 'full'),
+      examStartIST: windowStatus.formattedStart,
+      examEndIST: windowStatus.formattedEnd,
+      isBeforeStart: windowStatus.isBeforeStart,
+      isBeforeEarlyAccess: windowStatus.isBeforeEarlyAccess,
+      isLive: windowStatus.isLive,
+      isEnded: windowStatus.isEnded,
     });
 
     console.log('✅ Backend: Exam timing validated');
 
-    const timeWindowStart = examStart;
-    const timeWindowEnd = new Date(examStart.getTime() + examData.duration * 60000);
+    // Timing validation:
+    // Allow starting if:
+    // 1. In development mode OR
+    // 2. Exam is in draft/active/published status OR
+    // 3. Current time is within acceptable start window
+    const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+    const canBypassStrictWindow = isDev || examData.status === 'draft' || examData.status === 'active';
 
-    console.log('⏰ Backend: Strict timing check:', {
-      timeWindowStart: timeWindowStart.toISOString(),
-      timeWindowEnd: timeWindowEnd.toISOString(),
-      now: now.toISOString(),
-      canStart: now >= timeWindowStart && now <= timeWindowEnd
-    });
-
-    // Only enforce timing validation if the exam has specific timing requirements
-    if (examData.date_time && examData.duration) {
-      if (now < timeWindowStart) {
+    if (examData.date_time && !canBypassStrictWindow) {
+      if (windowStatus.isBeforeEarlyAccess) {
         console.log('❌ Backend: Exam not accessible yet. Returning 400 ERROR.');
-        return res.status(400).json({ success: false, message: `Exam accessible from ${timeWindowStart.toLocaleString()}.` });
+        return res.status(400).json({
+          success: false,
+          message: `Exam scheduled for ${windowStatus.formattedStart}. Accessible from ${formatIST(windowStatus.earlyAccessTime, 'timeOnly')} IST.`
+        });
       }
 
-      if (now > timeWindowEnd) {
+      // Allow access throughout the exam day / 24 hours window unless exam is explicitly marked completed
+      const generousWindowEnd = windowStatus.startTime + Math.max((examData.duration || 60) * 60000 * 4, 24 * 3600000);
+      if (windowStatus.now > generousWindowEnd && examData.status !== 'published') {
         console.log('❌ Backend: Exam access window closed. Returning 400 ERROR.');
         return res.status(400).json({ success: false, message: 'Exam access period has ended.' });
       }
     } else {
-      console.log('📝 Backend: No timing constraints, allowing exam start');
+      console.log('📝 Backend: Flexible / active timing mode, allowing exam start');
     }
 
     // Check for existing session using Supabase
@@ -1310,15 +1439,17 @@ exports.startExam = async (req, res) => {
         return res.status(400).json({ success: false, message: 'You have already submitted this exam.' });
       }
       // Resume existing session
-      const { data: questions, error: questionsError } = await supabase
+      const { data: rawQuestions, error: questionsError } = await supabase
         .from('questions')
-        .select('id, question_text, type, options, marks, order_index, code_template, time_limit')
+        .select('id, question_text, type, options, marks, order_index, code_template, time_limit, difficulty, test_cases')
         .eq('exam_id', id)
         .order('order_index');
       const { data: answers, error: answersError } = await supabase
         .from('answers')
         .select('question_id, answer_text, selected_option, code_submission, selected_language')
         .eq('session_id', existingSession.id);
+
+      const questions = (rawQuestions || []).map(formatQuestionForStudent);
 
       return res.json({
         success: true,
@@ -1375,17 +1506,12 @@ exports.startExam = async (req, res) => {
       if (!setErr && randomizedSet && randomizedSet.length > 0) {
         console.log(`✅ Backend: Found ${randomizedSet.length} randomized questions`);
         questions = randomizedSet.map(item => {
-          const qData = item.question_data;
-          return {
+          const qData = item.question_data || {};
+          return formatQuestionForStudent({
+            ...qData,
             id: qData.id || item.id,
-            question_text: qData.questionText || qData.question_text || qData.description || 'Missing text',
-            type: qData.type || qData.question_type || 'mcq',
-            options: qData.options || [],
-            marks: qData.marks || 1,
             order_index: item.question_order,
-            code_template: qData.codeTemplate || qData.code_template,
-            time_limit: qData.timeLimit || qData.time_limit
-          };
+          });
         });
       } else {
         console.log('⚠️ Backend: No randomized set found for student, falling back to master list');
@@ -1397,11 +1523,11 @@ exports.startExam = async (req, res) => {
       console.log('🗄️ Backend: Fetching questions from master table...');
       const { data: masterQuestions, error: mErr } = await supabase
         .from('questions')
-        .select('id, question_text, type, options, marks, order_index, code_template, time_limit')
+        .select('id, question_text, type, options, marks, order_index, code_template, time_limit, difficulty, test_cases')
         .eq('exam_id', id)
         .order('order_index');
       
-      questions = masterQuestions;
+      questions = (masterQuestions || []).map(formatQuestionForStudent);
       questionsError = mErr;
     }
 
@@ -1427,29 +1553,7 @@ exports.startExam = async (req, res) => {
             
             if (Array.isArray(parsedQuestions) && parsedQuestions.length > 0) {
               console.log(`✅ Found ${parsedQuestions.length} questions in description fallback`);
-              
-              questions = parsedQuestions.map((q, idx) => {
-                let parsedOptions = [];
-                try {
-                  if (typeof q.options === 'string') {
-                    parsedOptions = JSON.parse(q.options);
-                  } else if (Array.isArray(q.options)) {
-                    parsedOptions = q.options;
-                  }
-                } catch (e) {
-                  parsedOptions = [];
-                }
-
-                return {
-                  id: q.id || `fallback-${idx}`,
-                  question_text: q.questionText || q.description || q.title || q.question || 'Missing question text',
-                  type: q.type || 'mcq',
-                  options: parsedOptions,
-                  marks: q.marks || 1,
-                  order_index: idx + 1,
-                  correct_answer: q.correctAnswer || null
-                };
-              });
+              questions = parsedQuestions.map(formatQuestionForStudent);
             }
           }
         } catch (e) {
@@ -1876,3 +1980,49 @@ exports.reportViolation = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to report violation', error: error.message });
   }
 };
+
+/**
+ * GET /api/admin/exams/:id/questions
+ */
+exports.getExamQuestions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: questions, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('exam_id', id)
+      .order('order_index', { ascending: true });
+
+    if (error) {
+      return res.status(500).json({ success: false, message: 'Failed to get questions', error: error.message });
+    }
+
+    res.json({ success: true, data: questions || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+
+/**
+ * DELETE /api/admin/exams/:id/questions/:questionId
+ */
+exports.deleteQuestion = async (req, res) => {
+  try {
+    const { id, questionId } = req.params;
+    const { error } = await supabase
+      .from('questions')
+      .delete()
+      .eq('id', questionId)
+      .eq('exam_id', id);
+
+    if (error) {
+      return res.status(500).json({ success: false, message: 'Failed to delete question', error: error.message });
+    }
+
+    res.json({ success: true, message: 'Question deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+

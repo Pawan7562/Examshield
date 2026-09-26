@@ -1,5 +1,5 @@
-// create-admin-controller.js - Create admin controller with Supabase
 const { supabase } = require('../config/supabase');
+const { toISTISOString } = require('../utils/timezone');
 
 exports.getDashboard = async (req, res) => {
   try {
@@ -15,7 +15,7 @@ exports.getDashboard = async (req, res) => {
       supabase.from('students').select('*', { count: 'exact', head: true }).eq('college_id', collegeId),
       supabase.from('exams').select('*', { count: 'exact', head: true }).eq('college_id', collegeId),
       supabase.from('results').select('*', { count: 'exact', head: true }),
-      supabase.from('exams').select('*').eq('college_id', collegeId).in('status', ['published', 'active']).gt('date_time', new Date().toISOString()).order('date_time', { ascending: true }).limit(5)
+      supabase.from('exams').select('*').eq('college_id', collegeId).in('status', ['published', 'active']).gt('date_time', toISTISOString(new Date())).order('date_time', { ascending: true }).limit(5)
     ]);
     
     res.json({

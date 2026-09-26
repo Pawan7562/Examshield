@@ -1,5 +1,5 @@
 // src/pages/admin/Settings.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import {
@@ -11,18 +11,12 @@ import {
   Save,
   Eye,
   EyeOff,
-  Building2,
-  Globe,
-  Phone,
-  MapPin,
-  Calendar,
   CheckCircle,
   AlertTriangle,
   Trash2,
   LogOut,
   Settings as SettingsIcon,
   Palette,
-  Monitor,
   ChevronRight,
   Info,
   Key,
@@ -44,15 +38,15 @@ const SectionTab = ({ id, icon: Icon, label, active, onClick }) => (
       padding: '0.85rem 1.25rem',
       borderRadius: '12px',
       border: 'none',
-      background: active ? 'rgba(233,69,96,0.12)' : 'transparent',
-      color: active ? '#e94560' : '#64748b',
+      background: active ? 'rgba(10,116,218,0.12)' : 'transparent',
+      color: active ? '#0a74da' : '#64748b',
       fontWeight: active ? 700 : 500,
       fontSize: '0.92rem',
       cursor: 'pointer',
       width: '100%',
       textAlign: 'left',
       transition: 'all 0.2s ease',
-      borderLeft: active ? '3px solid #e94560' : '3px solid transparent',
+      borderLeft: active ? '3px solid #0a74da' : '3px solid transparent',
     }}
   >
     <Icon size={18} />
@@ -117,7 +111,7 @@ const Toggle = ({ checked, onChange, label, subLabel }) => (
         border: 'none',
         cursor: 'pointer',
         padding: 0,
-        color: checked ? '#e94560' : '#cbd5e1',
+        color: checked ? '#0a74da' : '#cbd5e1',
         transition: 'color 0.2s',
         flexShrink: 0,
       }}
@@ -137,7 +131,7 @@ const SaveButton = ({ loading, onClick }) => (
       gap: '0.5rem',
       padding: '0.75rem 2rem',
       borderRadius: '12px',
-      background: 'linear-gradient(135deg, #e94560 0%, #9b2335 100%)',
+      background: 'linear-gradient(135deg, #0a74da 0%, #0656a3 100%)',
       color: 'white',
       fontWeight: 700,
       fontSize: '0.92rem',
@@ -145,7 +139,7 @@ const SaveButton = ({ loading, onClick }) => (
       cursor: loading ? 'not-allowed' : 'pointer',
       opacity: loading ? 0.7 : 1,
       transition: 'all 0.3s ease',
-      boxShadow: '0 4px 14px rgba(233,69,96,0.3)',
+      boxShadow: '0 4px 14px rgba(10,116,218,0.3)',
     }}
   >
     <Save size={18} />
@@ -187,14 +181,14 @@ const ProfileSection = ({ user }) => {
         padding: '1.5rem',
         background: 'linear-gradient(135deg, rgba(233,69,96,0.05) 0%, rgba(139,92,246,0.05) 100%)',
         borderRadius: '16px',
-        border: '1.5px solid rgba(233,69,96,0.12)',
+        border: '1.5px solid rgba(10,116,218,0.12)',
         marginBottom: '2rem',
       }}>
         <div style={{
           width: 80,
           height: 80,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #e94560, #9b2335)',
+          background: 'linear-gradient(135deg, #0a74da, #0656a3)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -202,7 +196,7 @@ const ProfileSection = ({ user }) => {
           fontWeight: 800,
           color: 'white',
           flexShrink: 0,
-          boxShadow: '0 8px 24px rgba(233,69,96,0.3)',
+          boxShadow: '0 8px 24px rgba(10,116,218,0.3)',
         }}>{initials}</div>
         <div>
           <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b' }}>{form.name || 'Admin User'}</div>
@@ -312,7 +306,7 @@ const SecuritySection = () => {
       {/* Password card */}
       <div style={{ background: '#f8fafc', borderRadius: '16px', border: '1.5px solid #e2e8f0', padding: '1.75rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-          <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'linear-gradient(135deg, #e94560, #9b2335)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+          <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'linear-gradient(135deg, #0a74da, #0656a3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
             <Key size={18} />
           </div>
           <div>
@@ -580,8 +574,6 @@ const PreferencesSection = () => {
    Section: Danger Zone
 ───────────────────────────────────────────── */
 const DangerSection = () => {
-  const [confirmText, setConfirmText] = useState('');
-
   const DangerCard = ({ icon: Icon, title, description, buttonLabel, buttonColor = '#ef4444', onClick, requireConfirm }) => (
     <div style={{
       borderRadius: '16px',
@@ -693,7 +685,7 @@ const Settings = () => {
       <div className="admin-welcome-section" style={{ marginBottom: '2rem' }}>
         <div className="admin-welcome-content">
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <SettingsIcon size={28} color="#e94560" />
+            <SettingsIcon size={28} color="#0a74da" />
             Settings
           </h1>
           <p>Manage your account, security, and platform preferences</p>
@@ -751,9 +743,9 @@ const Settings = () => {
                 width: 42, height: 42, borderRadius: '10px',
                 background: activeTab === 'danger'
                   ? 'rgba(239,68,68,0.1)'
-                  : 'linear-gradient(135deg, rgba(233,69,96,0.1), rgba(139,92,246,0.1))',
+                  : 'linear-gradient(135deg, rgba(10,116,218,0.1), rgba(99,102,241,0.1))',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: activeTab === 'danger' ? '#ef4444' : '#e94560',
+                color: activeTab === 'danger' ? '#ef4444' : '#0a74da',
               }}>
                 <currentTab.icon size={20} />
               </div>

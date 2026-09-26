@@ -4,9 +4,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import CodingQuestionForm from '../../components/CodingQuestionForm';
+import { formatIST, toISTISOString } from '../../utils/timezone';
 import { 
   FileText, 
-  Plus, 
   ChevronLeft, 
   ChevronRight, 
   CheckCircle, 
@@ -18,12 +18,14 @@ import {
   Trash2, 
   Code, 
   HelpCircle, 
-  BookOpen,
-  Award,
-  Shield,
-  AlertCircle
+  BookOpen, 
+  Award, 
+  Shield, 
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
+import './CreateExam.css';
 
 const steps = ['Exam Details', 'Questions', 'Students', 'Review'];
 
@@ -240,18 +242,34 @@ export default function CreateExam() {
   const [questions, setQuestions] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState([]);
+  const [studentSearch, setStudentSearch] = useState('');
   const [loading, setLoading] = useState(false);
-  const [examId, setExamId] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     adminAPI.getStudents({ limit: 500 }).then(res => setAllStudents(res.data.students)).catch(() => {});
     
-    // Handle questions passed from AI Generator
-    if (location.state?.questions) {
-      setQuestions(location.state.questions);
-      toast.success(`Loaded ${location.state.questions.length} questions from AI Generator`);
+    // Handle questions passed from AI Generator (sessionStorage or location.state)
+    let qs = null;
+    try {
+      const sessionQs = sessionStorage.getItem('ai_generated_exam_questions');
+      if (sessionQs) {
+        qs = JSON.parse(sessionQs);
+        sessionStorage.removeItem('ai_generated_exam_questions');
+      }
+    } catch (_) {}
+
+    if (!qs && location.state?.questions) {
+      qs = location.state.questions;
+    }
+
+    if (Array.isArray(qs) && qs.length > 0) {
+      setQuestions(qs);
+      if (qs.some(q => q.type === 'coding')) {
+        setDetails(d => ({ ...d, type: 'coding' }));
+      }
+      toast.success(`Loaded ${qs.length} questions from AI Generator`);
     }
   }, [location.state]);
 
@@ -269,21 +287,30 @@ export default function CreateExam() {
   const toggleStudent = (id) => setSelectedStudents(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
   const toggleAll = () => setSelectedStudents(s => s.length === allStudents.length ? [] : allStudents.map(s => s.id));
 
+  const filteredStudents = allStudents.filter(s => {
+    if (!studentSearch.trim()) return true;
+    const q = studentSearch.toLowerCase();
+    return (s.name || '').toLowerCase().includes(q) ||
+      (s.email || '').toLowerCase().includes(q) ||
+      (s.roll_no || '').toLowerCase().includes(q) ||
+      (s.student_id || '').toLowerCase().includes(q);
+  });
+
   const totalCalc = questions.reduce((sum, q) => sum + (parseInt(q.marks) || 0), 0);
 
   const handleCreate = async () => {
     if (!details.name || !details.dateTime || !details.duration) return toast.error('Fill all required exam details');
     setLoading(true);
     try {
-      const res = await adminAPI.createExam({
+      await adminAPI.createExam({
         ...details,
+        dateTime: toISTISOString(details.dateTime),
         totalMarks: totalCalc || parseInt(details.totalMarks),
         passingMarks: parseInt(details.passingMarks),
         duration: parseInt(details.duration),
         questions,
         studentIds: selectedStudents,
       });
-      setExamId(res.data.id);
       toast.success('Exam created successfully!');
       navigate('/admin/exams');
     } catch (err) {
@@ -475,9 +502,16 @@ export default function CreateExam() {
             <div className="admin-step-section">
               <div className="admin-students-header">
                 <div className="admin-students-info">
-                  <h2 className="admin-step-title">Assign Students</h2>
+                  <h2 className="admin-step-title">
+                    <Users size={22} color="#0a74da" /> Assign Students
+                  </h2>
                   <p className="admin-students-count">
-                    {selectedStudents.length}/{allStudents.length} Students Selected
+                    <span>{selectedStudents.length} of {allStudents.length} Students Selected</span>
+                    {selectedStudents.length > 0 && (
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>
+                        ({Math.round((selectedStudents.length / (allStudents.length || 1)) * 100)}% enrolled)
+                      </span>
+                    )}
                   </p>
                 </div>
                 <Button 
@@ -488,22 +522,51 @@ export default function CreateExam() {
                   {selectedStudents.length === allStudents.length ? 'Deselect All' : 'Select All'}
                 </Button>
               </div>
+
+              {/* Candidate Search Bar */}
+              <div className="admin-students-toolbar">
+                <div className="admin-student-search-box">
+                  <Search size={16} className="admin-student-search-icon" />
+                  <input 
+                    type="text"
+                    placeholder="Search candidate name, roll number, student ID, or email..."
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    className="admin-student-search-input"
+                  />
+                </div>
+              </div>
               
               <div className="admin-students-list">
-                {allStudents.map(s => (
-                  <label key={s.id} className={`admin-student-item ${selectedStudents.includes(s.id) ? 'selected' : ''}`}>
-                    <input 
-                      type="checkbox" 
-                      checked={selectedStudents.includes(s.id)} 
-                      onChange={() => toggleStudent(s.id)} 
-                      className="admin-student-checkbox"
-                    />
-                    <div className="admin-student-info">
-                      <div className="admin-student-name">{s.name}</div>
-                      <div className="admin-student-meta">{s.student_id} · {s.roll_no}</div>
-                    </div>
-                  </label>
-                ))}
+                {filteredStudents.length === 0 ? (
+                  <div style={{ gridColumn: '1 / -1', padding: '36px', textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: '12px' }}>
+                    No students match "{studentSearch}". Try a different search term.
+                  </div>
+                ) : (
+                  filteredStudents.map(s => {
+                    const isSelected = selectedStudents.includes(s.id);
+                    const initials = (s.name || 'ST').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+                    return (
+                      <label key={s.id} className={`admin-student-item ${isSelected ? 'selected' : ''}`}>
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={() => toggleStudent(s.id)} 
+                          className="admin-student-checkbox"
+                        />
+                        <div className="admin-student-avatar">
+                          {initials}
+                        </div>
+                        <div className="admin-student-info">
+                          <div className="admin-student-name" title={s.name}>{s.name}</div>
+                          <div className="admin-student-meta">
+                            {s.student_id || s.roll_no ? `${s.student_id || ''}${s.student_id && s.roll_no ? ' · ' : ''}${s.roll_no || ''}` : s.email}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -511,29 +574,55 @@ export default function CreateExam() {
           {/* Step 3: Review */}
           {step === 3 && (
             <div className="admin-step-section">
-              <h2 className="admin-step-title">Review & Create</h2>
+              <div className="admin-review-hero-card">
+                <div className="admin-review-hero-info">
+                  <div className="admin-review-hero-title">{details.name || 'Untitled Assessment'}</div>
+                  <div className="admin-review-hero-sub">
+                    {details.subject ? `Subject: ${details.subject}` : 'Enterprise Assessment'} · Verified Configuration
+                  </div>
+                </div>
+                <div className="admin-review-hero-badges">
+                  <span className="admin-review-pill type">{details.type} MODE</span>
+                  <span className="admin-review-pill proctor">
+                    <Shield size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                    {details.isProctored ? 'AI PROCTORING ACTIVE' : 'UNPROCTORED'}
+                  </span>
+                </div>
+              </div>
+
               <div className="admin-review-grid">
                 {[
-                  ['Exam Name', details.name, FileText],
-                  ['Type', details.type.toUpperCase(), Settings],
+                  ['Exam Name', details.name || 'Untitled Exam', FileText],
+                  ['Assessment Type', details.type.toUpperCase(), Settings],
                   ['Subject', details.subject || '—', BookOpen],
-                  ['Date & Time', details.dateTime, Calendar],
-                  ['Duration', `${details.duration} minutes`, Clock],
-                  ['Total Marks', totalCalc || details.totalMarks, Award],
-                  ['Passing Marks', details.passingMarks, CheckCircle],
-                  ['Questions', questions.length, HelpCircle],
-                  ['Students', `${selectedStudents.length} assigned`, Users],
-                  ['Proctoring', details.isProctored ? 'Enabled' : 'Disabled', Shield],
+                  ['Date & Time (IST)', details.dateTime ? formatIST(details.dateTime, 'full') : 'Not set', Calendar],
+                  ['Duration', `${details.duration} Minutes`, Clock],
+                  ['Total Marks', `${totalCalc || details.totalMarks} Marks`, Award],
+                  ['Passing Score', `${details.passingMarks} Marks`, CheckCircle],
+                  ['Questions Configured', `${questions.length} Questions`, HelpCircle],
+                  ['Candidates Enrolled', `${selectedStudents.length} Students`, Users],
+                  ['Proctoring Security', details.isProctored ? 'Webcam + Speech + Tab' : 'Disabled', Shield],
                 ].map(([key, value, Icon]) => (
                   <div key={key} className="admin-review-item">
                     <div className="admin-review-label">
-                      {Icon && <Icon size={16} />}
+                      {Icon && <Icon size={14} />}
                       {key}
                     </div>
                     <div className="admin-review-value">{value}</div>
                   </div>
                 ))}
               </div>
+
+              {details.instructions && (
+                <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px 20px' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                    Candidate Instructions
+                  </div>
+                  <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                    {details.instructions}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

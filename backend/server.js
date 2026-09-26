@@ -1,4 +1,5 @@
-// server.js
+// server.js — Configured for India Standard Time (IST — Asia/Kolkata)
+process.env.TZ = 'Asia/Kolkata';
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
@@ -11,12 +12,15 @@ const path = require('path');
 const fs = require('fs');
 const winston = require('winston');
 const cron = require('node-cron');
+const { formatIST } = require('./utils/timezone');
 
-// Initialize logger
+// Initialize logger with IST timestamps
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
-    winston.format.timestamp(),
+    winston.format.timestamp({
+      format: () => formatIST(new Date(), 'full')
+    }),
     winston.format.colorize(),
     winston.format.printf(({ timestamp, level, message }) => `${timestamp} ${level}: ${message}`)
   ),
@@ -72,27 +76,43 @@ io.on('connection', (socket) => {
   logger.info(`Socket connected: ${socket.id}`);
 
   // Student joins exam room
-  socket.on('join-exam', ({ sessionId, examId, studentId, token }) => {
-    // TODO: Verify JWT token for socket connections
+  socket.on('join-exam', ({ sessionId, examId, studentId, studentName }) => {
     socket.join(`exam-${examId}`);
-    socket.join(`session-${sessionId}`);
+    if (sessionId) socket.join(`session-${sessionId}`);
+    if (studentId) socket.join(`student-${studentId}`);
     
-    activeExamSessions.set(sessionId, {
-      studentId, examId, socketId: socket.id,
-      status: 'active', connectedAt: new Date(),
-    });
+    if (sessionId) {
+      activeExamSessions.set(sessionId, {
+        sessionId,
+        studentId,
+        studentName: studentName || 'Candidate',
+        examId,
+        socketId: socket.id,
+        status: 'active',
+        connectedAt: new Date(),
+        lastHeartbeat: new Date(),
+      });
+    }
 
     // Notify admin room
-    io.to(`admin-exam-${examId}`).emit('student-joined', {
-      sessionId, studentId, timestamp: new Date(),
-    });
+    const joinPayload = {
+      sessionId,
+      studentId,
+      studentName: studentName || 'Candidate',
+      examId,
+      timestamp: new Date().toISOString(),
+    };
+    io.to(`admin-exam-${examId}`).emit('student-joined', joinPayload);
+    io.to(`exam-monitoring-${examId}`).emit('student-joined', joinPayload);
 
-    logger.info(`Student ${studentId} joined exam ${examId}`);
+    logger.info(`Student ${studentId || 'unknown'} joined exam ${examId}`);
   });
 
-  // Admin joins monitoring room
-  socket.on('monitor-exam', ({ examId, collegeId }) => {
+  // Admin joins monitoring room (supports both event names)
+  const handleAdminJoin = ({ examId, collegeId }) => {
+    if (!examId) return;
     socket.join(`admin-exam-${examId}`);
+    socket.join(`exam-monitoring-${examId}`);
     
     // Send current active sessions
     const sessions = Array.from(activeExamSessions.entries())
@@ -100,44 +120,150 @@ io.on('connection', (socket) => {
       .map(([id, data]) => ({ sessionId: id, ...data }));
     
     socket.emit('active-sessions', sessions);
+    logger.info(`Admin joined monitoring for exam ${examId}`);
+  };
+
+  socket.on('monitor-exam', handleAdminJoin);
+  socket.on('join-exam-monitoring', handleAdminJoin);
+
+  socket.on('leave-exam-monitoring', ({ examId }) => {
+    if (!examId) return;
+    socket.leave(`admin-exam-${examId}`);
+    socket.leave(`exam-monitoring-${examId}`);
+  });
+
+  // Camera feed stream from student to proctor
+  socket.on('camera-feed', ({ examId, studentId, sessionId, imageData, timestamp }) => {
+    const feedPayload = {
+      examId,
+      studentId,
+      sessionId,
+      imageData,
+      timestamp: timestamp || new Date().toISOString(),
+    };
+    io.to(`admin-exam-${examId}`).emit('camera-feed', feedPayload);
+    io.to(`exam-monitoring-${examId}`).emit('camera-feed', feedPayload);
+  });
+
+  // Student telemetry update (question progress, face count, audio level)
+  socket.on('student-activity', ({ examId, studentId, sessionId, activity }) => {
+    const actPayload = {
+      examId,
+      studentId,
+      sessionId,
+      activity: {
+        ...activity,
+        lastSeen: new Date().toISOString(),
+      },
+    };
+    io.to(`admin-exam-${examId}`).emit('student-activity', actPayload);
+    io.to(`exam-monitoring-${examId}`).emit('student-activity', actPayload);
   });
 
   // Violation event
-  socket.on('violation', ({ sessionId, examId, studentId, type, severity }) => {
-    // Broadcast to admin monitoring this exam
-    io.to(`admin-exam-${examId}`).emit('violation-alert', {
-      sessionId, studentId, type, severity, timestamp: new Date(),
-    });
+  socket.on('violation', ({ sessionId, examId, studentId, studentName, type, severity, description }) => {
+    const violPayload = {
+      sessionId,
+      examId,
+      studentId,
+      studentName: studentName || 'Candidate',
+      type,
+      severity: severity || 'medium',
+      description: description || type,
+      timestamp: new Date().toISOString(),
+    };
+    io.to(`admin-exam-${examId}`).emit('violation-alert', violPayload);
+    io.to(`exam-monitoring-${examId}`).emit('violation-alert', violPayload);
+  });
+
+  // Admin sends direct warning to student
+  socket.on('send-warning', ({ examId, studentId, message, severity, strike }) => {
+    const warnPayload = {
+      examId,
+      studentId,
+      message,
+      severity: severity || 'medium',
+      strike: strike || 1,
+      timestamp: new Date().toISOString(),
+    };
+    io.to(`student-${studentId}`).emit('warning-received', warnPayload);
+    io.to(`exam-${examId}`).emit('warning-received', warnPayload);
+    io.to(`admin-exam-${examId}`).emit('warning-sent', warnPayload);
+    io.to(`exam-monitoring-${examId}`).emit('warning-sent', warnPayload);
+  });
+
+  // Admin terminates exam for student
+  socket.on('terminate-exam', ({ examId, studentId, reason }) => {
+    const termPayload = {
+      examId,
+      studentId,
+      reason: reason || 'Exam terminated by proctor.',
+      timestamp: new Date().toISOString(),
+    };
+    io.to(`student-${studentId}`).emit('exam-terminated', termPayload);
+    io.to(`exam-${examId}`).emit('exam-terminated', termPayload);
+    io.to(`admin-exam-${examId}`).emit('student-terminated', termPayload);
+    io.to(`exam-monitoring-${examId}`).emit('student-terminated', termPayload);
+  });
+
+  // Admin broadcasts announcement to entire exam
+  socket.on('broadcast-message', ({ examId, title, message, urgency }) => {
+    const broadPayload = {
+      examId,
+      title: title || 'Proctor Announcement',
+      message,
+      urgency: urgency || 'normal',
+      timestamp: new Date().toISOString(),
+    };
+    io.to(`exam-${examId}`).emit('broadcast-received', broadPayload);
+    io.to(`admin-exam-${examId}`).emit('broadcast-sent', broadPayload);
+    io.to(`exam-monitoring-${examId}`).emit('broadcast-sent', broadPayload);
   });
 
   // Heartbeat - student is still present
-  socket.on('heartbeat', ({ sessionId }) => {
+  socket.on('heartbeat', ({ sessionId, examId, studentId }) => {
     if (activeExamSessions.has(sessionId)) {
       activeExamSessions.get(sessionId).lastHeartbeat = new Date();
     }
-    io.to(`admin-exam-${activeExamSessions.get(sessionId)?.examId}`).emit('heartbeat', {
-      sessionId, timestamp: new Date(),
-    });
+    const hbPayload = {
+      sessionId,
+      studentId,
+      examId,
+      timestamp: new Date().toISOString(),
+    };
+    if (examId) {
+      io.to(`admin-exam-${examId}`).emit('heartbeat', hbPayload);
+      io.to(`exam-monitoring-${examId}`).emit('heartbeat', hbPayload);
+    }
   });
 
   // Student submits exam
-  socket.on('exam-submitted', ({ sessionId, examId }) => {
+  socket.on('exam-submitted', ({ sessionId, examId, studentId }) => {
     if (activeExamSessions.has(sessionId)) {
       activeExamSessions.get(sessionId).status = 'submitted';
     }
-    io.to(`admin-exam-${examId}`).emit('student-submitted', {
-      sessionId, timestamp: new Date(),
-    });
+    const subPayload = {
+      sessionId,
+      studentId,
+      examId,
+      timestamp: new Date().toISOString(),
+    };
+    io.to(`admin-exam-${examId}`).emit('student-submitted', subPayload);
+    io.to(`exam-monitoring-${examId}`).emit('student-submitted', subPayload);
   });
 
   // Disconnect
   socket.on('disconnect', () => {
-    // Find and update the session
     for (const [sessionId, data] of activeExamSessions.entries()) {
       if (data.socketId === socket.id) {
-        io.to(`admin-exam-${data.examId}`).emit('student-disconnected', {
-          sessionId, studentId: data.studentId, timestamp: new Date(),
-        });
+        const dcPayload = {
+          sessionId,
+          studentId: data.studentId,
+          examId: data.examId,
+          timestamp: new Date().toISOString(),
+        };
+        io.to(`admin-exam-${data.examId}`).emit('student-disconnected', dcPayload);
+        io.to(`exam-monitoring-${data.examId}`).emit('student-disconnected', dcPayload);
         activeExamSessions.delete(sessionId);
         break;
       }

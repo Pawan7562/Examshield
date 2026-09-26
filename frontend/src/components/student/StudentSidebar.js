@@ -1,26 +1,20 @@
-// src/components/student/StudentSidebar.js
-import React, { useEffect } from 'react';
+// src/components/student/StudentSidebar.js — Professional Examination Cockpit Sidebar
+import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { 
   Home,
-  BookOpen,
+  FileText,
   Trophy,
   User,
   Settings,
-  FileText,
-  Calendar,
-  Clock,
-  Menu,
-  X,
+  Shield,
+  ShieldCheck,
   LogOut,
   ChevronRight,
   ChevronLeft,
-  Bell,
-  TrendingUp,
-  Target,
-  Award
+  Menu
 } from 'lucide-react';
 import './StudentSidebar.css';
 
@@ -30,54 +24,49 @@ export default function StudentSidebar() {
   const navigate = useNavigate();
   const { isCollapsed, isMobile, isMobileOpen, toggleSidebar, closeMobileSidebar } = useSidebar();
 
-  const menuItems = [
+  const menuSections = [
     {
-      section: 'Main',
+      title: 'Portal',
       items: [
         {
           id: 'dashboard',
           label: 'Dashboard',
           icon: Home,
           path: '/student/dashboard',
-          badge: null
         }
       ]
     },
     {
-      section: 'Academics',
+      title: 'Assessments',
       items: [
         {
           id: 'exams',
-          label: 'My Exams',
+          label: 'My Assessments',
           icon: FileText,
           path: '/student/exams',
-          badge: null
         },
         {
           id: 'results',
-          label: 'Results',
+          label: 'Transcripts & Results',
           icon: Trophy,
           path: '/student/results',
-          badge: null
         }
       ]
     },
     {
-      section: 'Account',
+      title: 'Candidate',
       items: [
         {
           id: 'profile',
-          label: 'Profile',
+          label: 'Academic Profile',
           icon: User,
           path: '/student/profile',
-          badge: null
         },
         {
           id: 'settings',
-          label: 'Settings',
+          label: 'Hardware & Security',
           icon: Settings,
           path: '/student/settings',
-          badge: null
         }
       ]
     }
@@ -99,83 +88,108 @@ export default function StudentSidebar() {
 
   return (
     <>
-      {/* Mobile Menu Toggle */}
+      {/* Mobile Toggle */}
       {isMobile && (
         <button 
           className="mobile-menu-toggle"
           onClick={toggleSidebar}
+          aria-label="Toggle Navigation Menu"
         >
-          <Menu size={24} />
-          <span>Menu</span>
+          <Menu size={22} />
         </button>
       )}
 
-      {/* Sidebar */}
+      {/* Main Sidebar Shell */}
       <aside className={`student-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobile ? 'mobile-sidebar' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
-        {/* Header */}
+        {/* Brand Header */}
         <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-text">EXAMSHIELD</div>
+          <div className="sidebar-logo" onClick={() => navigate('/student/dashboard')} style={{ cursor: 'pointer' }}>
+            <div className="sidebar-logo-icon">
+              <Shield size={20} />
+            </div>
+            {!isCollapsed && (
+              <div className="sidebar-brand-text">
+                <span className="sidebar-brand-name">ExamShield</span>
+                <span className="sidebar-brand-badge">STUDENT</span>
+              </div>
+            )}
           </div>
+          
           <button 
             className="sidebar-toggle"
             onClick={toggleSidebar}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label="Toggle sidebar width"
           >
-            {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
 
-        {/* User Profile Section */}
+        {/* Proctoring Status Pill */}
         {!isCollapsed && (
-          <div className="sidebar-user-profile">
-            <div className="user-avatar">
-              {user?.name?.charAt(0) || 'S'}
+          <div className="sidebar-proctor-status">
+            <div className="proctor-status-indicator">
+              <span className="proctor-status-dot" />
+              <span>AI Proctoring Ready</span>
             </div>
-            <div className="user-name">{user?.name}</div>
-            <div className="user-role">Student</div>
+            <ShieldCheck size={15} color="#10b981" />
           </div>
         )}
 
-        {/* Navigation Menu */}
+        {/* Navigation Sections */}
         <nav className="sidebar-nav">
-          {menuItems.map((section, sectionIndex) => (
-            <div key={sectionIndex} className="nav-section">
-              <div className="nav-section-title">
-                {!isCollapsed && section.section}
-              </div>
+          {menuSections.map((sec, sIdx) => (
+            <div key={sIdx} className="nav-section">
+              {!isCollapsed && (
+                <div className="nav-section-title">{sec.title}</div>
+              )}
               
-              {section.items.map((item) => (
-                <a
-                  key={item.id}
-                  href={item.path}
-                  className={`nav-item ${isActivePath(item.path) ? 'active' : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleNavClick(item.path);
-                  }}
-                  title={isCollapsed ? item.label : ''}
-                >
-                  <item.icon className="nav-item-icon" />
-                  {!isCollapsed && (
-                    <span className="nav-item-text">{item.label}</span>
-                  )}
-                  {item.badge && (
-                    <span className="nav-item-badge">{item.badge}</span>
-                  )}
-                </a>
-              ))}
+              {sec.items.map((item) => {
+                const active = isActivePath(item.path);
+                const IconComponent = item.icon;
+
+                return (
+                  <button
+                    key={item.id}
+                    className={`nav-item ${active ? 'active' : ''}`}
+                    onClick={() => handleNavClick(item.path)}
+                    title={isCollapsed ? item.label : ''}
+                  >
+                    <IconComponent size={19} className="nav-item-icon" />
+                    {!isCollapsed && (
+                      <span className="nav-item-text">{item.label}</span>
+                    )}
+                    {active && <span className="nav-active-pill" />}
+                  </button>
+                );
+              })}
             </div>
           ))}
         </nav>
 
-        {/* Logout Button */}
-        <div style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        {/* User Card & Logout Footer */}
+        <div className="sidebar-footer">
+          {!isCollapsed && (
+            <div className="sidebar-user-card" onClick={() => navigate('/student/profile')}>
+              <div className="user-avatar-initials">
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'S'}
+              </div>
+              <div className="user-details-text">
+                <span className="user-name-title">{user?.name || 'Candidate'}</span>
+                <span className="user-id-subtitle">
+                  {user?.roll_number || user?.enrollment_number || user?.studentId || 'Verified'}
+                </span>
+              </div>
+            </div>
+          )}
+
           <button 
-            className="nav-item logout-btn"
+            className="sidebar-logout-btn"
             onClick={handleLogout}
+            title={isCollapsed ? 'Logout' : ''}
           >
-            <LogOut size={20} className="nav-item-icon" />
-            {!isCollapsed && <span className="nav-item-text">Logout</span>}
+            <LogOut size={18} />
+            {!isCollapsed && <span>Sign Out</span>}
           </button>
         </div>
       </aside>

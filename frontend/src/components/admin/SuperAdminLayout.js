@@ -1,48 +1,189 @@
-// src/components/admin/SuperAdminLayout.js
-import React from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Building2,
+  CreditCard,
+  ShieldCheck,
+  Sliders,
+  LogOut,
+  Menu,
+  X,
+  ExternalLink,
+  Activity,
+  Server,
+  Database,
+  ChevronRight,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+import logoImg from '../../assets/logo.png';
+import '../../pages/super-admin/SuperAdmin.css';
 
 export default function SuperAdminLayout() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const handleLogout = () => { logout(); toast.success('Logged out'); navigate('/super-admin/login'); };
+  const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Super admin session terminated safely.');
+    navigate('/super-admin/login');
+  };
+
+  const getPageTitle = () => {
+    if (location.pathname.includes('/colleges')) return 'Multi-Tenant Directory & Onboarding';
+    if (location.pathname.includes('/payments')) return 'Payments, MRR & Financial Ledger';
+    if (location.pathname.includes('/audit-logs')) return 'Security Audit & Compliance Logs';
+    if (location.pathname.includes('/settings')) return 'Platform Governance & Policies';
+    return 'Platform Executive Command Center';
+  };
+
+  const navLinks = [
+    {
+      to: '/super-admin/dashboard',
+      icon: LayoutDashboard,
+      label: 'Executive Overview',
+      badge: 'Live',
+    },
+    {
+      to: '/super-admin/colleges',
+      icon: Building2,
+      label: 'Tenants & Onboarding',
+      badge: null,
+    },
+    {
+      to: '/super-admin/payments',
+      icon: CreditCard,
+      label: 'Payments & Revenue',
+      badge: 'Ledger',
+    },
+    {
+      to: '/super-admin/audit-logs',
+      icon: ShieldCheck,
+      label: 'Audit & Compliance',
+      badge: null,
+    },
+    {
+      to: '/super-admin/settings',
+      icon: Sliders,
+      label: 'Platform Governance',
+      badge: null,
+    },
+  ];
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#080810', fontFamily: 'Sora, sans-serif' }}>
-      <aside style={{ width: 220, background: 'rgba(12,12,22,0.98)', borderRight: '1px solid rgba(233,69,96,0.15)', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0 }}>
-        <div style={{ padding: '22px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#e94560', letterSpacing: 2 }}>COLLEGEEXAM</div>
-          <div style={{ fontSize: 10, color: '#4a5568', marginTop: 2 }}>Super Admin Panel</div>
-        </div>
-        <nav style={{ flex: 1, padding: '12px 8px' }}>
-          {[
-            { to: '/super-admin/dashboard', icon: '◈', label: 'Dashboard' },
-            { to: '/super-admin/colleges', icon: '◉', label: 'Colleges' },
-          ].map(item => (
-            <NavLink key={item.to} to={item.to} style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8,
-              color: isActive ? '#e94560' : '#718096', fontSize: 13, fontWeight: 500, marginBottom: 4,
-              background: isActive ? 'rgba(233,69,96,0.1)' : 'transparent',
-              borderLeft: isActive ? '2px solid #e94560' : '2px solid transparent',
-              textDecoration: 'none',
-            })}>
-              <span>{item.icon}</span><span>{item.label}</span>
-            </NavLink>
-          ))}
+    <div className="sa-layout">
+      <div className="sa-bg-mesh" aria-hidden="true" />
+
+      {/* ──── SIDEBAR ──── */}
+      <aside className={`sa-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
+        {/* Brand Header */}
+        <Link to="/super-admin/dashboard" className="sa-sidebar-brand" onClick={() => setMobileOpen(false)}>
+          <img src={logoImg} alt="ExamShield Logo" className="sa-brand-logo" />
+          <div className="sa-brand-text-stack">
+            <span className="sa-brand-title">
+              Exam<span>Shield</span>
+            </span>
+            <span className="sa-brand-badge">
+              <span className="sa-pulse-bullet" />
+              ROOT ADMIN CONSOLE
+            </span>
+          </div>
+        </Link>
+
+        {/* Navigation */}
+        <nav className="sa-nav">
+          <div className="sa-nav-section-title">GOVERNANCE &amp; OVERSIGHT</div>
+          {navLinks.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => setMobileOpen(false)}
+              >
+                <Icon />
+                <span>{item.label}</span>
+                {item.badge && <span className="sa-nav-badge">{item.badge}</span>}
+              </NavLink>
+            );
+          })}
+
+          <div className="sa-cluster-box">
+            <div className="sa-cluster-header">
+              <span>SYSTEM CLUSTER</span>
+              <span className="sa-pulse-bullet" />
+            </div>
+            <div className="sa-cluster-row">
+              <span>Neon Database</span>
+              <span className="sa-cluster-val">Connected</span>
+            </div>
+            <div className="sa-cluster-row">
+              <span>AI Proctoring</span>
+              <span className="sa-cluster-val">1080p Mesh</span>
+            </div>
+          </div>
         </nav>
-        <button onClick={handleLogout} style={{ margin: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px', color: '#ef4444', cursor: 'pointer', fontFamily: 'Sora, sans-serif', fontSize: 12 }}>
-          Logout ↩
-        </button>
+
+        {/* Footer Profile & Logout */}
+        <div className="sa-sidebar-footer">
+          <div className="sa-sidebar-user">
+            <div className="sa-user-avatar">SA</div>
+            <div className="sa-user-info">
+              <span className="sa-user-name">{user?.name || 'Master Admin'}</span>
+              <span className="sa-user-role">SUPER ADMINISTRATOR</span>
+            </div>
+          </div>
+
+          <button type="button" onClick={handleLogout} className="sa-logout-btn">
+            <LogOut size={15} />
+            <span>Sign Out</span>
+          </button>
+        </div>
       </aside>
-      <main style={{ flex: 1, marginLeft: 220, padding: '28px 32px' }}>
-        <Outlet />
-      </main>
-      <style>{`a{text-decoration:none;}`}</style>
+
+      {/* ──── MAIN CONTENT CONTAINER ──── */}
+      <div className="sa-main">
+        {/* Topbar */}
+        <header className="sa-topbar">
+          <div className="sa-topbar-left">
+            <button
+              type="button"
+              className="sa-mobile-toggle"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Toggle navigation"
+            >
+              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+
+            <div className="sa-breadcrumbs">
+              <span>ExamShield Network</span>
+              <ChevronRight size={14} />
+              <span className="sa-breadcrumb-current">{getPageTitle()}</span>
+            </div>
+          </div>
+
+          <div className="sa-topbar-right">
+            <div className="sa-health-pill">
+              <span className="sa-health-dot" />
+              <span>Mesh Status: 100% Operational</span>
+            </div>
+
+            <Link to="/" target="_blank" rel="noreferrer" className="sa-public-link" title="Visit Public Landing Page">
+              <span>View Landing</span>
+              <ExternalLink size={13} />
+            </Link>
+          </div>
+        </header>
+
+        {/* Page View Outlet */}
+        <main className="sa-content">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
-
-// ─── src/pages/super-admin/Dashboard.js ───────────────────────────────────────
-// Note: Export as named file but combined here for brevity

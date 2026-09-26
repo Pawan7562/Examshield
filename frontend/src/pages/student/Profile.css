@@ -1,0 +1,379 @@
+/* ═══════════════════════════════════════════════════════════
+   Profile.css — Professional Candidate Identity & Record
+   Institutional, high-trust ExamShield Proctoring Theme
+   ═══════════════════════════════════════════════════════════ */
+
+.pf-container {
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #0f172a;
+}
+
+/* Header Banner */
+.pf-header-banner {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.pf-header-left h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+}
+
+.pf-header-left p {
+  font-size: 0.88rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* 2-Column Main Layout */
+.pf-layout-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .pf-layout-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Left Card: Candidate ID Passport */
+.pf-passport-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.05);
+}
+
+.pf-passport-header {
+  background: linear-gradient(135deg, #0b1329 0%, #1e293b 100%);
+  padding: 32px 24px 44px;
+  text-align: center;
+  position: relative;
+  color: #ffffff;
+}
+
+.pf-passport-shield {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #38bdf8;
+  margin-bottom: 16px;
+}
+
+.pf-avatar-wrap {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0a74da 0%, #0656a3 100%);
+  color: #ffffff;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  border: 4px solid #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+
+.pf-avatar-verified {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  background: #10b981;
+  color: #ffffff;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pf-passport-body {
+  padding: 24px;
+  background: #ffffff;
+  text-align: center;
+}
+
+.pf-candidate-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+
+.pf-candidate-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0a74da;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.pf-institution-name {
+  font-size: 0.86rem;
+  color: #475569;
+  font-weight: 600;
+  margin: 0 0 18px;
+}
+
+/* Passport Credentials List */
+.pf-passport-list {
+  border-top: 1.5px solid #f1f5f9;
+  padding-top: 18px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pf-passport-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+}
+
+.pf-passport-item span:first-child {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.pf-passport-item span:last-child {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* Telemetry Clearance Box */
+.pf-clearance-box {
+  margin-top: 20px;
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.pf-clearance-box h5 {
+  margin: 0 0 2px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #166534;
+}
+
+.pf-clearance-box p {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #15803d;
+}
+
+/* Right Section: Cards */
+.pf-right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.pf-section-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 28px 30px;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.05);
+}
+
+.pf-section-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pf-section-subtitle {
+  font-size: 0.84rem;
+  color: #64748b;
+  margin: 0 0 24px;
+}
+
+/* Data Field Grid */
+.pf-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 640px) {
+  .pf-fields-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pf-field-item {
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  transition: all 0.2s ease;
+}
+
+.pf-field-item:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+
+.pf-field-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #0a74da;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pf-field-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.pf-field-val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+/* Security Form */
+.pf-form-row {
+  margin-bottom: 20px;
+}
+
+.pf-input-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.pf-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pf-input-field {
+  width: 100%;
+  height: 44px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0 44px 0 16px;
+  font-size: 0.9rem;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.pf-input-field:focus {
+  background: #ffffff;
+  border-color: #0a74da;
+  box-shadow: 0 0 0 3px rgba(10, 116, 218, 0.12);
+}
+
+.pf-input-toggle {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pf-input-toggle:hover {
+  color: #475569;
+}
+
+.pf-btn-submit {
+  height: 44px;
+  padding: 0 24px;
+  background: linear-gradient(135deg, #0a74da 0%, #0656a3 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(10, 116, 218, 0.25);
+  transition: all 0.2s ease;
+}
+
+.pf-btn-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(10, 116, 218, 0.35);
+}
+
+.pf-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -123,7 +123,7 @@ export default function ExamQuestions() {
                 <span style={{ 
                   fontSize: 11, 
                   fontWeight: 700, 
-                  color: q.type === 'mcq' ? '#e94560' : q.type === 'subjective' ? '#8b5cf6' : q.type === 'coding' ? '#06b6d4' : '#10b981' 
+                  color: q.type === 'mcq' ? '#0a74da' : q.type === 'subjective' ? '#8b5cf6' : q.type === 'coding' ? '#06b6d4' : '#10b981' 
                 }}>
                   Q{i + 1} · {q.type?.toUpperCase()} · {q.marks || 1} marks
                 </span>

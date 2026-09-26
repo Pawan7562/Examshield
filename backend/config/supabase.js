@@ -1,5 +1,12 @@
-// config/supabase-fixed.js - Fixed Supabase configuration
+// Compatibility exports retained for existing backend modules.
 const winston = require('winston');
+const { supabase } = require('./postgres-client');
+const {
+  query: postgresQuery,
+  getClient,
+  transaction: postgresTransaction,
+  pool,
+} = require('./database');
 
 const logger = winston.createLogger({
   level: 'info',
@@ -7,31 +14,10 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-// Supabase configuration - using service role key for full access
-const supabaseUrl = process.env.SUPABASE_URL || 'https://jzxvxxgsfbzqhrirnqfm.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 'sb_publishable_Y3eNbkdEjC59m67N0GiY4Q_1rOveLyL';
-
-console.log('🔗 Supabase Configuration:');
-console.log('URL:', supabaseUrl ? '✅ Configured' : '❌ Missing');
-console.log('Key:', supabaseKey ? '✅ Service Key Configured' : '❌ Missing');
-console.log('📝 Setting up full Supabase integration...');
-
-// Initialize Supabase client
-let supabase = null;
-try {
-  const { createClient } = require('@supabase/supabase-js');
-  supabase = createClient(supabaseUrl, supabaseKey);
-  console.log('✅ Supabase client initialized');
-} catch (error) {
-  console.log('❌ Supabase error:', error.message);
-  console.log('🔄 Falling back to local database...');
-  const { query: professionalQuery, transaction: professionalTransaction } = require('./database-professional');
-  module.exports = { query: professionalQuery, getClient: () => {}, transaction: professionalTransaction, supabase: null };
-  return;
-}
+// Legacy SQL translation is retained for old maintenance scripts.
 
 // Enhanced query function for Supabase
-const query = async (text, params) => {
+const legacyQuery = async (text, params) => {
   const start = Date.now();
   console.log('🔍 Executing Supabase query:', text, params);
   
@@ -166,7 +152,7 @@ const query = async (text, params) => {
 };
 
 // Transaction function
-const transaction = async (callback) => {
+const legacyTransaction = async (callback) => {
   console.log('🔄 Starting Supabase transaction...');
   try {
     await callback();
@@ -177,4 +163,13 @@ const transaction = async (callback) => {
   }
 };
 
-module.exports = { query, getClient: () => supabase, transaction, supabase };
+module.exports = {
+  query: postgresQuery,
+  getClient,
+  transaction: postgresTransaction,
+  pool,
+  supabase,
+  database: { query: postgresQuery, getClient, transaction: postgresTransaction, pool },
+  legacyQuery,
+  legacyTransaction,
+};

@@ -22,7 +22,9 @@ import {
   Calendar,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Key,
+  BookOpen
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 
@@ -97,6 +99,8 @@ export default function StudentManagement() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [addModal, setAddModal] = useState(false);
+  const [exams, setExams] = useState([]);
+  const [credentialFallback, setCredentialFallback] = useState(null);
   const [editStudent, setEditStudent] = useState(null);
   const [form, setForm] = useState({ 
     name: '', 
@@ -105,7 +109,8 @@ export default function StudentManagement() {
     department: '', 
     semester: '', 
     batch: '', 
-    phone: '' 
+    phone: '',
+    examId: ''
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -148,10 +153,15 @@ export default function StudentManagement() {
       department: '', 
       semester: '', 
       batch: '', 
-      phone: '' 
+      phone: '',
+      examId: ''
     });
     setEditStudent(null);
     setFormErrors({});
+    // Load published & upcoming exams so admin can select one
+    adminAPI.getExams({ page: 1, limit: 50 })
+      .then(res => setExams(res.data?.exams || []))
+      .catch(() => {});
     setAddModal(true);
   };
 
@@ -163,7 +173,8 @@ export default function StudentManagement() {
       department: student.department || '', 
       semester: student.semester || '', 
       batch: student.batch || '', 
-      phone: student.phone || '' 
+      phone: student.phone || '',
+      examId: ''
     });
     setEditStudent(student);
     setFormErrors({});
@@ -189,8 +200,15 @@ export default function StudentManagement() {
         await adminAPI.updateStudent(editStudent.id, form);
         toast.success('Student updated successfully');
       } else {
-        await adminAPI.addStudent(form);
-        toast.success('Student added! Credentials sent via email.');
+        const response = await adminAPI.addStudent(form);
+        const data = response.data?.data || response.data;
+        if (data?.emailSent) {
+          const keyMsg = data?.exam_key ? ` Exam Key: ${data.exam_key}` : '';
+          toast.success(`Student added! Credentials &${keyMsg} sent to ${data.email}`);
+        } else {
+          setCredentialFallback(data);
+          toast.success('Student added! Credentials generated below.');
+        }
       }
       setAddModal(false);
       fetchStudents(1);
@@ -468,12 +486,37 @@ export default function StudentManagement() {
             onChange={setFormField('phone')} 
             placeholder="+91 9876543210" 
           />
+
+          {!editStudent && (
+            <div className="admin-form-group" style={{ gridColumn: 'span 2' }}>
+              <label className="admin-form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
+                <Key size={14} style={{ color: '#10b981' }} />
+                <span>Assign to Examination &amp; Issue Exam Key</span>
+              </label>
+              <select
+                className="admin-form-input"
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', fontSize: '0.88rem', color: '#1f2937' }}
+                value={form.examId || ''}
+                onChange={setFormField('examId')}
+              >
+                <option value="">-- Automatically Assign to Active Examination --</option>
+                {exams.map(ex => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.name} (Key: {ex.exam_key || ex.exam_code || 'Auto-Key'})
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: '0.76rem', color: '#6b7280', marginTop: '4px', display: 'block' }}>
+                The student will receive their <strong>Student ID</strong>, <strong>Temporary Password</strong>, and <strong>Exam Access Key</strong> directly via email.
+              </span>
+            </div>
+          )}
         </div>
         
         {!editStudent && (
           <div className="admin-form-note">
             <AlertCircle size={16} />
-            A unique password will be generated and sent to the student's email.
+            Student ID, password, and exam key will be dispatched instantly to the student's email.
           </div>
         )}
         
@@ -484,6 +527,66 @@ export default function StudentManagement() {
           <Button onClick={handleSubmit} loading={submitting}>
             {submitting ? 'Saving...' : editStudent ? 'Update Student' : 'Add Student'}
           </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!credentialFallback}
+        onClose={() => setCredentialFallback(null)}
+        title="Student Credentials & Exam Access"
+      >
+        <div className="admin-form-note" style={{ background: '#ecfdf5', borderColor: '#10b981', color: '#065f46' }}>
+          <CheckCircle size={16} style={{ color: '#10b981' }} />
+          Student created successfully! Copy and share these credentials with the student:
+        </div>
+        <div className="admin-form-grid">
+          <Input label="Student ID" value={credentialFallback?.student_id || ''} readOnly />
+          <Input label="Email" value={credentialFallback?.email || ''} readOnly />
+          <Input label="Temporary Password" value={credentialFallback?.password || ''} readOnly />
+          {credentialFallback?.exam_key && (
+            <div className="admin-form-group" style={{ gridColumn: 'span 2' }}>
+              <label className="admin-form-label" style={{ fontWeight: 800, color: '#047857' }}>
+                🔑 Exam Access Key ({credentialFallback?.exam_name || 'Scheduled Exam'})
+              </label>
+              <input
+                className="admin-form-input"
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  border: '2px dashed #10b981',
+                  background: '#f0fdf4',
+                  fontWeight: 800,
+                  fontSize: '1.1rem',
+                  fontFamily: 'monospace',
+                  color: '#065f46',
+                  letterSpacing: '2px'
+                }}
+                value={credentialFallback?.exam_key || ''}
+                readOnly
+              />
+            </div>
+          )}
+        </div>
+        <div className="admin-form-actions">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const text = [
+                `Student ID: ${credentialFallback?.student_id || ''}`,
+                `Email: ${credentialFallback?.email || ''}`,
+                `Password: ${credentialFallback?.password || ''}`,
+                credentialFallback?.exam_key ? `Exam Key: ${credentialFallback.exam_key}` : '',
+                `Login URL: ${window.location.origin}/student/login`
+              ].filter(Boolean).join('\n');
+              navigator.clipboard.writeText(text)
+                .then(() => toast.success('All credentials & Exam Key copied!'))
+                .catch(() => toast.error('Could not copy credentials'));
+            }}
+          >
+            Copy All Credentials &amp; Key
+          </Button>
+          <Button onClick={() => setCredentialFallback(null)}>Done</Button>
         </div>
       </Modal>
 

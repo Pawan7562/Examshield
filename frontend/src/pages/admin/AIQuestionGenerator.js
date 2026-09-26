@@ -4,16 +4,18 @@ import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
 import MarkdownRenderer from '../../components/common/MarkdownRenderer';
 import toast from 'react-hot-toast';
+import { toISTISOString } from '../../utils/timezone';
 import {
   Brain, Activity, Sparkles, Layers, Zap,
   BookOpen, FileText, FolderOpen, Clock, Award,
   Calendar, Shield, Users, Database, Cpu,
   Globe, Target, Search, BarChart3, CheckCircle,
   HelpCircle, RefreshCw, Code, Save, Download,
-  Plus, Eye, Upload, Trash2, AlertCircle, Info,
+  Plus, Eye, Upload, Trash2, AlertCircle,
   ChevronDown, ChevronUp, X, Terminal, Lightbulb,
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
+import './AIQuestionGenerator.css';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -65,16 +67,14 @@ const QuestionCard = ({ question, selected, onToggle, onPreview, mode }) => {
 
   return (
     <div
-      className="admin-ai-question-card"
+      className={`admin-ai-question-card ${selected ? 'is-selected' : ''}`}
       style={{
-        borderLeft: `3px solid ${src?.color ?? '#a78bfa'}`,
-        background: selected ? 'rgba(139,92,246,0.08)' : undefined,
-        transition: 'all 0.2s ease',
+        borderLeftColor: src?.color ?? '#0a74da',
       }}
     >
       {/* Header row */}
       <div className="admin-ai-question-header">
-        <div className="admin-ai-question-meta" style={{ flex: 1, minWidth: 0 }}>
+        <div className="admin-ai-question-meta">
           {mode === 'partial' && (
             <input
               type="checkbox"
@@ -83,34 +83,36 @@ const QuestionCard = ({ question, selected, onToggle, onPreview, mode }) => {
               className="admin-ai-question-checkbox"
             />
           )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="admin-ai-question-title"
-              style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {question.isFallback && (
-                <span style={{ fontSize: '0.7rem', color: '#f59e0b', marginRight: '6px', verticalAlign: 'middle' }}>
-                  [Template]
-                </span>
-              )}
-              {question.title}
+          <div className="admin-ai-question-info">
+            <div className="admin-ai-question-title-row">
+              <span className="admin-ai-question-title">
+                {question.isFallback && (
+                  <span className="admin-ai-template-badge">
+                    Template Blueprint
+                  </span>
+                )}
+                {question.title}
+              </span>
             </div>
-            <div className="admin-ai-question-badges" style={{ marginTop: '6px', flexWrap: 'wrap', gap: '6px' }}>
+
+            <div className="admin-ai-question-badges">
               <span
                 className="admin-ai-difficulty-badge"
-                style={{ backgroundColor: diffColor + '25', color: diffColor, border: `1px solid ${diffColor}40` }}
+                style={{ backgroundColor: diffColor + '18', color: diffColor, border: `1px solid ${diffColor}40` }}
               >
                 {DIFFICULTIES.find(d => d.value === question.difficulty)?.icon} {question.difficulty}
               </span>
               <PlatformBadge sourceId={question.platform} />
-              {question.tags?.slice(0, 3).map(tag => (
-                <span key={tag} className="admin-ai-tag">{tag}</span>
+              {Array.from(new Set(question.tags || [])).slice(0, 4).map((tag, idx) => (
+                <span key={`${tag}-${idx}`} className="admin-ai-tag">{tag}</span>
               ))}
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+        <div className="admin-ai-question-actions-right">
           <button onClick={onPreview} className="admin-ai-preview-btn">
-            <Eye size={14} /> Preview
+            <Eye size={14} /> View Problem
           </button>
         </div>
       </div>
@@ -119,23 +121,30 @@ const QuestionCard = ({ question, selected, onToggle, onPreview, mode }) => {
       <div className="admin-ai-question-content">
         <MarkdownRenderer question={question} compact />
 
-        <div style={{ display: 'flex', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Terminal size={12} /> Time: <code style={{ color: '#a78bfa', marginLeft: '3px' }}>{question.timeComplexity}</code>
+        <div className="admin-ai-question-chips">
+          <span className="admin-ai-chip">
+            <Terminal size={12} /> Time: <code>{question.timeComplexity || 'O(n)'}</code>
           </span>
-          <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Activity size={12} /> Space: <code style={{ color: '#a78bfa', marginLeft: '3px' }}>{question.spaceComplexity}</code>
+          <span className="admin-ai-chip">
+            <Activity size={12} /> Space: <code>{question.spaceComplexity || 'O(1)'}</code>
           </span>
           {Array.isArray(question.testCases) && question.testCases.length > 0 && (
-            <span style={{ fontSize: '0.75rem', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span className="admin-ai-chip success">
               <CheckCircle size={12} /> {question.testCases.length} test cases
             </span>
           )}
-          {question.aiGenerated && (
-            <span style={{ fontSize: '0.75rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Brain size={12} /> AI Generated
+          {question.aiGenerated ? (
+            <span className="admin-ai-chip ai">
+              <Brain size={12} /> AI Synthesized
+            </span>
+          ) : (
+            <span className="admin-ai-chip template">
+              <Sparkles size={12} /> Standard Blueprint
             </span>
           )}
+          <span className="admin-ai-chip marks">
+            <Award size={12} /> {question.marks || 10} Pts
+          </span>
         </div>
       </div>
     </div>
@@ -150,11 +159,11 @@ const PreviewModal = ({ question, onClose, showFull }) => {
   if (!question) return null;
 
   const tabs = [
-    { id: 'problem',   label: 'Problem',   icon: FileText  },
-    { id: 'hints',     label: 'Hints',     icon: Lightbulb },
-    { id: 'approach',  label: 'Approach',  icon: Target    },
-    ...(showFull && question.editorial  ? [{ id: 'editorial', label: 'Editorial', icon: BookOpen }] : []),
-    ...(showFull && question.solutionCode ? [{ id: 'code',   label: 'Solution',  icon: Code    }] : []),
+    { id: 'problem',   label: 'Problem Statement', icon: FileText  },
+    { id: 'hints',     label: 'Hints & Clues',     icon: Lightbulb },
+    { id: 'approach',  label: 'Solution Approach', icon: Target    },
+    ...(showFull && question.editorial  ? [{ id: 'editorial', label: 'Editorial Theory', icon: BookOpen }] : []),
+    ...(showFull && question.solutionCode ? [{ id: 'code',   label: 'Python Reference',  icon: Code    }] : []),
   ];
 
   const diffColor = getDifficultyColor(question.difficulty);
@@ -164,75 +173,58 @@ const PreviewModal = ({ question, onClose, showFull }) => {
       className="admin-ai-preview-modal-premium"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="premium-modal-content" style={{ maxWidth: '820px', width: '95vw' }}>
+      <div className="premium-modal-content">
         {/* Modal Header */}
         <div className="premium-modal-header">
-          <div className="premium-header-title" style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ margin: 0, wordBreak: 'break-word', lineHeight: '1.4' }}>
-              {question.title}
-            </h3>
-            <div className="premium-header-badges" style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+          <div className="premium-header-title">
+            <h3>{question.title}</h3>
+            <div className="premium-header-badges">
               <span
                 className="premium-badge"
                 style={{
-                  background: `${diffColor}20`, color: diffColor, border: `1px solid ${diffColor}40`,
-                  padding: '3px 10px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700,
+                  background: `${diffColor}18`, color: diffColor, border: `1px solid ${diffColor}40`,
                 }}
               >
                 {DIFFICULTIES.find(d => d.value === question.difficulty)?.icon} {question.difficulty}
               </span>
               <PlatformBadge sourceId={question.platform} />
               {question.isFallback && (
-                <span style={{ fontSize: '0.72rem', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '10px' }}>
-                  Template (No AI Key)
+                <span className="premium-template-tag">
+                  Blueprint Template
                 </span>
               )}
-              {question.tags?.slice(0, 4).map(t => (
-                <span key={t} className="premium-tag" style={{ fontSize: '0.72rem' }}>{t}</span>
+              {Array.from(new Set(question.tags || [])).slice(0, 4).map((t, idx) => (
+                <span key={`${t}-${idx}`} className="premium-tag">{t}</span>
               ))}
             </div>
 
             {/* Complexity row */}
-            <div style={{ display: 'flex', gap: '16px', marginTop: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                ⏱ Time: <code style={{ color: '#a78bfa' }}>{question.timeComplexity}</code>
+            <div className="premium-complexity-row">
+              <span>
+                ⏱ Time: <code>{question.timeComplexity || 'O(n)'}</code>
               </span>
-              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                💾 Space: <code style={{ color: '#a78bfa' }}>{question.spaceComplexity}</code>
+              <span>
+                💾 Space: <code>{question.spaceComplexity || 'O(1)'}</code>
+              </span>
+              <span>
+                🏆 Marks: <code>{question.marks || 10} Pts</code>
               </span>
             </div>
           </div>
-          <button onClick={onClose} className="premium-modal-close" style={{ flexShrink: 0 }}>
+          <button onClick={onClose} className="premium-modal-close" aria-label="Close modal">
             <X size={18} />
           </button>
         </div>
 
         {/* Tab Bar */}
-        <div style={{
-          display: 'flex', gap: '4px', padding: '0 24px',
-          borderBottom: '1px solid rgba(139,92,246,0.15)',
-          background: 'rgba(0,0,0,0.2)',
-          overflowX: 'auto',
-        }}>
+        <div className="admin-ai-modal-tabs">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '10px 14px',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: activeTab === tab.id ? '2px solid #a78bfa' : '2px solid transparent',
-                  color: activeTab === tab.id ? '#a78bfa' : '#64748b',
-                  fontWeight: activeTab === tab.id ? 700 : 500,
-                  fontSize: '0.83rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                  whiteSpace: 'nowrap',
-                }}
+                className={`admin-ai-modal-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
               >
                 <Icon size={14} /> {tab.label}
               </button>
@@ -241,7 +233,7 @@ const PreviewModal = ({ question, onClose, showFull }) => {
         </div>
 
         {/* Scrollable body */}
-        <div className="premium-modal-scroll-area" style={{ padding: '24px' }}>
+        <div className="premium-modal-scroll-area">
           {activeTab === 'problem' && (
             <MarkdownRenderer
               question={question}
@@ -385,12 +377,19 @@ const AIQuestionGenerator = () => {
         throw new Error(rd?.message || 'Invalid response from server');
       }
 
-      const qs = rd.data.questions.map(q => ({
-        ...q,
-        // Normalise source object for the card
-        source: SOURCES.find(s => s.id === q.platform) || { id: q.platform, name: q.platform, icon: Code, color: '#64748b' },
-        marks: q.difficulty === 'easy' ? 5 : q.difficulty === 'medium' ? 10 : 15,
-      }));
+      const qs = rd.data.questions.map(q => {
+        const title = q.title || '';
+        const problemStatement = q.problemStatement || q.description || '';
+        return {
+          ...q,
+          type: 'coding',
+          title,
+          problemStatement,
+          questionText: q.questionText || (title ? `${title}\n\n${problemStatement}` : problemStatement),
+          platform: q.platform || 'leetcode',
+          marks: q.marks || (q.difficulty === 'easy' ? 5 : q.difficulty === 'medium' ? 10 : 15),
+        };
+      });
 
       const meta = rd.data.meta || {};
       setGeneratedQuestions(qs);
@@ -475,6 +474,33 @@ const AIQuestionGenerator = () => {
     toast.success('Questions exported!');
   };
 
+  // ── Use in Exam navigation ────────────────────────────────────────────────
+  const handleUseInExam = () => {
+    if (!selectedQuestions.length) return;
+    const cleanQuestions = selectedQuestions.map(q => {
+      const { source, ...rest } = q;
+      const title = rest.title || '';
+      const problemStatement = rest.problemStatement || rest.description || '';
+      return {
+        ...rest,
+        type: 'coding',
+        title,
+        problemStatement,
+        questionText: rest.questionText || (title ? `${title}\n\n${problemStatement}` : problemStatement),
+        platform: rest.platform || 'leetcode',
+        marks: rest.marks || (rest.difficulty === 'easy' ? 5 : rest.difficulty === 'medium' ? 10 : 15),
+      };
+    });
+    // Store in sessionStorage to completely avoid any History pushState Symbol cloning errors
+    try {
+      const serializableQuestions = JSON.parse(JSON.stringify(cleanQuestions));
+      sessionStorage.setItem('ai_generated_exam_questions', JSON.stringify(serializableQuestions));
+    } catch (err) {
+      console.warn('SessionStorage questions storage warning:', err);
+    }
+    navigate('/admin/exams/create');
+  };
+
   // ── Exam creation ─────────────────────────────────────────────────────────
   const createExamWithQuestions = async () => {
     if (!examConfig.name || !examConfig.dateTime) { toast.error('Complete exam configuration'); return; }
@@ -485,10 +511,15 @@ const AIQuestionGenerator = () => {
       const totalMarks = selectedQuestions.reduce((s, q) => s + (q.marks || 10), 0);
       const res = await adminAPI.createExam({
         ...examConfig,
+        dateTime: toISTISOString(examConfig.dateTime),
+        type: 'coding',
         totalMarks,
         duration: parseInt(examConfig.duration),
         passingMarks: parseInt(examConfig.passingMarks),
-        questions: selectedQuestions,
+        questions: selectedQuestions.map(q => ({
+          ...q,
+          type: 'coding',
+        })),
         studentIds: selectedStudents,
         questionRandomization: true,
         aiGenerated: true,
@@ -825,20 +856,25 @@ const AIQuestionGenerator = () => {
         {/* ── Generation Stats ──────────────────────────────────────────────── */}
         {generationStats && (
           <div className="admin-ai-stats">
-            <h4 className="admin-ai-stats-title"><Activity size={18} /> Generation Results</h4>
+            <div className="admin-ai-stats-header">
+              <h4 className="admin-ai-stats-title"><Activity size={18} /> Generation Telemetry & Distribution</h4>
+              <span className="admin-ai-stats-badge">
+                <CheckCircle size={13} /> Questions Ready
+              </span>
+            </div>
             <div className="admin-ai-stats-grid">
               <div className="admin-ai-stat-item">
                 <div className="admin-ai-stat-value">{generationStats.total}</div>
                 <div className="admin-ai-stat-label">Total Questions</div>
               </div>
-              <div className="admin-ai-stat-item">
-                <div className="admin-ai-stat-value" style={{ color: '#60a5fa' }}>{generationStats.aiGenerated}</div>
-                <div className="admin-ai-stat-label">AI Generated</div>
+              <div className="admin-ai-stat-item highlight">
+                <div className="admin-ai-stat-value">{generationStats.aiGenerated}</div>
+                <div className="admin-ai-stat-label">AI Synthesized</div>
               </div>
               {generationStats.fallbacks > 0 && (
-                <div className="admin-ai-stat-item">
-                  <div className="admin-ai-stat-value" style={{ color: '#f59e0b' }}>{generationStats.fallbacks}</div>
-                  <div className="admin-ai-stat-label">Templates Used</div>
+                <div className="admin-ai-stat-item warning">
+                  <div className="admin-ai-stat-value">{generationStats.fallbacks}</div>
+                  <div className="admin-ai-stat-label">Verified Blueprints</div>
                 </div>
               )}
               {Object.entries(generationStats.bySource).map(([src, cnt]) => {
@@ -867,7 +903,7 @@ const AIQuestionGenerator = () => {
                   <div className="admin-ai-filters">
                     <input
                       type="text"
-                      placeholder="Search…"
+                      placeholder="Search questions…"
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                       className="admin-ai-search-input"
@@ -896,7 +932,7 @@ const AIQuestionGenerator = () => {
                       <Download size={14} /> Export
                     </button>
                     <button
-                      onClick={() => navigate('/admin/exams/create', { state: { questions: selectedQuestions } })}
+                      onClick={handleUseInExam}
                       disabled={!selectedQuestions.length}
                       className="admin-ai-add-btn"
                     >
@@ -922,16 +958,23 @@ const AIQuestionGenerator = () => {
 
             {/* Full mode: Create Exam action */}
             {mode === 'full' && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+              <div className="admin-ai-full-mode-action-card">
+                <div className="admin-ai-full-mode-info">
+                  <div className="admin-ai-full-mode-title">
+                    <Zap size={22} color="#0099ff" /> Proctored AI Assessment Deployment
+                  </div>
+                  <div className="admin-ai-full-mode-sub">
+                    <strong>{selectedQuestions.length}</strong> questions prepared for <strong>{selectedStudents.length}</strong> candidates ({examConfig.name || 'Untitled Exam'} • {examConfig.duration || 60} mins)
+                  </div>
+                </div>
                 <button
                   onClick={createExamWithQuestions}
-                  disabled={isCreatingExam || !selectedQuestions.length}
-                  className="admin-ai-generate-btn"
-                  style={{ minWidth: '240px' }}
+                  disabled={isCreatingExam || !selectedQuestions.length || !selectedStudents.length}
+                  className="admin-ai-generate-btn full-deploy-btn"
                 >
                   {isCreatingExam
-                    ? <><RefreshCw size={18} className="animate-spin" /> Creating Exam…</>
-                    : <><Zap size={18} /> Create Exam with {selectedQuestions.length} Questions</>
+                    ? <><RefreshCw size={18} className="animate-spin" /> Deploying Exam…</>
+                    : <><Zap size={18} /> Deploy Exam ({selectedQuestions.length} Questions)</>
                   }
                 </button>
               </div>

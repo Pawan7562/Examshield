@@ -69,21 +69,7 @@ const PasswordReset = () => {
       });
 
       if (response.data.success) {
-        toast.success('Password reset instructions sent to your email');
-        
-        // For demo purposes, if the response includes a reset link, show it
-        if (response.data.resetLink) {
-          console.log('Password reset link (for demo):', response.data.resetLink);
-          toast.success('Check console for reset link (demo mode)');
-          
-          // In a real app, you wouldn't do this, but for demo purposes:
-          setTimeout(() => {
-            if (window.confirm('Demo mode: Would you like to navigate to the reset link?')) {
-              window.location.href = response.data.resetLink;
-            }
-          }, 2000);
-        }
-        
+        toast.success('Password reset instructions sent to your official email');
         setEmail('');
         setStudentId('');
       } else {

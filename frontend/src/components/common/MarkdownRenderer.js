@@ -1,7 +1,6 @@
 // src/components/common/MarkdownRenderer.js
 // Renders structured AI-generated coding problem descriptions beautifully.
-// Uses structured fields (problemStatement, constraints[], examples[], etc.)
-// with a plain-text description fallback. No external markdown parser needed.
+// Professional institutional styling for ExamShield SaaS.
 
 import React from 'react';
 
@@ -16,32 +15,32 @@ const SectionHeader = ({ icon, title }) => (
     gap: '8px',
     marginBottom: '10px',
     paddingBottom: '8px',
-    borderBottom: '1px solid rgba(139, 92, 246, 0.2)',
+    borderBottom: '1.5px solid #e2e8f0',
   }}>
     {icon && <span style={{ fontSize: '1rem' }}>{icon}</span>}
     <h4 style={{
       margin: 0,
-      fontSize: '0.9rem',
-      fontWeight: 700,
+      fontSize: '0.86rem',
+      fontWeight: 800,
       textTransform: 'uppercase',
-      letterSpacing: '0.08em',
-      color: 'var(--text-secondary, #a78bfa)',
+      letterSpacing: '0.06em',
+      color: '#0f172a',
     }}>{title}</h4>
   </div>
 );
 
-const CodeBlock = ({ children, language }) => (
+const CodeBlock = ({ children }) => (
   <pre style={{
-    background: 'rgba(0,0,0,0.4)',
-    border: '1px solid rgba(139,92,246,0.2)',
-    borderRadius: '8px',
-    padding: '12px 16px',
+    background: '#0b1329',
+    border: '1px solid #1e293b',
+    borderRadius: '10px',
+    padding: '14px 18px',
     overflowX: 'auto',
-    fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
-    fontSize: '0.82rem',
+    fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+    fontSize: '0.84rem',
     lineHeight: '1.6',
     color: '#e2e8f0',
-    margin: '6px 0',
+    margin: '8px 0',
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
   }}>
@@ -55,51 +54,53 @@ const ConstraintBadge = ({ text }) => (
     alignItems: 'flex-start',
     gap: '8px',
     padding: '6px 0',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
-    fontSize: '0.875rem',
+    borderBottom: '1px solid #f1f5f9',
+    fontSize: '0.88rem',
     lineHeight: '1.5',
-    color: '#cbd5e1',
+    color: '#334155',
     listStyle: 'none',
   }}>
-    <span style={{ color: '#a78bfa', fontWeight: 700, marginTop: '2px', flexShrink: 0 }}>•</span>
+    <span style={{ color: '#0a74da', fontWeight: 800, marginTop: '2px', flexShrink: 0 }}>•</span>
     <code style={{
       fontFamily: '"JetBrains Mono", monospace',
-      background: 'rgba(139,92,246,0.08)',
-      padding: '1px 5px',
-      borderRadius: '4px',
+      background: '#f1f5f9',
+      border: '1px solid #e2e8f0',
+      padding: '2px 7px',
+      borderRadius: '6px',
       fontSize: '0.82rem',
+      color: '#0f172a',
     }}>{text}</code>
   </li>
 );
 
 const ExampleBlock = ({ example, index }) => (
   <div style={{
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(139,92,246,0.15)',
-    borderRadius: '10px',
-    padding: '14px',
-    marginBottom: '12px',
+    background: '#f8fafc',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: '12px',
+    padding: '16px',
+    marginBottom: '14px',
   }}>
     <div style={{
       fontSize: '0.78rem',
-      fontWeight: 700,
+      fontWeight: 800,
       textTransform: 'uppercase',
-      letterSpacing: '0.1em',
-      color: '#a78bfa',
+      letterSpacing: '0.08em',
+      color: '#0a74da',
       marginBottom: '10px',
     }}>
       Example {index + 1}
     </div>
 
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '10px' }}>
       <div>
-        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Input
         </div>
         <CodeBlock>{String(example.input ?? '')}</CodeBlock>
       </div>
       <div>
-        <div style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <div style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Output
         </div>
         <CodeBlock>{String(example.output ?? '')}</CodeBlock>
@@ -108,15 +109,18 @@ const ExampleBlock = ({ example, index }) => (
 
     {example.explanation && (
       <div style={{
-        background: 'rgba(139,92,246,0.05)',
-        borderLeft: '3px solid rgba(139,92,246,0.4)',
-        padding: '8px 12px',
-        borderRadius: '0 6px 6px 0',
+        background: '#ffffff',
+        borderLeft: '3px solid #0a74da',
+        borderTop: '1px solid #e2e8f0',
+        borderRight: '1px solid #e2e8f0',
+        borderBottom: '1px solid #e2e8f0',
+        padding: '10px 14px',
+        borderRadius: '0 8px 8px 0',
       }}>
-        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Explanation:{' '}
         </span>
-        <span style={{ fontSize: '0.875rem', color: '#cbd5e1', lineHeight: '1.6' }}>
+        <span style={{ fontSize: '0.86rem', color: '#334155', lineHeight: '1.6' }}>
           {example.explanation}
         </span>
       </div>
@@ -127,28 +131,29 @@ const ExampleBlock = ({ example, index }) => (
 const HintItem = ({ hint, index }) => (
   <div style={{
     display: 'flex',
-    gap: '10px',
-    padding: '8px 12px',
-    background: 'rgba(245,158,11,0.05)',
-    border: '1px solid rgba(245,158,11,0.15)',
-    borderRadius: '8px',
-    marginBottom: '8px',
+    gap: '12px',
+    padding: '10px 14px',
+    background: '#fffbeb',
+    border: '1px solid #fde68a',
+    borderRadius: '10px',
+    marginBottom: '10px',
   }}>
     <span style={{
-      background: 'rgba(245,158,11,0.2)',
-      color: '#f59e0b',
+      background: '#fef3c7',
+      color: '#b45309',
+      border: '1px solid #fcd34d',
       borderRadius: '50%',
-      width: '22px',
-      height: '22px',
+      width: '24px',
+      height: '24px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: '0.75rem',
-      fontWeight: 700,
+      fontSize: '0.76rem',
+      fontWeight: 800,
       flexShrink: 0,
-      marginTop: '2px',
+      marginTop: '1px',
     }}>{index + 1}</span>
-    <span style={{ fontSize: '0.875rem', color: '#cbd5e1', lineHeight: '1.5' }}>{hint}</span>
+    <span style={{ fontSize: '0.88rem', color: '#92400e', lineHeight: '1.5', fontWeight: 500 }}>{hint}</span>
   </div>
 );
 
@@ -156,17 +161,6 @@ const HintItem = ({ hint, index }) => (
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * MarkdownRenderer
- *
- * Props:
- *  - question: the full question object from the backend
- *  - compact?: boolean — show minimal fields for card view
- *  - showHints?: boolean
- *  - showApproach?: boolean
- *  - showEditorial?: boolean (full mode)
- *  - showSolutionCode?: boolean (full mode)
- */
 const MarkdownRenderer = ({
   question,
   compact = false,
@@ -193,13 +187,13 @@ const MarkdownRenderer = ({
   } = question;
 
   const sectionStyle = {
-    marginBottom: '20px',
+    marginBottom: '22px',
   };
 
   const bodyTextStyle = {
-    fontSize: '0.9rem',
+    fontSize: '0.92rem',
     lineHeight: '1.75',
-    color: '#e2e8f0',
+    color: '#334155',
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
   };
@@ -209,13 +203,13 @@ const MarkdownRenderer = ({
     const preview = problemStatement || description || '';
     return (
       <p style={{
-        ...bodyTextStyle,
-        fontSize: '0.82rem',
+        fontSize: '0.86rem',
+        lineHeight: '1.6',
         display: '-webkit-box',
         WebkitLineClamp: 3,
         WebkitBoxOrient: 'vertical',
         overflow: 'hidden',
-        color: '#94a3b8',
+        color: '#475569',
         margin: 0,
       }}>
         {preview.slice(0, 280)}{preview.length > 280 ? '…' : ''}
@@ -239,7 +233,7 @@ const MarkdownRenderer = ({
   const useFallbackText = !hasProblemStatement && !hasInputFormat && !hasExamples;
 
   return (
-    <div style={{ color: '#e2e8f0', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ color: '#0f172a', fontFamily: 'Inter, system-ui, sans-serif' }}>
 
       {/* Problem Statement */}
       {hasProblemStatement ? (
@@ -292,17 +286,17 @@ const MarkdownRenderer = ({
       {Array.isArray(testCases) && testCases.length > 0 && (
         <div style={{
           ...sectionStyle,
-          background: 'rgba(34, 197, 94, 0.05)',
-          border: '1px solid rgba(34,197,94,0.15)',
-          borderRadius: '8px',
-          padding: '10px 14px',
+          background: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          borderRadius: '10px',
+          padding: '12px 16px',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: '10px',
         }}>
-          <span>🔒</span>
-          <span style={{ fontSize: '0.85rem', color: '#86efac' }}>
-            {testCases.length} hidden test case{testCases.length !== 1 ? 's' : ''} will be used for evaluation
+          <span style={{ fontSize: '1.1rem' }}>🔒</span>
+          <span style={{ fontSize: '0.86rem', color: '#166534', fontWeight: 600 }}>
+            {testCases.length} verified test case{testCases.length !== 1 ? 's' : ''} configured for proctored evaluation
           </span>
         </div>
       )}
@@ -320,10 +314,11 @@ const MarkdownRenderer = ({
         <div style={sectionStyle}>
           <SectionHeader icon="🎯" title="Recommended Approach" />
           <div style={{
-            background: 'rgba(139,92,246,0.06)',
-            border: '1px solid rgba(139,92,246,0.2)',
-            borderRadius: '8px',
-            padding: '12px 16px',
+            background: '#f8fafc',
+            border: '1.5px solid #e2e8f0',
+            borderLeft: '4px solid #0a74da',
+            borderRadius: '10px',
+            padding: '14px 18px',
           }}>
             <p style={{ ...bodyTextStyle, margin: 0 }}>{solutionApproach}</p>
           </div>
@@ -335,10 +330,11 @@ const MarkdownRenderer = ({
         <div style={sectionStyle}>
           <SectionHeader icon="📖" title="Editorial" />
           <div style={{
-            background: 'rgba(59,130,246,0.06)',
-            border: '1px solid rgba(59,130,246,0.2)',
-            borderRadius: '8px',
-            padding: '12px 16px',
+            background: '#f8fafc',
+            border: '1.5px solid #e2e8f0',
+            borderLeft: '4px solid #6366f1',
+            borderRadius: '10px',
+            padding: '14px 18px',
           }}>
             <p style={{ ...bodyTextStyle, margin: 0 }}>{editorial}</p>
           </div>
@@ -348,8 +344,8 @@ const MarkdownRenderer = ({
       {/* Solution Code (full mode only) */}
       {showSolutionCode && hasSolutionCode && (
         <div style={sectionStyle}>
-          <SectionHeader icon="💻" title="Solution Code (Python)" />
-          <CodeBlock language="python">{solutionCode}</CodeBlock>
+          <SectionHeader icon="💻" title="Solution Reference (Python)" />
+          <CodeBlock>{solutionCode}</CodeBlock>
         </div>
       )}
 
@@ -357,15 +353,15 @@ const MarkdownRenderer = ({
       {showApproach && hasFollowUp && (
         <div style={{
           ...sectionStyle,
-          background: 'rgba(245,158,11,0.05)',
-          border: '1px solid rgba(245,158,11,0.15)',
-          borderRadius: '8px',
-          padding: '12px 16px',
+          background: '#fffbeb',
+          border: '1px solid #fde68a',
+          borderRadius: '10px',
+          padding: '14px 18px',
         }}>
-          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
-            🔮 Follow-Up
+          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
+            🔮 Follow-Up & Extension
           </div>
-          <p style={{ ...bodyTextStyle, margin: 0, color: '#fde68a' }}>{followUp}</p>
+          <p style={{ ...bodyTextStyle, margin: 0, color: '#92400e' }}>{followUp}</p>
         </div>
       )}
     </div>

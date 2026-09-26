@@ -220,21 +220,88 @@ exports.addStudent = async (req, res) => {
       });
     }
 
-    // Send credentials email (Background - No await to prevent timeouts)
-    sendStudentCredentials({
-      name,
-      email,
-      studentId,
-      password,
-      collegeName: req.user.name || 'Your Institution',
-      loginUrl: process.env.STUDENT_LOGIN_URL || 'https://CollegeExam.vercel.app/student/login'
-    }).catch(emailError => {
-      console.error('❌ Background Email Error:', emailError.message);
-    });
+    // Look up exam to assign (either specified examId or latest active exam for this college)
+    const { examId } = req.body;
+    let targetExam = null;
+    let effectiveExamKey = null;
+
+    try {
+      if (examId) {
+        const { data: specifiedExam } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('id', examId)
+          .eq('college_id', collegeId)
+          .single();
+        targetExam = specifiedExam;
+      }
+
+      if (!targetExam) {
+        const { data: latestExams } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('college_id', collegeId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (latestExams && latestExams.length > 0) {
+          targetExam = latestExams[0];
+        }
+      }
+
+      if (targetExam) {
+        effectiveExamKey = targetExam.exam_key || targetExam.exam_code;
+        if (!effectiveExamKey) {
+          effectiveExamKey = `EXAM-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+          await supabase
+            .from('exams')
+            .update({ exam_key: effectiveExamKey, exam_code: effectiveExamKey })
+            .eq('id', targetExam.id);
+        }
+
+        // Insert exam assignment
+        await supabase
+          .from('exam_assignments')
+          .insert([{
+            exam_id: targetExam.id,
+            student_id: student.id,
+            status: 'assigned',
+            created_at: new Date().toISOString()
+          }]);
+
+        console.log(`✅ Assigned student ${student.id} to exam ${targetExam.title || targetExam.name} with key: ${effectiveExamKey}`);
+      }
+    } catch (examErr) {
+      console.warn('⚠️ Could not complete exam assignment:', examErr.message);
+    }
+
+    let emailSent = false;
+    try {
+      await sendStudentCredentials({
+        name,
+        email,
+        studentId,
+        password,
+        collegeName: req.user.name || 'Your Institution',
+        loginUrl: process.env.STUDENT_LOGIN_URL || 'http://localhost:3000/student/login',
+        examName: targetExam?.title || targetExam?.name || 'Scheduled Examination',
+        examKey: effectiveExamKey,
+        examDate: targetExam?.date_time,
+        examDuration: targetExam?.duration,
+        subject: targetExam?.subject
+      });
+      emailSent = true;
+    } catch (emailError) {
+      console.error('Student credentials email failed:', {
+        code: emailError.code,
+        message: emailError.message,
+      });
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Student added successfully!',
+      message: emailSent
+        ? `Student added and credentials email sent with exam key: ${effectiveExamKey || 'N/A'}`
+        : 'Student added, but the credentials email could not be sent. Share the displayed credentials securely.',
       data: {
         id: student?.id || 'unknown',
         student_id: student?.student_id || studentId,
@@ -243,7 +310,11 @@ exports.addStudent = async (req, res) => {
         roll_no: student?.roll_no || rollNumber,
         department: student?.department || 'Not specified',
         batch: student?.batch || 'Not specified',
-        password: password // Return plain password for display
+        emailSent,
+        password,
+        exam_id: targetExam?.id || null,
+        exam_name: targetExam?.title || targetExam?.name || null,
+        exam_key: effectiveExamKey || null,
       }
     });
 
@@ -264,20 +335,23 @@ exports.addStudent = async (req, res) => {
 exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, roll_no, department, batch, is_active } = req.body;
+    const { name, email, roll_no, rollNo, department, batch, is_active } = req.body;
     const collegeId = req.user.id;
+    const rollNumber = rollNo || roll_no;
+
+    const updatePayload = {
+      ...(name && { name }),
+      ...(email && { email }),
+      ...(rollNumber && { roll_no: rollNumber }),
+      ...(department !== undefined && { department }),
+      ...(batch !== undefined && { batch }),
+      ...(is_active !== undefined && { is_active }),
+      updated_at: new Date().toISOString()
+    };
 
     const { data: student, error } = await supabase
       .from('students')
-      .update({
-        name,
-        email,
-        roll_no,
-        department,
-        batch,
-        is_active,
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('id', id)
       .eq('college_id', collegeId)
       .select()

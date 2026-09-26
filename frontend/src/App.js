@@ -11,6 +11,7 @@ import FeaturesPage from './pages/public/Features';
 import HowItWorksPage from './pages/public/HowItWorks';
 import PricingPage from './pages/public/Pricing';
 import ContactPage from './pages/public/Contact';
+import AboutPage from './pages/public/About';
 
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';
@@ -38,6 +39,9 @@ import Settings from './pages/student/Settings';
 import SuperAdminLayout from './components/admin/SuperAdminLayout';
 import SuperAdminDashboard from './pages/super-admin/Dashboard';
 import CollegeManagement from './pages/super-admin/CollegeManagement';
+import PaymentManagement from './pages/super-admin/PaymentManagement';
+import AuditLogs from './pages/super-admin/AuditLogs';
+import PlatformSettings from './pages/super-admin/PlatformSettings';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -85,8 +89,10 @@ function App() {
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<Login role="admin" />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/admin/register" element={<Register />} />
           <Route path="/student/login" element={<Login role="student" />} />
           <Route path="/student/password-reset" element={<PasswordReset />} />
@@ -108,6 +114,7 @@ function App() {
             <Route path="ai-questions" element={<AIQuestionGenerator />} />
             <Route path="exams/:id/questions" element={<ExamQuestions />} />
             <Route path="exams/:id/questions/:questionId" element={<QuestionDetail />} />
+            <Route path="monitoring" element={<LiveMonitor />} />
             <Route path="exams/:id/monitor" element={<LiveMonitor />} />
             <Route path="results" element={<Results />} />
             <Route path="results/:id/evaluate" element={<EvaluateResult />} />
@@ -139,6 +146,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/student/exams/:examId"
+            element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <ExamRoom />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/super-admin"
@@ -151,6 +166,9 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="colleges" element={<CollegeManagement />} />
+            <Route path="payments" element={<PaymentManagement />} />
+            <Route path="audit-logs" element={<AuditLogs />} />
+            <Route path="settings" element={<PlatformSettings />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

@@ -2,7 +2,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
-import { format, formatDistance, formatDistanceToNow } from 'date-fns';
+import { formatDistance, formatDistanceToNow } from 'date-fns';
+import { formatIST } from '../../utils/timezone';
 import toast from 'react-hot-toast';
 
 const statusColors = {
@@ -649,7 +650,7 @@ export default function ExamManagementProfessional() {
                   </div>
                   <div style={{ display: 'flex', gap: '8px', fontSize: '12px', color: '#94a3b8' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      📅 {format(new Date(exam.date_time), 'MMM dd, yyyy')}
+                      📅 {formatIST(exam.date_time, 'dateTime')}
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       ⏱️ {exam.duration}m
@@ -820,7 +821,7 @@ export default function ExamManagementProfessional() {
                 <div style={{ marginBottom: '8px', fontWeight: '600' }}>Time Information</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>
-                    📅 Created: {format(new Date(exam.date_time), 'MMM dd, yyyy HH:mm')}
+                    📅 Scheduled: {formatIST(exam.date_time, 'dateTime')} (IST)
                   </span>
                   <span>
                     🕐 Duration: {formatDistanceToNow(new Date(exam.date_time), { addSuffix: true })}

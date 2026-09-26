@@ -14,6 +14,8 @@ const resultController = require('../controllers/resultController');
 const subscriptionController = require('../controllers/subscriptionController');
 const studentPasswordController = require('../controllers/studentPasswordController');
 const aiQuestionController = require('../controllers/aiQuestionController');
+const codeExecutionController = require('../controllers/codeExecutionController');
+const liveMonitoringController = require('../controllers/liveMonitoringController');
 
 // Student password routes
 const studentPasswordRoutes = require('./studentPasswordRoutes');
@@ -91,7 +93,14 @@ admin.post('/exams/:id/publish', examController.publishExam);
 admin.get('/exams/:id/questions', examController.getExamQuestions);
 admin.post('/exams/:id/questions', examController.addQuestions);
 admin.delete('/exams/:id/questions/:questionId', examController.deleteQuestion);
-admin.get('/exams/:id/monitor', examController.getLiveMonitoringData);
+
+// Live Monitoring & Remote Proctoring Cockpit
+admin.get('/monitoring/overview', liveMonitoringController.getLiveOverview);
+admin.get('/exams/:id/monitor', liveMonitoringController.getMonitoringData);
+admin.post('/exams/:id/warn-student', liveMonitoringController.sendWarning);
+admin.post('/exams/:id/terminate-student', liveMonitoringController.terminateStudentExam);
+admin.post('/exams/:id/broadcast', liveMonitoringController.broadcastAnnouncement);
+admin.get('/exams/:id/student-activity/:studentId', liveMonitoringController.getStudentActivity);
 
 // Results management
 admin.get('/results', resultController.getResults);
@@ -123,6 +132,8 @@ student.get('/exams/:id', examController.getExamDetails);
 student.post('/exams/:id/start', examController.startExam);
 student.post('/exams/:id/save-answer', examController.saveAnswer);
 student.post('/exams/:id/submit', examController.submitExam);
+student.post('/run-code', codeExecutionController.runCode);
+student.post('/submit-code', codeExecutionController.submitCode);
 student.post('/violations', examController.reportViolation);
 student.get('/results', resultController.getStudentResults);
 student.get('/results/by-key/:examKey', resultController.getStudentResultByKey);
@@ -168,29 +179,34 @@ router.use('/subscriptions', subscription);
 // =====================================================
 // SUPER ADMIN ROUTES
 // =====================================================
+// SUPER ADMIN MANAGEMENT & PLATFORM GOVERNANCE
+// =====================================================
 const superAdmin = express.Router();
 superAdmin.use(authenticate, authorize('super_admin'));
+
+// Dashboard Overview
 superAdmin.get('/dashboard', subscriptionController.getSuperAdminDashboard);
+
+// College Tenants & Multi-Tenancy Control
 superAdmin.get('/colleges', subscriptionController.getAllColleges);
+superAdmin.post('/colleges', subscriptionController.createCollegeByAdmin);
+superAdmin.put('/colleges/:id', subscriptionController.updateCollegeByAdmin);
 superAdmin.patch('/colleges/:id/toggle', subscriptionController.toggleCollegeStatus);
-superAdmin.get('/audit-logs', async (req, res) => {
-  try {
-    const { supabase } = require('../config/supabase-clean');
-    const { data, error } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100);
-    
-    if (error) {
-      return res.status(500).json({ success: false, message: 'Failed to fetch audit logs', error: error.message });
-    }
-    
-    res.json({ success: true, data: { logs: data || [] } });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch audit logs', error: error.message });
-  }
-});
+superAdmin.patch('/colleges/:id/plan', subscriptionController.updateCollegePlan);
+superAdmin.post('/colleges/:id/reset-password', subscriptionController.resetCollegePassword);
+superAdmin.delete('/colleges/:id', subscriptionController.deleteCollegeByAdmin);
+
+// Payment Ledger & Financial Management
+superAdmin.get('/payments', subscriptionController.getAllPayments);
+superAdmin.post('/payments/record', subscriptionController.recordManualPayment);
+
+// Audit & Compliance
+superAdmin.get('/audit-logs', subscriptionController.getAuditLogs);
+
+// System Settings & Governance Controls
+superAdmin.get('/settings', subscriptionController.getPlatformSettings);
+superAdmin.put('/settings', subscriptionController.updatePlatformSettings);
+
 router.use('/super-admin', superAdmin);
 
 // =====================================================

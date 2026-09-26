@@ -72,9 +72,11 @@ CREATE TABLE IF NOT EXISTS students (
 -- =====================================================
 CREATE TABLE IF NOT EXISTS exams (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name VARCHAR(255) NOT NULL,
+  name VARCHAR(255),
+  title VARCHAR(255),
   description TEXT,
   exam_code VARCHAR(20) UNIQUE NOT NULL, -- Unique exam key sent to students
+  exam_key VARCHAR(50) UNIQUE,
   type VARCHAR(50) NOT NULL CHECK (type IN ('mcq', 'subjective', 'coding', 'mixed')),
   subject VARCHAR(255),
   date_time TIMESTAMPTZ NOT NULL,
@@ -89,6 +91,8 @@ CREATE TABLE IF NOT EXISTS exams (
   created_by UUID REFERENCES colleges(id),
   status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'active', 'completed', 'cancelled')),
   result_published BOOLEAN DEFAULT false,
+  question_randomization BOOLEAN DEFAULT false,
+  ai_generated BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -101,6 +105,21 @@ CREATE TABLE IF NOT EXISTS exam_students (
   exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   is_notified BOOLEAN DEFAULT false,
+  UNIQUE(exam_id, student_id)
+);
+
+-- =====================================================
+-- TABLE: exam_assignments (student exam access and progress)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS exam_assignments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  status VARCHAR(50) NOT NULL DEFAULT 'assigned',
+  assigned_at TIMESTAMPTZ DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  submitted_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
   UNIQUE(exam_id, student_id)
 );
 
@@ -126,6 +145,37 @@ CREATE TABLE IF NOT EXISTS questions (
   time_limit INTEGER DEFAULT 2000,  -- ms
   memory_limit INTEGER DEFAULT 256, -- MB
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
+-- TABLE: exam_questions (AI and exam-specific question records)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS exam_questions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+  question_text TEXT NOT NULL,
+  question_type VARCHAR(50) NOT NULL DEFAULT 'mcq',
+  marks INTEGER NOT NULL DEFAULT 1,
+  difficulty VARCHAR(20) DEFAULT 'medium',
+  question_data JSONB,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
+-- TABLE: student_question_sets (per-student randomized questions)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS student_question_sets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  question_id VARCHAR(255),
+  question_order INTEGER NOT NULL,
+  question_data JSONB NOT NULL,
+  random_seed DOUBLE PRECISION,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(exam_id, student_id, question_order)
 );
 
 -- =====================================================
@@ -163,6 +213,7 @@ CREATE TABLE IF NOT EXISTS answers (
   is_correct BOOLEAN,
   is_evaluated BOOLEAN DEFAULT false,
   evaluator_remarks TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
   submitted_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(session_id, question_id)
@@ -186,6 +237,7 @@ CREATE TABLE IF NOT EXISTS results (
   coding_marks NUMERIC(6,2) DEFAULT 0,
   rank INTEGER,
   is_published BOOLEAN DEFAULT false,
+  submitted_at TIMESTAMPTZ,
   evaluated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -204,7 +256,8 @@ CREATE TABLE IF NOT EXISTS violations (
   severity VARCHAR(20) DEFAULT 'warning' CHECK (severity IN ('warning', 'critical')),
   description TEXT,
   screenshot_url VARCHAR(500),
-  occurred_at TIMESTAMPTZ DEFAULT NOW()
+  occurred_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =====================================================
@@ -259,6 +312,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE answers ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE results ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ;
+
 -- =====================================================
 -- INDEXES for performance
 -- =====================================================
@@ -268,8 +324,12 @@ CREATE INDEX IF NOT EXISTS idx_exams_college_id ON exams(college_id);
 CREATE INDEX IF NOT EXISTS idx_exams_date_time ON exams(date_time);
 CREATE INDEX IF NOT EXISTS idx_exam_sessions_exam_id ON exam_sessions(exam_id);
 CREATE INDEX IF NOT EXISTS idx_exam_sessions_student_id ON exam_sessions(student_id);
+CREATE INDEX IF NOT EXISTS idx_exam_assignments_exam_student ON exam_assignments(exam_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_exam_questions_exam_order ON exam_questions(exam_id, order_index);
+CREATE INDEX IF NOT EXISTS idx_student_question_sets_exam_student ON student_question_sets(exam_id, student_id);
 CREATE INDEX IF NOT EXISTS idx_answers_session_id ON answers(session_id);
 CREATE INDEX IF NOT EXISTS idx_violations_session_id ON violations(session_id);
+CREATE INDEX IF NOT EXISTS idx_violations_exam_created_at ON violations(exam_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_results_exam_id ON results(exam_id);
 CREATE INDEX IF NOT EXISTS idx_results_student_id ON results(student_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient_id ON notifications(recipient_id);
@@ -293,9 +353,17 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_colleges_updated_at ON colleges;
 CREATE TRIGGER update_colleges_updated_at BEFORE UPDATE ON colleges FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_students_updated_at ON students;
 CREATE TRIGGER update_students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_exams_updated_at ON exams;
 CREATE TRIGGER update_exams_updated_at BEFORE UPDATE ON exams FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_answers_updated_at ON answers;
 CREATE TRIGGER update_answers_updated_at BEFORE UPDATE ON answers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_results_updated_at ON results;
 CREATE TRIGGER update_results_updated_at BEFORE UPDATE ON results FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_subscriptions_updated_at ON subscriptions;
 CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_exam_questions_updated_at ON exam_questions;
+CREATE TRIGGER update_exam_questions_updated_at BEFORE UPDATE ON exam_questions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

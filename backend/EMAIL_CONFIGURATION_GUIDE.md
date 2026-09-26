@@ -1,121 +1,36 @@
-# Email Configuration Guide for CollegeExam
+# ExamShield Email Configuration
 
-## 🚨 ISSUE IDENTIFIED: Students Not Receiving Exam Emails
+Student credential emails use either Resend over HTTPS or SMTP. The service no longer reports a mock send as success. If provider configuration is missing or delivery fails, adding the student still succeeds, the API reports `emailSent: false`, and the admin receives a one-time credential fallback in the UI.
 
-### Root Cause:
-Email environment variables are **NOT CONFIGURED** in the backend `.env` file, causing the email service to fall back to **mock mode**.
+## Resend (Recommended)
 
----
-
-## 🔧 SOLUTION: Configure Email Environment Variables
-
-### Step 1: Create/Update `.env` File
-The `.env` file is currently ignored by Git (for security), so you need to create it manually:
-
-```bash
-# In the backend directory
-cd backend
-```
-
-Create `.env` file with the following content:
+Set these variables in the backend environment:
 
 ```env
-# Email Configuration for Student Notifications
+RESEND_API_KEY=re_your_key
+EMAIL_FROM=ExamShield <students@your-verified-domain.com>
+STUDENT_LOGIN_URL=https://your-app.example.com/student/login
+```
+
+Verify the sender domain in Resend before using it. Resend is selected automatically when `RESEND_API_KEY` is present.
+
+## Gmail SMTP
+
+Use a Google App Password, not the normal account password. App Passwords require 2-Step Verification on the Google account.
+
+```env
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
-EMAIL_USER=your-gmail-address@gmail.com
-EMAIL_PASS=your-app-password-here
-EMAIL_FROM=CollegeExam <your-gmail-address@gmail.com>
-
-# Application Configuration
-NODE_ENV=development
-STUDENT_LOGIN_URL=http://localhost:3002/student/login
+EMAIL_USER=your-account@gmail.com
+EMAIL_PASS=your-16-character-app-password
+EMAIL_FROM=ExamShield <your-account@gmail.com>
+STUDENT_LOGIN_URL=https://your-app.example.com/student/login
 ```
 
-### Step 2: Gmail App Password Setup
+Update the backend's local `.env` for development and set the same variables in the production host's secret/environment settings. Never commit credentials or paste them into chat.
 
-1. **Enable 2-Factor Authentication** on your Gmail account
-2. **Go to Google Account Settings** → Security
-3. **Generate App Password**:
-   - Select "App" from app options
-   - Give it a name like "CollegeExam"
-   - Copy the 16-character password generated
+## Verify Delivery
 
-### Step 3: Update Configuration
+With the backend running, call `/api/test-email?email=your-controlled-inbox@example.com`. This endpoint sends a real test message; use an inbox you control. A successful HTTP response confirms provider authentication and delivery to the provider, but check the inbox and spam folder too.
 
-Replace the placeholder values in the `.env` file:
-- `your-gmail-address@gmail.com` → Your actual Gmail address
-- `your-app-password-here` → The 16-character app password
-
----
-
-## 📧 Email Service Configuration Check
-
-The email service checks for these environment variables:
-- ✅ `EMAIL_HOST` - SMTP server (e.g., smtp.gmail.com)
-- ✅ `EMAIL_USER` - Gmail address
-- ✅ `EMAIL_PASS` - App password (NOT regular password)
-- ✅ `EMAIL_FROM` - From address for emails
-
----
-
-## 🧪 Test Email Configuration
-
-After setting up the `.env` file, test the configuration:
-
-```bash
-cd backend
-node test-email-notification.js
-```
-
-Expected output:
-```
-✅ Email configured - creating professional Gmail transporter
-📧 Email Service: Sending exam notification...
-✅ Email Service: Exam notification sent successfully
-```
-
----
-
-## 🚨 Current Status
-
-**Without Configuration:**
-- Mock mode activated
-- No actual emails sent
-- Students don't receive exam keys
-
-**With Configuration:**
-- Professional Gmail transporter
-- Real emails sent to students
-- Students receive exam keys properly
-
----
-
-## 📱 Production Deployment
-
-For Vercel deployment, set these environment variables in Vercel Dashboard:
-- `EMAIL_HOST`
-- `EMAIL_USER` 
-- `EMAIL_PASS`
-- `EMAIL_FROM`
-- `STUDENT_LOGIN_URL`
-
----
-
-## 🔒 Security Notes
-
-1. **Never commit `.env` file to Git**
-2. **Use App Passwords**, not regular Gmail passwords
-3. **Keep credentials secure** and separate from code
-4. **Update passwords regularly**
-
----
-
-## 🎯 Quick Fix Summary
-
-1. Create `.env` file with email configuration
-2. Test with `node test-email-notification.js`
-3. Verify emails are sent successfully
-4. Deploy with proper environment variables
-
-This will resolve the student email notification issue completely.
+The current configured Gmail account was tested and rejected with `535 BadCredentials`. Replace `EMAIL_PASS` with a newly generated App Password, or configure a verified Resend sender and `RESEND_API_KEY`, then restart/redeploy the backend. Until then, student accounts are created but credential emails cannot be delivered.

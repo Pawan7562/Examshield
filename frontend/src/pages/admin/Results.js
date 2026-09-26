@@ -11,12 +11,9 @@ import {
   Send, 
   CheckCircle, 
   XCircle, 
-  AlertCircle,
   TrendingUp,
   Users,
   FileText,
-  Calendar,
-  BarChart3,
   Eye,
   Edit3
 } from 'lucide-react';
@@ -182,7 +179,7 @@ export default function Results() {
         <div className="admin-stats-grid">
           <div className="admin-content-card admin-stat-card">
             <div className="admin-stat-header">
-              <div className="admin-stat-icon" style={{ background: 'linear-gradient(135deg, #e94560 0%, #9b2335 100%)' }}>
+              <div className="admin-stat-icon" style={{ background: 'linear-gradient(135deg, #0a74da 0%, #0656a3 100%)' }}>
                 <Users size={24} />
               </div>
             </div>

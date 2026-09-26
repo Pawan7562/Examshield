@@ -26,39 +26,43 @@ const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
 const comparePassword = async (plainPassword, hashedPassword) => {
   if (!hashedPassword) return false;
+  if (plainPassword === hashedPassword) return true;
 
   try {
     return await bcrypt.compare(plainPassword, hashedPassword);
   } catch (error) {
-    // Manual Supabase edits sometimes store plaintext or non-bcrypt values.
-    console.error('Password comparison failed:', error.message);
-    return false;
+    return plainPassword === hashedPassword;
   }
 };
 
-const createSupabaseAuthClient = () => createClient(
-  process.env.SUPABASE_URL || 'https://jzxvxxgsfbzqhrirnqfm.supabase.co',
-  process.env.SUPABASE_SERVICE_KEY || 'sb_publishable_Y3eNbkdEjC59m67N0GiY4Q_1rOveLyL',
-  {
+const createSupabaseAuthClient = () => {
+  const authUrl = process.env.SUPABASE_AUTH_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const authKey = process.env.SUPABASE_AUTH_ANON_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!authUrl || !authKey) throw new Error('Supabase Auth fallback is not configured.');
+
+  return createClient(authUrl, authKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
-  }
-);
+  });
+};
 
 const signInWithSupabaseAuth = async (email, password) => {
-  const authClient = createSupabaseAuthClient();
-  const { data, error } = await authClient.auth.signInWithPassword({ email, password });
-
-  // Avoid leaving a server-side auth session hanging around in the client instance.
   try {
-    await authClient.auth.signOut();
-  } catch (signOutError) {
-    console.error('Supabase auth sign-out cleanup failed:', signOutError.message);
-  }
+    const authClient = createSupabaseAuthClient();
+    const { data, error } = await authClient.auth.signInWithPassword({ email, password });
 
-  return { data, error };
+    try {
+      await authClient.auth.signOut();
+    } catch (signOutError) {
+      // quiet cleanup
+    }
+
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err };
+  }
 };
 
 const getCollegeDisplayName = (authUser, email) =>
@@ -345,26 +349,58 @@ exports.collegeLogin = async (req, res) => {
  */
 exports.studentLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const input = (req.body.email || req.body.studentId || req.body.emailOrId || req.body.id || '').trim();
+    const { password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password are required.' });
+    if (!input || !password) {
+      return res.status(400).json({ success: false, message: 'Email / Student ID and password are required.' });
     }
 
-    const normalizedEmail = normalizeEmail(email);
-    const { data: student, error } = await supabase
+    const normalizedEmail = normalizeEmail(input);
+
+    let student = null;
+    let { data: byEmail, error } = await supabase
       .from('students')
       .select('*')
-      .eq('email', normalizedEmail)
+      .ilike('email', normalizedEmail)
       .maybeSingle();
 
     if (error) {
-      console.error('Student login error:', error);
-      return res.status(500).json({ success: false, message: 'Login failed', error: error.message });
+      console.warn('Student lookup by email encountered error:', error.message);
     }
 
-    if (!student || !await comparePassword(password, student.password)) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    if (byEmail) {
+      student = byEmail;
+    } else {
+      // Check if user entered Student ID (e.g., ES-2026-431532)
+      const { data: byStudentId } = await supabase
+        .from('students')
+        .select('*')
+        .ilike('student_id', input)
+        .maybeSingle();
+
+      if (byStudentId) {
+        student = byStudentId;
+      } else {
+        // Check if user entered Roll Number
+        const { data: byRollNo } = await supabase
+          .from('students')
+          .select('*')
+          .ilike('roll_no', input)
+          .maybeSingle();
+
+        student = byRollNo;
+      }
+    }
+
+    const trimmedPassword = (password || '').trim();
+    let isPasswordValid = student ? await comparePassword(password, student.password) : false;
+    if (!isPasswordValid && trimmedPassword && trimmedPassword !== password) {
+      isPasswordValid = await comparePassword(trimmedPassword, student.password);
+    }
+
+    if (!student || !isPasswordValid) {
+      return res.status(401).json({ success: false, message: 'Invalid Student ID/Email or password.' });
     }
 
     if (student.is_active === false) {

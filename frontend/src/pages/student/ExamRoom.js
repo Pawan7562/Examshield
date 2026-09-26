@@ -1,5 +1,5 @@
-// src/pages/student/ExamRoom.js — Production-Grade Exam Interface
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// src/pages/student/ExamRoom.js — Professional Online Examination & Monitoring Environment
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { studentAPI } from '../../services/api';
@@ -10,80 +10,79 @@ import MCQQuestion from '../../components/MCQQuestion';
 import SubjectiveQuestion from '../../components/SubjectiveQuestion';
 import CodingQuestion from '../../components/CodingQuestion';
 import Timer from '../../components/Timer';
+import { parseToIST, formatIST } from '../../utils/timezone';
+import './ExamRoom.css';
+import {
+  Shield,
+  ShieldAlert,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Maximize,
+  Minimize,
+  ChevronLeft,
+  ChevronRight,
+  Flag,
+  RotateCcw,
+  Info,
+  X,
+  Send,
+  HelpCircle,
+  User,
+  Check,
+  FileText,
+  AlertCircle
+} from 'lucide-react';
 
-// ─── Inject Global Styles ───────────────────────────────────────────────────────
-if (!document.getElementById('examroom-styles')) {
-  const s = document.createElement('style');
-  s.id = 'examroom-styles';
-  s.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-    * { box-sizing: border-box; }
-    @keyframes er-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(.85)} }
-    @keyframes er-fade-in { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-    @keyframes er-slide-down { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
-    @keyframes er-shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
-    @keyframes er-glow-red { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0)} 50%{box-shadow:0 0 0 8px rgba(239,68,68,0.3)} }
-    .er-enter { animation: er-fade-in 0.25s ease both; }
-    .er-banner { animation: er-slide-down 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
-    .er-shake { animation: er-shake 0.4s ease; }
-    .er-warning-ring { animation: er-glow-red 1.5s infinite; }
-  `;
-  document.head.appendChild(s);
-}
-
-// ─── Design Tokens ──────────────────────────────────────────────────────────────
-const C = {
-  bg: '#080810',
-  surface: 'rgba(255,255,255,0.025)',
-  border: 'rgba(255,255,255,0.07)',
-  accent: '#e94560',
-  accentDark: '#b81c3a',
-  green: '#22c55e',
-  yellow: '#f59e0b',
-  red: '#ef4444',
-  text: '#e2e8f0',
-  muted: '#64748b',
-  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-};
-
-// ─── Reusable Toast Helpers (react-hot-toast v2 compatible) ────────────────────
+// ─── Toast Notification Helpers ───────────────────────────────────────────────
 const notify = {
   warn: (msg) => toast(msg, {
     icon: '⚠️',
     style: {
-      background: '#1a1a2e',
-      color: '#fbbf24',
-      border: '1px solid rgba(251,191,36,0.35)',
+      background: '#fffbeb',
+      color: '#b45309',
+      border: '1.5px solid #fde68a',
       fontWeight: 600,
-      fontFamily: C.fontFamily,
+      fontSize: '0.88rem',
+      borderRadius: '10px',
+      boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
     },
     duration: 5000,
   }),
   error: (msg) => toast.error(msg, {
     style: {
-      background: '#1a1a2e',
-      color: '#f87171',
-      border: '1px solid rgba(239,68,68,0.35)',
-      fontFamily: C.fontFamily,
+      background: '#fef2f2',
+      color: '#b91c1c',
+      border: '1.5px solid #fecaca',
+      fontWeight: 600,
+      fontSize: '0.88rem',
+      borderRadius: '10px',
+      boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
     },
     duration: 6000,
   }),
   success: (msg) => toast.success(msg, {
     style: {
-      background: '#1a1a2e',
-      color: '#4ade80',
-      border: '1px solid rgba(34,197,94,0.35)',
-      fontFamily: C.fontFamily,
+      background: '#f0fdf4',
+      color: '#15803d',
+      border: '1.5px solid #bbf7d0',
+      fontWeight: 600,
+      fontSize: '0.88rem',
+      borderRadius: '10px',
+      boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
     },
     duration: 4000,
   }),
   info: (msg) => toast(msg, {
     icon: 'ℹ️',
     style: {
-      background: '#1a1a2e',
-      color: '#93c5fd',
-      border: '1px solid rgba(147,197,253,0.3)',
-      fontFamily: C.fontFamily,
+      background: '#eff6ff',
+      color: '#1d4ed8',
+      border: '1.5px solid #bfdbfe',
+      fontWeight: 600,
+      fontSize: '0.88rem',
+      borderRadius: '10px',
+      boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
     },
     duration: 4000,
   }),
@@ -94,89 +93,77 @@ function TabWarningOverlay({ count, onDismiss }) {
   if (count === 0) return null;
   const isFinal = count >= 3;
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: isFinal ? 'rgba(0,0,0,0.92)' : 'rgba(0,0,0,0.75)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      backdropFilter: 'blur(6px)',
-    }}>
-      <div className="er-banner" style={{
-        background: isFinal
-          ? 'linear-gradient(135deg, #1a0000, #2d0000)'
-          : 'linear-gradient(135deg, #1a1200, #2d2000)',
-        border: `2px solid ${isFinal ? '#ef4444' : '#f59e0b'}`,
-        borderRadius: 20,
-        padding: '40px 48px',
-        maxWidth: 520,
-        width: '90%',
-        textAlign: 'center',
-        boxShadow: `0 0 60px ${isFinal ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.3)'}`,
-      }}>
-        <div style={{ fontSize: 56, marginBottom: 16 }}>
-          {isFinal ? '🚨' : '⚠️'}
+    <div className="er-modal-backdrop" style={{ zIndex: 9999 }}>
+      <div className="er-modal-card" style={{ maxWidth: 480, textAlign: 'center' }}>
+        <div
+          className="er-modal-icon-wrap"
+          style={{
+            background: isFinal ? '#fef2f2' : '#fffbeb',
+            color: isFinal ? '#ef4444' : '#f59e0b',
+          }}
+        >
+          {isFinal ? <ShieldAlert size={32} /> : <AlertTriangle size={32} />}
         </div>
-        <h2 style={{
-          fontSize: 22,
-          fontWeight: 800,
-          color: isFinal ? '#fca5a5' : '#fcd34d',
-          margin: '0 0 12px',
-          fontFamily: C.fontFamily,
-        }}>
-          {isFinal ? 'Exam Terminated!' : `Tab Switch Warning (${count}/3)`}
+        <h2 className="er-modal-title" style={{ color: isFinal ? '#dc2626' : '#d97706' }}>
+          {isFinal ? 'Examination Terminated' : `Tab Switch Warning (${count}/3)`}
         </h2>
-        <p style={{
-          fontSize: 14,
-          color: '#94a3b8',
-          lineHeight: 1.7,
-          margin: '0 0 24px',
-          fontFamily: C.fontFamily,
-        }}>
+        <p className="er-modal-subtitle" style={{ marginTop: 8 }}>
           {isFinal
-            ? 'You have exceeded the maximum number of tab switches. Your exam is being auto-submitted.'
+            ? 'You have exceeded the maximum permissible tab/window switches. Your exam is being automatically submitted.'
             : count === 2
-              ? 'This is your final warning. One more tab switch will automatically submit your exam.'
-              : 'Switching tabs or windows is not allowed during the exam. This violation has been recorded.'}
+              ? 'This is your FINAL warning. One more navigation away from this window will automatically submit your exam.'
+              : 'Switching away from the examination window is strictly prohibited. This security violation has been logged.'}
         </p>
-        {!isFinal && (
-          <button
-            onClick={onDismiss}
-            style={{
-              padding: '12px 32px',
-              background: count === 2
-                ? 'linear-gradient(135deg, #ef4444, #b91c1c)'
-                : 'linear-gradient(135deg, #f59e0b, #d97706)',
-              border: 'none',
-              borderRadius: 10,
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: C.fontFamily,
-            }}
-          >
-            I Understand — Continue Exam
-          </button>
-        )}
-        <div style={{ marginTop: 16, fontSize: 12, color: '#4a5568', fontFamily: C.fontFamily }}>
-          Violations are logged and reviewed by your institution
+
+        <div style={{
+          marginTop: 20,
+          padding: '12px 16px',
+          background: '#f8fafc',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0',
+          fontSize: '0.82rem',
+          color: '#64748b'
+        }}>
+          All security telemetry is recorded and verified by your institution's examination committee.
         </div>
+
+        {!isFinal && (
+          <div style={{ marginTop: 24 }}>
+            <button
+              onClick={onDismiss}
+              className="er-btn-save-next"
+              style={{
+                width: '100%',
+                justifyContent: 'center',
+                height: 44,
+                background: count === 2
+                  ? 'linear-gradient(135deg, #ef4444, #b91c1c)'
+                  : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                boxShadow: 'none'
+              }}
+            >
+              I Understand — Return to Exam
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ─── ExamRoom Component ─────────────────────────────────────────────────────────
+// ─── Main ExamRoom Component ───────────────────────────────────────────────────
 export default function ExamRoom() {
   const { examId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
   // ── Core State ──
-  const [phase, setPhase] = useState('key');
+  const [phase, setPhase] = useState('key'); // 'key' | 'waiting' | 'exam' | 'submitted'
   const [examData, setExamData] = useState(null);
   const [session, setSession] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
+  const [reviewed, setReviewed] = useState({}); // { [qId]: boolean }
   const [currentQ, setCurrentQ] = useState(0);
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -185,11 +172,17 @@ export default function ExamRoom() {
   const [examKey, setExamKey] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // ── Modals State ──
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
+
   // ── Proctoring State ──
   const [violationCount, setViolationCount] = useState(0);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [showTabWarning, setShowTabWarning] = useState(false);
   const [faceAlert, setFaceAlert] = useState(null); // null | 'no_face' | 'multiple_faces'
+  const [proctorWarning, setProctorWarning] = useState(null);
+  const [broadcastAlert, setBroadcastAlert] = useState(null);
 
   // ── Refs ──
   const socketRef = useRef(null);
@@ -201,7 +194,7 @@ export default function ExamRoom() {
   // Keep session ref current
   useEffect(() => { sessionRef.current = session; }, [session]);
 
-  // ─── Fullscreen ───────────────────────────────────────────────────────────────
+  // ─── Fullscreen Handlers ──────────────────────────────────────────────────────
   const enterFullScreen = useCallback(() => {
     try {
       const el = document.documentElement;
@@ -209,13 +202,12 @@ export default function ExamRoom() {
       if (fn) {
         fn.call(el)
           .then(() => setIsFullscreen(true))
-          .catch(() => { }); // Silently ignore — user may deny fullscreen
+          .catch(() => { });
       }
     } catch (_) { }
   }, []);
 
   const exitFullScreen = useCallback(() => {
-    // Only call exitFullscreen if document is actually in fullscreen
     const isCurrentlyFullscreen = !!(
       document.fullscreenElement ||
       document.webkitFullscreenElement ||
@@ -224,21 +216,27 @@ export default function ExamRoom() {
     if (isCurrentlyFullscreen) {
       const fn = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
       try {
-        if (fn) {
-          fn.call(document).catch(() => { }); // catch async Promise rejection
-        }
+        if (fn) fn.call(document).catch(() => { });
       } catch (_) { }
     }
     setIsFullscreen(false);
   }, []);
 
+  const toggleFullScreen = () => {
+    if (isFullscreen) {
+      exitFullScreen();
+    } else {
+      enterFullScreen();
+    }
+  };
+
   // ─── Exam Submit ──────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(async (autoSubmit = false) => {
     if (submittedRef.current) return;
-    if (!autoSubmit && !window.confirm('Submit exam? This cannot be undone.')) return;
 
     submittedRef.current = true;
     setSubmitted(true);
+    setShowSubmitModal(false);
     if (autoSaveRef.current) clearInterval(autoSaveRef.current);
 
     try {
@@ -252,16 +250,16 @@ export default function ExamRoom() {
       });
 
       if (response.success) {
-        notify.success('🎉 Exam submitted successfully!');
+        notify.success('Exam submitted successfully!');
         setResult(response.data);
         setPhase('submitted');
-        setTimeout(exitFullScreen, 1500);
+        setTimeout(exitFullScreen, 1200);
       } else {
         throw new Error(response.message || 'Submission failed');
       }
     } catch (err) {
       console.error('Submission error:', err);
-      notify.error('Submission failed. Please try again.');
+      notify.error('Submission encountered an issue. Please try again.');
       submittedRef.current = false;
       setSubmitted(false);
     }
@@ -273,16 +271,15 @@ export default function ExamRoom() {
     setViolationCount(prev => {
       const next = prev + 1;
       if (next >= 5) {
-        notify.error('🚨 Too many proctoring violations. Exam is being submitted.');
+        notify.error('Too many proctoring violations recorded. Exam is being auto-submitted.');
         handleSubmit(true);
       }
       return next;
     });
-    // Auto-clear face alert after 5 seconds
     setTimeout(() => setFaceAlert(null), 5000);
   }, [handleSubmit]);
 
-  // ─── Tab Switch Detection (production-level) ──────────────────────────────────
+  // ─── Tab Switch Detection ───────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'exam') return;
 
@@ -296,7 +293,6 @@ export default function ExamRoom() {
       tabSwitchCountRef.current += 1;
       setTabSwitchCount(tabSwitchCountRef.current);
 
-      // Emit socket event
       if (socketRef.current && sessionRef.current) {
         socketRef.current.emit('violation', {
           sessionId: sessionRef.current.id,
@@ -317,12 +313,10 @@ export default function ExamRoom() {
     const handleShow = () => {
       if (isBlurred) {
         isBlurred = false;
-        // Student came back — show the warning banner
         const n = tabSwitchCountRef.current;
         if (n > 0 && n < 3) {
           setShowTabWarning(true);
         } else if (n >= 3 && !submittedRef.current) {
-          // Auto-submit
           handleSubmit(true);
         }
       }
@@ -344,14 +338,14 @@ export default function ExamRoom() {
     };
   }, [phase, handleSubmit]);
 
-  // ─── Fullscreen Change ────────────────────────────────────────────────────────
+  // ─── Fullscreen Event Listener ────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'exam') return;
     const check = () => {
       const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
       setIsFullscreen(isFs);
       if (!isFs && phase === 'exam' && !submittedRef.current) {
-        notify.warn('Please return to full-screen mode for secure exam environment');
+        notify.warn('Exam must be taken in Full-Screen mode.');
       }
     };
     document.addEventListener('fullscreenchange', check);
@@ -362,7 +356,7 @@ export default function ExamRoom() {
     };
   }, [phase]);
 
-  // ─── Context Menu / Key Block ─────────────────────────────────────────────────
+  // ─── Context Menu & Shortcut Blocker ─────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'exam') return;
     const onCtx = (e) => { e.preventDefault(); return false; };
@@ -370,9 +364,8 @@ export default function ExamRoom() {
       const blocked = ['c', 'v', 'x', 'a', 's', 'r', 'n', 't', 'w', 'i', 'p', 'u', 'j', 'k'];
       if ((e.ctrlKey || e.metaKey) && blocked.includes(e.key.toLowerCase())) {
         e.preventDefault();
-        notify.warn(`Keyboard shortcut "${e.key.toUpperCase()}" is disabled during exam`);
+        notify.warn(`Shortcut "${e.key.toUpperCase()}" is disabled during examination`);
       }
-      // Block F-keys except F11 (fullscreen toggle)
       if (/^F\d+$/.test(e.key) && e.key !== 'F11') {
         e.preventDefault();
       }
@@ -385,32 +378,72 @@ export default function ExamRoom() {
     };
   }, [phase]);
 
-  // ─── Socket.IO ────────────────────────────────────────────────────────────────
+  // ─── Socket.IO Real-time Proctoring ──────────────────────────────────────────
   useEffect(() => {
+    if (phase !== 'exam' || !session) return;
+
     const token = localStorage.getItem('accessToken');
     const wsUrl = process.env.REACT_APP_WS_URL ||
       (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-d5i2.onrender.com');
     const socket = io(wsUrl, { auth: { token }, reconnectionAttempts: 5 });
     socketRef.current = socket;
 
-    socket.on('connect', () => console.log('🔗 Proctoring server connected'));
-    socket.on('violation_update', (data) => {
-      if (data.sessionId === sessionRef.current?.id) {
-        setViolationCount(data.violationCount ?? 0);
-        notify.warn(`Proctoring alert: ${data.type?.replace(/_/g, ' ')}`);
+    socket.on('connect', () => {
+      console.log('Proctoring connection established for session:', session.id);
+      socket.emit('join-exam', {
+        sessionId: session.id,
+        examId,
+        studentId: user?.id,
+        studentName: user?.name || 'Candidate',
+      });
+    });
+
+    // Heartbeat every 12s
+    const hbInterval = setInterval(() => {
+      if (socket.connected) {
+        socket.emit('heartbeat', {
+          sessionId: session.id,
+          examId,
+          studentId: user?.id,
+        });
+      }
+    }, 12000);
+
+    // Official Warning received from proctor
+    socket.on('warning-received', (data) => {
+      if (!data.studentId || data.studentId === user?.id) {
+        setProctorWarning(data);
+        notify.warn(`PROCTOR WARNING: ${data.message}`);
       }
     });
-    socket.on('exam_terminated', (data) => {
-      if (data.sessionId === sessionRef.current?.id) {
-        notify.error(`Exam terminated: ${data.reason}`);
+
+    // Broadcast announcement received from proctor
+    socket.on('broadcast-received', (data) => {
+      setBroadcastAlert(data);
+      setTimeout(() => setBroadcastAlert(null), 14000);
+    });
+
+    // Immediate Termination from proctor
+    socket.on('exam-terminated', (data) => {
+      if (!data.studentId || data.studentId === user?.id) {
+        notify.error(`Exam Terminated by Proctor: ${data.reason || 'Policy Violation'}`);
         handleSubmit(true);
       }
     });
 
-    return () => socket.disconnect();
-  }, [examId]); // eslint-disable-line
+    socket.on('violation_update', (data) => {
+      if (data.sessionId === sessionRef.current?.id) {
+        setViolationCount(data.violationCount ?? 0);
+      }
+    });
 
-  // ─── Auto-save ────────────────────────────────────────────────────────────────
+    return () => {
+      clearInterval(hbInterval);
+      socket.disconnect();
+    };
+  }, [phase, session, examId, user?.id, user?.name, handleSubmit]);
+
+  // ─── Periodic Auto-save ──────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'exam' || !session || submitted) return;
     autoSaveRef.current = setInterval(() => {
@@ -429,11 +462,19 @@ export default function ExamRoom() {
     return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
   }, [phase, session, submitted, answers, questions, examId]);
 
-  // ─── Fetch Exam Info ──────────────────────────────────────────────────────────
+  // ─── Fetch Exam Details ───────────────────────────────────────────────────────
   useEffect(() => {
     if (examId && phase === 'key') {
       studentAPI.getExamDetails(examId)
-        .then(r => { if (r.success) setExamData(r.data); })
+        .then(r => {
+          if (r.success && r.data) {
+            setExamData(r.data);
+            const key = r.data.exam?.exam_code || r.data.exam?.exam_key;
+            if (key) {
+              setExamKey(String(key).trim().toUpperCase());
+            }
+          }
+        })
         .catch(() => { });
     }
   }, [examId, phase]);
@@ -451,6 +492,22 @@ export default function ExamRoom() {
     }).catch(() => { });
   }, [questions, session, examId]);
 
+  // ─── Clear Answer ─────────────────────────────────────────────────────────────
+  const handleClearAnswer = (questionId) => {
+    setAnswers(prev => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+    notify.info('Choice cleared');
+  };
+
+  // ─── Toggle Review Flag ───────────────────────────────────────────────────────
+  const toggleReview = (questionId) => {
+    setReviewed(prev => ({ ...prev, [questionId]: !prev[questionId] }));
+  };
+
+  // ─── Start Exam Logic ─────────────────────────────────────────────────────────
   const triggerBackendStart = useCallback(async (keyToUse) => {
     setIsStartingExam(true);
     try {
@@ -464,23 +521,21 @@ export default function ExamRoom() {
           || 3600;
         setTimeSeconds(secs);
         setPhase('exam');
-        notify.success('✅ Exam started! Good luck!');
+        notify.success('Exam session initiated. Good luck!');
       } else {
-        // If the backend says we're still early (clock sync or timezone issue), stay in waiting, no fast loop
         if (response.message && response.message.includes('Exam accessible from')) {
-          // Signal a failure to the user but don't reset to key
-          notify.error('Waiting for server authorization... retrying shortly.');
+          notify.error('Waiting for server scheduled start authorization...');
         } else {
-          exitFullScreen(); // Exits if it failed
+          exitFullScreen();
           setPhase('key');
-          notify.error(response.message || 'Invalid exam key. Please try again.');
+          notify.error(response.message || 'Invalid exam key. Please verify and try again.');
         }
       }
     } catch (err) {
       if (err?.message && err.message.includes('Exam accessible from')) {
         notify.error('Waiting for server authorization... retrying shortly.');
       } else {
-        exitFullScreen(); // Exits if it failed
+        exitFullScreen();
         setPhase('key');
         console.error('Start exam error:', err);
         notify.error(err?.message || 'Failed to start exam. Check your key and try again.');
@@ -490,21 +545,15 @@ export default function ExamRoom() {
     }
   }, [examId, exitFullScreen]);
 
-  // ─── Start Exam ───────────────────────────────────────────────────────────────
   const handleStartExam = useCallback(() => {
     const key = examKey.trim();
-    if (!key) { notify.warn('Please enter your exam key'); return; }
+    if (!key) { notify.warn('Please enter your exam security key'); return; }
 
     enterFullScreen();
 
-    // Automatic waiting room hook
     if (examData?.exam?.date_time) {
-      let dateStr = examData.exam.date_time.replace(' ', 'T');
-      if (!dateStr.endsWith('Z') && !dateStr.includes('+')) {
-        dateStr = `${dateStr}+05:30`;
-      }
-      const startTime = new Date(dateStr).getTime();
-      if (Date.now() < startTime) {
+      const start = parseToIST(examData.exam.date_time);
+      if (start && Date.now() < start.getTime()) {
         setPhase('waiting');
         return;
       }
@@ -513,39 +562,68 @@ export default function ExamRoom() {
     triggerBackendStart(key);
   }, [examKey, examData, enterFullScreen, triggerBackendStart]);
 
-  // Waiting Room Auto-Start Effect
+  // Waiting Room Auto-Start Effect (Strictly anchored to IST)
   useEffect(() => {
     if (phase !== 'waiting' || !examData?.exam?.date_time || isStartingExam) return;
 
-    // Timezone safe target parsing exactly matching the IST +05:30 configuration
-    let dateStr = examData.exam.date_time.replace(' ', 'T');
-    if (!dateStr.endsWith('Z') && !dateStr.includes('+')) {
-      dateStr = `${dateStr}+05:30`;
-    }
-    const targetTime = new Date(dateStr).getTime();
+    const start = parseToIST(examData.exam.date_time);
+    if (!start) return;
+    const targetTime = start.getTime();
 
     const checkAndTrigger = () => {
-      // Trigger if local browser clock has reached the scheduled time
-      if (Date.now() >= targetTime + 1000) {
+      if (Date.now() >= targetTime) {
         triggerBackendStart(examKey.trim());
       }
     };
 
-    // Attempt every 5 seconds instead of 1 second to completely eradicate API loop flooding
-    const interval = setInterval(checkAndTrigger, 5000);
-    checkAndTrigger(); // Check immediately once
+    const interval = setInterval(checkAndTrigger, 3000);
+    checkAndTrigger();
 
     return () => clearInterval(interval);
   }, [phase, examData, examKey, triggerBackendStart, isStartingExam]);
 
-  // ─── Security Status Colors ───────────────────────────────────────────────────
-  const answeredCount = questions.filter(q => !!answers[q.id]).length;
-  const fsColor = isFullscreen ? C.green : C.yellow;
-  const tabColor = tabSwitchCount === 0 ? C.green : tabSwitchCount < 3 ? C.yellow : C.red;
-  const vioColor = violationCount === 0 ? C.green : violationCount < 3 ? C.yellow : C.red;
+  // ─── Computed Statistics ──────────────────────────────────────────────────────
+  const answeredCount = useMemo(() => {
+    return questions.filter(q => !!answers[q.id]).length;
+  }, [questions, answers]);
+
+  const reviewedCount = useMemo(() => {
+    return questions.filter(q => !!reviewed[q.id]).length;
+  }, [questions, reviewed]);
+
+  const unansweredCount = useMemo(() => {
+    return questions.length - answeredCount;
+  }, [questions, answeredCount]);
+
+  const progressPercentage = useMemo(() => {
+    if (!questions.length) return 0;
+    return Math.round((answeredCount / questions.length) * 100);
+  }, [answeredCount, questions.length]);
+
+  // ─── Navigation Handlers ──────────────────────────────────────────────────────
+  const handleSaveAndNext = () => {
+    if (currentQ < questions.length - 1) {
+      setCurrentQ(prev => prev + 1);
+    } else {
+      // Last question - prompt submit modal
+      setShowSubmitModal(true);
+    }
+  };
+
+  const handleMarkAndNext = () => {
+    const qId = questions[currentQ]?.id;
+    if (qId) {
+      setReviewed(prev => ({ ...prev, [qId]: true }));
+    }
+    if (currentQ < questions.length - 1) {
+      setCurrentQ(prev => prev + 1);
+    } else {
+      setShowSubmitModal(true);
+    }
+  };
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // ─── PHASE: KEY ──────────────────────────────────────────────────────────────
+  // ─── PHASE: KEY ENTRY SCREEN ──────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════════
   if (phase === 'key') {
     return (
@@ -554,92 +632,217 @@ export default function ExamRoom() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: `radial-gradient(ellipse at 50% 0%, rgba(233,69,96,0.08) 0%, ${C.bg} 70%)`,
-        fontFamily: C.fontFamily,
-        padding: '1rem',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #eef2f6 100%)',
+        fontFamily: "'Inter', sans-serif",
+        padding: '24px'
       }}>
         <div style={{
-          background: C.surface,
-          border: `1px solid ${C.border}`,
-          borderRadius: 20,
+          background: '#ffffff',
+          borderRadius: 24,
           padding: '44px 40px',
           width: '100%',
-          maxWidth: 440,
-          boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+          maxWidth: 480,
+          boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05)',
+          border: '1.5px solid #e2e8f0',
         }}>
-          {/* Icon */}
-          <div style={{
-            width: 68, height: 68, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #e94560, #b81c3a)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 24px',
-            boxShadow: '0 8px 32px rgba(233,69,96,0.4)',
-            fontSize: 30,
-          }}>🔒</div>
+          {/* Logo & Lock Badge */}
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{
+              width: 64,
+              height: 64,
+              borderRadius: 20,
+              background: 'linear-gradient(135deg, #0a74da 0%, #0656a3 100%)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 18px',
+              boxShadow: '0 8px 24px rgba(10, 116, 218, 0.25)',
+            }}>
+              <Shield size={32} />
+            </div>
+            <h1 style={{
+              fontSize: '1.65rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              margin: '0 0 6px'
+            }}>
+              ExamShield Assessment
+            </h1>
+            <p style={{ fontSize: '0.9rem', color: '#64748b', margin: 0 }}>
+              {examData?.exam?.title ? examData.exam.title : 'Secure Online Examination Portal'}
+            </p>
+          </div>
 
-          <h1 style={{ textAlign: 'center', fontSize: 28, fontWeight: 800, color: '#f1f5f9', marginBottom: 6, letterSpacing: '-0.5px' }}>
-            ExamShield
-          </h1>
-          <p style={{ textAlign: 'center', fontSize: 14, color: C.muted, marginBottom: 32 }}>
-            {examData?.exam?.title ? `"${examData.exam.title}"` : 'Enter your exam key to begin'}
-          </p>
+          {/* Student Profile Identity Chip */}
+          {user && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '12px 16px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 12,
+              marginBottom: 24
+            }}>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                background: '#0a74da',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '0.9rem'
+              }}>
+                {user.name ? user.name.charAt(0).toUpperCase() : 'S'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1e293b' }}>
+                  {user.name || 'Candidate'}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
+                  ID: {user.roll_number || user.enrollment_number || user.email || 'ES-STUDENT'}
+                </div>
+              </div>
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#15803d',
+                background: '#dcfce7',
+                padding: '3px 8px',
+                borderRadius: 6
+              }}>
+                Verified
+              </span>
+            </div>
+          )}
 
-          {/* Input */}
+          {/* Exam Key Input */}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>
-              Exam Key
+            <label style={{
+              display: 'block',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: '#475569',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginBottom: 8
+            }}>
+              Enter Examination Access Key
             </label>
             <input
               type="text"
               value={examKey}
               onChange={e => setExamKey(e.target.value.toUpperCase())}
-              placeholder="e.g.  EXAM-2024-XYZ"
+              placeholder="e.g. EXAM-8942-ABC"
               disabled={isStartingExam}
               onKeyDown={e => e.key === 'Enter' && handleStartExam()}
-              onFocus={e => { e.target.style.borderColor = C.accent; e.target.style.outline = 'none'; }}
-              onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; }}
               style={{
-                width: '100%', padding: '14px 16px',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1.5px solid rgba(255,255,255,0.1)',
-                borderRadius: 10, color: '#f1f5f9',
-                fontSize: 16, fontFamily: 'inherit',
-                letterSpacing: '3px', transition: 'border-color 0.2s',
+                width: '100%',
+                padding: '14px 18px',
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 12,
+                color: '#0f172a',
+                fontSize: '1.05rem',
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 600,
+                letterSpacing: '2px',
+                outline: 'none',
+                boxSizing: 'border-box',
+                transition: 'all 0.2s ease',
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = '#0a74da';
+                e.target.style.boxShadow = '0 0 0 3px rgba(10, 116, 218, 0.15)';
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = '#cbd5e1';
+                e.target.style.boxShadow = 'none';
               }}
               autoFocus
             />
           </div>
 
-          {/* Button */}
+          {/* Start Exam Button */}
           <button
             onClick={handleStartExam}
             disabled={isStartingExam || !examKey.trim()}
             style={{
-              width: '100%', padding: '14px',
+              width: '100%',
+              height: 48,
               background: isStartingExam || !examKey.trim()
-                ? 'rgba(255,255,255,0.06)'
-                : 'linear-gradient(135deg, #e94560, #b81c3a)',
-              border: 'none', borderRadius: 10,
-              color: isStartingExam || !examKey.trim() ? C.muted : '#fff',
-              fontSize: 15, fontWeight: 700, cursor: isStartingExam || !examKey.trim() ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit', transition: 'all 0.2s',
-              boxShadow: examKey.trim() && !isStartingExam ? '0 4px 20px rgba(233,69,96,0.4)' : 'none',
+                ? '#cbd5e1'
+                : 'linear-gradient(135deg, #0a74da 0%, #0656a3 100%)',
+              border: 'none',
+              borderRadius: 12,
+              color: '#ffffff',
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              cursor: isStartingExam || !examKey.trim() ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              boxShadow: examKey.trim() && !isStartingExam ? '0 4px 14px rgba(10, 116, 218, 0.3)' : 'none',
+              transition: 'all 0.2s ease',
             }}
           >
-            {isStartingExam ? '⏳  Validating Key...' : '🚀  Start Exam'}
+            {isStartingExam ? (
+              <span>Validating Examination Credentials...</span>
+            ) : (
+              <>
+                <Send size={18} />
+                <span>Verify Key & Enter Examination</span>
+              </>
+            )}
           </button>
 
-          {/* Info */}
-          <div style={{ marginTop: 24, padding: 16, background: 'rgba(233,69,96,0.05)', border: '1px solid rgba(233,69,96,0.15)', borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 10 }}>📋 Before You Begin</div>
+          {/* Security & Instructions Checklist */}
+          <div style={{
+            marginTop: 24,
+            padding: '16px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 12
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: '#334155',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginBottom: 10
+            }}>
+              <Info size={14} color="#0a74da" />
+              <span>Examination Security Protocol</span>
+            </div>
             {[
-              'Allow camera access — required for AI proctoring',
-              'Exam enters full-screen mode automatically',
-              'Tab switching is monitored (max 3 switches allowed)',
-              'Answers auto-save every 30 seconds',
-              'Ensure stable internet throughout the exam',
-            ].map((t, i) => (
-              <div key={i} style={{ fontSize: 12, color: '#718096', lineHeight: 1.8 }}>• {t}</div>
+              'Webcam permission required for continuous AI proctoring',
+              'Exam automatically locks into full-screen mode',
+              'Tab/window switches monitored (Max 3 switches before auto-submit)',
+              'Answers auto-save every 30 seconds to the cloud',
+            ].map((rule, idx) => (
+              <div key={idx} style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+                fontSize: '0.8rem',
+                color: '#64748b',
+                lineHeight: 1.5,
+                marginBottom: 6
+              }}>
+                <Check size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
+                <span>{rule}</span>
+              </div>
             ))}
           </div>
         </div>
@@ -651,37 +854,61 @@ export default function ExamRoom() {
   // ─── PHASE: WAITING ROOM ──────────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════════
   if (phase === 'waiting') {
-    let dateStr = examData?.exam?.date_time ? examData.exam.date_time.replace(' ', 'T') : null;
-    if (dateStr && !dateStr.endsWith('Z') && !dateStr.includes('+')) {
-      dateStr = `${dateStr}+05:30`;
-    }
-    const scheduledTime = dateStr ? new Date(dateStr) : new Date();
+    const scheduledTime = parseToIST(examData?.exam?.date_time) || new Date();
+
     return (
       <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: `radial-gradient(ellipse at 50% 0%, rgba(245,158,11,0.06) 0%, ${C.bg} 70%)`,
-        fontFamily: C.fontFamily, padding: '1rem',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f8fafc',
+        fontFamily: "'Inter', sans-serif",
+        padding: '24px'
       }}>
-        <div className="er-enter" style={{
-          background: C.surface, border: `1px solid ${C.border}`,
-          borderRadius: 20, padding: 44, width: '100%', maxWidth: 520,
-          textAlign: 'center', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
-        }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: C.yellow, marginBottom: 8 }}>Waiting to Start</h1>
-          <p style={{ fontSize: 14, color: C.muted, marginBottom: 24, lineHeight: 1.6 }}>
-            You have successfully joined the room. The exam will begin automatically when the scheduled time arrives. Please do not close or refresh this window.
+        <div className="er-modal-card" style={{ maxWidth: 520, textAlign: 'center' }}>
+          <div className="er-modal-icon-wrap" style={{ background: '#fffbeb', color: '#f59e0b' }}>
+            <Clock size={32} />
+          </div>
+          <h1 className="er-modal-title">Waiting Room</h1>
+          <p className="er-modal-subtitle">
+            You have verified your credentials for <strong>{examData?.exam?.title || 'the examination'}</strong>.
+            The exam will launch automatically once the scheduled start time arrives.
           </p>
+
           <div style={{
-            background: 'rgba(255,255,255,0.03)', border: `2px solid rgba(245,158,11,0.3)`,
-            borderRadius: 12, padding: '20px', display: 'inline-block'
+            margin: '24px 0',
+            padding: '20px',
+            background: '#f8fafc',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: 14,
+            display: 'inline-block',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: C.yellow, fontWeight: 700, marginBottom: 6 }}>Scheduled Start</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: '#f1f5f9' }}>
-              {scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <div style={{
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: '#b45309',
+              marginBottom: 6
+            }}>
+              Scheduled Start Time (IST)
             </div>
-            <div style={{ marginTop: 10, fontSize: 12, color: C.muted }}>
-              Waiting for the clock...
+            <div style={{
+              fontSize: '1.85rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              fontFamily: "'JetBrains Mono', monospace"
+            }}>
+              {formatIST(scheduledTime, 'timeOnlySeconds')}
+            </div>
+            <div style={{ marginTop: 6, fontSize: '0.92rem', color: '#475569', fontWeight: 600 }}>
+              📅 {formatIST(scheduledTime, 'dateOnly')} (India Standard Time)
+            </div>
+            <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#64748b' }}>
+              Keep this browser tab open. Do not refresh or close.
             </div>
           </div>
         </div>
@@ -690,83 +917,84 @@ export default function ExamRoom() {
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // ─── PHASE: SUBMITTED ────────────────────────────────────────────────────────
+  // ─── PHASE: SUBMITTED (RESULT / CONFIRMATION) ─────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════════
   if (phase === 'submitted') {
     const pct = result?.percentage ?? 0;
     const passed = pct >= 40;
+
     return (
       <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: `radial-gradient(ellipse at 50% 0%, rgba(34,197,94,0.06) 0%, ${C.bg} 70%)`,
-        fontFamily: C.fontFamily, padding: '1rem',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #eef2f6 100%)',
+        fontFamily: "'Inter', sans-serif",
+        padding: '24px'
       }}>
-        <div style={{
-          background: C.surface, border: `1px solid ${C.border}`,
-          borderRadius: 20, padding: 44, width: '100%', maxWidth: 520,
-          textAlign: 'center', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
-        }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 20px', fontSize: 34,
-            boxShadow: '0 8px 32px rgba(34,197,94,0.35)',
-          }}>✅</div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: C.green, marginBottom: 8 }}>Exam Submitted!</h1>
-          <p style={{ fontSize: 14, color: C.muted }}>Your answers have been recorded and are being graded.</p>
+        <div className="er-modal-card" style={{ maxWidth: 540, textAlign: 'center' }}>
+          <div className="er-modal-icon-wrap" style={{ background: '#ecfdf5', color: '#10b981' }}>
+            <CheckCircle2 size={36} />
+          </div>
+          <h1 className="er-modal-title" style={{ color: '#065f46' }}>
+            Exam Successfully Submitted
+          </h1>
+          <p className="er-modal-subtitle">
+            Your responses and proctoring telemetry have been verified and sealed in the examination records.
+          </p>
+
           {result && (
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr',
-              gap: 12, margin: '28px 0',
-            }}>
-              {[
-                { label: 'Your Score', value: result.score ?? '—' },
-                { label: 'Total Marks', value: result.totalMarks ?? '—' },
-                { label: 'Percentage', value: `${pct}%`, color: passed ? C.green : '#f59e0b' },
-                { label: 'Status', value: passed ? '✅ Passed' : '⏱️ Completed', color: passed ? C.green : '#94a3b8' },
-              ].map((item, i) => (
-                <div key={i} style={{
-                  background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
-                  borderRadius: 12, padding: '14px 10px',
-                }}>
-                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '1px', color: C.muted, fontWeight: 700, marginBottom: 6 }}>{item.label}</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: item.color || '#f1f5f9' }}>{item.value}</div>
-                </div>
-              ))}
+            <div className="er-summary-grid">
+              <div className="er-summary-item">
+                <span className="er-summary-label">Marks Awarded</span>
+                <span className="er-summary-value" style={{ color: '#0a74da' }}>
+                  {result.score ?? 'Pending'} / {result.totalMarks ?? '—'}
+                </span>
+              </div>
+              <div className="er-summary-item">
+                <span className="er-summary-label">Percentage</span>
+                <span className="er-summary-value" style={{ color: passed ? '#10b981' : '#f59e0b' }}>
+                  {pct}%
+                </span>
+              </div>
+              <div className="er-summary-item">
+                <span className="er-summary-label">Status</span>
+                <span className="er-summary-value" style={{ color: passed ? '#10b981' : '#64748b' }}>
+                  {passed ? 'Passed' : 'Completed'}
+                </span>
+              </div>
+              <div className="er-summary-item">
+                <span className="er-summary-label">Proctoring Status</span>
+                <span className="er-summary-value" style={{ color: violationCount === 0 ? '#10b981' : '#f59e0b' }}>
+                  {violationCount === 0 ? 'Clear (0 flags)' : `${violationCount} alerts`}
+                </span>
+              </div>
             </div>
           )}
+
           <button
             onClick={() => navigate('/student/dashboard')}
-            style={{
-              width: '100%', padding: 14,
-              background: 'linear-gradient(135deg, #e94560, #b81c3a)',
-              border: 'none', borderRadius: 10, color: '#fff',
-              fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-            }}
-          >Back to Dashboard</button>
+            className="er-btn-save-next"
+            style={{ width: '100%', height: 46, justifyContent: 'center', fontSize: '0.92rem' }}
+          >
+            Return to Candidate Dashboard
+          </button>
         </div>
       </div>
     );
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // ─── PHASE: EXAM ─────────────────────────────────────────────────────────────
+  // ─── PHASE: ACTIVE EXAM ──────────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════════
   const currentQuestion = questions[currentQ];
+  const isCurrentAnswered = !!answers[currentQuestion?.id];
+  const isCurrentReviewed = !!reviewed[currentQuestion?.id];
 
   return (
-    <div style={{
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      background: C.bg,
-      fontFamily: C.fontFamily,
-      color: C.text,
-    }}>
-
-      {/* ── Tab Switch Warning Overlay ── */}
+    <div className="er-shell">
+      {/* ── Security Tab Warning Dialog ── */}
       {showTabWarning && (
         <TabWarningOverlay
           count={tabSwitchCount}
@@ -776,410 +1004,630 @@ export default function ExamRoom() {
 
       {/* ── Face Detection Alert Banner ── */}
       {faceAlert && (
-        <div className="er-banner" style={{
+        <div style={{
           position: 'fixed',
-          top: 0, left: 0, right: 0,
+          top: 0,
+          left: 0,
+          right: 0,
           zIndex: 8000,
-          background: faceAlert === 'multiple_faces'
-            ? 'linear-gradient(135deg, #7f1d1d, #991b1b)'
-            : 'linear-gradient(135deg, #78350f, #92400e)',
-          borderBottom: `2px solid ${faceAlert === 'multiple_faces' ? '#ef4444' : '#f59e0b'}`,
+          background: faceAlert === 'multiple_faces' ? '#ef4444' : '#f59e0b',
+          color: '#ffffff',
           padding: '10px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 12,
+          fontWeight: 700,
+          fontSize: '0.88rem',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
         }}>
-          <span style={{ fontSize: 20 }}>{faceAlert === 'multiple_faces' ? '🚨' : '👁️'}</span>
-          <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>
+          {faceAlert === 'multiple_faces' ? <ShieldAlert size={20} /> : <AlertTriangle size={20} />}
+          <span>
             {faceAlert === 'multiple_faces'
-              ? 'MULTIPLE PERSONS DETECTED — Only the exam taker should be visible'
-              : 'FACE NOT VISIBLE — Please ensure your face is in the camera frame'}
+              ? 'MULTIPLE PERSONS DETECTED — Only the registered student may be visible'
+              : 'FACE NOT VISIBLE — Please face your camera directly to avoid disqualification'}
           </span>
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Violation Recorded</span>
+          <span style={{ fontSize: '0.75rem', opacity: 0.85, marginLeft: 'auto' }}>
+            Flag logged
+          </span>
         </div>
       )}
 
-      {/* ── Header ── */}
-      <div style={{
-        position: 'sticky',
-        top: faceAlert ? 48 : 0,
-        zIndex: 100,
-        background: 'rgba(8,8,16,0.95)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: `1px solid ${C.border}`,
-        transition: 'top 0.3s ease',
-      }}>
+      {/* ── Broadcast Announcement Banner from Proctor ── */}
+      {broadcastAlert && (
         <div style={{
-          maxWidth: 1440,
-          margin: '0 auto',
-          height: 60,
-          padding: '0 24px',
+          position: 'fixed',
+          top: faceAlert ? 44 : 0,
+          left: 0,
+          right: 0,
+          zIndex: 8500,
+          background: 'linear-gradient(90deg, #0284c7, #0369a1)',
+          color: '#ffffff',
+          padding: '10px 24px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           gap: 12,
+          fontWeight: 700,
+          fontSize: '0.88rem',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
         }}>
-          {/* Brand */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <div style={{
-              width: 10, height: 10, borderRadius: '50%',
-              background: C.accent,
-              boxShadow: `0 0 8px ${C.accent}`,
-              animation: 'er-pulse 2s infinite',
-            }} />
-            <span style={{ fontWeight: 800, fontSize: 16, color: '#f1f5f9', letterSpacing: '-0.3px' }}>ExamShield</span>
-            {examData?.exam?.title && (
-              <span style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
-                — {examData.exam.title}
-              </span>
-            )}
-          </div>
+          <span style={{ fontSize: '1.1rem' }}>📢</span>
+          <span>
+            <strong>EXAM COMMITTEE NOTICE:</strong> {broadcastAlert.message}
+          </span>
+          <button
+            onClick={() => setBroadcastAlert(null)}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: '#fff',
+              borderRadius: 4,
+              padding: '2px 8px',
+              cursor: 'pointer',
+              marginLeft: 'auto',
+              fontSize: '0.75rem',
+              fontWeight: 700
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
-          {/* Status Chips */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {/* Fullscreen */}
-            <StatusChip color={fsColor} label={isFullscreen ? 'Full-screen' : 'Windowed'} />
-            {/* Tab Switches */}
-            <StatusChip
-              color={tabColor}
-              label={`Tabs: ${tabSwitchCount}/3`}
-              pulse={tabSwitchCount > 0}
-            />
-            {/* Violations */}
-            <StatusChip
-              color={vioColor}
-              label={`Alerts: ${violationCount}`}
-              pulse={violationCount > 0}
-            />
-            {/* Timer */}
-            {timeSeconds > 0 && <Timer seconds={timeSeconds} onExpire={() => handleSubmit(true)} />}
-            {/* Submit */}
+      {/* ── Official Proctor Warning Modal ── */}
+      {proctorWarning && (
+        <div className="er-modal-backdrop" style={{ zIndex: 10000 }}>
+          <div className="er-modal-card" style={{ maxWidth: 480, textAlign: 'center', border: '2px solid #ef4444' }}>
+            <div className="er-modal-icon-wrap" style={{ background: '#fef2f2', color: '#dc2626' }}>
+              <ShieldAlert size={36} />
+            </div>
+            <h2 className="er-modal-title" style={{ color: '#dc2626' }}>
+              Official Proctoring Warning (Strike {proctorWarning.strike || 1}/3)
+            </h2>
+            <div style={{
+              margin: '16px 0',
+              padding: '14px 18px',
+              background: '#fff1f2',
+              border: '1px solid #fecdd3',
+              borderRadius: 10,
+              color: '#9f1239',
+              fontSize: '0.92rem',
+              fontWeight: 600,
+              textAlign: 'left',
+              lineHeight: 1.45
+            }}>
+              "{proctorWarning.message}"
+            </div>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0 0 20px' }}>
+              Your examination window is actively monitored. Exceeding permissible strikes will cause immediate automatic disqualification.
+            </p>
             <button
-              onClick={() => handleSubmit(false)}
-              disabled={submitted}
-              style={{
-                padding: '8px 18px',
-                background: submitted ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #e94560, #b81c3a)',
-                border: 'none',
-                borderRadius: 8,
-                color: submitted ? C.muted : '#fff',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: submitted ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit',
-                boxShadow: submitted ? 'none' : '0 2px 12px rgba(233,69,96,0.4)',
-                transition: 'all 0.2s',
-                flexShrink: 0,
-              }}
+              onClick={() => setProctorWarning(null)}
+              className="er-btn-save-next"
+              style={{ width: '100%', justifyContent: 'center', height: 44, background: '#dc2626', color: '#fff' }}
             >
-              {submitted ? '✅ Submitted' : 'Submit Exam'}
+              I Acknowledge & Return to Exam
             </button>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ── Body ── */}
-      {currentQuestion?.type === 'coding' ? (
-        // ── CODING: Full-width split-pane layout ──────────────────────────────
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-          {/* Slim top bar: question navigator + status */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '10px',
-            padding: '8px 20px',
-            background: 'rgba(8,8,16,0.8)',
-            borderBottom: `1px solid ${C.border}`,
-            flexShrink: 0, flexWrap: 'wrap',
-          }}>
-            {/* Question pills */}
-            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-              {questions.map((q, i) => {
-                const isCur = i === currentQ;
-                const isAns = !!answers[q.id];
-                return (
-                  <button
-                    key={q.id || i}
-                    onClick={() => setCurrentQ(i)}
-                    title={`Q${i + 1}: ${q.title || q.type}`}
-                    style={{
-                      width: 32, height: 32, borderRadius: 8,
-                      border: isCur
-                        ? '2px solid #e94560'
-                        : isAns ? '1.5px solid rgba(34,197,94,0.5)' : `1.5px solid ${C.border}`,
-                      background: isCur
-                        ? 'rgba(233,69,96,0.15)'
-                        : isAns ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.02)',
-                      color: isCur ? '#e94560' : isAns ? '#22c55e' : '#475569',
-                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'inherit', transition: 'all 0.15s',
-                    }}
-                  >{i + 1}</button>
-                );
-              })}
-            </div>
-
-            {/* Spacer */}
-            <div style={{ flex: 1 }} />
-
-            {/* Answered count */}
-            <span style={{ fontSize: 11, color: C.muted }}>
-              {answeredCount}/{questions.length} answered
+      {/* ═════════════════════════════════════════════════════════════════════════
+          1. TOP NAVIGATION COCKPIT
+          ═════════════════════════════════════════════════════════════════════════ */}
+      <header className="er-navbar">
+        {/* Brand & Exam Title */}
+        <div className="er-nav-brand">
+          <div className="er-brand-logo">
+            <Shield size={24} />
+            <span>ExamShield</span>
+          </div>
+          <span className="er-brand-badge">Secure Exam</span>
+          <div className="er-nav-exam-title">
+            <span className="er-exam-title-text">
+              {examData?.exam?.title || 'Examination Session'}
             </span>
+            <span className="er-exam-subject-tag">
+              {examData?.exam?.subject || 'Comprehensive Assessment'}
+            </span>
+          </div>
+        </div>
 
-            {/* Prev / Next */}
-            <button
-              onClick={() => setCurrentQ(q => Math.max(0, q - 1))}
-              disabled={currentQ === 0}
-              style={{
-                padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                background: currentQ === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${currentQ === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)'}`,
-                color: currentQ === 0 ? '#334155' : '#94a3b8',
-                cursor: currentQ === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-              }}
-            >← Prev</button>
-            <button
-              onClick={() => setCurrentQ(q => Math.min(questions.length - 1, q + 1))}
-              disabled={currentQ === questions.length - 1}
-              style={{
-                padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                background: currentQ === questions.length - 1 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${currentQ === questions.length - 1 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)'}`,
-                color: currentQ === questions.length - 1 ? '#334155' : '#94a3b8',
-                cursor: currentQ === questions.length - 1 ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-              }}
-            >Next →</button>
+        {/* Candidate Identity Chip */}
+        <div className="er-nav-candidate">
+          <div className="er-candidate-avatar">
+            {user?.name ? user.name.charAt(0).toUpperCase() : <User size={14} />}
+          </div>
+          <div className="er-candidate-details">
+            <span className="er-candidate-name">{user?.name || 'Candidate'}</span>
+            <span className="er-candidate-id">
+              {user?.roll_number || user?.enrollment_number || user?.email || 'ID: ES-STD'}
+            </span>
+          </div>
+        </div>
+
+        {/* Security Telemetry & Controls */}
+        <div className="er-nav-controls">
+          {/* Fullscreen status & toggle */}
+          <button
+            onClick={toggleFullScreen}
+            className="er-chip er-chip-fullscreen"
+            style={{ cursor: 'pointer', border: 'none' }}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          >
+            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+            <span>{isFullscreen ? 'Full-Screen' : 'Windowed'}</span>
+          </button>
+
+          {/* Tab Switch Counter Pill */}
+          <div className={`er-chip ${tabSwitchCount === 0 ? 'er-chip-proctor' : tabSwitchCount < 3 ? 'er-chip-warning' : 'er-chip-danger'}`}>
+            <div className={`er-chip-dot ${tabSwitchCount > 0 ? 'er-chip-pulse' : ''}`} />
+            <span>Tabs: {tabSwitchCount}/3</span>
           </div>
 
-          {/* Full-width split-pane coding IDE */}
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            {currentQuestion && (
-              <CodingQuestion
-                question={currentQuestion}
-                answer={answers[currentQuestion.id] || ''}
-                onAnswer={(code) => handleAnswer(currentQuestion.id, code)}
-              />
-            )}
+          {/* Violation / Alert Pill */}
+          {violationCount > 0 && (
+            <div className="er-chip er-chip-danger">
+              <ShieldAlert size={14} />
+              <span>Flags: {violationCount}</span>
+            </div>
+          )}
+
+          {/* Live Countdown Timer */}
+          {timeSeconds > 0 && (
+            <Timer seconds={timeSeconds} onExpire={() => handleSubmit(true)} />
+          )}
+
+          {/* Submit Exam Trigger */}
+          <button
+            onClick={() => setShowSubmitModal(true)}
+            disabled={submitted}
+            className="er-btn-submit-exam"
+          >
+            <Send size={15} />
+            <span>Submit Exam</span>
+          </button>
+        </div>
+      </header>
+
+      {/* ═════════════════════════════════════════════════════════════════════════
+          2. PROGRESS & METADATA SUB-BAR
+          ═════════════════════════════════════════════════════════════════════════ */}
+      <div className="er-subbar">
+        {/* Progress bar */}
+        <div className="er-progress-summary">
+          <span className="er-progress-text">
+            Progress: <strong>{answeredCount}</strong> of <strong>{questions.length}</strong> Answered ({progressPercentage}%)
+          </span>
+          <div className="er-progress-bar-wrap">
+            <div
+              className="er-progress-bar-fill"
+              style={{ width: `${progressPercentage}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Stats breakdown pills */}
+        <div className="er-subbar-stats">
+          <div className="er-stat-pill">
+            <span className="er-stat-badge badge-answered">{answeredCount}</span>
+            <span>Answered</span>
+          </div>
+          <div className="er-stat-pill">
+            <span className="er-stat-badge badge-review">{reviewedCount}</span>
+            <span>For Review</span>
+          </div>
+          <div className="er-stat-pill">
+            <span className="er-stat-badge badge-unanswered">{unansweredCount}</span>
+            <span>Unanswered</span>
+          </div>
+
+          {/* Exam Instructions modal trigger */}
+          <button
+            onClick={() => setShowInstructionsModal(true)}
+            className="er-btn-instructions"
+          >
+            <HelpCircle size={14} />
+            <span>Instructions</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ═════════════════════════════════════════════════════════════════════════
+          3. MAIN EXAM CONTENT: TWO COLUMN SPLIT (QUESTION CANVAS + SIDE PANEL)
+          ═════════════════════════════════════════════════════════════════════════ */}
+      {currentQuestion?.type === 'coding' ? (
+        // Full width IDE layout for Coding Questions
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 24px',
+            background: '#ffffff',
+            borderBottom: '1px solid #e2e8f0',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className="er-q-number-badge">Q{currentQ + 1}</span>
+              <span className="er-q-type-badge">Coding Challenge</span>
+              <span className="er-q-marks-badge">{currentQuestion.marks || 5} Marks</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setCurrentQ(q => Math.max(0, q - 1))}
+                disabled={currentQ === 0}
+                className="er-btn-prev"
+              >
+                <ChevronLeft size={16} /> Prev
+              </button>
+              <button
+                onClick={handleSaveAndNext}
+                className="er-btn-save-next"
+              >
+                {currentQ === questions.length - 1 ? 'Review & Submit' : 'Next'} <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', height: 'calc(100vh - 130px)', position: 'relative' }}>
+            <CodingQuestion
+              question={currentQuestion}
+              answer={answers[currentQuestion.id] || ''}
+              onAnswer={(code) => handleAnswer(currentQuestion.id, code)}
+            />
+            {/* Live Camera & Voice Proctoring PiP HUD */}
+            <ProfessionalProctoring
+              sessionId={session?.id}
+              examId={examId}
+              studentId={user?.id}
+              onViolation={handleFaceViolation}
+              currentQuestion={currentQ + 1}
+              totalQuestions={questions.length}
+              mode="pip"
+              pipCorner="bottom-left"
+              socket={socketRef.current}
+            />
           </div>
         </div>
       ) : (
-        // ── MCQ / SUBJECTIVE: 3-column layout ────────────────────────────────
-        <div style={{
-          flex: 1, overflowY: 'auto',
-          padding: '20px 24px',
-        }}>
-          <div style={{
-            maxWidth: 1440, margin: '0 auto',
-            display: 'grid', gridTemplateColumns: '220px 1fr 220px',
-            gap: 20, alignItems: 'start',
-          }}>
-            {/* Left: Question Navigator */}
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 14, padding: 16,
-              position: 'sticky', top: 80,
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '1.2px', marginBottom: 14 }}>
-                Questions ({questions.length})
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 5, marginBottom: 16 }}>
-                {questions.map((q, i) => {
-                  const isCur = i === currentQ;
-                  const isAns = !!answers[q.id];
-                  return (
+        // Standard MCQ & Subjective Layout
+        <main className="er-main-content">
+          {/* ── Left Question Canvas ── */}
+          <div className="er-question-pane">
+            {currentQuestion ? (
+              <div className="er-question-card">
+                {/* Question Top Header */}
+                <div className="er-question-header">
+                  <div className="er-q-meta-left">
+                    <span className="er-q-number-badge">
+                      Question {currentQ + 1}
+                    </span>
+                    <span className="er-q-type-badge">
+                      {currentQuestion.type === 'mcq' ? 'Multiple Choice' : 'Descriptive'}
+                    </span>
+                    <span className="er-q-marks-badge">
+                      +{currentQuestion.marks || 1} {currentQuestion.marks === 1 ? 'Mark' : 'Marks'}
+                    </span>
+                  </div>
+
+                  <div className="er-q-actions-right">
+                    {/* Mark for review toggle */}
                     <button
-                      key={q.id || i}
-                      onClick={() => setCurrentQ(i)}
-                      title={`Q${i + 1}`}
-                      style={{
-                        aspectRatio: '1',
-                        border: isCur
-                          ? '2px solid #e94560'
-                          : isAns ? '1.5px solid rgba(34,197,94,0.5)' : `1.5px solid ${C.border}`,
-                        borderRadius: 7,
-                        background: isCur
-                          ? 'rgba(233,69,96,0.15)'
-                          : isAns ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.02)',
-                        color: isCur ? '#e94560' : isAns ? '#22c55e' : '#475569',
-                        fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontFamily: 'inherit', padding: 0, transition: 'all 0.15s',
-                      }}
-                    >{i + 1}</button>
-                  );
-                })}
-              </div>
-              {/* Legend */}
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {[
-                  { color: 'rgba(233,69,96,0.15)', border: '2px solid #e94560', label: 'Current' },
-                  { color: 'rgba(34,197,94,0.1)', border: '1.5px solid rgba(34,197,94,0.5)', label: `Answered (${answeredCount})` },
-                  { color: 'rgba(255,255,255,0.02)', border: `1.5px solid ${C.border}`, label: 'Skipped' },
-                ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: C.muted }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 3, background: item.color, border: item.border, flexShrink: 0 }} />
-                    {item.label}
+                      onClick={() => toggleReview(currentQuestion.id)}
+                      className={`er-btn-flag-review ${isCurrentReviewed ? 'active' : ''}`}
+                      title="Flag question to review later"
+                    >
+                      <Flag size={14} />
+                      <span>{isCurrentReviewed ? 'Marked for Review' : 'Mark for Review'}</span>
+                    </button>
+
+                    {/* Clear selection */}
+                    <button
+                      onClick={() => handleClearAnswer(currentQuestion.id)}
+                      disabled={!isCurrentAnswered}
+                      className="er-btn-clear-choice"
+                      title="Clear your answer for this question"
+                    >
+                      <RotateCcw size={14} />
+                      <span>Clear Response</span>
+                    </button>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Center: Question */}
-            <div>
-              {currentQuestion ? (
-                <div key={currentQ} className="er-enter" style={{
-                  background: C.surface, border: `1px solid ${C.border}`,
-                  borderRadius: 16, padding: '28px 32px',
-                  position: 'relative', overflow: 'hidden',
-                }}>
-                  {/* Top accent bar */}
-                  <div style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-                    background: 'linear-gradient(90deg, #e94560, #7c3aed)',
-                  }} />
-
-                  {/* Question header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{
-                        width: 38, height: 38, borderRadius: 10,
-                        background: 'rgba(233,69,96,0.12)', border: '1.5px solid rgba(233,69,96,0.25)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 14, fontWeight: 800, color: C.accent, flexShrink: 0,
-                      }}>{currentQ + 1}</div>
-                      <div style={{ fontSize: 13, color: C.muted }}>
-                        Question {currentQ + 1} of {questions.length}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <span style={{
-                        padding: '3px 10px', background: 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${C.border}`, borderRadius: 20,
-                        fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase',
-                      }}>
-                        {currentQuestion.type === 'mcq' ? 'MCQ' : 'Descriptive'}
-                      </span>
-                      <span style={{
-                        padding: '3px 10px', background: 'rgba(124,58,237,0.08)',
-                        border: '1px solid rgba(124,58,237,0.2)', borderRadius: 20,
-                        fontSize: 11, color: '#a78bfa', fontWeight: 700,
-                      }}>
-                        {currentQuestion.marks || 1} {currentQuestion.marks === 1 ? 'Mark' : 'Marks'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Question body */}
-                  {currentQuestion.type === 'mcq' && (
+                {/* Question Body */}
+                <div className="er-question-body">
+                  {currentQuestion.type === 'mcq' ? (
                     <MCQQuestion
                       question={currentQuestion}
                       answer={answers[currentQuestion.id] || ''}
                       onAnswer={(opt) => handleAnswer(currentQuestion.id, opt)}
                     />
-                  )}
-                  {currentQuestion.type === 'subjective' && (
+                  ) : (
                     <SubjectiveQuestion
                       question={currentQuestion}
                       answer={answers[currentQuestion.id] || ''}
                       onAnswer={(text) => handleAnswer(currentQuestion.id, text)}
                     />
                   )}
+                </div>
 
-                  {/* Navigation */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 28 }}>
+                {/* Question Action Footer */}
+                <div className="er-question-footer">
+                  <button
+                    onClick={() => setCurrentQ(q => Math.max(0, q - 1))}
+                    disabled={currentQ === 0}
+                    className="er-btn-prev"
+                  >
+                    <ChevronLeft size={16} />
+                    <span>Previous</span>
+                  </button>
+
+                  <div className="er-footer-right-actions">
                     <button
-                      onClick={() => setCurrentQ(q => Math.max(0, q - 1))}
-                      disabled={currentQ === 0}
-                      style={navArrowStyle(currentQ === 0)}
-                    >← Previous</button>
-                    <span style={{ fontSize: 12, color: '#334155' }}>
-                      {answeredCount} / {questions.length} answered
-                    </span>
+                      onClick={handleMarkAndNext}
+                      className="er-btn-mark-next"
+                    >
+                      <Flag size={15} />
+                      <span>Mark for Review & Next</span>
+                    </button>
+
                     <button
-                      onClick={() => setCurrentQ(q => Math.min(questions.length - 1, q + 1))}
-                      disabled={currentQ === questions.length - 1}
-                      style={navArrowStyle(currentQ === questions.length - 1)}
-                    >Next →</button>
+                      onClick={handleSaveAndNext}
+                      className="er-btn-save-next"
+                    >
+                      <span>{currentQ === questions.length - 1 ? 'Review & Submit' : 'Save & Next'}</span>
+                      <ChevronRight size={16} />
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <div style={{
-                  background: C.surface, border: `1px solid ${C.border}`,
-                  borderRadius: 16, padding: '60px 32px', textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 48 }}>📋</div>
-                  <p style={{ color: C.muted, marginTop: 12 }}>No questions available for this exam.</p>
+              </div>
+            ) : (
+              <div className="er-question-card" style={{ padding: '60px', textAlign: 'center' }}>
+                <FileText size={48} color="#94a3b8" style={{ margin: '0 auto 16px' }} />
+                <h3 style={{ fontSize: '1.2rem', color: '#1e293b', marginBottom: 8 }}>
+                  No Question Available
+                </h3>
+                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                  There are currently no examination items loaded for this section.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ── Right Side Panel: Proctoring & Question Palette ── */}
+          <aside className="er-side-panel">
+            {/* Live Proctoring Webcam Box */}
+            <div className="er-proctor-box">
+              <div className="er-proctor-header">
+                <div className="er-proctor-title">
+                  <Shield size={14} color="#0a74da" />
+                  <span>AI Proctoring Stream</span>
                 </div>
-              )}
+                <span className="er-proctor-status-tag">
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#15803d' }} />
+                  Monitoring Active
+                </span>
+              </div>
+              <div className="er-proctor-feed-wrap">
+                <ProfessionalProctoring
+                  sessionId={session?.id}
+                  examId={examId}
+                  studentId={user?.id}
+                  onViolation={handleFaceViolation}
+                  currentQuestion={currentQ + 1}
+                  totalQuestions={questions.length}
+                  socket={socketRef.current}
+                />
+              </div>
             </div>
 
-            {/* Right: Proctoring */}
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 14, position: 'sticky', top: 80, overflow: 'hidden',
-            }}>
-              <div style={{
-                padding: '10px 14px', borderBottom: `1px solid ${C.border}`,
-                fontSize: 10, fontWeight: 700, color: '#334155',
-                textTransform: 'uppercase', letterSpacing: '1px',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, animation: 'er-pulse 2s infinite' }} />
-                Live Proctoring
+            {/* Question Palette Box */}
+            <div className="er-palette-box">
+              <div className="er-palette-title">
+                <span>Question Palette</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>
+                  {answeredCount}/{questions.length} Done
+                </span>
               </div>
-              <ProfessionalProctoring
-                sessionId={session?.id}
-                examId={examId}
-                studentId={user?.id}
-                onViolation={handleFaceViolation}
-                currentQuestion={currentQ + 1}
-                totalQuestions={questions.length}
-              />
+
+              {/* Grid of question buttons */}
+              <div className="er-palette-grid">
+                {questions.map((q, idx) => {
+                  const isCur = idx === currentQ;
+                  const isAns = !!answers[q.id];
+                  const isRev = !!reviewed[q.id];
+
+                  let statusClass = 'status-unanswered';
+                  if (isAns && isRev) {
+                    statusClass = 'status-answered-review';
+                  } else if (isRev) {
+                    statusClass = 'status-review';
+                  } else if (isAns) {
+                    statusClass = 'status-answered';
+                  }
+
+                  return (
+                    <button
+                      key={q.id || idx}
+                      onClick={() => setCurrentQ(idx)}
+                      className={`er-palette-btn ${statusClass} ${isCur ? 'current' : ''}`}
+                      title={`Question ${idx + 1}`}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Palette Legend */}
+              <div className="er-palette-legend">
+                <div className="er-legend-item">
+                  <div className="er-legend-icon icon-answered" />
+                  <span>Answered ({answeredCount})</span>
+                </div>
+                <div className="er-legend-item">
+                  <div className="er-legend-icon icon-answered-review" />
+                  <span>Answered & Marked for Review</span>
+                </div>
+                <div className="er-legend-item">
+                  <div className="er-legend-icon icon-review" />
+                  <span>Marked for Review ({reviewedCount})</span>
+                </div>
+                <div className="er-legend-item">
+                  <div className="er-legend-icon icon-unanswered" />
+                  <span>Not Answered ({unansweredCount})</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </main>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════════════════════
+          4. SUBMIT CONFIRMATION MODAL
+          ═════════════════════════════════════════════════════════════════════════ */}
+      {showSubmitModal && (
+        <div className="er-modal-backdrop">
+          <div className="er-modal-card">
+            <div className="er-modal-header">
+              <div className="er-modal-icon-wrap" style={{ background: '#eff6ff', color: '#0a74da' }}>
+                <Send size={28} />
+              </div>
+              <h2 className="er-modal-title">Ready to Submit Examination?</h2>
+              <p className="er-modal-subtitle">
+                Please verify your answers summary before submitting. Once submitted, your examination cannot be reopened or edited.
+              </p>
+            </div>
+
+            {/* Summary statistics grid */}
+            <div className="er-summary-grid">
+              <div className="er-summary-item">
+                <span className="er-summary-label">Total Questions</span>
+                <span className="er-summary-value">{questions.length}</span>
+              </div>
+              <div className="er-summary-item">
+                <span className="er-summary-label">Answered</span>
+                <span className="er-summary-value" style={{ color: '#10b981' }}>{answeredCount}</span>
+              </div>
+              <div className="er-summary-item">
+                <span className="er-summary-label">Unanswered</span>
+                <span className="er-summary-value" style={{ color: '#ef4444' }}>{unansweredCount}</span>
+              </div>
+              <div className="er-summary-item">
+                <span className="er-summary-label">Marked for Review</span>
+                <span className="er-summary-value" style={{ color: '#8b5cf6' }}>{reviewedCount}</span>
+              </div>
+            </div>
+
+            {unansweredCount > 0 && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 14px',
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: 10,
+                color: '#b45309',
+                fontSize: '0.82rem',
+                marginBottom: 20
+              }}>
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>You have <strong>{unansweredCount} unanswered questions</strong>. They will be marked with 0 score.</span>
+              </div>
+            )}
+
+            <div className="er-modal-actions">
+              <button
+                onClick={() => setShowSubmitModal(false)}
+                className="er-modal-btn-cancel"
+              >
+                Back to Exam
+              </button>
+              <button
+                onClick={() => handleSubmit(false)}
+                disabled={submitted}
+                className="er-modal-btn-confirm"
+              >
+                {submitted ? 'Submitting...' : 'Yes, Submit Examination'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ═════════════════════════════════════════════════════════════════════════
+          5. EXAM INSTRUCTIONS SLIDE-OVER / MODAL
+          ═════════════════════════════════════════════════════════════════════════ */}
+      {showInstructionsModal && (
+        <div className="er-modal-backdrop">
+          <div className="er-modal-card er-instructions-modal">
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 16,
+              paddingBottom: 12,
+              borderBottom: '1px solid #e2e8f0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <HelpCircle size={22} color="#0a74da" />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                  Examination Instructions & Rules
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowInstructionsModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  padding: 4
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="er-instructions-content">
+              <h4>1. General Navigation</h4>
+              <ul>
+                <li>Use the <strong>Save & Next</strong> button to save your response and navigate to the next question.</li>
+                <li>You can jump directly to any question by clicking its number in the <strong>Question Palette</strong> on the right.</li>
+                <li>Use <strong>Mark for Review & Next</strong> if you want to flag a question to review before final submission.</li>
+                <li>For multiple-choice questions, you can use keyboard keys <strong>A-D</strong> or <strong>1-4</strong> to select choices instantly.</li>
+              </ul>
+
+              <h4>2. Question Palette Color Indicators</h4>
+              <ul>
+                <li><strong style={{ color: '#10b981' }}>Green:</strong> You have answered the question.</li>
+                <li><strong style={{ color: '#8b5cf6' }}>Purple:</strong> You have flagged the question for review.</li>
+                <li><strong style={{ color: '#64748b' }}>Light Gray:</strong> You have not answered the question.</li>
+              </ul>
+
+              <h4>3. AI Proctoring & Anti-Cheating Protocol</h4>
+              <ul>
+                <li>Maintain a centered position within your webcam frame throughout the session.</li>
+                <li>Switching browser tabs, opening new windows, or minimizing the browser is strictly recorded. A maximum of <strong>3 tab switches</strong> is allowed before automatic disqualification.</li>
+                <li>Keyboard shortcuts for copy/paste/refresh are blocked by the security system.</li>
+                <li>Ensure a quiet, well-lit environment without unauthorized individuals present in the room.</li>
+              </ul>
+            </div>
+
+            <div style={{ paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+              <button
+                onClick={() => setShowInstructionsModal(false)}
+                className="er-btn-save-next"
+                style={{ width: '100%', height: 42, justifyContent: 'center' }}
+              >
+                Close & Continue Examination
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-// ─── StatusChip helper ──────────────────────────────────────────────────────────
-
-function StatusChip({ color, label, pulse }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 6,
-      padding: '4px 12px',
-      background: `${color}14`,
-      border: `1px solid ${color}30`,
-      borderRadius: 20,
-      fontSize: 12, color, fontWeight: 600,
-      fontFamily: "'Inter', sans-serif",
-      whiteSpace: 'nowrap',
-    }}>
-      <div style={{
-        width: 7, height: 7, borderRadius: '50%', background: color,
-        animation: pulse ? 'er-pulse 1.5s infinite' : 'none',
-      }} />
-      {label}
-    </div>
-  );
-}
-
-// ─── Nav arrow button style ─────────────────────────────────────────────────────
-function navArrowStyle(disabled) {
-  return {
-    padding: '10px 22px',
-    background: disabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
-    border: `1.5px solid ${disabled ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)'}`,
-    borderRadius: 10,
-    color: disabled ? '#334155' : '#94a3b8',
-    fontSize: 13, fontWeight: 600,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    fontFamily: "'Inter', sans-serif",
-    pointerEvents: disabled ? 'none' : 'auto',
-    transition: 'all 0.15s',
-  };
 }

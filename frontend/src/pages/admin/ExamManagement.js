@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
-import { format } from 'date-fns';
+import { formatIST } from '../../utils/timezone';
 import toast from 'react-hot-toast';
 import { 
   Plus, 
@@ -249,7 +249,7 @@ export default function ExamManagement() {
                   <div className="admin-exam-meta">
                     <div className="admin-exam-meta-item">
                       <Calendar size={14} />
-                      {format(new Date(exam.date_time), 'dd MMM yyyy, HH:mm')}
+                      {formatIST(exam.date_time, 'dateTime')}
                     </div>
                     <div className="admin-exam-meta-item">
                       <Clock size={14} />

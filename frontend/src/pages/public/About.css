@@ -1,0 +1,333 @@
+/* ══════════════════════════════════════
+   About.css — ExamShield About Page
+   ══════════════════════════════════════ */
+
+/* ── Hero ── */
+.about-hero-section {
+  padding: 80px 0 64px;
+  text-align: center;
+}
+.about-hero-section h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2.6rem, 5vw, 4rem);
+  font-weight: 700;
+  color: var(--es-text);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 0 auto 24px;
+  max-width: 800px;
+}
+.about-hero-section h1 span { color: var(--es-green); }
+
+/* ── Stats Grid ── */
+.about-stats-section { padding: 0 0 80px; }
+.about-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+.about-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 16px;
+  background: #ffffff;
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius-lg);
+  box-shadow: var(--es-shadow-sm);
+  transition: all 0.25s ease;
+  gap: 8px;
+}
+.about-stat-card:hover { transform: translateY(-4px); box-shadow: var(--es-shadow-md); border-color: rgba(8,127,76,0.2); }
+.about-stat-icon { color: var(--es-green); }
+.about-stat-card strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--es-text);
+  line-height: 1;
+}
+.about-stat-card span { font-size: 0.78rem; font-weight: 600; color: var(--es-muted); }
+
+/* ── Mission ── */
+.about-mission-section { padding: 0 0 80px; }
+.about-mission-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: start;
+}
+.about-mission-left h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-weight: 700;
+  color: var(--es-text);
+  margin: 0 0 20px;
+  letter-spacing: -0.02em;
+}
+.about-mission-left p {
+  font-size: 0.96rem;
+  color: var(--es-muted);
+  line-height: 1.75;
+  margin: 0 0 16px;
+}
+.about-mission-quote {
+  background: linear-gradient(135deg, #071f18, #0c3526);
+  border-radius: var(--es-radius-lg);
+  padding: 36px;
+}
+.about-quote-text {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.88);
+  line-height: 1.65;
+  margin: 0 0 28px;
+  font-style: italic;
+}
+.about-quote-author {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.about-quote-avatar {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.about-quote-author strong { display: block; color: #fff; font-size: 0.9rem; }
+.about-quote-author span { color: rgba(255,255,255,0.55); font-size: 0.78rem; }
+
+/* ── Timeline ── */
+.about-timeline-section { padding: 0 0 80px; }
+.about-timeline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+  margin-bottom: 40px;
+  overflow-x: auto;
+  gap: 0;
+}
+.about-timeline::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  top: 28px;
+  height: 2px;
+  background: var(--es-border);
+  z-index: 0;
+}
+.about-timeline-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 100px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  padding: 0 8px;
+  transition: all 0.2s;
+}
+.about-timeline-year {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--es-muted);
+  transition: all 0.2s;
+}
+.about-timeline-dot {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--es-border);
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px var(--es-border);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.about-timeline-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--es-muted);
+  text-align: center;
+  transition: all 0.2s;
+}
+.about-timeline-item.active .about-timeline-year { color: var(--es-green); }
+.about-timeline-item.active .about-timeline-dot {
+  background: var(--es-green);
+  box-shadow: 0 0 0 4px rgba(8,127,76,0.15);
+}
+.about-timeline-item.active .about-timeline-label { color: var(--es-green); }
+.about-timeline-item:hover .about-timeline-year { color: var(--es-green); }
+
+.about-timeline-panel {
+  background: linear-gradient(135deg, var(--es-green-light), #f0fff8);
+  border: 1px solid rgba(8,127,76,0.15);
+  border-radius: var(--es-radius-lg);
+  padding: 36px;
+  animation: slideUp 0.25s ease;
+}
+.about-timeline-panel-year {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 4rem;
+  font-weight: 800;
+  color: rgba(8,127,76,0.08);
+  line-height: 1;
+  margin-bottom: -16px;
+}
+.about-timeline-panel h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--es-text);
+  margin: 0 0 16px;
+}
+.about-timeline-panel p { margin: 0; color: var(--es-muted); font-size: 0.96rem; line-height: 1.7; }
+
+/* ── Values ── */
+.about-values-section { padding: 0 0 80px; }
+.about-values-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.about-value-card {
+  background: #fff;
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius-lg);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--es-shadow-sm);
+  transition: all 0.25s ease;
+}
+.about-value-card:hover { transform: translateY(-4px); box-shadow: var(--es-shadow-md); }
+.about-value-card h3 {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--es-text);
+}
+.about-value-card p { margin: 0; font-size: 0.88rem; color: var(--es-muted); line-height: 1.65; }
+
+/* ── Leadership ── */
+.about-team-section { padding: 0 0 80px; }
+.about-team-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.about-team-card {
+  display: flex;
+  gap: 18px;
+  background: #fff;
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius-lg);
+  padding: 24px;
+  box-shadow: var(--es-shadow-sm);
+  transition: all 0.25s ease;
+  align-items: flex-start;
+}
+.about-team-card:hover { transform: translateY(-3px); box-shadow: var(--es-shadow-md); }
+.about-team-avatar {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.88rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.about-team-info strong { display: block; font-size: 0.95rem; font-weight: 700; color: var(--es-text); margin-bottom: 4px; }
+.about-team-role { display: block; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--es-green); margin-bottom: 10px; }
+.about-team-info p { margin: 0; font-size: 0.82rem; color: var(--es-muted); line-height: 1.6; }
+
+/* ── Certifications ── */
+.about-certs-section { padding: 0 0 80px; }
+.about-certs-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+  padding: 48px;
+  background: linear-gradient(135deg, #071f18, #0c3526);
+  border-radius: var(--es-radius-lg);
+}
+.about-certs-left .feat-kicker { color: #4ade80; }
+.about-certs-left h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 16px;
+  letter-spacing: -0.02em;
+}
+.about-certs-left p { color: rgba(255,255,255,0.65); font-size: 0.95rem; line-height: 1.7; margin: 0 0 24px; }
+.about-certs-badges {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.about-cert-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--es-radius);
+  color: rgba(255,255,255,0.88);
+  font-size: 0.88rem;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+.about-cert-badge:hover { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.3); }
+.about-cert-badge svg { color: #4ade80; flex-shrink: 0; }
+
+/* ── About CTA ── */
+.about-cta-section {
+  text-align: center;
+  padding: 80px 0;
+}
+.about-cta-section h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 700;
+  color: var(--es-text);
+  margin: 12px auto 20px;
+  max-width: 640px;
+  letter-spacing: -0.02em;
+}
+.about-cta-section p { max-width: 520px; margin: 0 auto; color: var(--es-muted); font-size: 1rem; line-height: 1.7; }
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .about-stats-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 860px) {
+  .about-mission-inner,
+  .about-certs-inner { grid-template-columns: 1fr; gap: 32px; }
+  .about-values-grid,
+  .about-team-grid { grid-template-columns: 1fr 1fr; }
+  .about-certs-inner { padding: 32px; }
+}
+@media (max-width: 600px) {
+  .about-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .about-values-grid,
+  .about-team-grid { grid-template-columns: 1fr; }
+  .about-certs-badges { grid-template-columns: 1fr; }
+  .about-team-card { flex-direction: column; }
+  .about-timeline { flex-direction: column; gap: 20px; }
+  .about-timeline::before { display: none; }
+}

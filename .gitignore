@@ -5,3 +5,5 @@ uploads/
 build/
 dist/
 .DS_Store
+.neon
+.env.local

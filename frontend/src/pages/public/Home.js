@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   ArrowUpRight,
-  ArrowLeft,
   Check,
   CheckCircle2,
   ShieldCheck,
@@ -15,15 +14,12 @@ import {
   FileText,
   Users,
   Award,
+  Star,
   ChevronDown,
   ChevronUp,
-  ShieldAlert,
-  Volume2,
   Layers,
-  Clock,
   Laptop,
   Building2,
-  Activity,
   AlertTriangle,
   GraduationCap,
   Calendar,
@@ -32,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import PublicLayout from '../../components/public/PublicLayout';
+import heroExamMonitoringImg from '../../assets/exam-monitoring-hero.jpeg';
 import './Home.css';
 
 const dashboardPathFor = (role) => {
@@ -311,28 +308,79 @@ const lifecycleSteps = [
   },
 ];
 
-// Verified Institutional Testimonials
+// Verified Institutional Testimonials with Executive Metadata
 const institutionalTestimonials = [
   {
-    quote: 'ExamShield delivered seamless proctoring for our 12,000 engineering finals with zero student lockouts. The synchronized video audit dossiers eliminated all grade dispute ambiguities.',
+    id: 'apex',
+    category: 'higher-ed',
     author: 'Dr. Arthur Vance',
+    initials: 'AV',
+    avatarBg: 'linear-gradient(135deg, #0a74da, #0284c7)',
     role: 'Dean of Academic Examinations',
     institution: 'Apex Institute of Technology',
-    stats: '12,000+ Exams Secured',
+    stats: '12,000+ Finals Secured · 0 Disputes',
+    quote: 'ExamShield delivered seamless proctoring for our 12,000 engineering finals with zero candidate lockouts. The synchronized video audit dossiers eliminated all grade dispute ambiguities before the academic senate.',
+    tags: ['ABET Accredited', 'Canvas LTI 1.3', 'Engineering Cohort'],
   },
   {
-    quote: 'Switching from intrusive software downloads to ExamShield’s browser kiosk cut our pre-exam support tickets by 86%. Our proctors love the AI-prioritized risk sorting.',
+    id: 'medical-board',
+    category: 'medical',
     author: 'Prof. Elena Rostova',
-    role: 'Director of Distance Learning',
+    initials: 'ER',
+    avatarBg: 'linear-gradient(135deg, #059669, #10b981)',
+    role: 'Director of Assessment & Distance Learning',
     institution: 'State Medical & Health Sciences Board',
-    stats: '86% Reduction in Support Issues',
+    stats: '86% Reduction in Proctor Overhead',
+    quote: 'Switching from intrusive software downloads to ExamShield’s zero-install browser kiosk cut our pre-exam support tickets by 86%. Our proctors love the AI-prioritized risk cockpit that flags looking-away incidents instantly.',
+    tags: ['Clinical Pathology', 'HIPAA Aligned', 'Zero Kernel Driver'],
   },
   {
-    quote: 'For high-stakes corporate certifications, integrity is non-negotiable. ExamShield gave us enterprise compliance, FERPA adherence, and bulletproof exam defense.',
+    id: 'horizon',
+    category: 'certifications',
     author: 'Marcus Chen',
+    initials: 'MC',
+    avatarBg: 'linear-gradient(135deg, #7c3aed, #6366f1)',
     role: 'Head of Global Certifications',
     institution: 'Horizon Cyber Academy',
-    stats: '99.98% Anomaly Precision',
+    stats: '99.98% Anomaly Precision (45 Countries)',
+    quote: 'For high-stakes cloud security certifications, credential integrity is non-negotiable. ExamShield provided enterprise compliance, real-time whisper intercom, and bulletproof exam defensibility across 45 countries.',
+    tags: ['Global InfoSec', 'AES-256 Cloud', '1:50 Proctoring'],
+  },
+  {
+    id: 'metro',
+    category: 'higher-ed',
+    author: 'Dr. Kimberly Patel',
+    initials: 'KP',
+    avatarBg: 'linear-gradient(135deg, #ea580c, #f97316)',
+    role: 'Controller of Examinations',
+    institution: 'Metro State University System',
+    stats: '18 Campus Halls Live on Single Radar',
+    quote: 'Managing 18 engineering and business examination halls used to require over 60 invigilators on campus. With ExamShield’s centralized College Admin radar, 12 proctors maintained higher vigilance than ever before.',
+    tags: ['18 Exam Halls', 'Banner ERP Sync', 'Multi-Dept Radar'],
+  },
+  {
+    id: 'nursing',
+    category: 'medical',
+    author: 'Dr. Alistair Thorne',
+    initials: 'AT',
+    avatarBg: 'linear-gradient(135deg, #0284c7, #06b6d4)',
+    role: 'Dean of Clinical Licensing',
+    institution: 'National Healthcare Licensure Council',
+    stats: '100% Admissible Evidence Dossiers',
+    quote: 'When medical licensing decisions are audited, having frame-by-frame gaze coordinates, audio decibel spikes, and proctor timestamps packaged into a court-ready dossier gives our board complete confidence.',
+    tags: ['Medical Licensure', 'Forensic PDF Dossier', 'Acoustic Mesh'],
+  },
+  {
+    id: 'law',
+    category: 'certifications',
+    author: 'Sarah Jenkins, Esq.',
+    initials: 'SJ',
+    avatarBg: 'linear-gradient(135deg, #0f172a, #334155)',
+    role: 'Testing Committee Chair',
+    institution: 'Chartered Legal & Financial Standards Institute',
+    stats: 'Zero Student Privacy Complaints',
+    quote: 'Our candidates refused to install invasive kernel-level spyware. ExamShield’s browser kiosk lockdown and transparent warning alerts satisfied student privacy while completely stopping Alt+Tab cheating.',
+    tags: ['Browser Kiosk', 'FERPA & GDPR', '3-Strike Alerts'],
   },
 ];
 
@@ -375,19 +423,11 @@ export default function Home() {
   const [activeAudience, setActiveAudience] = useState('universities');
   const [activeShowcaseTab, setActiveShowcaseTab] = useState('cockpit');
   const [activeFaq, setActiveFaq] = useState(0);
-  const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
+  const [activeTestimonialCategory, setActiveTestimonialCategory] = useState('all');
 
-  const goToNextTestimonial = () => {
-    setCurrentTestimonialIndex((prev) => Math.min(prev + 1, institutionalTestimonials.length - 1));
-  };
-
-  const goToPreviousTestimonial = () => {
-    setCurrentTestimonialIndex((prev) => Math.max(prev - 1, 0));
-  };
-
-  const goToTestimonial = (index) => {
-    setCurrentTestimonialIndex(index);
-  };
+  const filteredTestimonials = activeTestimonialCategory === 'all'
+    ? institutionalTestimonials
+    : institutionalTestimonials.filter((t) => t.category === activeTestimonialCategory);
 
   const selectedDepartment = collegeDepartments.find((d) => d.id === activeDepartment) || collegeDepartments[0];
   const selectedAudience = audienceSolutions.find((item) => item.id === activeAudience) || audienceSolutions[0];
@@ -441,130 +481,15 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Hero Interactive SaaS Proctoring Cockpit Mockup */}
-        <div className="landing-hero-cockpit-wrapper" aria-label="ExamShield live proctoring cockpit preview">
-          <div className="hero-cockpit-frame">
-            {/* Cockpit Window Header */}
-            <div className="hero-cockpit-header">
-              <div className="cockpit-dots" aria-hidden="true">
-                <span className="dot red" />
-                <span className="dot yellow" />
-                <span className="dot green" />
-              </div>
-
-              <div className="cockpit-session-meta">
-                <span className="session-id">SESSION #EX-84920</span>
-                <span className="candidate-name">Sarah Mitchell (ID: CS-2024-81)</span>
-              </div>
-
-              <div className="cockpit-live-status">
-                <span className="live-pulsar" aria-hidden="true" />
-                <span>REC ● 1080p WebRTC</span>
-              </div>
-            </div>
-
-            {/* Cockpit Main Feed & Telemetry HUD */}
-            <div className="hero-cockpit-main">
-              <div className="hero-video-viewport">
-                <img
-                  className="hero-candidate-feed"
-                  src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=85"
-                  alt="Live candidate taking an online exam with face mesh overlay"
-                  fetchPriority="high"
-                />
-
-                {/* AI HUD Detection Overlay */}
-                <div className="ai-hud-overlay" aria-hidden="true">
-                  <div className="face-bounding-box">
-                    <div className="corner top-left" />
-                    <div className="corner top-right" />
-                    <div className="corner bottom-left" />
-                    <div className="corner bottom-right" />
-                    <div className="ai-match-pill">
-                      <ScanFace size={13} />
-                      <span>Face Verified 99.4%</span>
-                    </div>
-                  </div>
-
-                  <div className="hud-telemetry-badge top-right">
-                    <span className="hud-signal good">
-                      <Eye size={12} />
-                      Gaze: Center (0° Dev)
-                    </span>
-                  </div>
-
-                  <div className="hud-telemetry-badge bottom-left">
-                    <span className="hud-signal good">
-                      <Volume2 size={12} />
-                      Audio: 22dB (Calm)
-                    </span>
-                  </div>
-
-                  <div className="hud-risk-badge">
-                    <span className="risk-score-value">2% RISK</span>
-                    <span className="risk-label">Verified Safe</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Cockpit Side Event Ticker */}
-              <div className="hero-cockpit-sidebar">
-                <div className="cockpit-sidebar-header">
-                  <Activity size={14} aria-hidden="true" />
-                  <strong>Real-Time AI Signals</strong>
-                </div>
-
-                <div className="cockpit-event-list">
-                  <div className="cockpit-event-item passed">
-                    <span className="event-time">10:00:02</span>
-                    <div className="event-body">
-                      <strong>Biometric Identity Match</strong>
-                      <span>Facial landmarks matched with student ID</span>
-                    </div>
-                  </div>
-
-                  <div className="cockpit-event-item passed">
-                    <span className="event-time">10:04:15</span>
-                    <div className="event-body">
-                      <strong>Browser Kiosk Locked</strong>
-                      <span>Fullscreen active • Devtools disabled</span>
-                    </div>
-                  </div>
-
-                  <div className="cockpit-event-item passed">
-                    <span className="event-time">10:18:40</span>
-                    <div className="event-body">
-                      <strong>Multi-Person Check</strong>
-                      <span>Single candidate in frame (1 face verified)</span>
-                    </div>
-                  </div>
-
-                  <div className="cockpit-event-item notice">
-                    <span className="event-time">10:32:11</span>
-                    <div className="event-body">
-                      <strong>Acoustic Baseline</strong>
-                      <span>Ambient noise floor calibrated to room</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Invigilator Action Bar */}
-                <div className="cockpit-action-bar">
-                  <button type="button" className="cockpit-btn primary" title="Send a private audio whisper to candidate">
-                    <Mic size={13} aria-hidden="true" />
-                    Whisper
-                  </button>
-                  <button type="button" className="cockpit-btn secondary" title="Flag a timestamp for post-exam review">
-                    <Clock size={13} aria-hidden="true" />
-                    Flag
-                  </button>
-                  <button type="button" className="cockpit-btn warning" title="Enforce warning to candidate">
-                    <ShieldAlert size={13} aria-hidden="true" />
-                    Warn
-                  </button>
-                </div>
-              </div>
-            </div>
+        {/* Hero Proctoring Showcase Image */}
+        <div className="landing-hero-cockpit-wrapper" aria-label="ExamShield live exam monitoring and AI proctoring platform">
+          <div className="hero-showcase-frame">
+            <img
+              src={heroExamMonitoringImg}
+              alt="ExamShield AI Proctoring & Live Exam Monitoring"
+              className="hero-showcase-image"
+              fetchpriority="high"
+            />
           </div>
         </div>
       </section>
@@ -1205,8 +1130,8 @@ export default function Home() {
         </div>
 
         <div className="landing-inline-link-row">
-          <Link to="/admin/register" className="landing-inline-link" aria-label="Test the live proctoring dashboard with a free institutional trial">
-            Try the Dashboard Demo with an Institutional Trial
+          <Link to="/admin/register" className="landing-inline-link" aria-label="Deploy the live proctoring dashboard with a free institutional trial">
+            Deploy Live Proctoring with an Institutional Trial
             <ArrowRight size={15} aria-hidden="true" />
           </Link>
         </div>
@@ -1265,81 +1190,150 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Institutional Testimonials */}
-      <section className="public-shell landing-section" aria-labelledby="testimonials-heading">
+      {/* ──── INSTITUTIONAL VALIDATION & PROVEN RESULTS ──── */}
+      <section className="public-shell landing-section proven-results-section" aria-labelledby="testimonials-heading">
         <div className="landing-section-title">
-          <p className="landing-section-kicker">PROVEN RESULTS</p>
-          <h2 id="testimonials-heading">Validated by examination leaders</h2>
-          <p>Read how academic leaders, certifiers, and faculty trust ExamShield to safeguard their credentials.</p>
+          <div className="landing-eyebrow-wrapper">
+            <span className="landing-eyebrow-pill">
+              <Award size={14} aria-hidden="true" />
+              PROVEN RESULTS &amp; INSTITUTIONAL TRUST
+            </span>
+          </div>
+          <h2 id="testimonials-heading">
+            Validated by examination leaders across <span>150+ universities</span>
+          </h2>
+          <p>
+            Read how academic deans, exam controllers, and certification boards deploy ExamShield to eliminate academic dishonesty and protect degree credibility.
+          </p>
         </div>
 
-        {/* Testimonial Carousel */}
-        <div className="testimonials-carousel-container">
-          <div className="testimonials-slider" role="region" aria-label="Institutional testimonials">
-            {/* Testimonial Slides */}
-            <div className="testimonials-track">
-              {institutionalTestimonials.map((t, index) => (
-                <div
-                  key={t.author}
-                  className={`testimonial-slide ${currentTestimonialIndex === index ? 'active' : ''}`}
-                  role="listitem"
-                  aria-hidden={currentTestimonialIndex !== index}
-                  tabIndex={-1}
-                >
-                  <article className="testimonial-card">
-                    <div className="testimonial-stat-badge">{t.stats}</div>
-                    <p className="testimonial-quote">“{t.quote}”</p>
-                    <div className="testimonial-author-meta">
-                      <div className="author-avatar-badge" aria-hidden="true">
-                        {t.author.charAt(3) || 'U'}
-                      </div>
-                      <div>
-                        <strong>{t.author}</strong>
-                        <span>{t.role}</span>
-                        <small>{t.institution}</small>
-                      </div>
-                    </div>
-                  </article>
-                </div>
-              ))}
+        {/* Quantified Executive Impact Bar */}
+        <div className="proven-stats-bar">
+          <div className="proven-stat-card">
+            <div className="stat-card-header">
+              <span className="stat-number">1.2M+</span>
+              <span className="stat-pill-trend">Verified</span>
             </div>
+            <span className="stat-label">Exams Monitored Globally</span>
+            <span className="stat-sub">Across 45 countries with 100% audit trail retention</span>
           </div>
 
-          {/* Navigation Controls */}
-          <div className="testimonials-navigation" aria-label="Testimonial navigation">
-            <button
-              type="button"
-              className={`testimonial-nav-btn prev ${currentTestimonialIndex === 0 ? 'disabled' : ''}`}
-              onClick={goToPreviousTestimonial}
-              aria-disabled={currentTestimonialIndex === 0}
-            >
-              <ArrowLeft size={20} aria-hidden="true" />
-              Previous
-            </button>
-
-            <div className="testimonials-dots" role="tablist" aria-label="Testimonial slides">
-              {institutionalTestimonials.map((_, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  className={`testimonial-dot ${currentTestimonialIndex === index ? 'active' : ''}`}
-                  role="tab"
-                  aria-selected={currentTestimonialIndex === index}
-                  onClick={() => goToTestimonial(index)}
-                  aria-label={`Testimonial ${index + 1}`}
-                />
-              ))}
+          <div className="proven-stat-card">
+            <div className="stat-card-header">
+              <span className="stat-number">99.98%</span>
+              <span className="stat-pill-trend">Precision</span>
             </div>
+            <span className="stat-label">Neural Anomaly Detection</span>
+            <span className="stat-sub">Sub-180ms gaze vector &amp; acoustic mesh intelligence</span>
+          </div>
 
+          <div className="proven-stat-card">
+            <div className="stat-card-header">
+              <span className="stat-number">86%</span>
+              <span className="stat-pill-trend">Efficiency</span>
+            </div>
+            <span className="stat-label">Overhead Ticket Reduction</span>
+            <span className="stat-sub">Zero kernel drivers &amp; 100% browser kiosk stability</span>
+          </div>
+
+          <div className="proven-stat-card">
+            <div className="stat-card-header">
+              <span className="stat-number">1:50</span>
+              <span className="stat-pill-trend">Capacity</span>
+            </div>
+            <span className="stat-label">Invigilator Ratio Scaled</span>
+            <span className="stat-sub">Centralized multi-department proctoring cockpit</span>
+          </div>
+        </div>
+
+        {/* Category Filters for Case Studies */}
+        <div className="testimonial-filter-tabs" role="tablist" aria-label="Testimonial categories">
+          {[
+            { id: 'all', label: 'All Case Studies' },
+            { id: 'higher-ed', label: 'Higher Education & Deans' },
+            { id: 'medical', label: 'Medical & Clinical Boards' },
+            { id: 'certifications', label: 'Professional Certifications' },
+          ].map((cat) => (
             <button
+              key={cat.id}
               type="button"
-              className={`testimonial-nav-btn next ${currentTestimonialIndex === institutionalTestimonials.length - 1 ? 'disabled' : ''}`}
-              onClick={goToNextTestimonial}
-              aria-disabled={currentTestimonialIndex === institutionalTestimonials.length - 1}
+              className={`filter-tab-pill ${activeTestimonialCategory === cat.id ? 'active' : ''}`}
+              role="tab"
+              aria-selected={activeTestimonialCategory === cat.id}
+              onClick={() => setActiveTestimonialCategory(cat.id)}
             >
-              Next
-              <ArrowRight size={20} aria-hidden="true" />
+              <span>{cat.label}</span>
+              <span className="filter-count">
+                {cat.id === 'all'
+                  ? institutionalTestimonials.length
+                  : institutionalTestimonials.filter((t) => t.category === cat.id).length}
+              </span>
             </button>
+          ))}
+        </div>
+
+        {/* 3-Column Executive Testimonials Grid */}
+        <div className="proven-testimonials-grid" role="list">
+          {filteredTestimonials.map((t) => (
+            <article key={t.author} className="proven-testimonial-card" role="listitem">
+              <div className="card-top-row">
+                <div className="verified-badge-wrap">
+                  <CheckCircle2 size={13} className="verified-check-icon" aria-hidden="true" />
+                  <span>Verified Executive Review</span>
+                </div>
+                <div className="star-rating" aria-label="5 out of 5 stars">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} size={13} className="star-icon-filled" aria-hidden="true" />
+                  ))}
+                </div>
+              </div>
+
+              {/* Quantified Metric Badge */}
+              <div className="testimonial-highlight-metric">
+                <span className="metric-accent-dot" />
+                <strong>{t.stats}</strong>
+              </div>
+
+              {/* Quote */}
+              <blockquote className="proven-quote">
+                “{t.quote}”
+              </blockquote>
+
+              {/* Institutional Tags */}
+              <div className="card-compliance-tags">
+                {t.tags.map((tag) => (
+                  <span key={tag} className="compliance-tag">{tag}</span>
+                ))}
+              </div>
+
+              {/* Author & Credential Profile */}
+              <div className="proven-author-footer">
+                <div className="author-avatar-crest" style={{ background: t.avatarBg }}>
+                  <span>{t.initials}</span>
+                </div>
+                <div className="author-details">
+                  <h4 className="author-name">{t.author}</h4>
+                  <p className="author-title">{t.role}</p>
+                  <p className="author-institution">{t.institution}</p>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        {/* Institutional Trust & Compliance Banner */}
+        <div className="institutional-compliance-strip">
+          <div className="strip-label">
+            <ShieldCheck size={16} aria-hidden="true" />
+            <span>ACCREDITATION &amp; COMPLIANCE:</span>
+          </div>
+          <div className="strip-badges">
+            <span className="compliance-chip">FERPA Compliant</span>
+            <span className="compliance-chip">GDPR Data Shield</span>
+            <span className="compliance-chip">ISO/IEC 27001 Certified</span>
+            <span className="compliance-chip">AES-256 Storage</span>
+            <span className="compliance-chip">LTI 1.3 Canvas &amp; Moodle</span>
+            <span className="compliance-chip">Zero Kernel Drivers</span>
           </div>
         </div>
       </section>

@@ -3,7 +3,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 
 // Use direct backend URL for both development and production
-const developmentApiBaseURL = 'http://localhost:5000/api';
+const developmentApiBaseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 // Priority: env var > hardcoded production URL
 const productionApiBaseURL = process.env.REACT_APP_API_URL || 'https://examshield-d5i2.onrender.com/api';
 
@@ -14,7 +14,7 @@ console.log('API Base URL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000, // Reduced timeout to 10 seconds
+  timeout: 60000, // 60 seconds to accommodate AI generation & cold starts
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -27,6 +27,20 @@ api.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+
+const handleAuthRedirect = () => {
+  const currentPath = window.location.pathname;
+  if (currentPath.includes('/login') || currentPath.includes('/register') || currentPath === '/') {
+    return;
+  }
+  if (currentPath.startsWith('/super-admin')) {
+    window.location.href = '/super-admin/login';
+  } else if (currentPath.startsWith('/student')) {
+    window.location.href = '/student/login';
+  } else {
+    window.location.href = '/admin/login';
+  }
+};
 
 // Response interceptor - handle token refresh and 401 errors
 api.interceptors.response.use(
@@ -78,13 +92,13 @@ api.interceptors.response.use(
           console.error('Token refresh failed:', refreshError);
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
-          window.location.href = '/admin/login';
+          handleAuthRedirect();
           return Promise.reject(refreshError);
         }
       } else {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.location.href = '/admin/login';
+        handleAuthRedirect();
       }
     }
 
@@ -123,7 +137,7 @@ export const authAPI = {
 export const adminAPI = {
   getDashboard: () => api.get('/admin/dashboard'),
   getStudents: (params) => api.get('/admin/students', { params }),
-  addStudent: (data) => api.post('/admin/students', data),
+  addStudent: (data) => api.post('/admin/students', data, { timeout: 30000 }),
   bulkUpload: (formData) => api.post('/admin/students/bulk', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
@@ -138,7 +152,12 @@ export const adminAPI = {
   getExamQuestions: (id) => api.get(`/admin/exams/${id}/questions`),
   addQuestions: (id, data) => api.post(`/admin/exams/${id}/questions`, data),
   deleteQuestion: (examId, questionId) => api.delete(`/admin/exams/${examId}/questions/${questionId}`),
+  getMonitoringOverview: () => api.get('/admin/monitoring/overview'),
   getMonitoringData: (id) => api.get(`/admin/exams/${id}/monitor`),
+  warnStudent: (examId, data) => api.post(`/admin/exams/${examId}/warn-student`, data),
+  terminateStudent: (examId, data) => api.post(`/admin/exams/${examId}/terminate-student`, data),
+  broadcastAnnouncement: (examId, data) => api.post(`/admin/exams/${examId}/broadcast`, data),
+  getStudentActivity: (examId, studentId) => api.get(`/admin/exams/${examId}/student-activity/${studentId}`),
 
   getResults: (params) => api.get('/admin/results', { params }),
   evaluateResult: (id, data) => api.post(`/admin/results/${id}/evaluate`, data),
@@ -161,6 +180,8 @@ export const studentAPI = {
   saveAnswer: (examId, data) => api.post(`/student/exams/${examId}/save-answer`, data),
   submitExam: (examId, data) => api.post(`/student/exams/${examId}/submit`, data),
   reportViolation: (data) => api.post('/student/violations', data),
+  runCode: (data) => api.post('/student/run-code', data),
+  submitCode: (data) => api.post('/student/submit-code', data),
   getResults: () => api.get('/student/results'),
   getExamResult: (examId) => api.get(`/student/results/${examId}`),
   getResultByKey: (examKey) => api.get(`/student/results/by-key/${examKey}`),
@@ -179,8 +200,17 @@ export const subscriptionAPI = {
 export const superAdminAPI = {
   getDashboard: () => api.get('/super-admin/dashboard'),
   getColleges: (params) => api.get('/super-admin/colleges', { params }),
+  onboardCollege: (data) => api.post('/super-admin/colleges', data),
+  updateCollege: (id, data) => api.put(`/super-admin/colleges/${id}`, data),
   toggleCollege: (id) => api.patch(`/super-admin/colleges/${id}/toggle`),
-  getAuditLogs: () => api.get('/super-admin/audit-logs'),
+  updateCollegePlan: (id, data) => api.patch(`/super-admin/colleges/${id}/plan`, data),
+  resetCollegePassword: (id, data) => api.post(`/super-admin/colleges/${id}/reset-password`, data),
+  deleteCollege: (id) => api.delete(`/super-admin/colleges/${id}`),
+  getPayments: (params) => api.get('/super-admin/payments', { params }),
+  recordManualPayment: (data) => api.post('/super-admin/payments/record', data),
+  getAuditLogs: (params) => api.get('/super-admin/audit-logs', { params }),
+  getSettings: () => api.get('/super-admin/settings'),
+  updateSettings: (data) => api.put('/super-admin/settings', data),
 };
 
 export default api;

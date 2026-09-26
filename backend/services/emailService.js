@@ -36,17 +36,7 @@ const getTransporter = () => {
   });
 
   if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
-    if (!RESEND_API_KEY) {
-      console.warn('⚠️  Email NOT configured — falling back to mock transporter.');
-      console.warn('   Set EMAIL_HOST/USER/PASS or RESEND_API_KEY in your env vars.');
-    }
-    _transporter = {
-      sendMail: async (opts) => {
-        console.log('📧 [MOCK] Would send to:', opts.to, '| Subject:', opts.subject);
-        return { status: 'mock' };
-      },
-    };
-    return _transporter;
+    throw new Error('Email delivery is not configured. Set RESEND_API_KEY or EMAIL_HOST, EMAIL_USER, and EMAIL_PASS.');
   }
 
   // PORT 587 + STARTTLS is the most reliable option across all cloud platforms
@@ -71,9 +61,9 @@ const getTransporter = () => {
     pool: true,
     maxConnections: 3,
     maxMessages: 100,
-    connectionTimeout: 30000,  // 30 s
-    greetingTimeout: 15000,    // 15 s
-    socketTimeout: 30000,      // 30 s
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   return _transporter;
@@ -244,44 +234,90 @@ const baseTemplate = (content) => `
  * NOTE: This is intentionally awaitable so callers can catch real errors.
  * Use .catch() in fire-and-forget contexts.
  */
-const sendStudentCredentials = async ({ name, email, studentId, password, collegeName, loginUrl }) => {
+const sendStudentCredentials = async ({ 
+  name, 
+  email, 
+  studentId, 
+  password, 
+  collegeName, 
+  loginUrl,
+  examName,
+  examKey,
+  examDate,
+  examDuration,
+  subject
+}) => {
   console.log('\n🎓 STUDENT CREDENTIALS:');
-  console.log('  Name:', name, '| Email:', email, '| ID:', studentId, '| College:', collegeName);
+  console.log('  Name:', name, '| Email:', email, '| ID:', studentId, '| College:', collegeName, '| ExamKey:', examKey || 'None');
+
+  const formattedDate = examDate ? new Date(examDate).toLocaleString('en-IN', {
+    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
+  }) : null;
 
   const content = `
-    <div class="badge">ACCOUNT CREATED</div>
+    <div class="badge">${examKey ? 'ACCOUNT & EXAM ACCESS ISSUED' : 'ACCOUNT CREATED'}</div>
     <p class="greeting">Welcome, ${name}!</p>
-    <p class="text">Your student account has been created on ExamShield by <strong>${collegeName}</strong>. Use the credentials below to log in to your exam portal.</p>
+    <p class="text">Your student account has been created on ExamShield by <strong>${collegeName}</strong>.${examKey ? ' You have also been enrolled in an upcoming examination.' : ' Use the credentials below to log in to your exam portal.'}</p>
 
-    <div class="credentials-box">
+    <!-- Student Login Credentials -->
+    <div class="credentials-box" style="border: 2px solid #0f3460; background: #f0f7ff; margin-bottom: 20px;">
+      <h3 style="color: #0f3460; font-size: 14px; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 1px;">🔐 Student Portal Login Credentials</h3>
       <div class="credential-item">
         <span class="credential-label">Student ID</span>
-        <span class="credential-value">${studentId}</span>
+        <span class="credential-value" style="color: #0f3460; font-size: 16px;">${studentId}</span>
       </div>
       <div class="credential-item">
-        <span class="credential-label">Email</span>
+        <span class="credential-label">Registered Email</span>
         <span class="credential-value">${email}</span>
       </div>
       <div class="credential-item">
-        <span class="credential-label">Password</span>
-        <span class="credential-value">${password}</span>
+        <span class="credential-label">Temporary Password</span>
+        <span class="credential-value" style="color: #e94560; font-size: 16px;">${password}</span>
       </div>
     </div>
 
-    <div style="text-align:center;">
-      <a href="${loginUrl}" class="btn">Login to ExamShield →</a>
+    ${examKey ? `
+    <!-- Examination Key & Authorization -->
+    <div class="exam-card" style="border: 2px solid #10b981; background: #ecfdf5; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #065f46; font-size: 15px; margin-bottom: 8px;">📝 Examination Authorization</h3>
+      <p class="exam-detail" style="font-size: 14px; color: #1f2937;"><strong>Exam Title:</strong> ${examName || 'Scheduled Examination'}</p>
+      ${subject ? `<p class="exam-detail" style="font-size: 13px; color: #374151;"><strong>Subject:</strong> ${subject}</p>` : ''}
+      ${formattedDate ? `<p class="exam-detail" style="font-size: 13px; color: #374151;"><strong>Scheduled Date:</strong> ${formattedDate} (IST)</p>` : ''}
+      ${examDuration ? `<p class="exam-detail" style="font-size: 13px; color: #374151;"><strong>Duration:</strong> ${examDuration} Minutes</p>` : ''}
+      
+      <div style="background: #ffffff; border: 2px dashed #10b981; border-radius: 6px; padding: 14px; margin-top: 14px; text-align: center;">
+        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #047857; margin-bottom: 4px;">YOUR EXAM ACCESS KEY</div>
+        <div style="font-size: 22px; font-weight: 800; color: #065f46; font-family: 'Courier New', monospace; letter-spacing: 3px;">${examKey}</div>
+        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">Keep this key ready — you will enter it to begin the proctored exam.</div>
+      </div>
+    </div>
+    ` : ''}
+
+    <div style="text-align:center; margin: 26px 0;">
+      <a href="${loginUrl}" class="btn" style="background: #0f3460; font-size: 15px; padding: 14px 34px;">Login &amp; Enter Exam Portal →</a>
     </div>
 
     <div class="warning-box">
-      <p>⚠️ <strong>Important:</strong> Please change your password after your first login. Keep your credentials secure and do not share them with anyone.</p>
+      <p>⚠️ <strong>Important Instructions:</strong></p>
+      <ul style="margin: 8px 0 0 18px; font-size: 13px; line-height: 1.6; color: #856404;">
+        <li>Use a laptop or desktop computer with a functional webcam and microphone.</li>
+        <li>Ensure you have a stable internet connection before launching the exam.</li>
+        ${examKey ? `<li>Copy your <strong>Exam Key (${examKey})</strong> to unlock the exam session.</li>` : ''}
+        <li>Do not switch tabs, minimize windows, or use unauthorized secondary devices.</li>
+      </ul>
     </div>
   `;
 
+  const subjectLine = examKey
+    ? `Welcome to ExamShield — Your Student ID, Password & Exam Key (${examKey})`
+    : `Welcome to ExamShield — Your Login Credentials`;
+
   await sendWithRetry({
     to: email,
-    subject: `Welcome to ExamShield — Your Login Credentials`,
+    subject: subjectLine,
     html: baseTemplate(content),
-  });
+  }, 1, 0);
 
   logger.info(`Credentials email sent to ${email}`);
 };

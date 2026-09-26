@@ -1,0 +1,621 @@
+/* ═══════════════════════════════════════════════════════════
+   Register.css — ExamShield Institutional Registration
+   Matching Landing Page & Login Theme:
+   --landing-yellow: #ffc61c;
+   --landing-yellow-deep: #0a74da;
+   --landing-text: #2d3138;
+   --landing-muted: #8a8f97;
+   --landing-card-bg: rgba(255, 255, 255, 0.94);
+   --landing-shadow: 0 16px 38px rgba(191, 156, 53, 0.16);
+   ═══════════════════════════════════════════════════════════ */
+
+.register-page-section {
+  padding: 40px 0 90px;
+  position: relative;
+  z-index: 1;
+}
+
+.register-container {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+/* Eyebrow & Page Header */
+.register-page-header {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto 36px;
+}
+
+.register-eyebrow-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 184, 0, 0.38);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #8f6400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(191, 156, 53, 0.1);
+}
+
+.register-eyebrow-pill svg {
+  color: #d97706;
+}
+
+.register-page-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2.1rem, 3.8vw, 2.8rem);
+  font-weight: 800;
+  color: var(--landing-text, #1f2430);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 0 0 12px;
+}
+
+.register-page-title span {
+  color: #0a74da;
+}
+
+.register-page-subtitle {
+  color: var(--landing-muted, #64748b);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0 auto;
+}
+
+/* Two-Column Grid */
+.register-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.22fr;
+  gap: 32px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .register-grid {
+    grid-template-columns: 1fr;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+}
+
+/* Left Column: Trust & Value Proposition Card */
+.register-value-card {
+  background: linear-gradient(175deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 250, 240, 0.92) 100%);
+  border: 1px solid rgba(255, 184, 0, 0.28);
+  border-radius: 24px;
+  padding: 34px 28px;
+  box-shadow: 0 18px 40px rgba(191, 156, 53, 0.12);
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+
+.register-value-card::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(255, 198, 28, 0.25), transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.register-value-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #166534;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 18px;
+}
+
+.register-value-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.25;
+  margin: 0 0 10px;
+}
+
+.register-value-desc {
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.55;
+  margin: 0 0 24px;
+}
+
+.register-benefits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.register-benefit-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.register-benefit-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(10, 116, 218, 0.08);
+  border: 1px solid rgba(10, 116, 218, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a74da;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.register-benefit-text h4 {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 3px;
+}
+
+.register-benefit-text p {
+  font-size: 0.82rem;
+  color: #64748b;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Trial Guarantee Banner */
+.register-trial-guarantee {
+  background: #ffffff;
+  border: 1px dashed rgba(255, 184, 0, 0.5);
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.register-trial-icon {
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+.register-trial-text h5 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #92400e;
+  margin: 0 0 2px;
+}
+
+.register-trial-text p {
+  font-size: 0.78rem;
+  color: #78350f;
+  margin: 0;
+}
+
+/* Right Column: Registration Card */
+.register-card {
+  background: var(--landing-card-bg, rgba(255, 255, 255, 0.96));
+  border: 1px solid rgba(255, 184, 0, 0.28);
+  border-radius: 24px;
+  padding: 34px 34px 30px;
+  box-shadow: var(--landing-shadow, 0 18px 42px rgba(191, 156, 53, 0.16));
+  backdrop-filter: blur(14px);
+  position: relative;
+}
+
+@media (max-width: 540px) {
+  .register-card {
+    padding: 24px 20px 22px;
+  }
+}
+
+/* Stepper Tabs */
+.register-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 26px;
+  position: relative;
+}
+
+.register-step-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 2;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+
+.register-step-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 2px solid #e2e8f0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.88rem;
+  font-weight: 800;
+  transition: all 0.25s ease;
+}
+
+.register-step-item.active .register-step-circle {
+  background: #0a74da;
+  border-color: #0a74da;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(10, 116, 218, 0.35);
+}
+
+.register-step-item.completed .register-step-circle {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.register-step-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.register-step-num {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.register-step-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.register-step-item.active .register-step-name {
+  color: #0a74da;
+}
+
+.register-step-connector {
+  flex: 1;
+  height: 2px;
+  background: #e2e8f0;
+  margin: 0 14px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.register-step-connector-fill {
+  height: 100%;
+  background: #10b981;
+  transition: width 0.3s ease;
+}
+
+/* Error Banner */
+.register-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 0.86rem;
+  margin-bottom: 22px;
+  line-height: 1.45;
+}
+
+.register-error-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+/* Form Styles */
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.register-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.register-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 580px) {
+  .register-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.register-field-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.register-field-label .required-star {
+  color: #ef4444;
+  margin-left: 3px;
+}
+
+.register-field-optional {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.register-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.register-input-icon {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+
+.register-input {
+  width: 100%;
+  height: 46px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0 16px 0 42px;
+  font-size: 0.92rem;
+  color: #1e293b;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.register-input:focus {
+  outline: none;
+  border-color: #0a74da;
+  box-shadow: 0 0 0 3px rgba(10, 116, 218, 0.14);
+}
+
+.register-input:focus + .register-input-icon,
+.register-input:focus ~ .register-input-icon {
+  color: #0a74da;
+}
+
+.register-input-toggle {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: color 0.2s ease;
+}
+
+.register-input-toggle:hover {
+  color: #334155;
+}
+
+/* Password Strength Meter */
+.password-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.password-meter-bars {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  height: 4px;
+}
+
+.password-meter-bar {
+  height: 100%;
+  border-radius: 2px;
+  background: #e2e8f0;
+  transition: background-color 0.25s ease;
+}
+
+.password-meter-bar.active-weak {
+  background: #ef4444;
+}
+
+.password-meter-bar.active-fair {
+  background: #f59e0b;
+}
+
+.password-meter-bar.active-good {
+  background: #3b82f6;
+}
+
+.password-meter-bar.active-strong {
+  background: #10b981;
+}
+
+.password-meter-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Terms Checkbox */
+.register-terms-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.83rem;
+  color: #475569;
+  line-height: 1.45;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.register-terms-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #0a74da;
+  margin-top: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Buttons */
+.register-btn-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.register-btn-back {
+  padding: 0 20px;
+  height: 48px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.register-btn-back:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.register-btn-primary {
+  flex: 1;
+  height: 48px;
+  background: linear-gradient(135deg, #0a74da 0%, #0656a3 100%);
+  border: none;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(10, 116, 218, 0.35);
+  transition: all 0.25s ease;
+}
+
+.register-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(10, 116, 218, 0.45);
+}
+
+.register-btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Card Meta Links */
+.register-card-meta {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.register-card-meta a {
+  color: #0a74da;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.register-card-meta a:hover {
+  text-decoration: underline;
+}
+
+.register-meta-student-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+
+.register-meta-student-pill:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  text-decoration: none !important;
+}
+
+.register-meta-student-pill svg {
+  color: #0a74da;
+}

@@ -102,9 +102,6 @@ exports.requestPasswordReset = async (req, res) => {
     res.json({
       success: true,
       message: 'Password reset instructions sent to your email',
-      // For demo purposes, include the reset link in the response
-      // In production, you would NOT include this in the response
-      resetLink: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/student/password-reset?token=${resetToken}&userId=${student.student_id}`
     });
 
   } catch (error) {

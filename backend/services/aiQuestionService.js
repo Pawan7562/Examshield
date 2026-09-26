@@ -617,8 +617,9 @@ const generateQuestionBatch = async ({ topic, difficulty, sources, count, mode }
   if (apiConfigured) {
     try {
       const genAI = getGeminiClient();
+      const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
       model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: modelName,
         generationConfig: {
           temperature: 0.9,       // Higher creativity for varied questions
           topK: 40,
@@ -626,7 +627,7 @@ const generateQuestionBatch = async ({ topic, difficulty, sources, count, mode }
           maxOutputTokens: mode === 'full' ? 4000 : 2500,
         },
       });
-      console.log('✅ Gemini client initialised successfully');
+      console.log(`✅ Gemini client initialised successfully with model: ${modelName}`);
     } catch (err) {
       console.warn('⚠️ Gemini initialisation failed:', err.message);
     }
@@ -675,6 +676,15 @@ const generateQuestionBatch = async ({ topic, difficulty, sources, count, mode }
         } catch (err) {
           console.error(`❌ Attempt ${attempts} failed for ${source}[${i}]:`, err.message);
           
+          if (err.message?.includes('leaked') || err.message?.includes('PERMISSION_DENIED') || err.message?.includes('API_KEY_INVALID') || err.message?.includes('403') || err.message?.includes('not found')) {
+            console.warn('⚠️ Gemini API key unusable or model unavailable. Switching to template fallback instantly.');
+            model = null;
+            const fallback = createFallbackQuestion(topic, difficulty, source, qIndex, mode);
+            fallback.errorType = 'AI_KEY_UNAVAILABLE';
+            results.push(fallback);
+            break;
+          }
+
           if (attempts >= maxAttempts) {
             let errorType = 'AI_GENERATION_FAILED';
             if (err.message?.includes('quota') || err.message?.includes('rate')) errorType = 'AI_RATE_LIMITED';

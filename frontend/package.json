@@ -34,7 +34,7 @@
     "vercel-build": "CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
     "build:prod": "npm run build"
   },
-  "homepage": "https://COLLEGEEXAM.vercel.app",
+  "homepage": "/",
   "eslintConfig": {
     "extends": [
       "react-app"
