@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
    Subscription.css — Institutional License & Quota System
-   Enterprise capacity tracking and tier management
+   High-performance aesthetic styling for college admin
    ═══════════════════════════════════════════════════════════ */
 
 .admin-quota-container {
@@ -9,27 +9,57 @@
   margin: 0 auto;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #0f172a;
+  padding-bottom: 60px;
 }
 
-/* ── CURRENT ACTIVE LICENSE CARD ──────────────────────────── */
+/* ── PAGE HEADER ─────────────────────────────────────────── */
+.admin-header-pretitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #0a74da;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+/* ── CURRENT ACTIVE LICENSE HERO CARD ────────────────────── */
 .admin-current-plan-card {
-  background: linear-gradient(135deg, #0b1329 0%, #1e293b 100%);
-  border-radius: 20px;
-  padding: 30px 36px;
+  background: linear-gradient(135deg, #0b1329 0%, #172554 50%, #1e293b 100%);
+  border-radius: 22px;
+  padding: 32px 38px;
   color: #ffffff;
   margin-bottom: 26px;
-  box-shadow: 0 8px 24px rgba(11, 19, 41, 0.25);
+  box-shadow: 0 10px 30px rgba(11, 19, 41, 0.35);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 28px;
   flex-wrap: wrap;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-current-plan-card::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .admin-current-plan-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  z-index: 2;
+  max-width: 780px;
 }
 
 .admin-current-plan-label {
@@ -44,32 +74,89 @@
 }
 
 .admin-current-plan-name {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Grotesk', -apple-system, sans-serif;
   font-size: 1.85rem;
   font-weight: 800;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   color: #ffffff;
 }
 
+.admin-plan-tagline {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #94a3b8;
+  font-family: 'Inter', sans-serif;
+}
+
 .admin-plan-icon {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+/* License Key Pill */
+.admin-license-key-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 14px;
+  border-radius: 10px;
+  margin-top: 4px;
+  backdrop-filter: blur(8px);
+}
+
+.admin-license-key-pill .license-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+}
+
+.admin-license-key-pill .license-code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.86rem;
+  color: #38bdf8;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.license-copy-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #e2e8f0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.license-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
 .admin-current-plan-details {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   font-size: 0.86rem;
-  color: #94a3b8;
+  color: #cbd5e1;
   margin-top: 6px;
   flex-wrap: wrap;
 }
@@ -80,23 +167,58 @@
   gap: 6px;
 }
 
+.admin-days-pill {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 6px;
+}
+
+.dot-divider {
+  color: #475569;
+}
+
 .admin-current-plan-pricing {
   text-align: right;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
+  z-index: 2;
 }
 
 .admin-plan-price {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 2.2rem;
+  font-family: 'Space Grotesk', -apple-system, sans-serif;
+  font-size: 2.3rem;
   font-weight: 800;
   color: #ffffff;
   line-height: 1;
 }
 
-/* ── QUOTA PROGRESS BARS ──────────────────────────────────── */
+.admin-price-period {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.admin-invoice-quicklink {
+  font-size: 0.8rem;
+  color: #38bdf8;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.2s ease;
+}
+
+.admin-invoice-quicklink:hover {
+  color: #7dd3fc;
+}
+
+/* ── QUOTA PROGRESS METERS ───────────────────────────────── */
 .admin-quota-meters-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -113,12 +235,18 @@
 .admin-quota-card {
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
-  border-radius: 18px;
-  padding: 22px 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  border-radius: 20px;
+  padding: 24px 26px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  transition: all 0.2s ease;
+}
+
+.admin-quota-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
 }
 
 .admin-quota-header {
@@ -155,13 +283,13 @@
 
 .admin-quota-current {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.75rem;
+  font-size: 1.85rem;
   font-weight: 800;
   color: #0f172a;
 }
 
 .admin-quota-limit {
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   color: #64748b;
   font-weight: 600;
 }
@@ -170,21 +298,125 @@
   width: 100%;
   height: 8px;
   background: #f1f5f9;
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
+  margin-bottom: 14px;
 }
 
 .admin-quota-progress-fill {
   height: 100%;
-  border-radius: 4px;
-  transition: width 0.4s ease;
+  border-radius: 6px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── PLANS COMPARISON GRID ────────────────────────────────── */
+.admin-quota-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.admin-quota-note {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.admin-quota-link {
+  color: #0a74da;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.admin-quota-link:hover {
+  color: #0656a3;
+  text-decoration: underline;
+}
+
+/* ── PLANS & BILLING CYCLE SWITCHER SECTION ──────────────── */
+.admin-plans-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+  padding-bottom: 20px;
+  border-bottom: 1.5px solid #f1f5f9;
+}
+
+.admin-plans-titles {
+  max-width: 650px;
+}
+
+.admin-plans-subtitle {
+  font-size: 0.92rem;
+  color: #64748b;
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
+
+/* Modern Pill Toggle for Monthly vs Annual */
+.admin-billing-toggle-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.admin-billing-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+}
+
+.toggle-option {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-weight: 700;
+  font-size: 0.88rem;
+  padding: 8px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-option.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.toggle-discount-badge {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+
+.billing-savings-callout {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #10b981;
+}
+
+/* ── PLAN CARDS GRID ─────────────────────────────────────── */
 .admin-plans-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 22px;
+  gap: 24px;
 }
 
 @media (max-width: 960px) {
@@ -196,35 +428,36 @@
 .admin-plan-card {
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 30px 28px;
+  border-radius: 22px;
+  padding: 32px 28px;
   display: flex;
   flex-direction: column;
   position: relative;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
 }
 
 .admin-plan-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   border-color: #cbd5e1;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.08);
 }
 
 .admin-plan-card.current {
   border-color: #10b981;
   background: #fcfdfc;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.08);
 }
 
 .admin-plan-card.popular {
   border-color: #0a74da;
-  box-shadow: 0 8px 24px rgba(10, 116, 218, 0.12);
+  box-shadow: 0 10px 28px rgba(10, 116, 218, 0.14);
 }
 
 .admin-plan-card .admin-plan-badge {
   position: absolute;
-  top: -12px;
-  right: 24px;
+  top: -13px;
+  right: 22px;
   background: linear-gradient(135deg, #0a74da 0%, #0656a3 100%);
   color: #ffffff;
   font-size: 0.68rem;
@@ -242,35 +475,123 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .admin-plan-name {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.35rem;
+  font-family: 'Space Grotesk', -apple-system, sans-serif;
+  font-size: 1.4rem;
   font-weight: 800;
   color: #0f172a;
   margin: 0;
+  line-height: 1.2;
+}
+
+.admin-plan-tier-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #0a74da;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-plan-tagline-text {
+  font-size: 0.84rem;
+  color: #64748b;
+  margin: 0 0 18px;
+  line-height: 1.4;
+  min-height: 38px;
 }
 
 .admin-plan-pricing {
-  margin-bottom: 22px;
+  margin-bottom: 20px;
   padding-bottom: 18px;
   border-bottom: 1.5px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.admin-plan-price {
+.admin-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.admin-plan-pricing .admin-plan-price {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 2.2rem;
+  font-size: 2.3rem;
   font-weight: 800;
   color: #0f172a;
   line-height: 1;
 }
 
 .admin-plan-billing {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: #64748b;
-  margin-top: 4px;
+  font-weight: 600;
+}
+
+.admin-annual-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+}
+
+.original-strike {
+  color: #94a3b8;
+  text-decoration: line-through;
+  font-weight: 600;
+}
+
+.annual-billed {
+  color: #475569;
+  font-weight: 600;
+}
+
+.admin-savings-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 12px;
+  width: fit-content;
+}
+
+/* Quota Mini Summary */
+.admin-plan-quota-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+.quota-summary-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.quota-summary-label {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.quota-summary-val {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #0f172a;
 }
 
 .admin-plan-features {
@@ -299,52 +620,418 @@
 .admin-plan-button {
   width: 100%;
   justify-content: center;
-  height: 44px;
+  height: 46px;
+  font-weight: 700;
+  border-radius: 12px;
 }
 
-/* ── PAYMENT & ENCRYPTION BANNER ──────────────────────────── */
-.admin-payment-info {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-}
-
-.admin-payment-icon {
-  width: 48px;
-  height: 48px;
+/* ── CAPABILITY MATRIX TABLE ─────────────────────────────── */
+.admin-matrix-table-wrapper {
+  overflow-x: auto;
+  margin-top: 14px;
   border-radius: 14px;
-  background: #eff6ff;
-  border: 1.5px solid #bfdbfe;
-  color: #0a74da;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  border: 1.5px solid #e2e8f0;
 }
 
-.admin-payment-content h3 {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.15rem;
+.admin-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.admin-matrix-table th {
+  background: #f8fafc;
+  padding: 14px 18px;
+  text-align: left;
   font-weight: 800;
   color: #0f172a;
-  margin: 0 0 4px;
+  border-bottom: 2px solid #e2e8f0;
 }
 
-.admin-payment-content p {
-  font-size: 0.86rem;
-  color: #64748b;
-  margin: 0 0 10px;
-  line-height: 1.5;
+.admin-matrix-table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
 }
 
-.admin-payment-note {
-  font-size: 0.78rem;
-  color: #0a74da;
-  font-weight: 600;
+.admin-matrix-table tr:hover td {
+  background: #f8fafc;
+}
+
+/* ── ENTERPRISE CUSTOM VOLUME BANNER ─────────────────────── */
+.admin-enterprise-banner {
+  background: linear-gradient(135deg, #091e42 0%, #0a74da 100%);
+  border-radius: 22px;
+  padding: 34px 38px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+  box-shadow: 0 10px 28px rgba(10, 116, 218, 0.2);
+}
+
+.enterprise-banner-content {
+  max-width: 780px;
+}
+
+.enterprise-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #eff6ff;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 800;
   padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.enterprise-banner-content h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.45rem;
+  font-weight: 800;
+  margin: 0 0 8px;
+  line-height: 1.3;
+}
+
+.enterprise-banner-content p {
+  font-size: 0.9rem;
+  color: #e0f2fe;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.enterprise-quote-btn {
+  background: #ffffff;
+  color: #0a74da;
+  border: none;
+  font-weight: 800;
+  font-size: 0.92rem;
+  padding: 14px 24px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.enterprise-quote-btn:hover {
+  background: #f0f9ff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* ── FAQ ACCORDION ───────────────────────────────────────── */
+.admin-faqs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.admin-faq-item {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.admin-faq-item.open {
+  border-color: #0a74da;
+}
+
+.admin-faq-question {
+  width: 100%;
+  text-align: left;
+  background: #ffffff;
+  border: none;
+  padding: 18px 22px;
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.admin-faq-question:hover {
+  background: #f8fafc;
+}
+
+.admin-faq-answer {
+  padding: 0 22px 18px;
+  font-size: 0.88rem;
+  color: #475569;
+  line-height: 1.55;
+  background: #ffffff;
+}
+
+/* ── PAYMENT & ENCRYPTION BANNER ─────────────────────────── */
+.admin-payment-info-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 26px 30px;
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+  margin-top: 26px;
+}
+
+.admin-security-badges {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.admin-security-badges .badge-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(22, 101, 52, 0.2);
+}
+
+/* ── MODALS & CERTIFICATE ────────────────────────────────── */
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.admin-modal-box {
+  background: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 580px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  animation: modalScale 0.25s ease-out;
+}
+
+.admin-certificate-box {
+  max-width: 680px;
+}
+
+@keyframes modalScale {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.admin-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1.5px solid #f1f5f9;
+}
+
+.admin-modal-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.admin-modal-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
   border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.admin-modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.admin-modal-form {
+  padding: 22px 24px;
+}
+
+.admin-modal-desc {
+  font-size: 0.88rem;
+  color: #64748b;
+  margin: 0 0 18px;
+  line-height: 1.45;
+}
+
+.admin-form-group {
+  margin-bottom: 16px;
+}
+
+.admin-form-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.admin-form-input,
+.admin-form-select,
+.admin-form-textarea {
+  width: 100%;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: #0f172a;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.admin-form-input:focus,
+.admin-form-select:focus,
+.admin-form-textarea:focus {
+  outline: none;
+  border-color: #0a74da;
+  box-shadow: 0 0 0 3px rgba(10, 116, 218, 0.12);
+}
+
+.admin-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.admin-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+/* Certificate Frame */
+.admin-certificate-content {
+  padding: 24px;
+}
+
+.certificate-frame {
+  border: 3px double #0a74da;
+  border-radius: 16px;
+  padding: 30px;
+  background: #fcfdfc;
+  position: relative;
+}
+
+.certificate-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.cert-org {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #0a74da;
+  text-transform: uppercase;
+}
+
+.cert-title {
+  font-family: 'Space Grotesk', serif;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 6px 0;
+}
+
+.cert-subtitle {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.cert-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  background: #f8fafc;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.cert-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cert-label {
+  font-size: 0.74rem;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.cert-value {
+  font-size: 0.92rem;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.cert-value code {
+  font-family: 'JetBrains Mono', monospace;
+  color: #0a74da;
+  font-weight: 700;
+}
+
+.cert-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1.5px dashed #cbd5e1;
+}
+
+.cert-seal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #0a74da;
+}
+
+.cert-meta {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  font-size: 0.74rem;
+  color: #64748b;
+  font-weight: 500;
 }

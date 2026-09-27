@@ -182,6 +182,7 @@ subscription.get('/plans', subscriptionController.getPlans);
 subscription.get('/current', authenticate, authorize('college_admin'), subscriptionController.getCurrentSubscription);
 subscription.post('/create-order', authenticate, authorize('college_admin'), subscriptionController.createOrder);
 subscription.post('/verify', authenticate, authorize('college_admin'), subscriptionController.verifyPayment);
+subscription.post('/quote-request', authenticate, authorize('college_admin'), subscriptionController.requestCustomQuote);
 router.use('/subscriptions', subscription);
 
 // =====================================================

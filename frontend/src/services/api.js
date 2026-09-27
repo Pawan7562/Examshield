@@ -264,6 +264,7 @@ export const subscriptionAPI = {
   getCurrent: () => api.get('/subscriptions/current'),
   createOrder: (data) => api.post('/subscriptions/create-order', data),
   verifyPayment: (data) => api.post('/subscriptions/verify', data),
+  requestQuote: (data) => api.post('/subscriptions/quote-request', data),
 };
 
 // Super Admin APIs
