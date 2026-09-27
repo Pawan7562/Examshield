@@ -27,7 +27,20 @@ const initRedisAdapter = async (io) => {
     const { createClient } = require('redis');
     const { createAdapter } = require('@socket.io/redis-adapter');
 
-    pubClient = createClient({ url: redisUrl });
+    const clientConfig = {
+      url: redisUrl,
+      socket: {
+        reconnectStrategy: (retries) => {
+          if (retries >= 2) {
+            return false; // Stop reconnecting after 2 failed attempts
+          }
+          return 500;
+        },
+        connectTimeout: 5000,
+      }
+    };
+
+    pubClient = createClient(clientConfig);
     subClient = pubClient.duplicate();
     redisClient = pubClient.duplicate();
 
@@ -47,6 +60,12 @@ const initRedisAdapter = async (io) => {
     return true;
   } catch (error) {
     logger.warn(`⚠️ Failed to connect to Redis (${error.message}). Falling back to in-memory mode.`);
+    try { pubClient?.disconnect(); } catch (_) {}
+    try { subClient?.disconnect(); } catch (_) {}
+    try { redisClient?.disconnect(); } catch (_) {}
+    pubClient = null;
+    subClient = null;
+    redisClient = null;
     isRedisConnected = false;
     return false;
   }
