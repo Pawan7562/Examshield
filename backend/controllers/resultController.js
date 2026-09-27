@@ -22,8 +22,15 @@ exports.getResults = async (req, res) => {
     }
 
     const result = await query(
-      `SELECT r.*, s.name as student_name, s.student_id, s.roll_no, s.email,
-              e.name as exam_name, e.type as exam_type, e.total_marks as exam_total_marks
+      `SELECT r.id, r.student_id, r.exam_id, r.session_id,
+              r.marks_obtained, r.percentage, r.grade, r.status,
+              r.mcq_marks, r.subjective_marks, r.coding_marks,
+              r.rank, r.is_published, r.evaluated_at, r.created_at, r.updated_at, r.submitted_at,
+              s.name as student_name, s.student_id as student_code, s.roll_no, s.email,
+              COALESCE(e.title, e.name, 'Examination') as exam_name, 
+              COALESCE(e.name, e.title, 'Examination') as exam_title,
+              COALESCE(NULLIF(r.total_marks, 0), e.total_marks, 100) as total_marks,
+              e.total_marks as exam_total_marks, e.passing_marks as exam_passing_marks, e.type as exam_type
        FROM results r
        JOIN students s ON r.student_id = s.id
        JOIN exams e ON r.exam_id = e.id
@@ -36,6 +43,57 @@ exports.getResults = async (req, res) => {
     res.json({ success: true, data: { results: result.rows } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch results', error: error.message });
+  }
+};
+
+/**
+ * PUT /api/admin/results/:id
+ * Direct update for marks, grade, status
+ */
+exports.updateResult = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { marks_obtained, status, grade } = req.body;
+    const collegeId = req.user.id;
+
+    const existing = await query(`
+      SELECT r.*, e.total_marks, e.passing_marks 
+      FROM results r 
+      JOIN exams e ON r.exam_id = e.id 
+      WHERE r.id = $1 AND e.college_id = $2
+    `, [id, collegeId]);
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Result not found or unauthorized' });
+    }
+
+    const total = existing.rows[0].total_marks || existing.rows[0].exam_total_marks || 100;
+    const marks = parseFloat(marks_obtained) || 0;
+    const pct = Math.round((marks / total) * 100 * 10) / 10;
+    const passMarks = existing.rows[0].passing_marks || (total * 0.4);
+    const computedStatus = status || (marks >= passMarks ? 'pass' : 'fail');
+
+    const getGrade = (p) => {
+      if (p >= 90) return 'A+'; if (p >= 80) return 'A';
+      if (p >= 70) return 'B+'; if (p >= 60) return 'B';
+      if (p >= 50) return 'C'; return 'F';
+    };
+    const computedGrade = grade || getGrade(pct);
+
+    await query(`
+      UPDATE results 
+      SET marks_obtained = $1, percentage = $2, status = $3, grade = $4, evaluated_at = NOW()
+      WHERE id = $5
+    `, [marks, pct, computedStatus, computedGrade, id]);
+
+    res.json({
+      success: true,
+      message: 'Result updated successfully',
+      data: { marks_obtained: marks, percentage: pct, status: computedStatus, grade: computedGrade }
+    });
+  } catch (error) {
+    console.error('Update result error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update result', error: error.message });
   }
 };
 

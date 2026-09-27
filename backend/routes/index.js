@@ -104,6 +104,7 @@ admin.get('/exams/:id/student-activity/:studentId', liveMonitoringController.get
 
 // Results management
 admin.get('/results', resultController.getResults);
+admin.put('/results/:id', resultController.updateResult);
 admin.post('/results/:id/evaluate', resultController.evaluateResult);
 admin.post('/results/exam/:examId/publish', resultController.publishResults);
 

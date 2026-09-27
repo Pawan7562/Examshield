@@ -140,7 +140,10 @@ exports.getExams = async (req, res) => {
     const countPromise = pool.query(`SELECT COUNT(*)::int AS total FROM exams ${whereClause}`, params);
     const examsParams = [...params, parsedLimit, parsedOffset];
     const examsPromise = pool.query(`
-      SELECT * FROM exams 
+      SELECT *, 
+             COALESCE(title, name, 'Untitled Exam') AS name, 
+             COALESCE(title, name, 'Untitled Exam') AS title 
+      FROM exams 
       ${whereClause} 
       ORDER BY created_at DESC 
       LIMIT $${examsParams.length - 1} OFFSET $${examsParams.length}

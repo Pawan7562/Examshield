@@ -223,6 +223,7 @@ export const adminAPI = {
   getStudentActivity: (examId, studentId) => api.get(`/admin/exams/${examId}/student-activity/${studentId}`),
 
   getResults: (params) => api.get('/admin/results', { params }),
+  updateResult: (id, data) => api.put(`/admin/results/${id}`, data),
   evaluateResult: (id, data) => api.post(`/admin/results/${id}/evaluate`, data),
   publishResults: (examId) => api.post(`/admin/results/exam/${examId}/publish`),
 
