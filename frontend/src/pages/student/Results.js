@@ -117,22 +117,91 @@ export default function StudentResults() {
   };
 
   const handleDownloadByKey = async () => {
-    if (!examKeyInput.trim()) {
-      toast.error('Please enter an Exam Key');
+    const key = examKeyInput.trim();
+    if (!key) {
+      toast('Please enter your Examination Access Key or Code.', {
+        icon: 'ℹ️',
+        style: {
+          background: '#0f172a',
+          color: '#f8fafc',
+          border: '1px solid #334155',
+          borderRadius: '10px',
+          fontWeight: 600,
+          fontSize: '13px'
+        }
+      });
       return;
     }
+
     setDownloadingKey(true);
-    const downloadId = toast.loading('Locating verified evaluation record...');
+    const downloadId = toast.loading('Searching official examination records...', {
+      style: {
+        background: '#0f172a',
+        color: '#f8fafc',
+        borderRadius: '10px',
+        fontWeight: 600,
+        fontSize: '13px'
+      }
+    });
     
     try {
-      const response = await studentAPI.getResultByKey(examKeyInput.trim());
-      const resData = response.data.data ? response.data.data.result : response.data.result;
+      const response = await studentAPI.getResultByKey(key);
+      const payload = response?.data || response;
+      const resData = payload?.data?.result || payload?.result;
       
-      toast.success('Record verified! Downloading PDF...', { id: downloadId });
+      if (!payload?.success || !resData) {
+        // Pending evaluation or informational status
+        const infoMsg = payload?.message || 'Evaluation in Progress: Official transcripts will be released once grading is approved by your institution.';
+        toast(infoMsg, {
+          id: downloadId,
+          icon: '📋',
+          duration: 5500,
+          style: {
+            background: '#0f172a',
+            color: '#f8fafc',
+            border: '1px solid #38bdf8',
+            borderRadius: '10px',
+            fontSize: '13px',
+            fontWeight: 500,
+            lineHeight: '1.45',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4)'
+          }
+        });
+        return;
+      }
+
+      toast.success('Official Record Found! Downloading PDF...', {
+        id: downloadId,
+        duration: 3500,
+        style: {
+          background: '#0f172a',
+          color: '#f8fafc',
+          borderRadius: '10px',
+          fontSize: '13px',
+          fontWeight: 500
+        }
+      });
       downloadResultPDF(resData);
       setExamKeyInput('');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Assessment record not published or invalid key.', { id: downloadId });
+      const errMsg = err?.message || err?.response?.data?.message || (typeof err === 'string' ? err : 'Evaluation record not found for this key.');
+      const isNotFound = errMsg.toLowerCase().includes('not found') || errMsg.toLowerCase().includes('invalid');
+
+      toast(errMsg, {
+        id: downloadId,
+        icon: isNotFound ? '🔍' : '📋',
+        duration: 5500,
+        style: {
+          background: '#0f172a',
+          color: '#f8fafc',
+          border: isNotFound ? '1px solid #475569' : '1px solid #38bdf8',
+          borderRadius: '10px',
+          fontSize: '13px',
+          fontWeight: 500,
+          lineHeight: '1.45',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4)'
+        }
+      });
     } finally {
       setDownloadingKey(false);
     }

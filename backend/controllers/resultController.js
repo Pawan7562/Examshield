@@ -264,27 +264,68 @@ exports.getStudentResultByKey = async (req, res) => {
   try {
     const { examKey } = req.params;
     const studentId = req.user.id;
+    const cleanKey = (examKey || '').trim().toUpperCase();
 
+    // 1. Search for published result by exam_code or exam_key (case-insensitive)
     const result = await query(
-      `SELECT r.*, e.name as exam_name, e.type, e.total_marks, e.passing_marks, e.subject, e.exam_code, e.date_time as exam_date, s.name as student_name, s.student_id as student_roll_no
+      `SELECT r.*, COALESCE(e.title, e.name, 'Examination') as exam_name, e.type, e.total_marks, e.passing_marks, e.subject, e.exam_code, e.date_time as exam_date, s.name as student_name, s.student_id as student_roll_no
        FROM results r 
        JOIN exams e ON r.exam_id = e.id
        JOIN students s ON r.student_id = s.id
-       WHERE e.exam_code = $1 AND r.student_id = $2`,
-      [examKey, studentId]
+       WHERE (UPPER(e.exam_code) = $1 OR UPPER(e.exam_key) = $1) AND r.student_id = $2`,
+      [cleanKey, studentId]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Invalid Exam Key.' });
+    if (result.rows.length > 0) {
+      if (!result.rows[0].is_published) {
+        return res.status(200).json({
+          success: false,
+          isPending: true,
+          message: 'Evaluation Under Review: Your exam has been completed. Official transcripts will be released once grading is approved by your institution.'
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: { result: result.rows[0] },
+      });
     }
 
-    if (!result.rows[0].is_published) {
-      return res.status(400).json({ success: false, message: 'This exam result is pending publication by the administrator.' });
+    // 2. If no result record, check if student completed a session for this exam
+    const sessionCheck = await query(
+      `SELECT es.status, es.submitted_at, COALESCE(e.title, e.name, 'Examination') as exam_name
+       FROM exam_sessions es
+       JOIN exams e ON es.exam_id = e.id
+       WHERE (UPPER(e.exam_code) = $1 OR UPPER(e.exam_key) = $1) AND es.student_id = $2
+       LIMIT 1`,
+      [cleanKey, studentId]
+    );
+
+    if (sessionCheck.rows.length > 0) {
+      return res.status(200).json({
+        success: false,
+        isPending: true,
+        message: 'Evaluation in Progress: Your examination submission is recorded. Official transcripts will be available once results are published.'
+      });
     }
 
-    res.json({
-      success: true,
-      data: { result: result.rows[0] },
+    // 3. Check if exam exists at all
+    const examCheck = await query(
+      `SELECT id, COALESCE(title, name, 'Examination') as title FROM exams WHERE UPPER(exam_code) = $1 OR UPPER(exam_key) = $1 LIMIT 1`,
+      [cleanKey]
+    );
+
+    if (examCheck.rows.length > 0) {
+      return res.status(200).json({
+        success: false,
+        isPending: true,
+        message: 'No examination attempt found for this access key with your student account.'
+      });
+    }
+
+    return res.status(200).json({
+      success: false,
+      message: 'Access Key Not Found: Please verify the examination code on your admission ticket.'
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch result by key', error: error.message });
