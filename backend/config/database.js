@@ -40,10 +40,7 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),
 });
 
-pool.on('connect', (client) => {
-  client.query("SET timezone = 'Asia/Kolkata'").catch((err) => {
-    logger.warn('Failed to set PostgreSQL session timezone to Asia/Kolkata', err);
-  });
+pool.on('connect', () => {
   logger.info('Connected to PostgreSQL database (Timezone: Asia/Kolkata)');
 });
 
