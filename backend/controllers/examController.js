@@ -1632,6 +1632,12 @@ exports.startExam = async (req, res) => {
       } : null
     });
 
+    const nowMs = Date.now();
+    const sessionDurationMs = (examData.duration || 60) * 60 * 1000;
+    const sessionRemainingSec = Math.floor(sessionDurationMs / 1000);
+    const windowRemainingSec = windowStatus?.endTime ? Math.max(0, Math.floor((windowStatus.endTime - nowMs) / 1000)) : sessionRemainingSec;
+    const timeRemaining = Math.min(sessionRemainingSec, windowRemainingSec);
+
     res.json({
       success: true,
       message: 'Exam started. Good luck!',
@@ -1640,7 +1646,7 @@ exports.startExam = async (req, res) => {
         exam: { ...examData, exam_code: undefined },
         questions: finalQuestions,
         savedAnswers: [],
-        timeRemaining: Math.max(0, Math.floor((examEnd - now) / 1000)),
+        timeRemaining,
       },
     });
   } catch (error) {
