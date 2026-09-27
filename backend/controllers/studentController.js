@@ -394,6 +394,7 @@ exports.deleteStudent = async (req, res) => {
     );
 
     if (checkRes.rows.length === 0) {
+      client.release();
       return res.status(404).json({
         success: false,
         message: 'Student not found in your institution'
@@ -404,27 +405,42 @@ exports.deleteStudent = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // 1. Delete associated password requests
-    await client.query(
-      'DELETE FROM student_password_requests WHERE student_uuid = $1 OR student_id = $2',
-      [student.id, student.student_id]
-    );
+    // Clean up all tables that reference students.id
+    // Order: innermost dependents first, then parent-level tables
 
-    // 2. Delete exam assignments
-    await client.query(
-      'DELETE FROM exam_assignments WHERE student_id = $1',
-      [student.id]
-    );
+    // 1. answers (ON DELETE NO ACTION)
+    try { await client.query('DELETE FROM answers WHERE student_id = $1', [student.id]); } catch (_) {}
 
-    // 3. Delete exam attempts & violations if tables exist
+    // 2. violations (ON DELETE NO ACTION)
+    try { await client.query('DELETE FROM violations WHERE student_id = $1', [student.id]); } catch (_) {}
+
+    // 3. results (ON DELETE NO ACTION)
+    try { await client.query('DELETE FROM results WHERE student_id = $1', [student.id]); } catch (_) {}
+
+    // 4. exam_sessions (ON DELETE NO ACTION)
+    try { await client.query('DELETE FROM exam_sessions WHERE student_id = $1', [student.id]); } catch (_) {}
+
+    // 5. exam_attempts (if exists)
+    try { await client.query('DELETE FROM exam_attempts WHERE student_id = $1', [student.id]); } catch (_) {}
+
+    // 6. student_question_sets (ON DELETE CASCADE — but explicit is safer)
+    try { await client.query('DELETE FROM student_question_sets WHERE student_id = $1', [student.id]); } catch (_) {}
+
+    // 7. exam_assignments (ON DELETE CASCADE)
+    try { await client.query('DELETE FROM exam_assignments WHERE student_id = $1', [student.id]); } catch (_) {}
+
+    // 8. exam_students (ON DELETE CASCADE)
+    try { await client.query('DELETE FROM exam_students WHERE student_id = $1', [student.id]); } catch (_) {}
+
+    // 9. student_password_requests (ON DELETE CASCADE)
     try {
-      await client.query('DELETE FROM violations WHERE student_id = $1', [student.id]);
-    } catch (_) {}
-    try {
-      await client.query('DELETE FROM exam_attempts WHERE student_id = $1', [student.id]);
+      await client.query(
+        'DELETE FROM student_password_requests WHERE student_uuid = $1 OR student_id = $2',
+        [student.id, student.student_id]
+      );
     } catch (_) {}
 
-    // 4. Delete the student
+    // 10. Finally delete the student
     await client.query(
       'DELETE FROM students WHERE id = $1 AND college_id = $2',
       [id, collegeId]
@@ -434,12 +450,12 @@ exports.deleteStudent = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Student ${student.name} deleted successfully`
+      message: `Student "${student.name}" deleted successfully`
     });
 
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error('Delete student error:', error);
+    console.error('Delete student error:', error.message);
     res.status(500).json({
       success: false,
       message: 'Failed to delete student',
