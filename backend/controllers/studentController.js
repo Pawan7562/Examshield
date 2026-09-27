@@ -390,6 +390,7 @@ exports.deleteStudent = async (req, res) => {
 
     client = await pool.connect();
 
+    // Verify the student belongs to this college
     const checkRes = await client.query(
       'SELECT id, name, student_id FROM students WHERE id = $1 AND college_id = $2',
       [id, collegeId]
@@ -406,39 +407,46 @@ exports.deleteStudent = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Clean up ALL tables that reference students.id (in dependency order)
+    // Helper: run a cleanup query with a SAVEPOINT so that if it fails
+    // (e.g. table doesn't exist), we rollback only that step and keep
+    // the outer transaction alive for the next step.
+    const safeDelete = async (label, sql, params) => {
+      const sp = `sp_${label.replace(/[^a-z0-9]/gi, '_')}`;
+      await client.query(`SAVEPOINT ${sp}`);
+      try {
+        const r = await client.query(sql, params);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        if (r.rowCount > 0) console.log(`[deleteStudent] ${label}: removed ${r.rowCount} row(s)`);
+      } catch (e) {
+        await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        console.warn(`[deleteStudent] skip ${label}: ${e.message}`);
+      }
+    };
 
-    // answers.session_id -> exam_sessions, so delete answers FIRST
-    try { await client.query('DELETE FROM answers WHERE student_id = $1', [student.id]); } catch (_) {}
+    // Delete in dependency order (children before parents)
+    // answers and violations reference exam_sessions → must go first
+    await safeDelete('answers',                 'DELETE FROM answers WHERE student_id = $1',                [student.id]);
+    await safeDelete('violations',              'DELETE FROM violations WHERE student_id = $1',             [student.id]);
+    await safeDelete('results',                 'DELETE FROM results WHERE student_id = $1',                [student.id]);
+    await safeDelete('exam_sessions',           'DELETE FROM exam_sessions WHERE student_id = $1',          [student.id]);
+    await safeDelete('exam_attempts',           'DELETE FROM exam_attempts WHERE student_id = $1',          [student.id]);
+    await safeDelete('student_question_sets',   'DELETE FROM student_question_sets WHERE student_id = $1', [student.id]);
+    await safeDelete('exam_assignments',        'DELETE FROM exam_assignments WHERE student_id = $1',       [student.id]);
+    await safeDelete('exam_students',           'DELETE FROM exam_students WHERE student_id = $1',          [student.id]);
+    await safeDelete('student_password_requests',
+      'DELETE FROM student_password_requests WHERE student_uuid = $1 OR student_id = $2',
+      [student.id, student.student_id]
+    );
 
-    // violations.session_id -> exam_sessions, so delete violations BEFORE exam_sessions
-    try { await client.query('DELETE FROM violations WHERE student_id = $1', [student.id]); } catch (_) {}
-
-    // results.session_id -> exam_sessions (NO ACTION), so delete results BEFORE exam_sessions
-    try { await client.query('DELETE FROM results WHERE student_id = $1', [student.id]); } catch (_) {}
-
-    // Now safe to delete exam_sessions
-    try { await client.query('DELETE FROM exam_sessions WHERE student_id = $1', [student.id]); } catch (_) {}
-
-    // Other dependent tables
-    try { await client.query('DELETE FROM exam_attempts WHERE student_id = $1', [student.id]); } catch (_) {}
-    try { await client.query('DELETE FROM student_question_sets WHERE student_id = $1', [student.id]); } catch (_) {}
-    try { await client.query('DELETE FROM exam_assignments WHERE student_id = $1', [student.id]); } catch (_) {}
-    try { await client.query('DELETE FROM exam_students WHERE student_id = $1', [student.id]); } catch (_) {}
-    try {
-      await client.query(
-        'DELETE FROM student_password_requests WHERE student_uuid = $1 OR student_id = $2',
-        [student.id, student.student_id]
-      );
-    } catch (_) {}
-
-    // Finally delete the student record
+    // Finally, delete the student record itself
     await client.query(
       'DELETE FROM students WHERE id = $1 AND college_id = $2',
       [id, collegeId]
     );
 
     await client.query('COMMIT');
+    console.log(`[deleteStudent] ✅ deleted student ${student.id} (${student.name})`);
 
     res.json({
       success: true,
@@ -447,7 +455,7 @@ exports.deleteStudent = async (req, res) => {
 
   } catch (error) {
     if (client) await client.query('ROLLBACK').catch(() => {});
-    console.error('Delete student error:', error.message);
+    console.error('[deleteStudent] FATAL:', error.message, '|', error.detail || '', '| code:', error.code);
     res.status(500).json({
       success: false,
       message: 'Failed to delete student',
@@ -457,6 +465,7 @@ exports.deleteStudent = async (req, res) => {
     if (client) client.release();
   }
 };
+
 
 /**
  * GET /api/student/profile
