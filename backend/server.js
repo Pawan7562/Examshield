@@ -95,6 +95,10 @@ const io = new Server(server, {
   },
 });
 
+// Horizontal load balancing: Connect Socket.IO to Redis cluster if REDIS_URL is provided
+const { initRedisAdapter } = require('./config/redis');
+initRedisAdapter(io);
+
 // Socket.IO rooms for exam monitoring
 const activeExamSessions = new Map(); // sessionId -> {studentId, examId, collegeId, status}
 
