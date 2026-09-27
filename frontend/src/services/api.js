@@ -192,6 +192,8 @@ export const authAPI = {
   superAdminLogin: (data) => api.post('/auth/super-admin/login', data),
   collegeRegister: (data) => api.post('/auth/college/register', data),
   collegeLogin: (data) => api.post('/auth/college/login', data),
+  collegeForgotPassword: (data) => api.post('/auth/college/forgot-password', data),
+  collegeResetPassword: (data) => api.post('/auth/college/reset-password', data),
   studentLogin: (data) => api.post('/auth/student/login', data),
   getMe: () => api.get('/auth/me'),
 };
@@ -207,6 +209,9 @@ export const adminAPI = {
   updateStudent: (id, data) => api.put(`/admin/students/${id}`, data),
   toggleStudent: (id) => api.patch(`/admin/students/${id}/toggle-status`),
   deleteStudent: (id) => api.delete(`/admin/students/${id}`),
+  resetStudentPassword: (id, data) => api.post(`/admin/students/${id}/reset-password`, data),
+  getStudentPasswordRequests: (params) => api.get('/admin/students/password-requests', { params }),
+  resolvePasswordRequest: (id, data) => api.post(`/admin/students/password-requests/${id}/resolve`, data),
 
   getExams: (params) => api.get('/admin/exams', { params }),
   createExam: (data) => api.post('/admin/exams', data),
@@ -244,6 +249,8 @@ export const adminAPI = {
 export const studentAPI = {
   getProfile: () => api.get('/student/profile'),
   changePassword: (data) => api.post('/student/change-password', data),
+  requestPasswordAssistance: (data) => api.post('/student-password/request-admin-assistance', data),
+  getMyPasswordRequests: () => api.get('/student-password/my-requests'),
   getExams: () => api.get('/student/exams'),
   getExamDetails: (examId) => api.get(`/student/exams/${examId}`),
   startExam: (id, data) => api.post(`/student/exams/${id}/start`, data),

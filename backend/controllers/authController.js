@@ -480,3 +480,106 @@ exports.refreshToken = async (req, res) => {
 exports.getMe = async (req, res) => {
   res.json({ success: true, data: { user: req.user } });
 };
+
+/**
+ * POST /api/auth/college/forgot-password
+ * College Admin password recovery initiation
+ */
+exports.collegeForgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Administrator email is required.' });
+    }
+
+    const normalized = normalizeEmail(email);
+    const { pool } = require('../config/database');
+    const result = await pool.query(
+      'SELECT id, name, email FROM colleges WHERE LOWER(email) = $1',
+      [normalized]
+    );
+
+    if (result.rows.length === 0) {
+      // Return success to avoid email enumeration
+      return res.json({
+        success: true,
+        message: 'If an account exists with this email, password recovery instructions have been sent.'
+      });
+    }
+
+    const college = result.rows[0];
+    const jwtSecret = process.env.JWT_SECRET || 'CollegeExam_jwt_secret_key_change_in_production_123456';
+    const resetToken = jwt.sign(
+      { id: college.id, email: college.email, type: 'college_admin_pwd_reset' },
+      jwtSecret,
+      { expiresIn: '2h' }
+    );
+
+    const platformUrl = process.env.PLATFORM_URL || 'http://localhost:3000';
+    const resetUrl = `${platformUrl}/college/reset-password?token=${resetToken}`;
+
+    // Optional email dispatch
+    console.log(`[AUTH] College Admin Password Reset requested for ${college.email}: ${resetUrl}`);
+
+    res.json({
+      success: true,
+      message: 'Password reset link sent to your registered administrator email.',
+      data: {
+        resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined,
+        resetUrl: process.env.NODE_ENV === 'development' ? resetUrl : undefined
+      }
+    });
+  } catch (error) {
+    console.error('College forgot-password error:', error);
+    res.status(500).json({ success: false, message: 'Failed to process password reset request', error: error.message });
+  }
+};
+
+/**
+ * POST /api/auth/college/reset-password
+ * Complete College Admin password reset
+ */
+exports.collegeResetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Reset token and new password are required.' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long.' });
+    }
+
+    const jwtSecret = process.env.JWT_SECRET || 'CollegeExam_jwt_secret_key_change_in_production_123456';
+    let decoded;
+    try {
+      decoded = jwt.verify(token, jwtSecret);
+    } catch (tokenErr) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired password reset link. Please request a new one.' });
+    }
+
+    if (decoded.type !== 'college_admin_pwd_reset' || !decoded.id) {
+      return res.status(400).json({ success: false, message: 'Invalid reset token payload.' });
+    }
+
+    const { pool } = require('../config/database');
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    const updateRes = await pool.query(
+      'UPDATE colleges SET password = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, email',
+      [hashedPassword, decoded.id]
+    );
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'College account not found.' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Administrator password reset successfully! You can now log in with your new password.'
+    });
+  } catch (error) {
+    console.error('College reset-password error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset password', error: error.message });
+  }
+};

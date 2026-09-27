@@ -39,6 +39,7 @@ const StudentResults = lazy(() => import('./pages/student/Results'));
 const Profile = lazy(() => import('./pages/student/Profile'));
 const PasswordReset = lazy(() => import('./pages/student/PasswordReset'));
 const Settings = lazy(() => import('./pages/student/Settings'));
+const AdminResetPassword = lazy(() => import('./pages/auth/AdminResetPassword'));
 
 const SuperAdminDashboard = lazy(() => import('./pages/super-admin/Dashboard'));
 const CollegeManagement = lazy(() => import('./pages/super-admin/CollegeManagement'));
@@ -112,7 +113,9 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/admin/register" element={<Register />} />
           <Route path="/student/login" element={<Login role="student" />} />
-          <Route path="/student/password-reset" element={<PasswordReset />} />
+          <Route path="/college/reset-password" element={<AdminResetPassword />} />
+          <Route path="/admin/reset-password" element={<AdminResetPassword />} />
+          <Route path="/student/password-reset" element={<Navigate to="/student/login" replace />} />
           <Route path="/super-admin/login" element={<SuperAdminLogin />} />
 
           <Route

@@ -14,4 +14,10 @@ router.get('/verify-token', studentPasswordController.verifyResetToken);
 // Change password (when logged in)
 router.post('/change', studentPasswordController.changePassword);
 
+// Request password reset assistance from College Admin (from login page or student dashboard)
+router.post('/request-admin-assistance', studentPasswordController.requestAdminAssistance);
+
+// Get my password reset requests (student dashboard)
+router.get('/my-requests', studentPasswordController.getMyPasswordRequests);
+
 module.exports = router;

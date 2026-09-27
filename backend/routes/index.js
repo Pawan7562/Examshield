@@ -45,6 +45,8 @@ const auth = express.Router();
 auth.post('/super-admin/login', authController.superAdminLogin);
 auth.post('/college/register', authController.collegeRegister);
 auth.post('/college/login', authController.collegeLogin);
+auth.post('/college/forgot-password', authController.collegeForgotPassword);
+auth.post('/college/reset-password', authController.collegeResetPassword);
 auth.post('/student/login', authController.studentLogin);
 auth.post('/refresh', authController.refreshToken);
 auth.get('/me', authenticate, authController.getMe);
@@ -56,13 +58,16 @@ router.use('/auth', auth);
 const admin = express.Router();
 admin.use(authenticate, authorize('college_admin'));
 
-// Student management
+// Student management & Password Governance
 admin.get('/students', adminController.getStudents);
 admin.post('/students', checkSubscription, studentController.addStudent);
 admin.post('/students/bulk', checkSubscription, upload.single('file'), studentController.bulkUploadStudents);
 admin.put('/students/:id', studentController.updateStudent);
 admin.patch('/students/:id/toggle-status', studentController.toggleStudentStatus);
 admin.delete('/students/:id', studentController.deleteStudent);
+admin.post('/students/:id/reset-password', studentController.resetStudentPassword);
+admin.get('/students/password-requests', studentController.getPasswordRequests);
+admin.post('/students/password-requests/:id/resolve', studentController.resolvePasswordRequest);
 
 // Exam management
 admin.get('/exams', adminController.getExams);

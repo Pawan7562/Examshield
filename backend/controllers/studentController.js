@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const csv = require('csv-parser');
 const fs = require('fs');
 const { supabase } = require('../config/supabase');
+const { pool } = require('../config/database');
 const { sendStudentCredentials } = require('../services/emailService');
 
 /**
@@ -812,5 +813,233 @@ exports.bulkUploadStudents = async (req, res) => {
       message: 'Bulk upload failed',
       error: error.message
     });
+  }
+};
+
+/**
+ * POST /api/admin/students/:id/reset-password
+ * College Admin resets password for a student (auto-generated or manual)
+ */
+exports.resetStudentPassword = async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const collegeId = req.user.id;
+    const { newPassword, autoGenerate = true, notifyStudent = true } = req.body;
+
+    // Check if student belongs to this college
+    const studentCheck = await pool.query(
+      'SELECT id, student_id, name, email, roll_no FROM students WHERE id = $1 AND college_id = $2',
+      [studentId, collegeId]
+    );
+
+    if (studentCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Student not found in your institution.' });
+    }
+
+    const student = studentCheck.rows[0];
+
+    // Determine password
+    let passwordToSet = newPassword;
+    if (autoGenerate || !passwordToSet || !passwordToSet.trim()) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
+      passwordToSet = '';
+      for (let i = 0; i < 10; i++) {
+        passwordToSet += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+    }
+
+    if (passwordToSet.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(passwordToSet, 10);
+
+    // Update in database
+    await pool.query(
+      'UPDATE students SET password = $1, updated_at = NOW() WHERE id = $2 AND college_id = $3',
+      [hashedPassword, studentId, collegeId]
+    );
+
+    // Mark any pending password reset requests for this student as resolved
+    await pool.query(
+      `UPDATE student_password_requests 
+       SET status = 'resolved', admin_notes = 'Password reset by College Admin directly', resolved_by = $1, resolved_at = NOW(), updated_at = NOW() 
+       WHERE (student_uuid = $2 OR student_id = $3 OR student_email = $4) AND college_id = $1 AND status = 'pending'`,
+      [collegeId, studentId, student.student_id, student.email]
+    );
+
+    // Optional email dispatch
+    if (notifyStudent && student.email) {
+      try {
+        await sendStudentCredentials(student.email, {
+          name: student.name,
+          studentId: student.student_id,
+          password: passwordToSet,
+          loginUrl: process.env.STUDENT_LOGIN_URL || 'http://localhost:3000/student/login',
+        });
+      } catch (mailErr) {
+        console.warn('Student credential dispatch warning (non-fatal):', mailErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Password for ${student.name} (${student.student_id}) has been reset successfully!`,
+      data: {
+        student: {
+          id: student.id,
+          name: student.name,
+          studentId: student.student_id,
+          email: student.email,
+        },
+        temporaryPassword: passwordToSet,
+        loginUrl: process.env.STUDENT_LOGIN_URL || 'http://localhost:3000/student/login'
+      }
+    });
+
+  } catch (error) {
+    console.error('Reset student password error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset student password', error: error.message });
+  }
+};
+
+/**
+ * GET /api/admin/students/password-requests
+ * Fetch all student password reset assistance requests for college
+ */
+exports.getPasswordRequests = async (req, res) => {
+  try {
+    const collegeId = req.user.id;
+    const { status = 'all' } = req.query;
+
+    let query = `
+      SELECT r.*, s.name as current_name, s.email as current_email, s.is_active
+      FROM student_password_requests r
+      LEFT JOIN students s ON r.student_uuid = s.id
+      WHERE r.college_id = $1
+    `;
+    const params = [collegeId];
+
+    if (status && status !== 'all') {
+      params.push(status);
+      query += ` AND r.status = $${params.length}`;
+    }
+
+    query += ` ORDER BY r.created_at DESC LIMIT 100`;
+
+    const result = await pool.query(query, params);
+    const requests = result.rows || [];
+    const pendingCount = requests.filter(r => r.status === 'pending').length;
+
+    res.json({
+      success: true,
+      data: {
+        requests,
+        pendingCount
+      }
+    });
+  } catch (error) {
+    console.error('Get password requests error:', error);
+    res.status(500).json({ success: false, message: 'Failed to load password requests', error: error.message });
+  }
+};
+
+/**
+ * POST /api/admin/students/password-requests/:id/resolve
+ * College Admin resolves or dismisses a student password reset request
+ */
+exports.resolvePasswordRequest = async (req, res) => {
+  try {
+    const requestId = req.params.id;
+    const collegeId = req.user.id;
+    const { action = 'reset', newPassword, notes = '' } = req.body;
+
+    const requestRes = await pool.query(
+      'SELECT * FROM student_password_requests WHERE id = $1 AND college_id = $2',
+      [requestId, collegeId]
+    );
+
+    if (requestRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Password reset request not found.' });
+    }
+
+    const reqData = requestRes.rows[0];
+
+    if (action === 'dismiss' || action === 'reject') {
+      await pool.query(
+        `UPDATE student_password_requests 
+         SET status = 'rejected', admin_notes = $1, resolved_by = $2, resolved_at = NOW(), updated_at = NOW() 
+         WHERE id = $3`,
+        [notes || 'Dismissed by administrator', collegeId, requestId]
+      );
+
+      return res.json({
+        success: true,
+        message: 'Password reset request dismissed.'
+      });
+    }
+
+    // Action: reset
+    let passwordToSet = newPassword;
+    if (!passwordToSet || !passwordToSet.trim()) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
+      passwordToSet = '';
+      for (let i = 0; i < 10; i++) {
+        passwordToSet += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(passwordToSet, 10);
+
+    // Update student
+    await pool.query(
+      'UPDATE students SET password = $1, updated_at = NOW() WHERE id = $2 AND college_id = $3',
+      [hashedPassword, reqData.student_uuid, collegeId]
+    );
+
+    // Mark request as resolved
+    await pool.query(
+      `UPDATE student_password_requests 
+       SET status = 'resolved', admin_notes = $1, resolved_by = $2, resolved_at = NOW(), updated_at = NOW() 
+       WHERE id = $3`,
+      [notes || 'Approved & Reset by Administrator', collegeId, requestId]
+    );
+
+    // Also mark any other pending requests for the same student as resolved
+    await pool.query(
+      `UPDATE student_password_requests 
+       SET status = 'resolved', admin_notes = 'Batch resolved with active request', resolved_by = $1, resolved_at = NOW(), updated_at = NOW() 
+       WHERE student_uuid = $2 AND college_id = $1 AND status = 'pending'`,
+      [collegeId, reqData.student_uuid]
+    );
+
+    // Send email to student
+    if (reqData.student_email) {
+      try {
+        await sendStudentCredentials(reqData.student_email, {
+          name: reqData.student_name,
+          studentId: reqData.student_id,
+          password: passwordToSet,
+          loginUrl: process.env.STUDENT_LOGIN_URL || 'http://localhost:3000/student/login',
+        });
+      } catch (err) {
+        console.warn('Email send warning (non-fatal):', err.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Password for ${reqData.student_name} (${reqData.student_id}) has been reset!`,
+      data: {
+        temporaryPassword: passwordToSet,
+        studentId: reqData.student_id,
+        studentName: reqData.student_name,
+        email: reqData.student_email
+      }
+    });
+
+  } catch (error) {
+    console.error('Resolve password request error:', error);
+    res.status(500).json({ success: false, message: 'Failed to resolve request', error: error.message });
   }
 };

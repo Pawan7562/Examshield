@@ -4,7 +4,6 @@ import { adminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import { 
   Search, 
-  Plus, 
   Upload, 
   Edit2, 
   Trash2, 
@@ -24,7 +23,9 @@ import {
   XCircle,
   AlertCircle,
   Key,
-  BookOpen
+  RefreshCw,
+  Copy,
+  Clock
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 
@@ -125,6 +126,113 @@ export default function StudentManagement() {
   const [csvFile, setCsvFile] = useState(null);
   const fileRef = useRef();
 
+  // Tab & Password Requests state
+  const [activeTab, setActiveTab] = useState('students'); // 'students' | 'requests'
+  const [passwordRequests, setPasswordRequests] = useState([]);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+
+  // Reset Student Password Modal State
+  const [resetModal, setResetModal] = useState(false);
+  const [targetStudentForReset, setTargetStudentForReset] = useState(null);
+  const [resetForm, setResetForm] = useState({
+    newPassword: '',
+    notifyEmail: true,
+    adminNotes: '',
+    linkedRequestId: null
+  });
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetSuccessData, setResetSuccessData] = useState(null);
+
+  const fetchPasswordRequests = async () => {
+    try {
+      setRequestsLoading(true);
+      const res = await adminAPI.getStudentPasswordRequests();
+      if (res.data?.success) {
+        setPasswordRequests(res.data.data?.requests || []);
+        setPendingRequestsCount(res.data.data?.pendingCount || 0);
+      }
+    } catch (err) {
+      console.error('Failed to load password requests:', err);
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  const generateSecurePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    let pwd = 'Exam#';
+    for (let i = 0; i < 6; i++) {
+      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setResetForm(f => ({ ...f, newPassword: pwd }));
+    navigator.clipboard?.writeText(pwd);
+    toast.success('Generated password: ' + pwd);
+  };
+
+  const openResetModal = (student, linkedRequestId = null) => {
+    setTargetStudentForReset(student);
+    const initialPwd = 'Exam#' + Math.random().toString(36).substring(2, 6) + Math.floor(10 + Math.random() * 90);
+    setResetForm({
+      newPassword: initialPwd,
+      notifyEmail: true,
+      adminNotes: linkedRequestId ? 'Password reset processed via assistance request' : '',
+      linkedRequestId
+    });
+    setResetSuccessData(null);
+    setResetModal(true);
+  };
+
+  const handleResetSubmit = async () => {
+    if (!resetForm.newPassword || resetForm.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
+    try {
+      setResetSubmitting(true);
+      const res = await adminAPI.resetStudentPassword(targetStudentForReset.id, {
+        newPassword: resetForm.newPassword,
+        notifyEmail: resetForm.notifyEmail,
+        adminNotes: resetForm.adminNotes,
+        requestId: resetForm.linkedRequestId
+      });
+
+      if (res.data?.success) {
+        toast.success(res.data.message || 'Student password updated successfully');
+        setResetSuccessData({
+          student: targetStudentForReset,
+          newPassword: resetForm.newPassword,
+          emailSent: res.data?.data?.emailSent
+        });
+        setResetModal(false);
+        fetchPasswordRequests();
+        fetchStudents(pagination.page, true);
+      } else {
+        toast.error(res.data?.message || 'Failed to reset student password');
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to reset password';
+      toast.error(msg);
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
+
+  const handleDismissRequest = async (requestId) => {
+    if (!window.confirm('Dismiss this password assistance request?')) return;
+    try {
+      await adminAPI.resolvePasswordRequest(requestId, {
+        status: 'dismissed',
+        adminNotes: 'Dismissed by administrator'
+      });
+      toast.success('Request dismissed');
+      fetchPasswordRequests();
+    } catch (err) {
+      toast.error('Failed to dismiss request');
+    }
+  };
+
   const fetchStudents = async (page = 1, isBackground = false) => {
     if (!isBackground) setLoading(true);
     try {
@@ -147,6 +255,7 @@ export default function StudentManagement() {
   // Immediate fetch on mount
   useEffect(() => {
     fetchStudents(1, students.length > 0);
+    fetchPasswordRequests();
   }, []);
 
   // Debounce only when actively searching
@@ -294,28 +403,69 @@ export default function StudentManagement() {
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="admin-content-card">
-        <div className="admin-search-section">
-          <div className="admin-search-input">
-            <Search size={20} />
-            <input
-              value={search} 
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by name, email, roll number, or student ID..."
-            />
-          </div>
-          <Button variant="secondary" icon={Filter}>
-            Filters
-          </Button>
-        </div>
+      {/* Navigation Sub-Tabs */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('students')}
+          className={`admin-btn ${activeTab === 'students' ? 'admin-btn-primary' : 'admin-btn-secondary'}`}
+          style={{ borderRadius: '10px', padding: '10px 18px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Users size={16} />
+          <span>Enrolled Students ({pagination.total})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('requests');
+            fetchPasswordRequests();
+          }}
+          className={`admin-btn ${activeTab === 'requests' ? 'admin-btn-primary' : 'admin-btn-secondary'}`}
+          style={{ borderRadius: '10px', padding: '10px 18px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Key size={16} />
+          <span>Student Password Requests</span>
+          {pendingRequestsCount > 0 && (
+            <span style={{
+              background: '#ef4444',
+              color: '#ffffff',
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              padding: '2px 8px',
+              borderRadius: '999px',
+              marginLeft: '4px'
+            }}>
+              {pendingRequestsCount} Pending
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Students Table */}
-      <div className="admin-content-card">
-        <div className="admin-table-container">
-          <table className="admin-table">
-            <thead>
+      {activeTab === 'students' && (
+        <>
+          {/* Search and Filters */}
+          <div className="admin-content-card">
+            <div className="admin-search-section">
+              <div className="admin-search-input">
+                <Search size={20} />
+                <input
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search by name, email, roll number, or student ID..."
+                />
+              </div>
+              <Button variant="secondary" icon={Filter}>
+                Filters
+              </Button>
+            </div>
+          </div>
+
+          {/* Students Table */}
+          <div className="admin-content-card">
+            <div className="admin-table-container">
+              <table className="admin-table">
+                <thead>
               <tr>
                 <th>Student ID</th>
                 <th>Name</th>
@@ -378,6 +528,16 @@ export default function StudentManagement() {
                     <div className="admin-table-actions">
                       <Button variant="ghost" size="sm" icon={Edit2} onClick={() => openEdit(student)}>
                         Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Key}
+                        onClick={() => openResetModal(student)}
+                        title="Reset Student Password"
+                        style={{ color: '#0a74da' }}
+                      >
+                        Reset Pwd
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -442,6 +602,141 @@ export default function StudentManagement() {
           </div>
         )}
       </div>
+    </>
+  )}
+
+  {activeTab === 'requests' && (
+    <div className="admin-content-card">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid #f1f5f9' }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Key size={18} color="#0a74da" />
+            Student Password Assistance Queue
+          </h3>
+          <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748b' }}>
+            Review and securely reset credentials for students requesting assistance.
+          </p>
+        </div>
+        <Button variant="secondary" icon={RefreshCw} onClick={fetchPasswordRequests} loading={requestsLoading}>
+          Refresh Queue
+        </Button>
+      </div>
+
+      <div className="admin-table-container">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Student Info</th>
+              <th>Roll No</th>
+              <th>Submitted At</th>
+              <th>Requested From</th>
+              <th>Reason &amp; Candidate Notes</th>
+              <th>Status</th>
+              <th>Admin Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requestsLoading ? (
+              <tr>
+                <td colSpan={7} className="admin-table-loading">
+                  <div className="admin-loading-spinner" />
+                  Loading assistance queue...
+                </td>
+              </tr>
+            ) : passwordRequests.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="admin-table-empty">
+                  <CheckCircle size={44} color="#10b981" />
+                  <h3>No Password Assistance Requests</h3>
+                  <p>All student password reset requests are resolved and up to date.</p>
+                </td>
+              </tr>
+            ) : (
+              passwordRequests.map(req => (
+                <tr key={req.id}>
+                  <td>
+                    <div className="admin-student-info">
+                      <span style={{ fontWeight: 700 }}>{req.student_name}</span>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{req.student_email}</span>
+                      <span style={{ fontSize: '0.74rem', color: '#0a74da', fontFamily: 'monospace' }}>{req.student_id}</span>
+                    </div>
+                  </td>
+                  <td className="admin-student-roll">{req.roll_no || '—'}</td>
+                  <td>
+                    <div style={{ fontSize: '0.82rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={13} color="#64748b" />
+                      <span>{new Date(req.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                      {new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </td>
+                  <td>
+                    <span style={{ fontSize: '0.8rem', padding: '3px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#475569', textTransform: 'capitalize' }}>
+                      {req.requested_from || 'Dashboard'}
+                    </span>
+                  </td>
+                  <td style={{ maxWidth: '280px' }}>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#1e293b' }}>
+                      {req.reason}
+                    </div>
+                    {req.admin_notes && (
+                      <div style={{ fontSize: '0.78rem', color: '#059669', background: '#ecfdf5', padding: '3px 6px', borderRadius: '4px', marginTop: '4px' }}>
+                        <strong>Admin:</strong> {req.admin_notes}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <span className={`admin-status-badge ${req.status === 'resolved' ? 'active' : 'inactive'}`} style={{
+                      background: req.status === 'resolved' ? '#ecfdf5' : req.status === 'pending' ? '#fef3c7' : '#f1f5f9',
+                      color: req.status === 'resolved' ? '#059669' : req.status === 'pending' ? '#d97706' : '#64748b'
+                    }}>
+                      {req.status === 'resolved' ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+                      {req.status.toUpperCase()}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="admin-table-actions">
+                      {req.status === 'pending' ? (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={Key}
+                            onClick={() => openResetModal({
+                              id: req.student_uuid || req.student_id,
+                              name: req.student_name,
+                              email: req.student_email,
+                              student_id: req.student_id,
+                              roll_no: req.roll_no
+                            }, req.id)}
+                          >
+                            Reset &amp; Resolve
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDismissRequest(req.id)}
+                            className="danger"
+                          >
+                            Dismiss
+                          </Button>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
+                          ✓ Resolved
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
 
       {/* Add/Edit Modal */}
       <Modal open={addModal} onClose={() => setAddModal(false)} title={editStudent ? 'Edit Student' : 'Add New Student'}>
@@ -657,6 +952,153 @@ export default function StudentManagement() {
               {submitting ? 'Uploading...' : 'Upload Students'}
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Reset Student Password Modal */}
+      <Modal
+        open={resetModal}
+        onClose={() => setResetModal(false)}
+        title="Secure Student Password Reset"
+      >
+        {targetStudentForReset && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>
+                {targetStudentForReset.name}
+              </div>
+              <div style={{ fontSize: '0.84rem', color: '#64748b', marginTop: '3px' }}>
+                Roll No: <strong>{targetStudentForReset.roll_no}</strong> • Student ID: <strong>{targetStudentForReset.student_id}</strong>
+              </div>
+              <div style={{ fontSize: '0.84rem', color: '#0a74da', marginTop: '2px' }}>
+                {targetStudentForReset.email}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label className="admin-form-label" style={{ margin: 0, fontWeight: 700 }}>
+                  New Student Password *
+                </label>
+                <button
+                  type="button"
+                  onClick={generateSecurePassword}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#0a74da',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <RefreshCw size={13} />
+                  Auto-Generate Strong Password
+                </button>
+              </div>
+              <input
+                type="text"
+                className="admin-form-input"
+                placeholder="Enter new password (min 6 chars)"
+                value={resetForm.newPassword}
+                onChange={(e) => setResetForm(f => ({ ...f, newPassword: e.target.value }))}
+              />
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.86rem', color: '#334155', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={resetForm.notifyEmail}
+                onChange={(e) => setResetForm(f => ({ ...f, notifyEmail: e.target.checked }))}
+              />
+              <span>Send new login credentials to student's email</span>
+            </label>
+
+            <div>
+              <label className="admin-form-label" style={{ fontWeight: 700 }}>
+                Resolution / Administrative Notes (Optional)
+              </label>
+              <textarea
+                className="admin-form-input"
+                rows={2}
+                placeholder="e.g. Identity verified via student roll number and updated credentials issued"
+                value={resetForm.adminNotes}
+                onChange={(e) => setResetForm(f => ({ ...f, adminNotes: e.target.value }))}
+                style={{ padding: '8px 12px' }}
+              />
+            </div>
+
+            <div className="admin-form-actions">
+              <Button variant="secondary" onClick={() => setResetModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleResetSubmit} loading={resetSubmitting}>
+                Confirm &amp; Reset Password
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Reset Success Modal */}
+      <Modal
+        open={!!resetSuccessData}
+        onClose={() => setResetSuccessData(null)}
+        title="Student Password Reset Complete"
+      >
+        <div className="admin-form-note" style={{ background: '#ecfdf5', borderColor: '#10b981', color: '#065f46' }}>
+          <CheckCircle size={16} style={{ color: '#10b981' }} />
+          Password has been updated in the database {resetSuccessData?.emailSent ? 'and emailed to student' : ''}!
+        </div>
+
+        <div className="admin-form-grid" style={{ marginTop: '14px' }}>
+          <Input label="Student Name" value={resetSuccessData?.student?.name || ''} readOnly />
+          <Input label="Student Email" value={resetSuccessData?.student?.email || ''} readOnly />
+          <div className="admin-form-group" style={{ gridColumn: 'span 2' }}>
+            <label className="admin-form-label" style={{ fontWeight: 800, color: '#047857' }}>
+              🔑 New Account Password
+            </label>
+            <input
+              className="admin-form-input"
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                border: '2px dashed #10b981',
+                background: '#f0fdf4',
+                fontWeight: 800,
+                fontSize: '1.1rem',
+                fontFamily: 'monospace',
+                color: '#065f46'
+              }}
+              value={resetSuccessData?.newPassword || ''}
+              readOnly
+            />
+          </div>
+        </div>
+
+        <div className="admin-form-actions" style={{ marginTop: '20px' }}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const text = [
+                `Student: ${resetSuccessData?.student?.name || ''}`,
+                `Student ID: ${resetSuccessData?.student?.student_id || ''}`,
+                `Email: ${resetSuccessData?.student?.email || ''}`,
+                `New Password: ${resetSuccessData?.newPassword || ''}`,
+                `Login URL: ${window.location.origin}/student/login`
+              ].join('\n');
+              navigator.clipboard?.writeText(text);
+              toast.success('Credentials copied to clipboard!');
+            }}
+          >
+            <Copy size={16} />
+            Copy Credentials
+          </Button>
+          <Button onClick={() => setResetSuccessData(null)}>Done</Button>
         </div>
       </Modal>
     </div>
