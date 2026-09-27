@@ -1,4 +1,5 @@
 // controllers/examController.js
+const { pool } = require('../config/database');
 const { supabase } = require('../config/supabase-clean');
 const { sendExamNotification, sendExamReminder } = require('../services/emailService');
 const { v4: uuidv4 } = require('uuid');
@@ -653,51 +654,91 @@ exports.updateExam = async (req, res) => {
   try {
     const { id } = req.params;
     const collegeId = req.user.id;
-    const { name, description, subject, dateTime, duration, totalMarks, passingMarks, instructions, status } = req.body;
+    const { 
+      name, title, description, subject, dateTime, date_time, 
+      duration, totalMarks, total_marks, passingMarks, passing_marks, 
+      instructions, status, type 
+    } = req.body;
 
-    console.log('🚀 Backend: Updating exam request:', {
-      examId: id,
-      collegeId: collegeId,
-      updateData: { name, description, subject, dateTime, duration, totalMarks, passingMarks, instructions, status }
-    });
+    const examTitle = title || name;
+    const examDuration = duration !== undefined ? parseInt(duration) : undefined;
+    const examTotal = totalMarks !== undefined ? parseInt(totalMarks) : (total_marks !== undefined ? parseInt(total_marks) : undefined);
+    const examPass = passingMarks !== undefined ? parseInt(passingMarks) : (passing_marks !== undefined ? parseInt(passing_marks) : undefined);
+    const examDate = dateTime || date_time;
 
-    // Prepare update data
-    const updateData = {};
-    if (name !== undefined) updateData.name = name;
-    if (description !== undefined) updateData.description = description;
-    if (subject !== undefined) updateData.subject = subject;
-    if (dateTime !== undefined) updateData.date_time = toISTISOString(dateTime);
-    if (duration !== undefined) updateData.duration = duration;
-    if (totalMarks !== undefined) updateData.total_marks = totalMarks;
-    if (passingMarks !== undefined) updateData.passing_marks = passingMarks;
-    if (instructions !== undefined) updateData.instructions = instructions;
-    if (status !== undefined) updateData.status = status;
+    const updateFields = [];
+    const updateValues = [id, collegeId];
+    let idx = 3;
 
-    console.log('📝 Backend: Prepared update data:', updateData);
-
-    // Update exam using Supabase
-    const { data: updatedExam, error: updateError } = await supabase
-      .from('exams')
-      .update(updateData)
-      .eq('id', id)
-      .eq('college_id', collegeId)
-      .select()
-      .single();
-
-    console.log('📊 Backend: Exam update result:', {
-      updateError: updateError,
-      updatedExam: updatedExam
-    });
-
-    if (updateError || !updatedExam) {
-      console.log('❌ Backend: Exam not found for update');
-      return res.status(404).json({ success: false, message: 'Exam not found.' });
+    if (examTitle !== undefined) {
+      updateFields.push(`title = $${idx}`, `name = $${idx}`);
+      updateValues.push(examTitle);
+      idx++;
+    }
+    if (description !== undefined) {
+      updateFields.push(`description = $${idx}`);
+      updateValues.push(description);
+      idx++;
+    }
+    if (subject !== undefined) {
+      updateFields.push(`subject = $${idx}`);
+      updateValues.push(subject);
+      idx++;
+    }
+    if (examDuration !== undefined && !isNaN(examDuration)) {
+      updateFields.push(`duration = $${idx}`);
+      updateValues.push(examDuration);
+      idx++;
+    }
+    if (examTotal !== undefined && !isNaN(examTotal)) {
+      updateFields.push(`total_marks = $${idx}`);
+      updateValues.push(examTotal);
+      idx++;
+    }
+    if (examPass !== undefined && !isNaN(examPass)) {
+      updateFields.push(`passing_marks = $${idx}`);
+      updateValues.push(examPass);
+      idx++;
+    }
+    if (status !== undefined) {
+      updateFields.push(`status = $${idx}`);
+      updateValues.push(status);
+      idx++;
+    }
+    if (type !== undefined) {
+      updateFields.push(`type = $${idx}`);
+      updateValues.push(type);
+      idx++;
+    }
+    if (instructions !== undefined) {
+      updateFields.push(`instructions = $${idx}`);
+      updateValues.push(instructions);
+      idx++;
+    }
+    if (examDate) {
+      updateFields.push(`date_time = $${idx}`);
+      updateValues.push(new Date(examDate));
+      idx++;
     }
 
-    console.log('✅ Backend: Exam updated successfully');
-    res.json({ success: true, message: 'Exam updated.', data: { exam: updatedExam } });
+    if (updateFields.length === 0) {
+      return res.json({ success: true, message: 'Nothing to update' });
+    }
+
+    const queryText = `
+      UPDATE exams 
+      SET ${updateFields.join(', ')}, updated_at = NOW() 
+      WHERE id = $1 AND college_id = $2 
+      RETURNING *, COALESCE(title, name) as title, COALESCE(title, name) as name
+    `;
+    const { rows } = await pool.query(queryText, updateValues);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Exam not found or unauthorized' });
+    }
+
+    res.json({ success: true, message: 'Exam updated.', data: { exam: rows[0] } });
   } catch (error) {
-    console.error('❌ Backend: Update exam error:', error);
+    console.error('Update exam error:', error);
     res.status(500).json({ success: false, message: 'Update failed', error: error.message });
   }
 };
@@ -858,57 +899,7 @@ exports.publishExam = async (req, res) => {
   }
 };
 
-/**
- * GET /api/admin/exams/:id/questions
- */
-exports.getExamQuestions = async (req, res) => {
-  try {
-    const { id } = req.params;
 
-    console.log('🚀 Backend: Fetching exam questions request:', {
-      examId: id
-    });
-
-    // Fetch questions using Supabase
-    const { data: questions, error: questionsError } = await supabase
-      .from('questions') // Use existing questions table
-      .select('*')
-      .eq('exam_id', id)
-      .order('order_index', { ascending: true });
-
-    console.log('📊 Backend: Questions fetch result:', {
-      questionsError: questionsError,
-      questionsFound: questions,
-      questionsCount: questions?.length || 0
-    });
-
-    if (questionsError) {
-      console.error('❌ Backend: Error fetching questions:', questionsError);
-      // Fallback: check if exam has AI-generated questions in description
-      try {
-        const { data: examData } = await supabase
-          .from('exams')
-          .select('description')
-          .eq('id', id)
-          .single();
-        
-        if (examData?.description?.includes('Questions:')) {
-          console.log('📊 Backend: Found AI-generated questions in description, returning empty array for now');
-          return res.json({ success: true, data: { questions: [] } });
-        }
-      } catch (fallbackError) {
-        console.error('Fallback check failed:', fallbackError);
-      }
-      return res.status(500).json({ success: false, message: 'Failed to fetch questions', error: questionsError.message });
-    }
-
-    console.log('✅ Backend: Questions fetched successfully');
-    res.json({ success: true, data: { questions: questions || [] } });
-  } catch (error) {
-    console.error('❌ Backend: Get exam questions error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch questions', error: error.message });
-  }
-};
 
 /**
  * POST /api/admin/exams/:id/questions
@@ -1987,41 +1978,38 @@ exports.reportViolation = async (req, res) => {
 exports.getExamQuestions = async (req, res) => {
   try {
     const { id } = req.params;
-    const { data: questions, error } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('exam_id', id)
-      .order('order_index', { ascending: true });
+    const { rows: questions } = await pool.query(
+      `SELECT * FROM questions WHERE exam_id = $1 ORDER BY order_index ASC, created_at ASC`,
+      [id]
+    );
 
-    if (error) {
-      return res.status(500).json({ success: false, message: 'Failed to get questions', error: error.message });
-    }
+    const { rows: examRows } = await pool.query(
+      `SELECT id, COALESCE(title, name, 'Untitled Exam') as title, type, duration, total_marks, passing_marks, status FROM exams WHERE id = $1`,
+      [id]
+    );
 
-    res.json({ success: true, data: questions || [] });
+    res.json({ 
+      success: true, 
+      data: {
+        questions: questions || [],
+        exam: examRows[0] || null
+      },
+      questions: questions || [],
+      exam: examRows[0] || null
+    });
   } catch (error) {
+    console.error('getExamQuestions error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
-
-/**
- * DELETE /api/admin/exams/:id/questions/:questionId
- */
 exports.deleteQuestion = async (req, res) => {
   try {
     const { id, questionId } = req.params;
-    const { error } = await supabase
-      .from('questions')
-      .delete()
-      .eq('id', questionId)
-      .eq('exam_id', id);
-
-    if (error) {
-      return res.status(500).json({ success: false, message: 'Failed to delete question', error: error.message });
-    }
-
+    await pool.query(`DELETE FROM questions WHERE id = $1 AND exam_id = $2`, [questionId, id]);
     res.json({ success: true, message: 'Question deleted successfully' });
   } catch (error) {
+    console.error('deleteQuestion error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };

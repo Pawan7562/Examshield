@@ -126,6 +126,7 @@ function App() {
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="students" element={<StudentManagement />} />
             <Route path="exams" element={<ExamManagement />} />
+            <Route path="exams/:id/edit" element={<ExamManagement />} />
             <Route path="exams/create" element={<CreateExam />} />
             <Route path="ai-questions" element={<AIQuestionGenerator />} />
             <Route path="exams/:id/questions" element={<ExamQuestions />} />

@@ -140,12 +140,14 @@ exports.getExams = async (req, res) => {
     const countPromise = pool.query(`SELECT COUNT(*)::int AS total FROM exams ${whereClause}`, params);
     const examsParams = [...params, parsedLimit, parsedOffset];
     const examsPromise = pool.query(`
-      SELECT *, 
-             COALESCE(title, name, 'Untitled Exam') AS name, 
-             COALESCE(title, name, 'Untitled Exam') AS title 
-      FROM exams 
-      ${whereClause} 
-      ORDER BY created_at DESC 
+      SELECT e.*, 
+             COALESCE(e.title, e.name, 'Untitled Exam') AS name, 
+             COALESCE(e.title, e.name, 'Untitled Exam') AS title,
+             (SELECT COUNT(*)::int FROM questions q WHERE q.exam_id = e.id) AS question_count,
+             (SELECT COUNT(*)::int FROM exam_candidates ec WHERE ec.exam_id = e.id) AS student_count
+      FROM exams e
+      ${whereClause.replace(/college_id/g, 'e.college_id').replace(/status/g, 'e.status')} 
+      ORDER BY e.created_at DESC 
       LIMIT $${examsParams.length - 1} OFFSET $${examsParams.length}
     `, examsParams);
 
