@@ -754,7 +754,7 @@ exports.resetStudentPassword = async (req, res) => {
   try {
     const studentId = req.params.id;
     const collegeId = req.user.id;
-    const { newPassword, autoGenerate = true, notifyStudent = true } = req.body;
+    const { newPassword, autoGenerate = true, notifyStudent = true, notifyEmail } = req.body;
 
     // Check if student belongs to this college
     const studentCheck = await pool.query(
@@ -798,15 +798,22 @@ exports.resetStudentPassword = async (req, res) => {
       [collegeId, studentId, student.student_id, student.email]
     );
 
-    // Optional email dispatch
-    if (notifyStudent && student.email) {
+    // Email dispatch: respect notifyEmail (passed from frontend) or notifyStudent
+    const shouldNotify = (notifyEmail !== undefined ? notifyEmail : notifyStudent) !== false;
+    let emailSent = false;
+    if (shouldNotify && student.email) {
       try {
-        await sendStudentCredentials(student.email, {
+        await sendStudentCredentials({
           name: student.name,
+          email: student.email,
           studentId: student.student_id,
           password: passwordToSet,
-          loginUrl: process.env.STUDENT_LOGIN_URL || 'http://localhost:3000/student/login',
+          collegeName: req.user?.name || req.user?.college_name || 'Your Institution',
+          loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login',
+          isReset: true
         });
+        emailSent = true;
+        console.log(`✅ Password reset credentials successfully sent to student: ${student.email}`);
       } catch (mailErr) {
         console.warn('Student credential dispatch warning (non-fatal):', mailErr.message);
       }
@@ -815,6 +822,7 @@ exports.resetStudentPassword = async (req, res) => {
     res.json({
       success: true,
       message: `Password for ${student.name} (${student.student_id}) has been reset successfully!`,
+      emailSent,
       data: {
         student: {
           id: student.id,
@@ -823,7 +831,9 @@ exports.resetStudentPassword = async (req, res) => {
           email: student.email,
         },
         temporaryPassword: passwordToSet,
-        loginUrl: process.env.STUDENT_LOGIN_URL || 'http://localhost:3000/student/login'
+        newPassword: passwordToSet,
+        emailSent,
+        loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login'
       }
     });
 
@@ -944,14 +954,20 @@ exports.resolvePasswordRequest = async (req, res) => {
     );
 
     // Send email to student
+    let emailSent = false;
     if (reqData.student_email) {
       try {
-        await sendStudentCredentials(reqData.student_email, {
+        await sendStudentCredentials({
           name: reqData.student_name,
+          email: reqData.student_email,
           studentId: reqData.student_id,
           password: passwordToSet,
-          loginUrl: process.env.STUDENT_LOGIN_URL || 'http://localhost:3000/student/login',
+          collegeName: req.user?.name || req.user?.college_name || 'Your Institution',
+          loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login',
+          isReset: true
         });
+        emailSent = true;
+        console.log(`✅ Password reset email sent via request resolution to: ${reqData.student_email}`);
       } catch (err) {
         console.warn('Email send warning (non-fatal):', err.message);
       }
@@ -960,11 +976,14 @@ exports.resolvePasswordRequest = async (req, res) => {
     res.json({
       success: true,
       message: `Password for ${reqData.student_name} (${reqData.student_id}) has been reset!`,
+      emailSent,
       data: {
         temporaryPassword: passwordToSet,
+        newPassword: passwordToSet,
         studentId: reqData.student_id,
         studentName: reqData.student_name,
-        email: reqData.student_email
+        email: reqData.student_email,
+        emailSent
       }
     });
 

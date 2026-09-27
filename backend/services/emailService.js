@@ -234,31 +234,53 @@ const baseTemplate = (content) => `
  * NOTE: This is intentionally awaitable so callers can catch real errors.
  * Use .catch() in fire-and-forget contexts.
  */
-const sendStudentCredentials = async ({ 
-  name, 
-  email, 
-  studentId, 
-  password, 
-  collegeName, 
-  loginUrl,
-  examName,
-  examKey,
-  examDate,
-  examDuration,
-  subject
-}) => {
+const sendStudentCredentials = async (firstArg, secondArg) => {
+  let opts = {};
+  if (typeof firstArg === 'string') {
+    opts = { ...(secondArg || {}), email: firstArg };
+  } else if (firstArg && typeof firstArg === 'object') {
+    opts = firstArg;
+  }
+
+  const { 
+    name, 
+    email, 
+    studentId, 
+    password, 
+    collegeName = 'Your Institution', 
+    loginUrl = process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login',
+    examName,
+    examKey,
+    examDate,
+    examDuration,
+    subject,
+    isReset = false
+  } = opts;
+
   console.log('\n🎓 STUDENT CREDENTIALS:');
-  console.log('  Name:', name, '| Email:', email, '| ID:', studentId, '| College:', collegeName, '| ExamKey:', examKey || 'None');
+  console.log('  Name:', name, '| Email:', email, '| ID:', studentId, '| College:', collegeName, '| isReset:', isReset);
+
+  if (!email) {
+    throw new Error('Recipient email is required for credentials dispatch.');
+  }
 
   const formattedDate = examDate ? new Date(examDate).toLocaleString('en-IN', {
     weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
   }) : null;
 
+  const badgeText = isReset 
+    ? 'PASSWORD RESET SUCCESSFUL' 
+    : (examKey ? 'ACCOUNT & EXAM ACCESS ISSUED' : 'ACCOUNT CREATED');
+
+  const actionNotice = isReset
+    ? `Your student portal password on ExamShield has been reset by <strong>${collegeName}</strong>. Please find your updated login credentials below.`
+    : `Your student account has been created on ExamShield by <strong>${collegeName}</strong>.${examKey ? ' You have also been enrolled in an upcoming examination.' : ' Use the credentials below to log in to your exam portal.'}`;
+
   const content = `
-    <div class="badge">${examKey ? 'ACCOUNT & EXAM ACCESS ISSUED' : 'ACCOUNT CREATED'}</div>
-    <p class="greeting">Welcome, ${name}!</p>
-    <p class="text">Your student account has been created on ExamShield by <strong>${collegeName}</strong>.${examKey ? ' You have also been enrolled in an upcoming examination.' : ' Use the credentials below to log in to your exam portal.'}</p>
+    <div class="badge">${badgeText}</div>
+    <p class="greeting">${isReset ? 'Hello' : 'Welcome'}, ${name || 'Candidate'}!</p>
+    <p class="text">${actionNotice}</p>
 
     <!-- Student Login Credentials -->
     <div class="credentials-box" style="border: 2px solid #0f3460; background: #f0f7ff; margin-bottom: 20px;">
@@ -272,7 +294,7 @@ const sendStudentCredentials = async ({
         <span class="credential-value">${email}</span>
       </div>
       <div class="credential-item">
-        <span class="credential-label">Temporary Password</span>
+        <span class="credential-label">${isReset ? 'New Password' : 'Temporary Password'}</span>
         <span class="credential-value" style="color: #e94560; font-size: 16px;">${password}</span>
       </div>
     </div>
@@ -309,9 +331,11 @@ const sendStudentCredentials = async ({
     </div>
   `;
 
-  const subjectLine = examKey
-    ? `Welcome to ExamShield — Your Student ID, Password & Exam Key (${examKey})`
-    : `Welcome to ExamShield — Your Login Credentials`;
+  const subjectLine = isReset
+    ? `ExamShield — Your Password Has Been Reset`
+    : (examKey
+        ? `Welcome to ExamShield — Your Student ID, Password & Exam Key (${examKey})`
+        : `Welcome to ExamShield — Your Login Credentials`);
 
   await sendWithRetry({
     to: email,
