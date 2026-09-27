@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -14,34 +14,49 @@ import ContactPage from './pages/public/Contact';
 import AboutPage from './pages/public/About';
 
 import AdminLayout from './components/admin/AdminLayout';
-import AdminDashboard from './pages/admin/Dashboard';
-import StudentManagement from './pages/admin/StudentManagement';
-import ExamManagement from './pages/admin/ExamManagement';
-import CreateExam from './pages/admin/CreateExam';
-import AIQuestionGenerator from './pages/admin/AIQuestionGenerator';
-import ExamQuestions from './pages/admin/ExamQuestions';
-import QuestionDetail from './pages/admin/QuestionDetail';
-import LiveMonitor from './pages/admin/LiveMonitor';
-import Results from './pages/admin/Results';
-import EvaluateResult from './pages/admin/EvaluateResult';
-import Subscription from './pages/admin/Subscription';
-import AdminSettings from './pages/admin/Settings';
-
 import StudentLayout from './components/student/StudentLayout';
-import StudentDashboard from './pages/student/Dashboard';
-import ExamList from './pages/student/ExamList';
-import ExamRoom from './pages/student/ExamRoom';
-import StudentResults from './pages/student/Results';
-import Profile from './pages/student/Profile';
-import PasswordReset from './pages/student/PasswordReset';
-import Settings from './pages/student/Settings';
-
 import SuperAdminLayout from './components/admin/SuperAdminLayout';
-import SuperAdminDashboard from './pages/super-admin/Dashboard';
-import CollegeManagement from './pages/super-admin/CollegeManagement';
-import PaymentManagement from './pages/super-admin/PaymentManagement';
-import AuditLogs from './pages/super-admin/AuditLogs';
-import PlatformSettings from './pages/super-admin/PlatformSettings';
+
+// Route-level code-splitting: loads heavy page components only on demand
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
+const StudentManagement = lazy(() => import('./pages/admin/StudentManagement'));
+const ExamManagement = lazy(() => import('./pages/admin/ExamManagement'));
+const CreateExam = lazy(() => import('./pages/admin/CreateExam'));
+const AIQuestionGenerator = lazy(() => import('./pages/admin/AIQuestionGenerator'));
+const ExamQuestions = lazy(() => import('./pages/admin/ExamQuestions'));
+const QuestionDetail = lazy(() => import('./pages/admin/QuestionDetail'));
+const LiveMonitor = lazy(() => import('./pages/admin/LiveMonitor'));
+const Results = lazy(() => import('./pages/admin/Results'));
+const EvaluateResult = lazy(() => import('./pages/admin/EvaluateResult'));
+const Subscription = lazy(() => import('./pages/admin/Subscription'));
+const AdminSettings = lazy(() => import('./pages/admin/Settings'));
+
+const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
+const ExamList = lazy(() => import('./pages/student/ExamList'));
+const ExamRoom = lazy(() => import('./pages/student/ExamRoom'));
+const StudentResults = lazy(() => import('./pages/student/Results'));
+const Profile = lazy(() => import('./pages/student/Profile'));
+const PasswordReset = lazy(() => import('./pages/student/PasswordReset'));
+const Settings = lazy(() => import('./pages/student/Settings'));
+
+const SuperAdminDashboard = lazy(() => import('./pages/super-admin/Dashboard'));
+const CollegeManagement = lazy(() => import('./pages/super-admin/CollegeManagement'));
+const PaymentManagement = lazy(() => import('./pages/super-admin/PaymentManagement'));
+const AuditLogs = lazy(() => import('./pages/super-admin/AuditLogs'));
+const PlatformSettings = lazy(() => import('./pages/super-admin/PlatformSettings'));
+
+const PageFallback = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+    <div style={{
+      width: '32px',
+      height: '32px',
+      border: '3px solid rgba(10, 116, 218, 0.15)',
+      borderTopColor: '#0a74da',
+      borderRadius: '50%',
+      animation: 'spin 0.6s linear infinite'
+    }} />
+  </div>
+);
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -83,8 +98,9 @@ function App() {
           }}
         />
 
-        <Routes>
-          <Route path="/" element={<Home />} />
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/pricing" element={<PricingPage />} />
@@ -171,8 +187,9 @@ function App() {
             <Route path="settings" element={<PlatformSettings />} />
           </Route>
 
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   );

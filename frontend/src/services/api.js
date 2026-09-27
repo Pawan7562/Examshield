@@ -124,6 +124,69 @@ api.interceptors.response.use(
   }
 );
 
+// =====================================================
+// High-Speed Client-Side In-Memory Cache (20s TTL)
+// =====================================================
+const apiCache = new Map();
+const CACHE_TTL_MS = 20000;
+
+export const clearApiCache = (filter = '') => {
+  if (!filter) {
+    apiCache.clear();
+  } else {
+    for (const key of apiCache.keys()) {
+      if (key.includes(filter)) apiCache.delete(key);
+    }
+  }
+};
+
+// Wrap api.get for instantaneous navigation between pages
+const rawGet = api.get.bind(api);
+api.get = async (url, config = {}) => {
+  if (config.bypassCache) {
+    return rawGet(url, config);
+  }
+  const cacheKey = `${url}?${JSON.stringify(config.params || {})}`;
+  const now = Date.now();
+  const cached = apiCache.get(cacheKey);
+
+  if (cached && (now - cached.timestamp < (config.ttl || CACHE_TTL_MS))) {
+    return cached.data;
+  }
+
+  const promise = rawGet(url, config).then((data) => {
+    apiCache.set(cacheKey, { timestamp: Date.now(), data });
+    return data;
+  });
+
+  return promise;
+};
+
+// Invalidate cache immediately on mutations (POST, PUT, PATCH, DELETE)
+const rawPost = api.post.bind(api);
+api.post = async (...args) => {
+  clearApiCache();
+  return rawPost(...args);
+};
+
+const rawPut = api.put.bind(api);
+api.put = async (...args) => {
+  clearApiCache();
+  return rawPut(...args);
+};
+
+const rawPatch = api.patch.bind(api);
+api.patch = async (...args) => {
+  clearApiCache();
+  return rawPatch(...args);
+};
+
+const rawDelete = api.delete.bind(api);
+api.delete = async (...args) => {
+  clearApiCache();
+  return rawDelete(...args);
+};
+
 // Auth APIs
 export const authAPI = {
   superAdminLogin: (data) => api.post('/auth/super-admin/login', data),
