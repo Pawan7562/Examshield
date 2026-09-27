@@ -102,9 +102,12 @@ export default function StudentManagement() {
 
   const [students, setStudents] = useState(() => {
     try {
+      sessionStorage.removeItem('cached_admin_students');
       if (!storageKey) return [];
       const cached = sessionStorage.getItem(storageKey);
-      return cached ? JSON.parse(cached) : [];
+      if (!cached) return [];
+      const parsed = JSON.parse(cached);
+      return Array.isArray(parsed) ? parsed.filter(s => !collegeId || !s.college_id || s.college_id === collegeId) : [];
     } catch (_) {
       return [];
     }
@@ -154,9 +157,11 @@ export default function StudentManagement() {
     try {
       setRequestsLoading(true);
       const res = await adminAPI.getStudentPasswordRequests();
-      if (res.data?.success) {
-        setPasswordRequests(res.data.data?.requests || []);
-        setPendingRequestsCount(res.data.data?.pendingCount || 0);
+      const payload = res?.data || res;
+      if (payload?.success || res?.success) {
+        const reqList = payload?.requests || payload?.data?.requests || res?.requests || [];
+        setPasswordRequests(reqList);
+        setPendingRequestsCount(payload?.pendingCount || payload?.data?.pendingCount || res?.pendingCount || 0);
       }
     } catch (err) {
       console.error('Failed to load password requests:', err);
@@ -204,21 +209,22 @@ export default function StudentManagement() {
         requestId: resetForm.linkedRequestId
       });
 
-      if (res.data?.success) {
-        toast.success(res.data.message || 'Student password updated successfully');
+      const isSuccess = res?.success || res?.data?.success;
+      if (isSuccess) {
+        toast.success(res?.message || res?.data?.message || 'Student password updated successfully');
         setResetSuccessData({
           student: targetStudentForReset,
           newPassword: resetForm.newPassword,
-          emailSent: res.data?.data?.emailSent
+          emailSent: res?.data?.emailSent ?? res?.emailSent
         });
         setResetModal(false);
         fetchPasswordRequests();
         fetchStudents(pagination.page, true);
       } else {
-        toast.error(res.data?.message || 'Failed to reset student password');
+        toast.error(res?.message || res?.data?.message || 'Failed to reset student password');
       }
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Failed to reset password';
+      const msg = err?.message || err?.response?.data?.message || (typeof err === 'string' ? err : 'Failed to reset password');
       toast.error(msg);
     } finally {
       setResetSubmitting(false);
@@ -244,7 +250,10 @@ export default function StudentManagement() {
     try {
       const res = await adminAPI.getStudents({ page, limit: 15, search: search || undefined });
       const payload = res?.data || res;
-      const list = payload?.students || payload?.data?.students || (Array.isArray(payload) ? payload : []);
+      let list = payload?.students || payload?.data?.students || (Array.isArray(payload) ? payload : []);
+      if (collegeId) {
+        list = list.filter(s => !s.college_id || s.college_id === collegeId);
+      }
       setStudents(list);
       if (storageKey) {
         try { sessionStorage.setItem(storageKey, JSON.stringify(list)); } catch (_) {}
