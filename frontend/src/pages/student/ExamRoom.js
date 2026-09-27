@@ -469,6 +469,12 @@ export default function ExamRoom() {
         .then(r => {
           if (r.success && r.data) {
             setExamData(r.data);
+            // Professional handling: If already completed, jump directly to submitted screen
+            if (r.data.isSubmitted) {
+              setResult(r.data.result || null);
+              setPhase('submitted');
+              return;
+            }
             const key = r.data.exam?.exam_code || r.data.exam?.exam_key;
             if (key) {
               setExamKey(String(key).trim().toUpperCase());
@@ -512,6 +518,16 @@ export default function ExamRoom() {
     setIsStartingExam(true);
     try {
       const response = await studentAPI.startExam(examId, { examKey: keyToUse });
+
+      // Professional handling: Candidate already submitted this exam
+      if (response.isSubmitted || response.data?.isSubmitted) {
+        exitFullScreen();
+        setResult(response.data?.result || null);
+        setPhase('submitted');
+        notify.info('This examination has already been completed.');
+        return;
+      }
+
       if (response.success) {
         const data = response.data || response;
         setSession(data.session);
@@ -532,6 +548,14 @@ export default function ExamRoom() {
         }
       }
     } catch (err) {
+      const errorMsg = err?.response?.data?.message || err?.message || '';
+      if (errorMsg.toLowerCase().includes('already submitted') || errorMsg.toLowerCase().includes('already completed')) {
+        exitFullScreen();
+        setPhase('submitted');
+        notify.info('This examination has already been completed.');
+        return;
+      }
+
       if (err?.message && err.message.includes('Exam accessible from')) {
         notify.error('Waiting for server authorization... retrying shortly.');
       } else {

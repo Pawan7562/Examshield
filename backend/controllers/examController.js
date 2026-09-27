@@ -1295,14 +1295,35 @@ exports.getExamDetails = async (req, res) => {
       hasAccess = true;
     }
 
-    console.log('📊 Backend: Exam access check:', { hasAccess, examId: id, studentId });
+    // Check if student has already completed this exam
+    const { data: existingSession } = await supabase
+      .from('exam_sessions')
+      .select('id, status, submitted_at, started_at')
+      .eq('exam_id', id)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    const isSubmitted = existingSession?.status === 'submitted' || existingSession?.status === 'terminated';
+    let examResult = null;
+    if (isSubmitted) {
+      const { data: resultData } = await supabase
+        .from('results')
+        .select('*')
+        .eq('exam_id', id)
+        .eq('student_id', studentId)
+        .maybeSingle();
+      examResult = resultData || null;
+    }
 
     res.json({
       success: true,
       data: {
         exam: exam,
         questions: questions || [],
-        hasAccess: hasAccess
+        hasAccess: hasAccess,
+        isSubmitted: isSubmitted,
+        session: existingSession || null,
+        result: examResult
       }
     });
 
@@ -1426,8 +1447,25 @@ exports.startExam = async (req, res) => {
 
     if (existingSession) {
       if (existingSession.status === 'submitted' || existingSession.status === 'terminated') {
-        console.log('❌ Backend: Session already submitted or terminated. Returning 400 ERROR.');
-        return res.status(400).json({ success: false, message: 'You have already submitted this exam.' });
+        console.log('ℹ️ Backend: Session already submitted or terminated. Returning completed state.');
+        const { data: resultData } = await supabase
+          .from('results')
+          .select('*')
+          .eq('exam_id', id)
+          .eq('student_id', studentId)
+          .maybeSingle();
+
+        return res.status(200).json({ 
+          success: true,
+          isSubmitted: true,
+          message: 'You have already completed and submitted this examination.',
+          data: {
+            isSubmitted: true,
+            session: existingSession,
+            result: resultData || null,
+            exam: { ...examData, exam_code: undefined }
+          }
+        });
       }
       // Resume existing session
       const { data: rawQuestions, error: questionsError } = await supabase
