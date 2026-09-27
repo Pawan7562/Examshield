@@ -172,7 +172,7 @@ exports.publishResults = async (req, res) => {
 
     // Notify students
     const results = await query(
-      `SELECT r.*, s.name, s.email, e.name as exam_name
+      `SELECT r.*, s.name, s.email, COALESCE(e.title, e.name, 'Examination') as exam_name
        FROM results r JOIN students s ON r.student_id = s.id
        JOIN exams e ON r.exam_id = e.id WHERE r.exam_id = $1`,
       [examId]
@@ -206,7 +206,7 @@ exports.getStudentResults = async (req, res) => {
     const studentId = req.user.id;
 
     const result = await query(
-      `SELECT r.*, e.name as exam_name, e.type as exam_type, e.subject, e.date_time
+      `SELECT r.*, COALESCE(e.title, e.name, 'Examination') as exam_name, e.type as exam_type, e.subject, e.date_time
        FROM results r JOIN exams e ON r.exam_id = e.id
        WHERE r.student_id = $1 AND r.is_published = true
        ORDER BY r.created_at DESC`,
@@ -229,7 +229,7 @@ exports.getStudentExamResult = async (req, res) => {
     const studentId = req.user.id;
 
     const result = await query(
-      `SELECT r.*, e.name as exam_name, e.type, e.total_marks, e.passing_marks, e.subject
+      `SELECT r.*, COALESCE(e.title, e.name, 'Examination') as exam_name, e.type, e.total_marks, e.passing_marks, e.subject
        FROM results r JOIN exams e ON r.exam_id = e.id
        WHERE r.exam_id = $1 AND r.student_id = $2 AND r.is_published = true`,
       [examId, studentId]
