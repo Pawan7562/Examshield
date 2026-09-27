@@ -1295,25 +1295,15 @@ exports.getExamDetails = async (req, res) => {
       hasAccess = true;
     }
 
-    // Check if student has already completed this exam
+    // Check if student already has a session (active or submitted)
     const { data: existingSession } = await supabase
       .from('exam_sessions')
-      .select('id, status, submitted_at, started_at')
+      .select('id, status, submitted_at, total_score')
       .eq('exam_id', id)
       .eq('student_id', studentId)
       .maybeSingle();
 
-    const isSubmitted = existingSession?.status === 'submitted' || existingSession?.status === 'terminated';
-    let examResult = null;
-    if (isSubmitted) {
-      const { data: resultData } = await supabase
-        .from('results')
-        .select('*')
-        .eq('exam_id', id)
-        .eq('student_id', studentId)
-        .maybeSingle();
-      examResult = resultData || null;
-    }
+    console.log('📊 Backend: Exam access check:', { hasAccess, examId: id, studentId, existingStatus: existingSession?.status });
 
     res.json({
       success: true,
@@ -1321,9 +1311,7 @@ exports.getExamDetails = async (req, res) => {
         exam: exam,
         questions: questions || [],
         hasAccess: hasAccess,
-        isSubmitted: isSubmitted,
-        session: existingSession || null,
-        result: examResult
+        existingSession: existingSession || null,
       }
     });
 
@@ -1447,23 +1435,15 @@ exports.startExam = async (req, res) => {
 
     if (existingSession) {
       if (existingSession.status === 'submitted' || existingSession.status === 'terminated') {
-        console.log('ℹ️ Backend: Session already submitted or terminated. Returning completed state.');
-        const { data: resultData } = await supabase
-          .from('results')
-          .select('*')
-          .eq('exam_id', id)
-          .eq('student_id', studentId)
-          .maybeSingle();
-
-        return res.status(200).json({ 
-          success: true,
-          isSubmitted: true,
-          message: 'You have already completed and submitted this examination.',
+        console.log('ℹ️ Backend: Session already submitted or terminated.');
+        return res.status(200).json({
+          success: false,
+          alreadySubmitted: true,
+          status: existingSession.status,
+          message: 'You have already completed and submitted this examination. Your responses are recorded.',
           data: {
-            isSubmitted: true,
             session: existingSession,
-            result: resultData || null,
-            exam: { ...examData, exam_code: undefined }
+            submittedAt: existingSession.submitted_at || existingSession.updated_at,
           }
         });
       }

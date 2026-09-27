@@ -469,10 +469,13 @@ export default function ExamRoom() {
         .then(r => {
           if (r.success && r.data) {
             setExamData(r.data);
-            // Professional handling: If already completed, jump directly to submitted screen
-            if (r.data.isSubmitted) {
-              setResult(r.data.result || null);
+            if (r.data.existingSession?.status === 'submitted') {
               setPhase('submitted');
+              setResult({
+                score: r.data.existingSession.total_score,
+                totalMarks: r.data.exam?.total_marks,
+                status: 'Submitted'
+              });
               return;
             }
             const key = r.data.exam?.exam_code || r.data.exam?.exam_key;
@@ -518,16 +521,23 @@ export default function ExamRoom() {
     setIsStartingExam(true);
     try {
       const response = await studentAPI.startExam(examId, { examKey: keyToUse });
-
-      // Professional handling: Candidate already submitted this exam
-      if (response.isSubmitted || response.data?.isSubmitted) {
+      if (response.alreadySubmitted || response.data?.alreadySubmitted || response.message?.includes('already completed') || response.message?.includes('already submitted')) {
         exitFullScreen();
-        setResult(response.data?.result || null);
         setPhase('submitted');
-        notify.info('This examination has already been completed.');
+        toast('This examination has already been completed and locked.', {
+          icon: '📋',
+          style: {
+            background: '#f0fdf4',
+            color: '#15803d',
+            border: '1.5px solid #bbf7d0',
+            fontWeight: 600,
+            fontSize: '0.88rem',
+            borderRadius: '10px'
+          },
+          duration: 6000
+        });
         return;
       }
-
       if (response.success) {
         const data = response.data || response;
         setSession(data.session);
@@ -548,21 +558,31 @@ export default function ExamRoom() {
         }
       }
     } catch (err) {
-      const errorMsg = err?.response?.data?.message || err?.message || '';
-      if (errorMsg.toLowerCase().includes('already submitted') || errorMsg.toLowerCase().includes('already completed')) {
+      const errMsg = err?.response?.data?.message || err?.message || '';
+      if (errMsg.toLowerCase().includes('already submitted') || errMsg.toLowerCase().includes('already completed')) {
         exitFullScreen();
         setPhase('submitted');
-        notify.info('This examination has already been completed.');
+        toast('This examination has already been completed and locked.', {
+          icon: '📋',
+          style: {
+            background: '#f0fdf4',
+            color: '#15803d',
+            border: '1.5px solid #bbf7d0',
+            fontWeight: 600,
+            fontSize: '0.88rem',
+            borderRadius: '10px'
+          },
+          duration: 6000
+        });
         return;
       }
-
-      if (err?.message && err.message.includes('Exam accessible from')) {
+      if (errMsg.includes('Exam accessible from')) {
         notify.error('Waiting for server authorization... retrying shortly.');
       } else {
         exitFullScreen();
         setPhase('key');
         console.error('Start exam error:', err);
-        notify.error(err?.message || 'Failed to start exam. Check your key and try again.');
+        notify.error(errMsg || 'Failed to start exam. Check your key and try again.');
       }
     } finally {
       setIsStartingExam(false);
