@@ -280,40 +280,45 @@ exports.updateStudent = async (req, res) => {
     const collegeId = req.user.id;
     const rollNumber = rollNo || roll_no;
 
-    const updatePayload = {
-      ...(name && { name }),
-      ...(email && { email }),
-      ...(rollNumber && { roll_no: rollNumber }),
-      ...(department !== undefined && { department }),
-      ...(batch !== undefined && { batch }),
-      ...(is_active !== undefined && { is_active }),
-      updated_at: new Date().toISOString()
-    };
+    const checkRes = await pool.query(
+      'SELECT id FROM students WHERE id = $1 AND college_id = $2',
+      [id, collegeId]
+    );
 
-    const { data: student, error } = await supabase
-      .from('students')
-      .update(updatePayload)
-      .eq('id', id)
-      .eq('college_id', collegeId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Student update error:', error);
-      throw error;
-    }
-
-    if (!student) {
+    if (checkRes.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Student not found'
+        message: 'Student not found in your institution'
       });
     }
+
+    const updateRes = await pool.query(
+      `UPDATE students 
+       SET name = COALESCE($1, name),
+           email = COALESCE($2, email),
+           roll_no = COALESCE($3, roll_no),
+           department = COALESCE($4, department),
+           batch = COALESCE($5, batch),
+           is_active = COALESCE($6, is_active),
+           updated_at = NOW()
+       WHERE id = $7 AND college_id = $8
+       RETURNING *`,
+      [
+        name ? name.trim() : null,
+        email ? email.trim().toLowerCase() : null,
+        rollNumber ? rollNumber.trim() : null,
+        department !== undefined ? department : null,
+        batch !== undefined ? batch : null,
+        is_active !== undefined ? is_active : null,
+        id,
+        collegeId
+      ]
+    );
 
     res.json({
       success: true,
       message: 'Student updated successfully',
-      data: student
+      data: updateRes.rows[0]
     });
 
   } catch (error) {
@@ -335,40 +340,32 @@ exports.toggleStudentStatus = async (req, res) => {
     const { id } = req.params;
     const collegeId = req.user.id;
 
-    const { data: currentStudent } = await supabase
-      .from('students')
-      .select('is_active')
-      .eq('id', id)
-      .eq('college_id', collegeId)
-      .single();
+    const checkRes = await pool.query(
+      'SELECT id, is_active FROM students WHERE id = $1 AND college_id = $2',
+      [id, collegeId]
+    );
 
-    if (!currentStudent) {
+    if (checkRes.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Student not found'
+        message: 'Student not found in your institution'
       });
     }
 
-    const { data: student, error } = await supabase
-      .from('students')
-      .update({
-        is_active: !currentStudent.is_active,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .eq('college_id', collegeId)
-      .select()
-      .single();
+    const currentStatus = checkRes.rows[0].is_active;
+    const newStatus = !currentStatus;
 
-    if (error) {
-      console.error('Toggle student status error:', error);
-      throw error;
-    }
+    const updateRes = await pool.query(
+      'UPDATE students SET is_active = $1, updated_at = NOW() WHERE id = $2 AND college_id = $3 RETURNING *',
+      [newStatus, id, collegeId]
+    );
+
+    const updated = updateRes.rows[0];
 
     res.json({
       success: true,
-      message: `Student ${student.is_active ? 'activated' : 'deactivated'} successfully`,
-      data: student
+      message: `Student ${updated.is_active ? 'activated' : 'deactivated'} successfully`,
+      data: updated
     });
 
   } catch (error) {
@@ -383,45 +380,73 @@ exports.toggleStudentStatus = async (req, res) => {
 
 /**
  * DELETE /api/admin/students/:id
- * Delete student
+ * Delete student with foreign key cascades
  */
 exports.deleteStudent = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const collegeId = req.user.id;
 
-    const { data: student, error } = await supabase
-      .from('students')
-      .delete()
-      .eq('id', id)
-      .eq('college_id', collegeId)
-      .select()
-      .single();
+    const checkRes = await client.query(
+      'SELECT id, name, student_id FROM students WHERE id = $1 AND college_id = $2',
+      [id, collegeId]
+    );
 
-    if (error) {
-      console.error('Delete student error:', error);
-      throw error;
-    }
-
-    if (!student) {
+    if (checkRes.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Student not found'
+        message: 'Student not found in your institution'
       });
     }
 
+    const student = checkRes.rows[0];
+
+    await client.query('BEGIN');
+
+    // 1. Delete associated password requests
+    await client.query(
+      'DELETE FROM student_password_requests WHERE student_uuid = $1 OR student_id = $2',
+      [student.id, student.student_id]
+    );
+
+    // 2. Delete exam assignments
+    await client.query(
+      'DELETE FROM exam_assignments WHERE student_id = $1',
+      [student.id]
+    );
+
+    // 3. Delete exam attempts & violations if tables exist
+    try {
+      await client.query('DELETE FROM violations WHERE student_id = $1', [student.id]);
+    } catch (_) {}
+    try {
+      await client.query('DELETE FROM exam_attempts WHERE student_id = $1', [student.id]);
+    } catch (_) {}
+
+    // 4. Delete the student
+    await client.query(
+      'DELETE FROM students WHERE id = $1 AND college_id = $2',
+      [id, collegeId]
+    );
+
+    await client.query('COMMIT');
+
     res.json({
       success: true,
-      message: 'Student deleted successfully'
+      message: `Student ${student.name} deleted successfully`
     });
 
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Delete student error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete student',
       error: error.message
     });
+  } finally {
+    client.release();
   }
 };
 
