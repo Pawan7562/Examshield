@@ -28,7 +28,7 @@ class WebSocketService {
 
         // Connect to backend WebSocket server with professional configuration
         const wsUrl = process.env.REACT_APP_WS_URL || 
-          (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-d5i2.onrender.com');
+          (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-1-an7c.onrender.com');
         
         this.socket = io(wsUrl, {
           auth: {

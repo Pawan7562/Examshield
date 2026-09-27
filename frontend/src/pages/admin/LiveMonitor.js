@@ -153,7 +153,7 @@ export default function LiveMonitor() {
 
     const token = localStorage.getItem('accessToken');
     const wsUrl = process.env.REACT_APP_WS_URL ||
-      (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-d5i2.onrender.com');
+      (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-1-an7c.onrender.com');
 
     const socket = io(wsUrl, {
       auth: { token, role: 'admin' },
