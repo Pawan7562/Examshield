@@ -125,7 +125,7 @@ exports.getStudents = async (req, res) => {
 exports.getExams = async (req, res) => {
   try {
     const collegeId = req.user.id;
-    const { limit = 50, offset = 0, status } = req.query;
+    const { limit = 50, offset = 0, status, search } = req.query;
     
     const parsedLimit = Math.min(Math.max(1, parseInt(limit) || 50), 100);
     const parsedOffset = Math.max(0, parseInt(offset) || 0);
@@ -137,16 +137,28 @@ exports.getExams = async (req, res) => {
       whereClause += ` AND status = $${params.length}`;
     }
 
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      whereClause += ` AND (COALESCE(title, name, '') ILIKE $${params.length} OR COALESCE(description, '') ILIKE $${params.length})`;
+    }
+
     const countPromise = pool.query(`SELECT COUNT(*)::int AS total FROM exams ${whereClause}`, params);
     const examsParams = [...params, parsedLimit, parsedOffset];
     const examsPromise = pool.query(`
       SELECT e.*, 
              COALESCE(e.title, e.name, 'Untitled Exam') AS name, 
              COALESCE(e.title, e.name, 'Untitled Exam') AS title,
-             (SELECT COUNT(*)::int FROM questions q WHERE q.exam_id = e.id) AS question_count,
-             (SELECT COUNT(*)::int FROM exam_candidates ec WHERE ec.exam_id = e.id) AS student_count
+             COALESCE((SELECT COUNT(*)::int FROM questions q WHERE q.exam_id = e.id), 0) AS question_count,
+             COALESCE((
+               SELECT COUNT(DISTINCT student_id)::int 
+               FROM (
+                 SELECT student_id FROM exam_assignments ea WHERE ea.exam_id = e.id
+                 UNION
+                 SELECT student_id FROM exam_students es WHERE es.exam_id = e.id
+               ) assigned
+             ), 0) AS student_count
       FROM exams e
-      ${whereClause.replace(/college_id/g, 'e.college_id').replace(/status/g, 'e.status')} 
+      ${whereClause.replace(/college_id/g, 'e.college_id').replace(/status/g, 'e.status').replace(/title/g, 'e.title').replace(/name/g, 'e.name').replace(/description/g, 'e.description')} 
       ORDER BY e.created_at DESC 
       LIMIT $${examsParams.length - 1} OFFSET $${examsParams.length}
     `, examsParams);
@@ -164,7 +176,8 @@ exports.getExams = async (req, res) => {
     console.error('Exams error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to load exams'
+      message: 'Failed to load exams',
+      error: error.message
     });
   }
 };
