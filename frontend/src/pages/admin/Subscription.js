@@ -102,9 +102,182 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+const DEFAULT_PLANS = {
+  monthly: {
+    basic: {
+      id: 'basic',
+      name: 'Basic Quota',
+      tier: 'Departmental',
+      tagline: 'Ideal for single departments & basic classroom proctoring',
+      price: 999,
+      annualTotal: 999,
+      billingCycle: 'monthly',
+      periodLabel: '/ month',
+      originalPrice: null,
+      savingsLabel: null,
+      maxStudents: 50,
+      maxExams: 10,
+      duration: 30,
+      popular: false,
+      features: [
+        '50 Candidate Seats Quota',
+        '10 Assessment Slots / Month',
+        'Standard MCQ & Subjective Formats',
+        'Proctor Lockdown (Anti-Tab Switch & Fullscreen)',
+        'Basic Result Card & Gradebook Export',
+        'Standard Helpdesk Email Support'
+      ]
+    },
+    standard: {
+      id: 'standard',
+      name: 'Standard Quota',
+      tier: 'Institutional Growth',
+      tagline: 'Best for growing faculties, mid-size institutions & tech colleges',
+      price: 2999,
+      annualTotal: 2999,
+      billingCycle: 'monthly',
+      periodLabel: '/ month',
+      originalPrice: null,
+      savingsLabel: null,
+      maxStudents: 200,
+      maxExams: 50,
+      duration: 30,
+      popular: true,
+      features: [
+        '200 Candidate Seats Quota',
+        '50 Assessment Slots / Month',
+        'All Exam Types: MCQ, Coding & Subjective',
+        'Interactive Python/Java/C++ Code Sandbox',
+        'AI Proctoring Lite (Audio + Tab + Device Telemetry)',
+        'Live Active Proctor Room & Monitor Grid',
+        'Priority Technical Hotline Support (4h SLA)'
+      ]
+    },
+    premium: {
+      id: 'premium',
+      name: 'Premium Enterprise',
+      tier: 'University Accreditation',
+      tagline: 'For full university campuses, multi-department certifications & autonomous institutions',
+      price: 7999,
+      annualTotal: 7999,
+      billingCycle: 'monthly',
+      periodLabel: '/ month',
+      originalPrice: null,
+      savingsLabel: null,
+      maxStudents: null,
+      maxExams: null,
+      duration: 30,
+      popular: false,
+      features: [
+        'Unlimited Candidate Enrollment Seats',
+        'Unlimited Monthly Assessment Slots',
+        'Deep AI Proctoring: Multi-face, Gaze, Voice & Secondary Cam',
+        'Real-time Plagiarism & Code Diff Detection',
+        'Custom College Subdomain & Institutional White-Labeling',
+        'Dedicated Technical Account Manager & 24/7 Priority Emergency Support',
+        'Direct REST API & LMS Webhook Integrations'
+      ]
+    }
+  },
+  annually: {
+    basic: {
+      id: 'basic',
+      name: 'Basic Quota',
+      tier: 'Departmental',
+      tagline: 'Ideal for single departments & basic classroom proctoring',
+      price: 799,
+      annualTotal: 9588,
+      billingCycle: 'annually',
+      periodLabel: '/ mo',
+      originalPrice: 999,
+      savingsLabel: 'Save 20%',
+      maxStudents: 50,
+      maxExams: 10,
+      duration: 365,
+      popular: false,
+      features: [
+        '50 Candidate Seats Quota',
+        '10 Assessment Slots / Month',
+        'Standard MCQ & Subjective Formats',
+        'Proctor Lockdown (Anti-Tab Switch & Fullscreen)',
+        'Basic Result Card & Gradebook Export',
+        'Standard Helpdesk Email Support',
+        '2 Months Free Included (Annual License)'
+      ]
+    },
+    standard: {
+      id: 'standard',
+      name: 'Standard Quota',
+      tier: 'Institutional Growth',
+      tagline: 'Best for growing faculties, mid-size institutions & tech colleges',
+      price: 2399,
+      annualTotal: 28788,
+      billingCycle: 'annually',
+      periodLabel: '/ mo',
+      originalPrice: 2999,
+      savingsLabel: 'Save 20%',
+      maxStudents: 200,
+      maxExams: 50,
+      duration: 365,
+      popular: true,
+      features: [
+        '200 Candidate Seats Quota',
+        '50 Assessment Slots / Month',
+        'All Exam Types: MCQ, Coding & Subjective',
+        'Interactive Python/Java/C++ Code Sandbox',
+        'AI Proctoring Lite (Audio + Tab + Device Telemetry)',
+        'Live Active Proctor Room & Monitor Grid',
+        'Priority Technical Hotline Support (4h SLA)',
+        '2 Months Free Included (Annual License)'
+      ]
+    },
+    premium: {
+      id: 'premium',
+      name: 'Premium Enterprise',
+      tier: 'University Accreditation',
+      tagline: 'For full university campuses, multi-department certifications & autonomous institutions',
+      price: 6399,
+      annualTotal: 76788,
+      billingCycle: 'annually',
+      periodLabel: '/ mo',
+      originalPrice: 7999,
+      savingsLabel: 'Save 20%',
+      maxStudents: null,
+      maxExams: null,
+      duration: 365,
+      popular: false,
+      features: [
+        'Unlimited Candidate Enrollment Seats',
+        'Unlimited Monthly Assessment Slots',
+        'Deep AI Proctoring: Multi-face, Gaze, Voice & Secondary Cam',
+        'Real-time Plagiarism & Code Diff Detection',
+        'Custom College Subdomain & Institutional White-Labeling',
+        'Dedicated Technical Account Manager & 24/7 Priority Emergency Support',
+        'Direct REST API & LMS Webhook Integrations',
+        '2 Months Free Included (Annual License)'
+      ]
+    }
+  }
+};
+
+const CACHE_KEY = 'cached_admin_subscription';
+
 export default function Subscription() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !sessionStorage.getItem(CACHE_KEY);
+    } catch (_) {
+      return true;
+    }
+  });
   const [upgrading, setUpgrading] = useState(null);
   const [billingCycle, setBillingCycle] = useState('annually'); // 'monthly' | 'annually'
   const [copiedKey, setCopiedKey] = useState(false);
@@ -124,14 +297,21 @@ export default function Subscription() {
   const [submittingQuote, setSubmittingQuote] = useState(false);
 
   useEffect(() => {
-    fetchSubscriptionData();
+    fetchSubscriptionData(!!data);
   }, []);
 
-  const fetchSubscriptionData = () => {
-    setLoading(true);
+  const fetchSubscriptionData = (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     subscriptionAPI.getCurrent()
-      .then(r => setData(r.data))
-      .catch(() => toast.error('Failed to load institutional license quotas'))
+      .then(r => {
+        setData(r.data);
+        try {
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify(r.data));
+        } catch (_) {}
+      })
+      .catch(() => {
+        if (!isBackground) toast.error('Failed to load institutional license quotas');
+      })
       .finally(() => setLoading(false));
   };
 
@@ -231,7 +411,7 @@ export default function Subscription() {
     }
   };
 
-  if (loading) return (
+  if (loading && !data) return (
     <div className="admin-loading-container">
       <div className="admin-loading-spinner"></div>
       <p style={{ marginTop: '14px', color: '#64748b', fontSize: '0.9rem', fontWeight: 600 }}>
@@ -242,8 +422,10 @@ export default function Subscription() {
 
   const { subscription, usage, plansMonthly, plansAnnually, college } = data || {};
 
-  // Active plans based on toggle
-  const currentPlans = billingCycle === 'annually' ? (plansAnnually || {}) : (plansMonthly || {});
+  // Active plans based on toggle with instant defaults
+  const currentPlans = billingCycle === 'annually' 
+    ? (plansAnnually || DEFAULT_PLANS.annually) 
+    : (plansMonthly || DEFAULT_PLANS.monthly);
 
   // Compute Quota usage metrics
   const maxStudents = subscription?.max_students || 200;

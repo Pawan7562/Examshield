@@ -361,6 +361,9 @@ exports.verifyPayment = async (req, res) => {
       [plan, endDate, collegeId]
     );
 
+    // Invalidate in-memory cache for immediate fresh fetch
+    subscriptionCache.delete(collegeId);
+
     res.json({
       success: true,
       message: `${planDetails.name} (${cycleKey.toUpperCase()}) successfully activated!`,
@@ -377,25 +380,43 @@ exports.verifyPayment = async (req, res) => {
   }
 };
 
+// Ultra-fast in-memory cache for college license & quotas (20-second TTL)
+const subscriptionCache = new Map();
+const SUBSCRIPTION_CACHE_TTL = 20000;
+
 /**
  * GET /api/subscriptions/current
- * High-speed direct Neon DB fetch for active license, capacity meters, and plan metadata
+ * Ultra-fast direct Neon DB fetch with in-memory caching for sub-millisecond response
  */
 exports.getCurrentSubscription = async (req, res) => {
   try {
     const collegeId = req.user.id;
+    const now = Date.now();
 
-    // Run parallel high-speed queries to Neon PostgreSQL
-    const [subRes, studentsRes, examsRes, resultsRes, collegeRes] = await Promise.all([
+    // 1. Instant Cache Hit Check (< 1ms response)
+    const cached = subscriptionCache.get(collegeId);
+    if (cached && (now - cached.timestamp < SUBSCRIPTION_CACHE_TTL)) {
+      return res.json({
+        success: true,
+        data: cached.data
+      });
+    }
+
+    // 2. High-speed single consolidated query + college metadata in parallel
+    const [subRes, statsRes, collegeRes] = await Promise.all([
       pool.query(`SELECT * FROM subscriptions WHERE college_id = $1 ORDER BY created_at DESC LIMIT 1`, [collegeId]),
-      pool.query(`SELECT COUNT(*)::int AS count FROM students WHERE college_id = $1`, [collegeId]),
-      pool.query(`SELECT COUNT(*)::int AS count FROM exams WHERE college_id = $1`, [collegeId]),
-      pool.query(`SELECT COUNT(*)::int AS count FROM results r JOIN exams e ON r.exam_id = e.id WHERE e.college_id = $1`, [collegeId]),
+      pool.query(`
+        SELECT 
+          (SELECT COUNT(*)::int FROM students WHERE college_id = $1) AS total_students,
+          (SELECT COUNT(*)::int FROM exams WHERE college_id = $1) AS total_exams,
+          (SELECT COUNT(*)::int FROM results r JOIN exams e ON r.exam_id = e.id WHERE e.college_id = $1) AS total_results
+      `, [collegeId]),
       pool.query(`SELECT id, name, email, subscription_plan, subscription_expiry FROM colleges WHERE id = $1`, [collegeId])
     ]);
 
     const college = collegeRes.rows[0] || {};
     let subscriptionData = subRes.rows[0] || null;
+    const statsRow = statsRes.rows[0] || {};
 
     // If no explicit subscription row found, generate default tier from college table
     if (!subscriptionData) {
@@ -418,32 +439,40 @@ exports.getCurrentSubscription = async (req, res) => {
       };
     }
 
-    const currentStudents = studentsRes.rows[0]?.count || 0;
-    const currentExams = examsRes.rows[0]?.count || 0;
-    const currentResults = resultsRes.rows[0]?.count || 0;
+    const currentStudents = statsRow.total_students || 0;
+    const currentExams = statsRow.total_exams || 0;
+    const currentResults = statsRow.total_results || 0;
+
+    const responseData = {
+      subscription: subscriptionData,
+      usage: {
+        students: currentStudents,
+        exams: currentExams,
+        results: currentResults,
+      },
+      studentCount: currentStudents,
+      hasSubscription: true,
+      plan: subscriptionData?.plan || 'standard',
+      plans: PLANS.monthly,
+      plansMonthly: PLANS.monthly,
+      plansAnnually: PLANS.annually,
+      allPlans: PLANS,
+      college: {
+        id: college.id,
+        name: college.name,
+        email: college.email,
+      }
+    };
+
+    // Store in cache for sub-millisecond future loads
+    subscriptionCache.set(collegeId, {
+      timestamp: now,
+      data: responseData
+    });
 
     res.json({
       success: true,
-      data: {
-        subscription: subscriptionData,
-        usage: {
-          students: currentStudents,
-          exams: currentExams,
-          results: currentResults,
-        },
-        studentCount: currentStudents,
-        hasSubscription: true,
-        plan: subscriptionData?.plan || 'standard',
-        plans: PLANS.monthly,
-        plansMonthly: PLANS.monthly,
-        plansAnnually: PLANS.annually,
-        allPlans: PLANS,
-        college: {
-          id: college.id,
-          name: college.name,
-          email: college.email,
-        }
-      }
+      data: responseData
     });
   } catch (error) {
     console.error('Get current subscription error:', error);
