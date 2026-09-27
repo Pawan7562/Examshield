@@ -774,7 +774,7 @@ exports.bulkUploadStudents = async (req, res) => {
                   studentId,
                   password,
                   collegeName: req.user.name || 'Your Institution',
-                  loginUrl: process.env.STUDENT_LOGIN_URL || 'https://CollegeExam.vercel.app/student/login'
+                  loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login'
                 }).catch(emailError => {
                   console.error(`❌ Bulk Upload Email Error for ${studentData.email}:`, emailError.message);
                 });

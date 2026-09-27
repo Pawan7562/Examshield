@@ -285,7 +285,7 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
             .maybeSingle();
 
           const loginUrl = process.env.STUDENT_LOGIN_URL || 
-            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://CollegeExam.vercel.app/student/login');
+            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://www.exam.nexifyforge.in/student/login');
 
           // Send email to each assigned student
           for (const student of students) {
@@ -856,7 +856,7 @@ exports.publishExam = async (req, res) => {
         if (assignedStudents && assignedStudents.length > 0) {
           const { sendExamNotification } = require('../services/emailService');
           const loginUrl = process.env.STUDENT_LOGIN_URL || 
-            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://CollegeExam.vercel.app/student/login');
+            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://www.exam.nexifyforge.in/student/login');
 
           console.log('📧 Backend: Sending exam notifications to students:', {
             totalStudents: assignedStudents.length,

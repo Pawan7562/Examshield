@@ -47,15 +47,41 @@ const allowedOrigins = [
   'https://CollegeExam.vercel.app',
   'https://www.pkthenexgenexam.xyz',
   'https://pkthenexgenexam.xyz',
-  process.env.FRONTEND_URL,
-  process.env.APP_URL
-].filter(Boolean);
+  'https://exam.nexifyforge.in',
+  'https://www.exam.nexifyforge.in',
+  'http://exam.nexifyforge.in',
+  'http://www.exam.nexifyforge.in',
+  ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : []),
+  ...(process.env.APP_URL ? process.env.APP_URL.split(',') : []),
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
+]
+  .map(o => (typeof o === 'string' ? o.trim().replace(/\/$/, '') : ''))
+  .filter(Boolean);
 
 // CORS origin validation function — used by both Express CORS and Socket.IO
 const corsOriginFn = (origin, callback) => {
   // Allow requests with no origin (mobile apps, curl, Postman, server-to-server)
   if (!origin) return callback(null, true);
-  if (allowedOrigins.includes(origin)) return callback(null, true);
+
+  const cleanOrigin = origin.replace(/\/$/, '');
+  if (allowedOrigins.includes(cleanOrigin)) return callback(null, true);
+
+  // Allow trusted root domains and all their subdomains
+  try {
+    const { hostname } = new URL(cleanOrigin);
+    if (
+      hostname === 'nexifyforge.in' ||
+      hostname.endsWith('.nexifyforge.in') ||
+      hostname === 'pkthenexgenexam.xyz' ||
+      hostname.endsWith('.pkthenexgenexam.xyz') ||
+      hostname.endsWith('.vercel.app')
+    ) {
+      return callback(null, true);
+    }
+  } catch (e) {
+    // invalid URL format
+  }
+
   logger.warn(`CORS blocked request from origin: ${origin}`);
   callback(new Error(`Origin ${origin} is not allowed by CORS policy`));
 };
@@ -284,7 +310,7 @@ const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   exposedHeaders: ['X-Total-Count'],
 };
 app.use(cors(corsOptions));

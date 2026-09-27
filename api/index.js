@@ -27,13 +27,38 @@ app.use(helmet({
 }));
 
 // CORS configuration for Vercel
+const allowedOrigins = [
+  'https://CollegeExam.vercel.app',
+  'https://collegeexam.vercel.app',
+  'https://exam.nexifyforge.in',
+  'https://www.exam.nexifyforge.in',
+  'http://exam.nexifyforge.in',
+  'http://www.exam.nexifyforge.in',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002'
+];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://CollegeExam.vercel.app', 'https://CollegeExam-git-*.vercel.app']
-    : ['http://localhost:3000', 'http://localhost:3001'],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const cleanOrigin = origin.replace(/\/$/, '');
+    if (allowedOrigins.includes(cleanOrigin)) return callback(null, true);
+    try {
+      const { hostname } = new URL(cleanOrigin);
+      if (
+        hostname === 'nexifyforge.in' ||
+        hostname.endsWith('.nexifyforge.in') ||
+        hostname.endsWith('.vercel.app')
+      ) {
+        return callback(null, true);
+      }
+    } catch (e) {}
+    callback(new Error(`Origin ${origin} is not allowed by CORS policy`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
 }));
 
 // Compression and rate limiting
