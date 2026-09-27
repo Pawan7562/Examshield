@@ -101,24 +101,26 @@ const ExamRow = ({ exam, onClick }) => {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('cached_admin_dashboard');
+      return cached ? JSON.parse(cached) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(!data);
   const navigate = useNavigate();
 
   useEffect(() => {
     adminAPI.getDashboard()
-      .then(res => setData(res.data))
+      .then(res => {
+        setData(res.data);
+        try { sessionStorage.setItem('cached_admin_dashboard', JSON.stringify(res.data)); } catch (_) {}
+      })
       .catch(() => toast.error('Failed to load college dashboard'))
       .finally(() => setLoading(false));
   }, []);
-
-  if (loading) {
-    return (
-      <div className="admin-loading-container">
-        <div className="admin-loading-spinner" />
-      </div>
-    );
-  }
 
   const { stats, upcomingExams } = data || {};
   const liveExam = upcomingExams?.find(exam => isExamStartable(exam));

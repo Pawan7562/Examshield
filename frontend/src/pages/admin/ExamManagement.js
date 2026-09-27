@@ -67,28 +67,46 @@ const StatusBadge = ({ status }) => {
 };
 
 export default function ExamManagement() {
-  const [exams, setExams] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [exams, setExams] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('cached_admin_exams');
+      return cached ? JSON.parse(cached) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(exams.length === 0);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
 
-  const fetchExams = () => {
-    setLoading(true);
+  const fetchExams = (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     adminAPI.getExams({ 
       status: filter === 'all' ? undefined : filter, 
       search: search || undefined,
       limit: 50 
     })
-      .then(r => setExams(r.data.exams || []))
+      .then(r => {
+        const data = r.data.exams || [];
+        setExams(data);
+        try { sessionStorage.setItem('cached_admin_exams', JSON.stringify(data)); } catch (_) {}
+      })
       .catch(() => toast.error('Failed to load exams'))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { 
-    const timeout = setTimeout(() => fetchExams(), 300);
+  // Immediate fetch on mount or filter change
+  useEffect(() => {
+    fetchExams(exams.length > 0);
+  }, [filter]);
+
+  // Debounced only for search keystrokes
+  useEffect(() => {
+    if (!search) return;
+    const timeout = setTimeout(() => fetchExams(false), 250);
     return () => clearTimeout(timeout);
-  }, [filter, search]);
+  }, [search]);
 
   const publishExam = async (id, name) => {
     try { 

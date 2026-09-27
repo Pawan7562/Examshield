@@ -1,78 +1,81 @@
 // controllers/liveMonitoringController.js
+const { pool } = require('../config/database');
 const { supabase } = require('../config/postgres-client');
 
 /**
  * GET /api/admin/monitoring/overview
- * Get summary of all exams for college to select or see multi-exam status
+ * Ultra-fast single consolidated query for multi-exam live monitoring status
  */
 exports.getLiveOverview = async (req, res) => {
   try {
     const collegeId = req.user.id;
 
-    // Fetch exams for this college (sorted by date_time descending)
-    const { data: exams, error: examsError } = await supabase
-      .from('exams')
-      .select('id, title, name, subject, exam_code, status, date_time, duration, total_marks')
-      .eq('college_id', collegeId)
-      .order('date_time', { ascending: false });
+    // Single consolidated high-speed query
+    const result = await pool.query(`
+      SELECT 
+        e.id, 
+        COALESCE(e.title, e.name, 'Untitled Examination') AS title,
+        COALESCE(e.name, e.title, 'Untitled Examination') AS name,
+        COALESCE(e.subject, 'General Assessment') AS subject,
+        e.exam_code, 
+        e.status, 
+        e.date_time, 
+        e.duration, 
+        e.total_marks,
+        COALESCE(sess.total_sessions, 0)::int AS total_sessions,
+        COALESCE(sess.active_students, 0)::int AS active_students,
+        COALESCE(sess.submitted_students, 0)::int AS submitted_students,
+        COALESCE(sess.terminated_students, 0)::int AS terminated_students,
+        COALESCE(viol.total_violations, 0)::int AS total_violations
+      FROM exams e
+      LEFT JOIN (
+        SELECT 
+          exam_id,
+          COUNT(*)::int AS total_sessions,
+          COUNT(CASE WHEN status = 'active' THEN 1 END)::int AS active_students,
+          COUNT(CASE WHEN status = 'submitted' THEN 1 END)::int AS submitted_students,
+          COUNT(CASE WHEN status = 'terminated' THEN 1 END)::int AS terminated_students
+        FROM exam_sessions
+        GROUP BY exam_id
+      ) sess ON sess.exam_id = e.id
+      LEFT JOIN (
+        SELECT exam_id, COUNT(*)::int AS total_violations
+        FROM violations
+        GROUP BY exam_id
+      ) viol ON viol.exam_id = e.id
+      WHERE e.college_id = $1
+      ORDER BY e.date_time DESC;
+    `, [collegeId]);
 
-    if (examsError) {
-      console.error('Error fetching exams for monitoring overview:', examsError);
-      return res.status(500).json({ success: false, message: 'Failed to fetch exams overview', error: examsError.message });
-    }
+    const now = new Date();
+    const examSummaries = (result.rows || []).map((exam) => {
+      const start = exam.date_time ? new Date(exam.date_time) : null;
+      const durationMin = Number(exam.duration) || 60;
+      const end = start ? new Date(start.getTime() + durationMin * 60000) : null;
+      const isTimeLive = start && end && now >= start && now <= end;
+      const isLive = exam.active_students > 0 || isTimeLive || exam.status === 'active' || exam.status === 'published';
 
-    const allExams = exams || [];
+      return {
+        id: exam.id,
+        title: exam.title,
+        name: exam.name,
+        subject: exam.subject,
+        exam_code: exam.exam_code,
+        status: exam.status,
+        date_time: exam.date_time,
+        start_time: exam.date_time,
+        duration: exam.duration,
+        isLive,
+        stats: {
+          totalSessions: exam.total_sessions,
+          activeStudents: exam.active_students,
+          submittedStudents: exam.submitted_students,
+          terminatedStudents: exam.terminated_students,
+          totalViolations: exam.total_violations,
+        },
+      };
+    });
 
-    // For each exam, query sessions to get real-time counts
-    const examSummaries = await Promise.all(
-      allExams.map(async (exam) => {
-        const { data: sessions } = await supabase
-          .from('exam_sessions')
-          .select('id, status, student_id')
-          .eq('exam_id', exam.id);
-
-        const { data: violations } = await supabase
-          .from('violations')
-          .select('id, type, severity')
-          .eq('exam_id', exam.id);
-
-        const sessList = sessions || [];
-        const violList = violations || [];
-
-        const activeCount = sessList.filter((s) => s.status === 'active').length;
-        const submittedCount = sessList.filter((s) => s.status === 'submitted').length;
-        const terminatedCount = sessList.filter((s) => s.status === 'terminated').length;
-
-        // Determine if exam is currently live based on time and status
-        const now = new Date();
-        const start = exam.date_time ? new Date(exam.date_time) : null;
-        const durationMin = Number(exam.duration) || 60;
-        const end = start ? new Date(start.getTime() + durationMin * 60000) : null;
-        const isTimeLive = start && end && now >= start && now <= end;
-        const isLive = activeCount > 0 || isTimeLive || exam.status === 'active' || exam.status === 'published';
-
-        return {
-          id: exam.id,
-          title: exam.title || exam.name || 'Untitled Examination',
-          subject: exam.subject || 'General Assessment',
-          exam_code: exam.exam_code,
-          status: exam.status,
-          date_time: exam.date_time,
-          start_time: exam.date_time,
-          duration: exam.duration,
-          isLive,
-          stats: {
-            totalSessions: sessList.length,
-            activeStudents: activeCount,
-            submittedStudents: submittedCount,
-            terminatedStudents: terminatedCount,
-            totalViolations: violList.length,
-          },
-        };
-      })
-    );
-
-    // Pick recommended active exam (first live or first with active students or latest)
     const activeExam = examSummaries.find((e) => e.stats.activeStudents > 0) ||
       examSummaries.find((e) => e.isLive) ||
       examSummaries[0] ||
@@ -102,151 +105,98 @@ exports.getLiveOverview = async (req, res) => {
 
 /**
  * GET /api/admin/exams/:id/monitor
- * Get comprehensive live monitoring data for a specific exam
+ * High-speed parallel query for specific exam live cockpit
  */
 exports.getMonitoringData = async (req, res) => {
   try {
     const { id: examId } = req.params;
     const collegeId = req.user.id;
 
-    // Verify exam belongs to college
-    const { data: examData, error: examError } = await supabase
-      .from('exams')
-      .select('*')
-      .eq('id', examId)
-      .eq('college_id', collegeId)
-      .single();
+    // Parallel fetch exam details, sessions with students, and violations
+    const examPromise = pool.query(
+      'SELECT * FROM exams WHERE id = $1 AND college_id = $2',
+      [examId, collegeId]
+    );
 
-    if (examError || !examData) {
+    const sessionsPromise = pool.query(`
+      SELECT 
+        s.*,
+        json_build_object(
+          'id', st.id,
+          'name', st.name,
+          'email', st.email,
+          'student_id', st.student_id,
+          'roll_no', st.roll_no
+        ) AS students
+      FROM exam_sessions s
+      JOIN students st ON s.student_id = st.id
+      WHERE s.exam_id = $1
+      ORDER BY s.started_at DESC
+    `, [examId]);
+
+    const violationsPromise = pool.query(
+      'SELECT * FROM violations WHERE exam_id = $1 ORDER BY created_at DESC LIMIT 200',
+      [examId]
+    );
+
+    const [examRes, sessionsRes, violationsRes] = await Promise.all([
+      examPromise,
+      sessionsPromise,
+      violationsPromise
+    ]);
+
+    const examData = examRes.rows[0];
+    if (!examData) {
       return res.status(404).json({ success: false, message: 'Exam not found or unauthorized' });
     }
 
-    // Get all sessions for this exam
-    let sessions = [];
-    try {
-      const { data: sessData, error: sessError } = await supabase
-        .from('exam_sessions')
-        .select(`
-          *,
-          students(id, name, email, student_id)
-        `)
-        .eq('exam_id', examId)
-        .order('started_at', { ascending: false });
-
-      if (!sessError && sessData) {
-        sessions = sessData;
-      } else {
-        // Fallback: query sessions and students separately
-        const { data: rawSessions } = await supabase
-          .from('exam_sessions')
-          .select('*')
-          .eq('exam_id', examId)
-          .order('started_at', { ascending: false });
-
-        if (rawSessions && rawSessions.length > 0) {
-          const studentIds = rawSessions.map((s) => s.student_id).filter(Boolean);
-          let studentsMap = {};
-          if (studentIds.length > 0) {
-            const { data: stdList } = await supabase
-              .from('students')
-              .select('id, name, email, student_id')
-              .in('id', studentIds);
-            if (stdList) {
-              stdList.forEach((st) => { studentsMap[st.id] = st; });
-            }
-          }
-          sessions = rawSessions.map((s) => ({
-            ...s,
-            students: studentsMap[s.student_id] || { id: s.student_id, name: 'Candidate', email: '', student_id: '' },
-          }));
-        }
-      }
-    } catch (e) {
-      console.warn('Fallback session query used due to:', e.message);
-    }
-
-    // Get violations for all students in this exam
-    let violations = [];
-    try {
-      const { data: violData } = await supabase
-        .from('violations')
-        .select('*')
-        .eq('exam_id', examId)
-        .order('created_at', { ascending: false })
-        .limit(200);
-
-      violations = violData || [];
-    } catch (ve) {
-      console.warn('Violations query warning:', ve.message);
-    }
+    const sessions = sessionsRes.rows || [];
+    const violations = violationsRes.rows || [];
 
     // Group violations by student
     const violationsByStudent = {};
     violations.forEach((violation) => {
       const sid = violation.student_id;
-      if (!violationsByStudent[sid]) {
-        violationsByStudent[sid] = [];
-      }
+      if (!violationsByStudent[sid]) violationsByStudent[sid] = [];
       violationsByStudent[sid].push(violation);
     });
 
     // Format candidate list
     const candidateList = sessions.map((session) => {
-      const st = session.students || session.student || {};
+      const st = session.students || {};
       const studentViolations = violationsByStudent[session.student_id] || [];
       const warningCount = studentViolations.filter((v) => v.type === 'warning').length;
 
       return {
         id: session.student_id,
         sessionId: session.id,
-        session_id: session.id,
         name: st.name || 'Candidate',
-        email: st.email || 'N/A',
-        studentId: st.student_id || st.id?.slice(0, 8) || 'STD',
-        status: session.status || 'active',
-        started_at: session.started_at,
-        submitted_at: session.submitted_at,
-        terminated_at: session.terminated_at,
-        violation_count: studentViolations.length,
-        warning_count: warningCount,
+        student_id: st.student_id || '',
+        roll_no: st.roll_no || '',
+        email: st.email || '',
+        status: session.status,
+        camera_status: session.camera_status || 'connected',
+        screen_share_status: session.screen_share_status || 'active',
+        audio_status: session.audio_status || 'normal',
+        violation_count: session.violation_count || studentViolations.length,
         violations: studentViolations,
-        activity: {
-          status: session.status || 'active',
-          currentQuestion: session.current_question || 0,
-          totalQuestions: examData.total_questions || 0,
-          timeSpent: session.started_at
-            ? Math.max(0, Math.floor((new Date() - new Date(session.started_at)) / 1000))
-            : 0,
-          cameraActive: session.status === 'active',
-          lastSeen: session.last_heartbeat || session.updated_at || session.started_at || new Date().toISOString(),
-          audioLevel: 0,
-        },
+        warning_count: session.warning_count || warningCount,
+        tab_switches: session.tab_switches || 0,
+        multiple_faces_detected: session.multiple_faces_detected || false,
+        no_face_detected: session.no_face_detected || false,
+        last_ping: session.last_ping || session.started_at,
+        started_at: session.started_at,
+        time_remaining: session.time_remaining,
+        current_question: session.current_question || 1,
+        total_questions: examData.total_questions || 0,
       };
     });
 
-    const activeStudents = candidateList.filter((c) => c.status === 'active').length;
-    const submittedStudents = candidateList.filter((c) => c.status === 'submitted').length;
-    const terminatedStudents = candidateList.filter((c) => c.status === 'terminated').length;
-    const flaggedStudents = candidateList.filter((c) => c.violation_count > 0 && c.status === 'active').length;
-    const safeStudents = candidateList.filter((c) => c.violation_count === 0 && c.status === 'active').length;
-
-    const stats = {
-      total: candidateList.length,
-      totalStudents: candidateList.length,
-      active: activeStudents,
-      activeStudents: activeStudents,
-      submitted: submittedStudents,
-      submittedStudents: submittedStudents,
-      terminated: terminatedStudents,
-      terminatedStudents: terminatedStudents,
-      flagged: flaggedStudents,
-      flaggedStudents: flaggedStudents,
-      safe: safeStudents,
-      safeStudents: safeStudents,
-      warnings: violations.filter((v) => v.type === 'warning').length,
-      totalWarnings: violations.filter((v) => v.type === 'warning').length,
-      totalViolations: violations.length,
-    };
+    const activeCount = candidateList.filter((c) => c.status === 'active').length;
+    const safeCount = candidateList.filter((c) => c.status === 'active' && c.violation_count === 0).length;
+    const flaggedCount = candidateList.filter((c) => c.status === 'active' && c.violation_count > 0).length;
+    const terminatedCount = candidateList.filter((c) => c.status === 'terminated').length;
+    const totalWarnings = candidateList.reduce((acc, c) => acc + (c.warning_count || 0), 0);
 
     return res.json({
       success: true,
@@ -254,14 +204,20 @@ exports.getMonitoringData = async (req, res) => {
         exam: examData,
         students: candidateList,
         sessions: candidateList,
-        violations: violationsByStudent,
-        recentViolations: violations.slice(0, 50),
-        stats,
+        recentViolations: violations.slice(0, 30),
+        stats: {
+          totalStudents: candidateList.length,
+          activeStudents: activeCount,
+          safeStudents: safeCount,
+          flaggedStudents: flaggedCount,
+          totalWarnings,
+          terminatedStudents: terminatedCount,
+        },
       },
     });
   } catch (error) {
-    console.error('Error getting monitoring data:', error);
-    return res.status(500).json({ success: false, message: 'Failed to get monitoring data', error: error.message });
+    console.error('Error in getMonitoringData:', error);
+    return res.status(500).json({ success: false, message: 'Server error retrieving monitoring details' });
   }
 };
 

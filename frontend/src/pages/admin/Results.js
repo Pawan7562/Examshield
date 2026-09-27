@@ -83,22 +83,26 @@ const GradeBadge = ({ grade }) => {
 };
 
 export default function Results() {
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('cached_admin_results');
+      return cached ? JSON.parse(cached) : [];
+    } catch (_) {
+      return [];
+    }
+  });
   const [exams, setExams] = useState([]);
   const [selectedExam, setSelectedExam] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(results.length === 0);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    adminAPI.getExams({ status: 'completed', limit: 100 }).then(r => setExams(r.data.exams || [])).catch(() => {});
-    fetchResults();
-  }, []);
-
-  const fetchResults = async (examId) => {
-    setLoading(true);
+  const fetchResults = async (examId, isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
-      const r = await adminAPI.getResults({ examId, search: search || undefined });
-      setResults(r.data.results || []);
+      const r = await adminAPI.getResults({ examId: examId || undefined, search: search || undefined });
+      const list = r.data.results || [];
+      setResults(list);
+      try { sessionStorage.setItem('cached_admin_results', JSON.stringify(list)); } catch (_) {}
     } catch { 
       toast.error('Failed to load results'); 
     } finally { 
@@ -106,10 +110,20 @@ export default function Results() {
     }
   };
 
+  // Immediate fetch on mount
   useEffect(() => {
-    const timeout = setTimeout(() => fetchResults(selectedExam || undefined), 300);
+    adminAPI.getExams({ status: 'completed', limit: 100 })
+      .then(r => setExams(r.data.exams || []))
+      .catch(() => {});
+    fetchResults(selectedExam, results.length > 0);
+  }, [selectedExam]);
+
+  // Debounce only when typing search
+  useEffect(() => {
+    if (!search) return;
+    const timeout = setTimeout(() => fetchResults(selectedExam, false), 250);
     return () => clearTimeout(timeout);
-  }, [search, selectedExam]);
+  }, [search]);
 
   const publishAllResults = async () => {
     if (!selectedExam) return toast.error('Select an exam first');

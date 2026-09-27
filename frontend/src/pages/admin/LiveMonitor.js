@@ -54,7 +54,14 @@ export default function LiveMonitor() {
   const navigate = useNavigate();
 
   // ─── Exam & Global State ───────────────────────────────────────────────────────
-  const [examsList, setExamsList] = useState([]);
+  const [examsList, setExamsList] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('cached_admin_monitor_exams');
+      return cached ? JSON.parse(cached) : [];
+    } catch (_) {
+      return [];
+    }
+  });
   const [currentExamId, setCurrentExamId] = useState(paramExamId || null);
   const [examData, setExamData] = useState(null);
   const [candidates, setCandidates] = useState([]);
@@ -72,7 +79,7 @@ export default function LiveMonitor() {
   const [connected, setConnected] = useState(false);
   const [pingMs, setPingMs] = useState(12);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(examsList.length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [simulationActive, setSimulationActive] = useState(false);
 
@@ -92,22 +99,58 @@ export default function LiveMonitor() {
 
   const socketRef = useRef(null);
 
+  const applyMonitoringData = useCallback((data) => {
+    if (!data) return;
+    setExamData(data.exam);
+    const stds = data.students || data.sessions || [];
+    setCandidates(stds);
+    setViolations(data.recentViolations || []);
+    if (data.stats) {
+      setStats({
+        total: data.stats.totalStudents || stds.length,
+        active: data.stats.activeStudents || stds.filter(s => s.status === 'active').length,
+        safe: data.stats.safeStudents || stds.filter(s => s.status === 'active' && s.violation_count === 0).length,
+        flagged: data.stats.flaggedStudents || stds.filter(s => s.status === 'active' && s.violation_count > 0).length,
+        warnings: data.stats.totalWarnings || 0,
+        terminated: data.stats.terminatedStudents || stds.filter(s => s.status === 'terminated').length,
+      });
+    }
+  }, []);
+
+  const loadExamMonitoringData = useCallback(async (examId) => {
+    try {
+      const res = await adminAPI.getMonitoringData(examId);
+      if (res.success && res.data) {
+        applyMonitoringData(res.data);
+      }
+    } catch (err) {
+      console.error('Error fetching exam monitoring details:', err);
+    }
+  }, [applyMonitoringData]);
+
   // ─── 1. Load Overview & Detect Selected Exam ──────────────────────────────────
   const loadOverviewAndData = useCallback(async (forcedExamId = null) => {
     try {
       setRefreshing(true);
-      const overviewRes = await adminAPI.getMonitoringOverview();
+      const targetPreloadId = forcedExamId || paramExamId;
+      const overviewPromise = adminAPI.getMonitoringOverview();
+      const directPromise = targetPreloadId ? adminAPI.getMonitoringData(targetPreloadId).catch(() => null) : Promise.resolve(null);
+
+      const [overviewRes, directRes] = await Promise.all([overviewPromise, directPromise]);
+
       if (overviewRes.success && overviewRes.data) {
         const exams = overviewRes.data.exams || [];
         setExamsList(exams);
+        try { sessionStorage.setItem('cached_admin_monitor_exams', JSON.stringify(exams)); } catch (_) {}
 
-        // Determine target exam ID
         const targetId = forcedExamId || paramExamId || overviewRes.data.activeExamId || (exams[0] ? exams[0].id : null);
         if (targetId) {
           setCurrentExamId(targetId);
-          await loadExamMonitoringData(targetId);
-        } else {
-          setLoading(false);
+          if (directRes && directRes.data && targetId === targetPreloadId) {
+            applyMonitoringData(directRes.data);
+          } else {
+            await loadExamMonitoringData(targetId);
+          }
         }
       }
     } catch (err) {
@@ -117,31 +160,7 @@ export default function LiveMonitor() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [paramExamId]);
-
-  const loadExamMonitoringData = async (examId) => {
-    try {
-      const res = await adminAPI.getMonitoringData(examId);
-      if (res.success && res.data) {
-        setExamData(res.data.exam);
-        const stds = res.data.students || res.data.sessions || [];
-        setCandidates(stds);
-        setViolations(res.data.recentViolations || []);
-        if (res.data.stats) {
-          setStats({
-            total: res.data.stats.totalStudents || stds.length,
-            active: res.data.stats.activeStudents || stds.filter(s => s.status === 'active').length,
-            safe: res.data.stats.safeStudents || stds.filter(s => s.status === 'active' && s.violation_count === 0).length,
-            flagged: res.data.stats.flaggedStudents || stds.filter(s => s.status === 'active' && s.violation_count > 0).length,
-            warnings: res.data.stats.totalWarnings || 0,
-            terminated: res.data.stats.terminatedStudents || stds.filter(s => s.status === 'terminated').length,
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching exam monitoring details:', err);
-    }
-  };
+  }, [paramExamId, applyMonitoringData, loadExamMonitoringData]);
 
   useEffect(() => {
     loadOverviewAndData(paramExamId);

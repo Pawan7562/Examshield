@@ -1,5 +1,5 @@
 // controllers/resultController.js
-const { query } = require('../config/database-simple');
+const { query, pool } = require('../config/database');
 const { sendResultNotification } = require('../services/emailService');
 
 /**

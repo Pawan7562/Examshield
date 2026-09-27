@@ -94,9 +94,16 @@ const StatusBadge = ({ isActive }) => (
 );
 
 export default function StudentManagement() {
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('cached_admin_students');
+      return cached ? JSON.parse(cached) : [];
+    } catch (_) {
+      return [];
+    }
+  });
   const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0 });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(students.length === 0);
   const [search, setSearch] = useState('');
   const [addModal, setAddModal] = useState(false);
   const [exams, setExams] = useState([]);
@@ -118,15 +125,17 @@ export default function StudentManagement() {
   const [csvFile, setCsvFile] = useState(null);
   const fileRef = useRef();
 
-  const fetchStudents = async (page = 1) => {
-    setLoading(true);
+  const fetchStudents = async (page = 1, isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const res = await adminAPI.getStudents({ page, limit: 15, search: search || undefined });
-      setStudents(res.data.students);
+      const list = res.data.students || [];
+      setStudents(list);
+      try { sessionStorage.setItem('cached_admin_students', JSON.stringify(list)); } catch (_) {}
       setPagination({ 
         page, 
-        total: res.data.pagination.total, 
-        pages: res.data.pagination.pages 
+        total: res.data.pagination?.total || list.length, 
+        pages: res.data.pagination?.pages || 1
       });
     } catch {
       toast.error('Failed to load students');
@@ -135,8 +144,15 @@ export default function StudentManagement() {
     }
   };
 
+  // Immediate fetch on mount
   useEffect(() => {
-    const t = setTimeout(() => fetchStudents(1), 300);
+    fetchStudents(1, students.length > 0);
+  }, []);
+
+  // Debounce only when actively searching
+  useEffect(() => {
+    if (!search) return;
+    const t = setTimeout(() => fetchStudents(1, false), 250);
     return () => clearTimeout(t);
   }, [search]);
 

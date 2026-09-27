@@ -72,71 +72,46 @@ exports.getStudents = async (req, res) => {
   try {
     const collegeId = req.user.id;
     const { limit = 50, search = '', page = 1 } = req.query;
-    const actualLimit = parseInt(limit);
-    const actualOffset = (parseInt(page) - 1) * actualLimit;
-    
-    let query = supabase
-      .from('students')
-      .select('*', { count: 'exact' })
-      .eq('college_id', collegeId)
-      .range(actualOffset, actualOffset + actualLimit - 1);
-    
-    // Apply search filters only if columns exist
-    if (search) {
-      // Try to search by name, email, and student_id only (skip roll_no if it doesn't exist)
-      try {
-        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,student_id.ilike.%${search}%`);
-      } catch (searchError) {
-        console.log('Search filter error (missing roll_no column):', searchError.message);
-        // Fallback to name and email only
-        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
-      }
+    const actualLimit = Math.min(Math.max(1, parseInt(limit) || 15), 100);
+    const actualPage = Math.max(1, parseInt(page) || 1);
+    const actualOffset = (actualPage - 1) * actualLimit;
+
+    const params = [collegeId];
+    let whereClause = 'WHERE college_id = $1';
+
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      whereClause += ` AND (name ILIKE $${params.length} OR email ILIKE $${params.length} OR student_id ILIKE $${params.length} OR roll_no ILIKE $${params.length})`;
     }
-    
-    // Apply other filters only if columns exist
-    if (req.query.isActive !== undefined) {
-      try {
-        query = query.eq('is_active', req.query.isActive === 'true');
-      } catch (error) {
-        console.log('is_active filter error:', error.message);
-      }
-    }
-    // Removed department and batch filters as they don't exist in students table
-    
-    const { data: students, error, count } = await query;
-    
-    if (error) {
-      console.error('Students query error:', error);
-      // Handle column-specific errors gracefully
-      if (error.message.includes('column') || error.message.includes('does not exist')) {
-        return res.status(400).json({
-          success: false,
-          message: 'Some search filters are not available. Please check database schema.',
-          error: 'Database schema issue - some columns may not exist'
-        });
-      }
-      throw error;
-    }
-    
-    // Calculate pagination
-    const total = count || 0;
+
+    const countPromise = pool.query(`SELECT COUNT(*)::int AS count FROM students ${whereClause}`, params);
+    const queryParams = [...params, actualLimit, actualOffset];
+    const studentsPromise = pool.query(`
+      SELECT * FROM students 
+      ${whereClause} 
+      ORDER BY created_at DESC 
+      LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}
+    `, queryParams);
+
+    const [countResult, studentsResult] = await Promise.all([countPromise, studentsPromise]);
+    const total = countResult.rows[0]?.count || 0;
+    const students = studentsResult.rows || [];
     const totalPages = Math.ceil(total / actualLimit);
-    
+
     res.json({
       success: true,
       data: {
-        students: students || [],
-        total: total,
+        students,
+        total,
         pagination: {
-          page: parseInt(page),
+          page: actualPage,
           limit: actualLimit,
           pages: totalPages,
-          hasNext: parseInt(page) < totalPages,
-          hasPrev: parseInt(page) > 1
+          hasNext: actualPage < totalPages,
+          hasPrev: actualPage > 1,
         }
       }
     });
-    
   } catch (error) {
     console.error('Students error:', error);
     res.status(500).json({
