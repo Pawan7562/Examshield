@@ -245,20 +245,29 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
     // Handle student assignments if provided
     if (studentIds && studentIds.length > 0) {
       try {
-        const studentAssignments = studentIds.map(studentId => ({
-          exam_id: examId,
-          student_id: studentId,
-          status: 'assigned'
-        }));
+        // Strict multi-tenant isolation: only assign students belonging to this college
+        const { rows: validStudentRows } = await pool.query(
+          'SELECT id FROM students WHERE id = ANY($1) AND college_id = $2',
+          [studentIds, collegeId]
+        );
+        const validStudentIds = validStudentRows.map(r => r.id);
 
-        const { error: assignmentError } = await supabase
-          .from('exam_assignments')
-          .insert(studentAssignments);
+        if (validStudentIds.length > 0) {
+          const studentAssignments = validStudentIds.map(studentId => ({
+            exam_id: examId,
+            student_id: studentId,
+            status: 'assigned'
+          }));
 
-        if (assignmentError) {
-          console.error('Student assignment error:', assignmentError);
-        } else {
-          console.log('Successfully assigned', studentIds.length, 'students to exam');
+          const { error: assignmentError } = await supabase
+            .from('exam_assignments')
+            .insert(studentAssignments);
+
+          if (assignmentError) {
+            console.error('Student assignment error:', assignmentError);
+          } else {
+            console.log('Successfully assigned', validStudentIds.length, 'students to exam');
+          }
         }
       } catch (error) {
         console.error('Error assigning students:', error);

@@ -1,6 +1,7 @@
 // src/pages/admin/ExamManagement.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
 import { formatIST } from '../../utils/timezone';
 import toast from 'react-hot-toast';
@@ -72,15 +73,20 @@ const StatusBadge = ({ status }) => {
 };
 
 export default function ExamManagement() {
+  const { user } = useAuth();
+  const collegeId = user?.id || '';
+  const storageKey = collegeId ? `cached_admin_exams_${collegeId}` : null;
+
   const [exams, setExams] = useState(() => {
     try {
-      const cached = sessionStorage.getItem('cached_admin_exams');
+      if (!storageKey) return [];
+      const cached = sessionStorage.getItem(storageKey);
       return cached ? JSON.parse(cached) : [];
     } catch (_) {
       return [];
     }
   });
-  const [loading, setLoading] = useState(exams.length === 0);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [editModal, setEditModal] = useState({
@@ -99,6 +105,7 @@ export default function ExamManagement() {
   const navigate = useNavigate();
 
   const fetchExams = (isBackground = false) => {
+    if (!collegeId) return;
     if (!isBackground) setLoading(true);
     adminAPI.getExams({ 
       status: filter === 'all' ? undefined : filter, 
@@ -106,18 +113,28 @@ export default function ExamManagement() {
       limit: 50 
     })
       .then(r => {
-        const data = r.data.exams || [];
+        const data = r.data?.exams || r.data?.data?.exams || [];
         setExams(data);
-        try { sessionStorage.setItem('cached_admin_exams', JSON.stringify(data)); } catch (_) {}
+        if (storageKey) {
+          try { sessionStorage.setItem(storageKey, JSON.stringify(data)); } catch (_) {}
+        }
       })
       .catch(() => toast.error('Failed to load exams'))
       .finally(() => setLoading(false));
   };
 
-  // Immediate fetch on mount or filter change
+  // Immediate fetch on mount or filter change or college change
   useEffect(() => {
-    fetchExams(exams.length > 0);
-  }, [filter]);
+    if (!collegeId) return;
+    try {
+      const cached = sessionStorage.getItem(`cached_admin_exams_${collegeId}`);
+      if (cached) setExams(JSON.parse(cached));
+      else setExams([]);
+    } catch (_) {
+      setExams([]);
+    }
+    fetchExams(false);
+  }, [collegeId, filter]);
 
   // Debounced only for search keystrokes
   useEffect(() => {

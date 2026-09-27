@@ -1,5 +1,6 @@
 // src/pages/admin/StudentManagement.js
 import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import { 
@@ -95,16 +96,21 @@ const StatusBadge = ({ isActive }) => (
 );
 
 export default function StudentManagement() {
+  const { user } = useAuth();
+  const collegeId = user?.id || '';
+  const storageKey = collegeId ? `cached_admin_students_${collegeId}` : null;
+
   const [students, setStudents] = useState(() => {
     try {
-      const cached = sessionStorage.getItem('cached_admin_students');
+      if (!storageKey) return [];
+      const cached = sessionStorage.getItem(storageKey);
       return cached ? JSON.parse(cached) : [];
     } catch (_) {
       return [];
     }
   });
   const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0 });
-  const [loading, setLoading] = useState(students.length === 0);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [addModal, setAddModal] = useState(false);
   const [exams, setExams] = useState([]);
@@ -237,13 +243,18 @@ export default function StudentManagement() {
     if (!isBackground) setLoading(true);
     try {
       const res = await adminAPI.getStudents({ page, limit: 15, search: search || undefined });
-      const list = res.data.students || [];
+      const payload = res?.data || res;
+      const list = payload?.students || payload?.data?.students || (Array.isArray(payload) ? payload : []);
       setStudents(list);
-      try { sessionStorage.setItem('cached_admin_students', JSON.stringify(list)); } catch (_) {}
+      if (storageKey) {
+        try { sessionStorage.setItem(storageKey, JSON.stringify(list)); } catch (_) {}
+      }
+      const totalCount = payload?.total ?? payload?.data?.total ?? payload?.pagination?.total ?? list.length;
+      const totalPages = payload?.pagination?.pages ?? payload?.data?.pagination?.pages ?? Math.ceil(totalCount / 15) ?? 1;
       setPagination({ 
         page, 
-        total: res.data.pagination?.total || list.length, 
-        pages: res.data.pagination?.pages || 1
+        total: totalCount, 
+        pages: Math.max(1, totalPages)
       });
     } catch {
       toast.error('Failed to load students');
@@ -252,11 +263,22 @@ export default function StudentManagement() {
     }
   };
 
-  // Immediate fetch on mount
+  // Fetch strictly for current college
   useEffect(() => {
-    fetchStudents(1, students.length > 0);
+    if (!collegeId) return;
+    try {
+      const cached = sessionStorage.getItem(`cached_admin_students_${collegeId}`);
+      if (cached) {
+        setStudents(JSON.parse(cached));
+      } else {
+        setStudents([]);
+      }
+    } catch (_) {
+      setStudents([]);
+    }
+    fetchStudents(1, false);
     fetchPasswordRequests();
-  }, []);
+  }, [collegeId]);
 
   // Debounce only when actively searching
   useEffect(() => {

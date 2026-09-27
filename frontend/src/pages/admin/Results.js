@@ -1,5 +1,6 @@
 // src/pages/admin/Results.js
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import { 
@@ -100,9 +101,14 @@ const GradeBadge = ({ grade }) => {
 };
 
 export default function Results() {
+  const { user } = useAuth();
+  const collegeId = user?.id || '';
+  const storageKey = collegeId ? `cached_admin_results_${collegeId}` : null;
+
   const [results, setResults] = useState(() => {
     try {
-      const cached = sessionStorage.getItem('cached_admin_results');
+      if (!storageKey) return [];
+      const cached = sessionStorage.getItem(storageKey);
       return cached ? JSON.parse(cached) : [];
     } catch (_) {
       return [];
@@ -110,7 +116,7 @@ export default function Results() {
   });
   const [exams, setExams] = useState([]);
   const [selectedExam, setSelectedExam] = useState('');
-  const [loading, setLoading] = useState(results.length === 0);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   // Modal states
@@ -125,12 +131,15 @@ export default function Results() {
   });
 
   const fetchResults = async (examId, isBackground = false) => {
+    if (!collegeId) return;
     if (!isBackground) setLoading(true);
     try {
       const r = await adminAPI.getResults({ examId: examId || undefined, search: search || undefined });
-      const list = r.data.results || [];
+      const list = r.data?.results || r.data?.data?.results || [];
       setResults(list);
-      try { sessionStorage.setItem('cached_admin_results', JSON.stringify(list)); } catch (_) {}
+      if (storageKey) {
+        try { sessionStorage.setItem(storageKey, JSON.stringify(list)); } catch (_) {}
+      }
     } catch { 
       toast.error('Failed to load results'); 
     } finally { 
@@ -138,13 +147,21 @@ export default function Results() {
     }
   };
 
-  // Immediate fetch on mount - load all exams (not just completed) so college can filter results for any exam
+  // Immediate fetch on mount or college change
   useEffect(() => {
+    if (!collegeId) return;
+    try {
+      const cached = sessionStorage.getItem(`cached_admin_results_${collegeId}`);
+      if (cached) setResults(JSON.parse(cached));
+      else setResults([]);
+    } catch (_) {
+      setResults([]);
+    }
     adminAPI.getExams({ limit: 100 })
-      .then(r => setExams(r.data.exams || []))
+      .then(r => setExams(r.data?.exams || r.data?.data?.exams || []))
       .catch(() => {});
-    fetchResults(selectedExam, results.length > 0);
-  }, [selectedExam]);
+    fetchResults(selectedExam, false);
+  }, [collegeId, selectedExam]);
 
   // Debounce search
   useEffect(() => {

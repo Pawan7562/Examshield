@@ -1,6 +1,6 @@
 // src/context/AuthContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../services/api';
+import api, { clearApiCache } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -12,13 +12,23 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('accessToken');
     const userData = localStorage.getItem('user');
     if (token && userData) {
-      setUser(JSON.parse(userData));
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      try {
+        setUser(JSON.parse(userData));
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      } catch (_) {
+        localStorage.clear();
+        sessionStorage.clear();
+        clearApiCache();
+      }
     }
     setLoading(false);
   }, []);
 
   const login = (userData, tokens) => {
+    // Strictly wipe any session caches from previous accounts
+    clearApiCache();
+    sessionStorage.clear();
+
     localStorage.setItem('accessToken', tokens.accessToken);
     localStorage.setItem('refreshToken', tokens.refreshToken);
     localStorage.setItem('user', JSON.stringify(userData));
@@ -27,6 +37,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    clearApiCache();
+    sessionStorage.clear();
+
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');

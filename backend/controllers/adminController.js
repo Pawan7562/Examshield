@@ -70,9 +70,13 @@ exports.getDashboard = async (req, res) => {
 
 exports.getStudents = async (req, res) => {
   try {
-    const collegeId = req.user.id;
+    const collegeId = req.user?.id;
+    if (!collegeId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized college session' });
+    }
+
     const { limit = 50, search = '', page = 1 } = req.query;
-    const actualLimit = Math.min(Math.max(1, parseInt(limit) || 15), 100);
+    const actualLimit = Math.min(Math.max(1, parseInt(limit) || 15), 500);
     const actualPage = Math.max(1, parseInt(page) || 1);
     const actualOffset = (actualPage - 1) * actualLimit;
 
@@ -87,7 +91,8 @@ exports.getStudents = async (req, res) => {
     const countPromise = pool.query(`SELECT COUNT(*)::int AS count FROM students ${whereClause}`, params);
     const queryParams = [...params, actualLimit, actualOffset];
     const studentsPromise = pool.query(`
-      SELECT * FROM students 
+      SELECT id, student_id, name, email, roll_no, department, batch, is_active, created_at, updated_at, college_id 
+      FROM students 
       ${whereClause} 
       ORDER BY created_at DESC 
       LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}

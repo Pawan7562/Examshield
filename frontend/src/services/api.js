@@ -140,13 +140,26 @@ export const clearApiCache = (filter = '') => {
   }
 };
 
+const getTenantCacheScope = () => {
+  try {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const u = JSON.parse(userStr);
+      return u.id || u.collegeId || 'auth';
+    }
+  } catch (_) {}
+  const token = localStorage.getItem('accessToken');
+  return token ? token.slice(-16) : 'anon';
+};
+
 // Wrap api.get for instantaneous navigation between pages
 const rawGet = api.get.bind(api);
 api.get = async (url, config = {}) => {
   if (config.bypassCache) {
     return rawGet(url, config);
   }
-  const cacheKey = `${url}?${JSON.stringify(config.params || {})}`;
+  const scope = getTenantCacheScope();
+  const cacheKey = `${scope}:${url}?${JSON.stringify(config.params || {})}`;
   const now = Date.now();
   const cached = apiCache.get(cacheKey);
 

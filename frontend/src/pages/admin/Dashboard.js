@@ -101,26 +101,42 @@ const ExamRow = ({ exam, onClick }) => {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const collegeId = user?.id || '';
+  const storageKey = collegeId ? `cached_admin_dashboard_${collegeId}` : null;
+
   const [data, setData] = useState(() => {
     try {
-      const cached = sessionStorage.getItem('cached_admin_dashboard');
+      if (!storageKey) return null;
+      const cached = sessionStorage.getItem(storageKey);
       return cached ? JSON.parse(cached) : null;
     } catch (_) {
       return null;
     }
   });
-  const [loading, setLoading] = useState(!data);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!collegeId) return;
+    try {
+      const cached = sessionStorage.getItem(`cached_admin_dashboard_${collegeId}`);
+      if (cached) setData(JSON.parse(cached));
+      else setData(null);
+    } catch (_) {
+      setData(null);
+    }
+    setLoading(true);
+
     adminAPI.getDashboard()
       .then(res => {
         setData(res.data);
-        try { sessionStorage.setItem('cached_admin_dashboard', JSON.stringify(res.data)); } catch (_) {}
+        if (storageKey) {
+          try { sessionStorage.setItem(storageKey, JSON.stringify(res.data)); } catch (_) {}
+        }
       })
       .catch(() => toast.error('Failed to load college dashboard'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [collegeId]);
 
   const { stats, upcomingExams } = data || {};
   const liveExam = upcomingExams?.find(exam => isExamStartable(exam));

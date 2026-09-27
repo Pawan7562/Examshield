@@ -8,12 +8,17 @@ const { pool } = require('../config/database');
 const { sendStudentCredentials } = require('../services/emailService');
 
 /**
- * Generate unique student ID: ES-YYYY-timestamp
+ * Generate unique student ID: ES-YYYY-random
  */
 const generateStudentId = async (collegeId) => {
   const year = new Date().getFullYear();
-  const timestamp = Date.now();
-  return `ES-${year}-${timestamp.toString().slice(-6)}`;
+  for (let attempts = 0; attempts < 5; attempts++) {
+    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    const candidate = `ES-${year}-${randomSuffix}`;
+    const check = await pool.query('SELECT id FROM students WHERE student_id = $1 LIMIT 1', [candidate]);
+    if (check.rows.length === 0) return candidate;
+  }
+  return `ES-${year}-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
 };
 
 /**
@@ -34,75 +39,51 @@ const generatePassword = () => {
  */
 exports.getStudents = async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, isActive, department, batch } = req.query;
-    const offset = (page - 1) * limit;
+    const { page = 1, limit = 20, search } = req.query;
     const collegeId = req.user.id;
-
-    let query = supabase
-      .from('students')
-      .select('*', { count: 'exact' })
-      .eq('college_id', collegeId)
-      .range(offset, offset + limit - 1)
-      .order('created_at', { ascending: false });
-
-    // Apply filters
-    if (search) {
-      // Try searching with all columns, fallback if schema is missing roll_no
-      try {
-        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,roll_no.ilike.%${search}%,student_id.ilike.%${search}%`);
-      } catch (err) {
-        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,student_id.ilike.%${search}%`);
-      }
-    }
-    
-    if (isActive !== undefined) {
-      query = query.eq('is_active', isActive === 'true');
-    }
-    
-    // Optional filters with column existence safety
-    if (department) {
-      query = query.eq('department', department);
-    }
-    if (batch) {
-      query = query.eq('batch', batch);
+    if (!collegeId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized college session' });
     }
 
-    const { data: students, error, count } = await query;
+    const actualLimit = Math.min(Math.max(1, parseInt(limit) || 15), 500);
+    const actualPage = Math.max(1, parseInt(page) || 1);
+    const actualOffset = (actualPage - 1) * actualLimit;
 
-    if (error) {
-      console.error('Students query error (Retrying without roll_no):', error);
-      // Final fallback for missing columns
-      if (error.message.includes('column') || error.message.includes('roll_no')) {
-         const retryQuery = await supabase.from('students')
-           .select('*', { count: 'exact' })
-           .eq('college_id', collegeId)
-           .or(`name.ilike.%${search || ''}%,email.ilike.%${search || ''}%`)
-           .range(offset, offset + limit - 1)
-           .order('created_at', { ascending: false });
-         
-         if (retryQuery.error) throw retryQuery.error;
-         
-         return res.json({
-           success: true,
-           data: {
-             students: retryQuery.data || [],
-             total: retryQuery.count || 0,
-             page: parseInt(page),
-             totalPages: Math.ceil((retryQuery.count || 0) / limit),
-             schema_warning: 'Some columns are missing in your database'
-           }
-         });
-      }
-      throw error;
+    const params = [collegeId];
+    let whereClause = 'WHERE college_id = $1';
+
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      whereClause += ` AND (name ILIKE $${params.length} OR email ILIKE $${params.length} OR student_id ILIKE $${params.length} OR roll_no ILIKE $${params.length})`;
     }
+
+    const countPromise = pool.query(`SELECT COUNT(*)::int AS count FROM students ${whereClause}`, params);
+    const queryParams = [...params, actualLimit, actualOffset];
+    const studentsPromise = pool.query(`
+      SELECT id, student_id, name, email, roll_no, department, batch, is_active, created_at, updated_at, college_id 
+      FROM students 
+      ${whereClause} 
+      ORDER BY created_at DESC 
+      LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}
+    `, queryParams);
+
+    const [countResult, studentsResult] = await Promise.all([countPromise, studentsPromise]);
+    const total = countResult.rows[0]?.count || 0;
+    const students = studentsResult.rows || [];
+    const totalPages = Math.ceil(total / actualLimit);
 
     res.json({
       success: true,
       data: {
-        students: students || [],
-        total: count || 0,
-        page: parseInt(page),
-        totalPages: Math.ceil((count || 0) / limit)
+        students,
+        total,
+        pagination: {
+          page: actualPage,
+          limit: actualLimit,
+          pages: totalPages,
+          hasNext: actualPage < totalPages,
+          hasPrev: actualPage > 1,
+        }
       }
     });
 
@@ -125,6 +106,10 @@ exports.addStudent = async (req, res) => {
     const { name, email, rollNo, roll_no, department, batch, phone, semester } = req.body;
     const collegeId = req.user.id;
 
+    if (!collegeId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized college session' });
+    }
+
     // Handle both rollNo (frontend) and roll_no (backend) field names
     const rollNumber = rollNo || roll_no;
 
@@ -136,18 +121,19 @@ exports.addStudent = async (req, res) => {
       });
     }
 
-    // Check if student already exists
-    const { data: existingStudent } = await supabase
-      .from('students')
-      .select('*')
-      .or(`email.eq.${email},roll_no.eq.${rollNumber}`)
-      .eq('college_id', collegeId)
-      .limit(1);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanRoll = rollNumber.trim();
 
-    if (existingStudent && existingStudent.length > 0) {
+    // Check if student already exists in this college
+    const existingCheck = await pool.query(
+      'SELECT id, email, roll_no FROM students WHERE (LOWER(email) = $1 OR roll_no = $2) AND college_id = $3 LIMIT 1',
+      [cleanEmail, cleanRoll, collegeId]
+    );
+
+    if (existingCheck.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Student with this email or roll number already exists'
+        message: 'A student with this email or roll number is already registered under your college.'
       });
     }
 
@@ -155,69 +141,21 @@ exports.addStudent = async (req, res) => {
     const studentId = await generateStudentId(collegeId);
     const password = generatePassword();
     const hashedPassword = await bcrypt.hash(password, 12);
+    const newStudentUuid = uuidv4();
 
-    // Create student with only available columns
-    const studentData = {
-      id: uuidv4(),
-      student_id: studentId,
-      name,
-      email,
-      roll_no: rollNumber,
-      password: hashedPassword,
-      college_id: collegeId,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    const insertRes = await pool.query(
+      `INSERT INTO students (id, student_id, name, email, roll_no, department, batch, password, college_id, is_active, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, NOW(), NOW())
+       RETURNING *`,
+      [newStudentUuid, studentId, name.trim(), cleanEmail, cleanRoll, department?.trim() || null, batch?.trim() || null, hashedPassword, collegeId]
+    );
 
-    // Only add optional fields if they exist in the database
-    // First, let's check what columns exist
-    try {
-      if (department) {
-        studentData.department = department;
-      }
-    } catch (err) {
-      console.log('Department field not available:', err.message);
-    }
+    const student = insertRes.rows[0];
 
-    try {
-      if (batch) {
-        studentData.batch = batch;
-      }
-    } catch (err) {
-      console.log('Batch field not available:', err.message);
-    }
-
-    // Create student
-    const { data: student, error } = await supabase
-      .from('students')
-      .insert([studentData])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Student creation error:', error);
-      // Handle column-specific errors gracefully
-      if (error.message.includes('column') || error.message.includes('schema')) {
-        return res.status(400).json({
-          success: false,
-          message: 'Some fields are not available. Please check database schema.',
-          error: 'Database schema issue - some columns may not exist'
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to add student',
-        error: error.message
-      });
-    }
-
-    // Check if student was actually created
     if (!student) {
       return res.status(500).json({
         success: false,
-        message: 'Failed to add student - no data returned',
-        error: 'Database insert failed'
+        message: 'Failed to add student - database insert failed'
       });
     }
 
@@ -722,63 +660,55 @@ exports.bulkUploadStudents = async (req, res) => {
           
           for (const studentData of students) {
             try {
-              // Check if student already exists
-              const { data: existing } = await supabase
-                .from('students')
-                .select('id')
-                .or(`email.eq.${studentData.email},roll_no.eq.${studentData.roll_no}`)
-                .eq('college_id', collegeId)
-                .limit(1);
+              if (!studentData.email || !studentData.roll_no || !studentData.name) {
+                errors.push(`Skipped row: Name, email, and roll number are required.`);
+                continue;
+              }
+              const cleanEmail = studentData.email.trim().toLowerCase();
+              const cleanRoll = studentData.roll_no.trim();
 
-              if (existing && existing.length > 0) {
-                errors.push(`Student ${studentData.email} already exists`);
+              // Check if student already exists in THIS college
+              const existingCheck = await pool.query(
+                'SELECT id FROM students WHERE (LOWER(email) = $1 OR roll_no = $2) AND college_id = $3 LIMIT 1',
+                [cleanEmail, cleanRoll, collegeId]
+              );
+
+              if (existingCheck.rows.length > 0) {
+                errors.push(`Student ${cleanEmail} (${cleanRoll}) is already registered in your college`);
                 continue;
               }
 
-              // Generate student ID and password
+              // Generate unique student ID and password
               const studentId = await generateStudentId(collegeId);
               const password = generatePassword();
               const hashedPassword = await bcrypt.hash(password, 12);
+              const newUuid = uuidv4();
 
-              // Insert student
-              const { data: student, error } = await supabase
-                .from('students')
-                .insert([{
-                  id: uuidv4(),
-                  student_id: studentId,
-                  name: studentData.name,
-                  email: studentData.email,
-                  roll_no: studentData.roll_no,
-                  department: studentData.department,
-                  batch: studentData.batch,
-                  password: hashedPassword,
-                  college_id: collegeId,
-                  is_active: true,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                }])
-                .select();
+              // Insert student strictly associated with this college
+              const insertRes = await pool.query(
+                `INSERT INTO students (id, student_id, name, email, roll_no, department, batch, password, college_id, is_active, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, NOW(), NOW())
+                 RETURNING *`,
+                [newUuid, studentId, studentData.name.trim(), cleanEmail, cleanRoll, studentData.department?.trim() || null, studentData.batch?.trim() || null, hashedPassword, collegeId]
+              );
 
-              if (error) {
-                errors.push(`Failed to insert ${studentData.email}: ${error.message}`);
-              } else {
-                results.push({
-                  ...student[0],
-                  password: password
-                });
+              const createdStudent = insertRes.rows[0];
+              results.push({
+                ...createdStudent,
+                password
+              });
 
-                // Send credentials email (fire-and-forget, same as manual upload)
-                sendStudentCredentials({
-                  name: studentData.name,
-                  email: studentData.email,
-                  studentId,
-                  password,
-                  collegeName: req.user.name || 'Your Institution',
-                  loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login'
-                }).catch(emailError => {
-                  console.error(`❌ Bulk Upload Email Error for ${studentData.email}:`, emailError.message);
-                });
-              }
+              // Send credentials email
+              sendStudentCredentials({
+                name: studentData.name,
+                email: cleanEmail,
+                studentId,
+                password,
+                collegeName: req.user.name || 'Your Institution',
+                loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login'
+              }).catch(emailError => {
+                console.error(`❌ Bulk Upload Email Error for ${cleanEmail}:`, emailError.message);
+              });
             } catch (err) {
               errors.push(`Failed to process ${studentData.email}: ${err.message}`);
             }

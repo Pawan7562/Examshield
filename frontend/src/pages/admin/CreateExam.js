@@ -248,7 +248,9 @@ export default function CreateExam() {
   const location = useLocation();
 
   useEffect(() => {
-    adminAPI.getStudents({ limit: 500 }).then(res => setAllStudents(res.data.students)).catch(() => {});
+    adminAPI.getStudents({ limit: 500 })
+      .then(res => setAllStudents(res.data?.students || res.data?.data?.students || (Array.isArray(res.data) ? res.data : [])))
+      .catch(() => {});
     
     // Handle questions passed from AI Generator (sessionStorage or location.state)
     let qs = null;
