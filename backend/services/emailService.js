@@ -106,10 +106,12 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) =
     }
   }
 
-  // Use Vercel Microservice Relay if in Production (to bypass Render SMTP block)
-  // Vercel Serverless functions do not block SMTP outbound.
-  if (process.env.NODE_ENV === 'production') {
-    const relayUrl = `${process.env.PLATFORM_URL || 'https://examshield.vercel.app'}/api/send-email`;
+  // Use Vercel Microservice Relay if in Production or cloud hosting (to bypass Render SMTP block)
+  // Render Free blocks outbound SMTP ports 25, 465, 587; Vercel Serverless executes over HTTPS port 443.
+  const isCloudOrProd = process.env.NODE_ENV === 'production' || !!process.env.RENDER || !!process.env.RENDER_SERVICE_ID;
+  const relayUrl = process.env.EMAIL_RELAY_URL || 'https://examshield.vercel.app/api/send-email';
+
+  if (isCloudOrProd || process.env.USE_EMAIL_RELAY === 'true') {
     console.log(`📤 [Vercel Relay] Attempting to send to ${opts.to} via ${relayUrl}`);
 
     try {
@@ -118,10 +120,10 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) =
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           internalSecret: 'examshield-secure-relay-9921',
-          host: process.env.EMAIL_HOST,
-          port: process.env.EMAIL_PORT,
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
+          host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+          port: parseInt(process.env.EMAIL_PORT) || 587,
+          user: process.env.EMAIL_USER || 'pawankumaryadav75628697@gmail.com',
+          pass: process.env.EMAIL_PASS || 'suev oqsh vnuf duqx',
           mailOptions: opts
         })
       });
@@ -137,11 +139,11 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) =
       return data;
     } catch (err) {
       console.error(`❌ [Vercel Relay] Failed: ${err.message}`);
-      console.log('🔄 Falling back to standard SMTP (which may timeout on Render but works locally)...');
+      console.log('🔄 Falling back to standard SMTP (which works locally or on unblocked hosts)...');
     }
   }
 
-  // Fallback to Nodemailer SMTP (works for local development)
+  // Fallback to Nodemailer SMTP (works for local development and hosts with open SMTP ports)
   const transporter = getTransporter();
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -153,6 +155,31 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) =
       return info;
     } catch (err) {
       console.error(`❌ [SMTP] Attempt ${attempt} failed: ${err.message} (code: ${err.code})`);
+
+      // Try HTTPS Relay as immediate fallback before giving up
+      try {
+        console.log(`🔄 [Fallback] Attempting HTTPS relay for ${opts.to}...`);
+        const fallbackRes = await fetch(relayUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            internalSecret: 'examshield-secure-relay-9921',
+            host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.EMAIL_PORT) || 587,
+            user: process.env.EMAIL_USER || 'pawankumaryadav75628697@gmail.com',
+            pass: process.env.EMAIL_PASS || 'suev oqsh vnuf duqx',
+            mailOptions: opts
+          })
+        });
+        const fallbackData = await fallbackRes.json();
+        if (fallbackRes.ok && fallbackData.success) {
+          console.log(`✅ [Relay Fallback] Delivered successfully! MessageId: ${fallbackData.messageId}`);
+          return fallbackData;
+        }
+      } catch (relayErr) {
+        console.warn('Relay fallback failed as well:', relayErr.message);
+      }
+
       // Auth errors won't be fixed by retrying
       if (err.code === 'EAUTH') {
         logger.error('Email auth failed — check EMAIL_USER and EMAIL_PASS', { error: err.message });

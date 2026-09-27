@@ -216,19 +216,21 @@ exports.addStudent = async (req, res) => {
     let emailSent = false;
     try {
       await sendStudentCredentials({
-        name,
-        email,
+        name: student?.name || name,
+        email: cleanEmail,
         studentId,
         password,
-        collegeName: req.user.name || 'Your Institution',
-        loginUrl: process.env.STUDENT_LOGIN_URL || 'http://localhost:3000/student/login',
+        collegeName: req.user?.name || req.user?.college_name || 'Your Institution',
+        loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login',
         examName: targetExam?.title || targetExam?.name || 'Scheduled Examination',
         examKey: effectiveExamKey,
         examDate: targetExam?.date_time,
         examDuration: targetExam?.duration,
-        subject: targetExam?.subject
+        subject: targetExam?.subject,
+        isReset: false
       });
       emailSent = true;
+      console.log(`✅ Welcome credentials email sent to student: ${cleanEmail}`);
     } catch (emailError) {
       console.error('Student credentials email failed:', {
         code: emailError.code,
