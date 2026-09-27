@@ -1,8 +1,14 @@
 // controllers/authController.js
-const bcrypt = require('bcryptjs');
+let bcrypt;
+try {
+  bcrypt = require('bcrypt');
+} catch (_) {
+  bcrypt = require('bcryptjs');
+}
 const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
 const { supabase } = require('../config/supabase-clean');
+const { pool } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const { sendCollegeWelcome } = require('../services/emailService');
 
@@ -136,16 +142,11 @@ exports.superAdminLogin = async (req, res) => {
     }
 
     const normalizedEmail = normalizeEmail(email);
-    const { data: admin, error } = await supabase
-      .from('super_admins')
-      .select('*')
-      .eq('email', normalizedEmail)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Super admin login error:', error);
-      return res.status(500).json({ success: false, message: 'Login failed', error: error.message });
-    }
+    const dbRes = await pool.query(
+      'SELECT * FROM super_admins WHERE email = $1 OR LOWER(email) = LOWER($1) LIMIT 1',
+      [normalizedEmail]
+    );
+    const admin = dbRes.rows[0] || null;
 
     if (!admin || !await comparePassword(password, admin.password)) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
@@ -268,16 +269,11 @@ exports.collegeLogin = async (req, res) => {
     }
 
     const normalizedEmail = normalizeEmail(email);
-    let { data: college, error } = await supabase
-      .from('colleges')
-      .select('*')
-      .eq('email', normalizedEmail)
-      .maybeSingle();
-
-    if (error) {
-      console.error('College login error:', error);
-      return res.status(500).json({ success: false, message: 'Login failed', error: error.message });
-    }
+    const dbRes = await pool.query(
+      'SELECT * FROM colleges WHERE email = $1 OR LOWER(email) = LOWER($1) LIMIT 1',
+      [normalizedEmail]
+    );
+    let college = dbRes.rows[0] || null;
 
     let isPasswordValid = college ? await comparePassword(password, college.password) : false;
 
@@ -360,42 +356,32 @@ exports.studentLogin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email / Student ID and password are required.' });
     }
 
-    const normalizedEmail = normalizeEmail(input);
+    const isEmailInput = input.includes('@');
+    let studentQuery;
+    let studentQueryParams;
 
-    let student = null;
-    let { data: byEmail, error } = await supabase
-      .from('students')
-      .select('*')
-      .ilike('email', normalizedEmail)
-      .maybeSingle();
-
-    if (error) {
-      console.warn('Student lookup by email encountered error:', error.message);
-    }
-
-    if (byEmail) {
-      student = byEmail;
+    if (isEmailInput) {
+      studentQuery = `
+        SELECT s.*, c.name AS college_name
+        FROM students s
+        LEFT JOIN colleges c ON s.college_id = c.id
+        WHERE s.email = $1 OR LOWER(s.email) = LOWER($1)
+        LIMIT 1;
+      `;
+      studentQueryParams = [normalizeEmail(input)];
     } else {
-      // Check if user entered Student ID (e.g., ES-2026-431532)
-      const { data: byStudentId } = await supabase
-        .from('students')
-        .select('*')
-        .ilike('student_id', input)
-        .maybeSingle();
-
-      if (byStudentId) {
-        student = byStudentId;
-      } else {
-        // Check if user entered Roll Number
-        const { data: byRollNo } = await supabase
-          .from('students')
-          .select('*')
-          .ilike('roll_no', input)
-          .maybeSingle();
-
-        student = byRollNo;
-      }
+      studentQuery = `
+        SELECT s.*, c.name AS college_name
+        FROM students s
+        LEFT JOIN colleges c ON s.college_id = c.id
+        WHERE s.student_id = $1 OR s.student_id ILIKE $1 OR s.roll_no = $1 OR s.roll_no ILIKE $1
+        LIMIT 1;
+      `;
+      studentQueryParams = [input];
     }
+
+    const dbRes = await pool.query(studentQuery, studentQueryParams);
+    const student = dbRes.rows[0] || null;
 
     const trimmedPassword = (password || '').trim();
     let isPasswordValid = student ? await comparePassword(password, student.password) : false;
@@ -411,28 +397,8 @@ exports.studentLogin = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Your account has been deactivated.' });
     }
 
-    let collegeName = null;
-    if (student.college_id) {
-      const { data: college } = await supabase
-        .from('colleges')
-        .select('name')
-        .eq('id', student.college_id)
-        .maybeSingle();
-
-      collegeName = college?.name || null;
-    }
-
-    // Update last login (Quietly fail if schema is missing the column)
-    supabase
-      .from('students')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', student.id)
-      .then(({ error }) => {
-        if (error && !error.message.includes('column')) {
-          console.error('Student last_login update error:', error.message);
-        }
-      })
-      .catch(() => {});
+    // Update last login in background (non-blocking for ultra-fast response)
+    pool.query('UPDATE students SET last_login = NOW() WHERE id = $1', [student.id]).catch(() => {});
 
     const tokens = generateTokens({ id: student.id, role: 'student' });
 
@@ -446,7 +412,7 @@ exports.studentLogin = async (req, res) => {
           name: student.name,
           email: student.email,
           rollNo: student.roll_no,
-          collegeName,
+          collegeName: student.college_name || null,
           collegeId: student.college_id,
           role: 'student',
         },

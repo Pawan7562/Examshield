@@ -532,6 +532,14 @@ server.listen(PORT, () => {
   logger.info(`🚀 CollegeExam server running on port ${PORT}`);
   logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`📡 Socket.IO enabled for real-time monitoring`);
+
+  // Pre-warm database pool for instant login response times
+  const { pool } = require('./config/database');
+  pool.query('SELECT 1').then(() => {
+    logger.info('⚡ Database connection pool pre-warmed and ready for instant logins');
+  }).catch((err) => {
+    logger.warn(`Initial DB warm-up ping: ${err.message}`);
+  });
 });
 
 // Enterprise Graceful Shutdown (Zero dropped candidate submissions on deploy/restart)

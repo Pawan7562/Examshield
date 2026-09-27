@@ -34,10 +34,12 @@ const pool = new Pool({
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD,
       }),
-  max: Number.parseInt(process.env.PG_POOL_MAX || '20', 10),
-  idleTimeoutMillis: 10000,
+  min: 2, // Pre-warmed persistent connections to eliminate cold TLS handshake latency
+  max: Number.parseInt(process.env.PG_POOL_MAX || '30', 10),
+  idleTimeoutMillis: 60000, // Keep warm connections alive for 60 seconds
   connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '10000', 10),
   keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),
 });
 
