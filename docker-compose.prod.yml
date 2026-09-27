@@ -1,0 +1,74 @@
+version: '3.8'
+
+# Production Cluster Orchestration for ExamShield (50k - 100k Users)
+services:
+  # 1. Reverse Proxy & Professional Load Balancer
+  load_balancer:
+    image: nginx:alpine
+    container_name: examshield_load_balancer
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - examshield_network
+
+  # 2. Redis Cache & Socket.IO Pub/Sub Cluster Backbone
+  redis:
+    image: redis:7-alpine
+    container_name: examshield_redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - examshield_network
+
+  # 3. High-Concurrency Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      REDIS_URL: redis://redis:6379
+      PG_POOL_MAX: 20
+      PG_CONNECTION_TIMEOUT_MS: 15000
+    depends_on:
+      - redis
+    networks:
+      - examshield_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+
+  # 4. Frontend Application Server
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      NODE_ENV: production
+    networks:
+      - examshield_network
+
+networks:
+  examshield_network:
+    driver: bridge
+
+volumes:
+  redis_data:

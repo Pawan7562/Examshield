@@ -1442,6 +1442,13 @@ exports.startExam = async (req, res) => {
 
       const questions = (rawQuestions || []).map(formatQuestionForStudent);
 
+      const nowMs = Date.now();
+      const sessionDurationMs = (examData.duration || 60) * 60 * 1000;
+      const sessionStartMs = new Date(existingSession.start_time || existingSession.created_at || nowMs).getTime();
+      const sessionRemainingSec = Math.max(0, Math.floor((sessionDurationMs - (nowMs - sessionStartMs)) / 1000));
+      const windowRemainingSec = windowStatus?.endTime ? Math.max(0, Math.floor((windowStatus.endTime - nowMs) / 1000)) : sessionRemainingSec;
+      const timeRemaining = Math.min(sessionRemainingSec, windowRemainingSec);
+
       return res.json({
         success: true,
         message: 'Resuming exam session.',
@@ -1450,7 +1457,7 @@ exports.startExam = async (req, res) => {
           exam: { ...examData, exam_code: undefined },
           questions: questions || [],
           savedAnswers: answers || [],
-          timeRemaining: Math.max(0, Math.floor((examEnd - now) / 1000)),
+          timeRemaining,
         },
       });
     }
@@ -1978,13 +1985,20 @@ exports.reportViolation = async (req, res) => {
 exports.getExamQuestions = async (req, res) => {
   try {
     const { id } = req.params;
-    const { rows: questions } = await pool.query(
-      `SELECT * FROM questions WHERE exam_id = $1 ORDER BY order_index ASC, created_at ASC`,
-      [id]
+    const collegeId = req.user.id;
+
+    // Verify ownership of the exam
+    const { rows: examRows } = await pool.query(
+      `SELECT id, COALESCE(title, name, 'Untitled Exam') as title, type, duration, total_marks, passing_marks, status FROM exams WHERE id = $1 AND college_id = $2`,
+      [id, collegeId]
     );
 
-    const { rows: examRows } = await pool.query(
-      `SELECT id, COALESCE(title, name, 'Untitled Exam') as title, type, duration, total_marks, passing_marks, status FROM exams WHERE id = $1`,
+    if (examRows.length === 0) {
+      return res.status(403).json({ success: false, message: 'Unauthorized or exam not found.' });
+    }
+
+    const { rows: questions } = await pool.query(
+      `SELECT * FROM questions WHERE exam_id = $1 ORDER BY order_index ASC, created_at ASC`,
       [id]
     );
 
@@ -2006,6 +2020,18 @@ exports.getExamQuestions = async (req, res) => {
 exports.deleteQuestion = async (req, res) => {
   try {
     const { id, questionId } = req.params;
+    const collegeId = req.user.id;
+
+    // Verify ownership of the exam
+    const { rows: examRows } = await pool.query(
+      `SELECT id FROM exams WHERE id = $1 AND college_id = $2`,
+      [id, collegeId]
+    );
+
+    if (examRows.length === 0) {
+      return res.status(403).json({ success: false, message: 'Unauthorized or exam not found.' });
+    }
+
     await pool.query(`DELETE FROM questions WHERE id = $1 AND exam_id = $2`, [questionId, id]);
     res.json({ success: true, message: 'Question deleted successfully' });
   } catch (error) {

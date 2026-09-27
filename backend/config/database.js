@@ -34,9 +34,10 @@ const pool = new Pool({
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD,
       }),
-  max: Number.parseInt(process.env.PG_POOL_MAX || '10', 10),
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '30000', 10),
+  max: Number.parseInt(process.env.PG_POOL_MAX || '20', 10),
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '10000', 10),
+  keepAlive: true,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),
 });
 

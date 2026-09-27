@@ -125,10 +125,48 @@ function areOutputsEqual(actual, expected) {
 function executeJavaScript(code, testCases = []) {
   const results = [];
   let totalTime = 0;
+
+  // Security guard against prototype escape, process execution, and host tampering
+  const DANGEROUS_PATTERNS = [
+    /process\s*\./i,
+    /child_process/i,
+    /require\s*\(/i,
+    /import\s*\(/i,
+    /mainModule/i,
+    /constructor\s*\[\s*['"`]constructor['"`]\s*\]/i,
+    /\.constructor\s*\.\s*constructor/i,
+    /__proto__/i,
+    /\bexecSync\b/i,
+    /\bspawnSync\b/i,
+    /\bprocess\b/i
+  ];
+
+  for (const pat of DANGEROUS_PATTERNS) {
+    if (pat.test(code)) {
+      return {
+        status: 'Security Violation',
+        totalTestCases: testCases.length,
+        passedTestCases: 0,
+        failedTestCases: testCases.length,
+        executionTimeMs: 0,
+        memoryKb: 0,
+        testCases: testCases.map((tc, idx) => ({
+          testCaseIndex: idx + 1,
+          input: tc.input || '',
+          expectedOutput: tc.output || '',
+          actualOutput: 'Security Violation: Restricted token or prototype manipulation detected.',
+          stdout: '',
+          passed: false,
+          error: 'Security Violation: Restricted keyword detected.',
+        })),
+      };
+    }
+  }
+
   const builtInGlobals = new Set([
     'console', 'Math', 'JSON', 'parseInt', 'parseFloat', 'Array', 'Object',
     'String', 'Number', 'Boolean', 'Date', 'Map', 'Set', 'BigInt', 'Infinity',
-    'NaN', 'input', 'undefined', 'null', 'eval', 'isFinite', 'isNaN', 'escape', 'unescape'
+    'NaN', 'input', 'undefined', 'null', 'isFinite', 'isNaN'
   ]);
 
   for (let i = 0; i < testCases.length; i++) {
@@ -293,10 +331,11 @@ function executeSimulated(code, language, testCases = []) {
     });
   }
 
-  const allNoExpected = results.length > 0 && results.every(r => r.expectedOutput === '' || r.expectedOutput === undefined || r.expectedOutput === null);
+  const passedCount = results.filter(r => r.passed).length;
+  const isAllPassed = passedCount === results.length;
 
   return {
-    status: allNoExpected ? 'Finished' : (passedCount === results.length ? 'Accepted' : 'Wrong Answer'),
+    status: allNoExpected ? 'Finished' : (isAllPassed ? 'Accepted' : 'Wrong Answer'),
     totalTestCases: results.length,
     passedTestCases: passedCount,
     failedTestCases: results.length - passedCount,

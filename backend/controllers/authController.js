@@ -25,13 +25,17 @@ const generateTokens = (payload) => {
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
 const comparePassword = async (plainPassword, hashedPassword) => {
-  if (!hashedPassword) return false;
-  if (plainPassword === hashedPassword) return true;
+  if (!hashedPassword || !plainPassword) return false;
 
   try {
-    return await bcrypt.compare(plainPassword, hashedPassword);
-  } catch (error) {
+    const isBcrypt = hashedPassword.startsWith('$2a$') || hashedPassword.startsWith('$2b$');
+    if (isBcrypt) {
+      return await bcrypt.compare(plainPassword, hashedPassword);
+    }
+    // Legacy transition check: strictly compare if non-bcrypt, but never fallback in catch
     return plainPassword === hashedPassword;
+  } catch (error) {
+    return false;
   }
 };
 

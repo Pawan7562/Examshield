@@ -98,6 +98,32 @@ const io = new Server(server, {
 // Socket.IO rooms for exam monitoring
 const activeExamSessions = new Map(); // sessionId -> {studentId, examId, collegeId, status}
 
+// Automatic session memory sweeper for 50k-100k concurrent users (evicts inactive sessions > 1 hour)
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [id, session] of activeExamSessions.entries()) {
+    if (new Date(session.lastHeartbeat || session.connectedAt).getTime() < cutoff) {
+      activeExamSessions.delete(id);
+    }
+  }
+}, 10 * 60 * 1000).unref();
+
+// Socket.IO authentication middleware
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || 
+    (socket.handshake.headers?.authorization ? socket.handshake.headers.authorization.replace(/^Bearer\s+/i, '') : null);
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'examshield_jwt_secret_key_change_in_production_123456');
+      socket.user = decoded;
+    } catch (e) {
+      logger.warn(`Socket authentication error: ${e.message}`);
+    }
+  }
+  next();
+});
+
 io.on('connection', (socket) => {
   logger.info(`Socket connected: ${socket.id}`);
 
@@ -322,15 +348,30 @@ app.options('*', cors(corsOptions));
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
 
-// Rate limiting
+// Rate limiting - optimized for 50k-100k users and shared college campus NAT IPs
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Increased from 200 to 1000 requests
+  max: 5000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // If request has Authorization header, isolate quota per user session rather than whole college IP
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith('Bearer ')) {
+      return `auth_${auth.slice(-32)}`;
+    }
+    return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip;
+  },
+  skip: (req) => req.method === 'OPTIONS',
   message: { success: false, message: 'Too many requests. Please try again later.' },
 });
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50, // Increased from 10 to 50 attempts
+  max: 100, // accommodates concurrent class/batch sign-ins from same campus IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip,
   message: { success: false, message: 'Too many login attempts. Please try again in 15 minutes.' },
 });
 
