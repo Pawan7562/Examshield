@@ -30,6 +30,7 @@ const Results = lazy(() => import('./pages/admin/Results'));
 const EvaluateResult = lazy(() => import('./pages/admin/EvaluateResult'));
 const Subscription = lazy(() => import('./pages/admin/Subscription'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
+const AdminSupport = lazy(() => import('./pages/admin/Support'));
 
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
 const ExamList = lazy(() => import('./pages/student/ExamList'));
@@ -137,6 +138,7 @@ function App() {
             <Route path="results/:id/evaluate" element={<EvaluateResult />} />
             <Route path="subscription" element={<Subscription />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="support" element={<AdminSupport />} />
           </Route>
 
           <Route

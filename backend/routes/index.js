@@ -16,6 +16,7 @@ const studentPasswordController = require('../controllers/studentPasswordControl
 const aiQuestionController = require('../controllers/aiQuestionController');
 const codeExecutionController = require('../controllers/codeExecutionController');
 const liveMonitoringController = require('../controllers/liveMonitoringController');
+const supportController = require('../controllers/supportController');
 
 // Student password routes
 const studentPasswordRoutes = require('./studentPasswordRoutes');
@@ -117,6 +118,12 @@ admin.get('/notifications', adminController.getNotifications);
 // AI Question Generation
 admin.get('/ai/status', aiQuestionController.getStatus);
 admin.post('/ai/generate-questions', aiQuestionController.generateQuestions);
+
+// Support & Helpdesk
+admin.get('/support/tickets', supportController.getTickets);
+admin.post('/support/tickets', supportController.createTicket);
+admin.get('/support/faqs', supportController.getFaqs);
+admin.get('/support/system-status', supportController.getSystemStatus);
 
 router.use('/admin', admin);
 

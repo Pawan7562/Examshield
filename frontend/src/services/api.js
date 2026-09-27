@@ -232,6 +232,12 @@ export const adminAPI = {
   // AI Question Generation
   getAIStatus: () => api.get('/admin/ai/status'),
   generateAIQuestions: (data) => api.post('/admin/ai/generate-questions', data, { timeout: 180000 }),
+
+  // Support & Helpdesk
+  getSupportTickets: (params) => api.get('/admin/support/tickets', { params }),
+  createSupportTicket: (data) => api.post('/admin/support/tickets', data),
+  getSupportFaqs: () => api.get('/admin/support/faqs'),
+  getSystemStatus: () => api.get('/admin/support/system-status'),
 };
 
 // Student APIs

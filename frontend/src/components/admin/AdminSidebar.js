@@ -16,7 +16,8 @@ import {
   Menu,
   Brain,
   ShieldCheck,
-  Radio
+  Radio,
+  Headphones
 } from 'lucide-react';
 import './AdminSidebar.css';
 
@@ -95,6 +96,12 @@ export default function AdminSidebar() {
           label: 'Proctoring Rules & College',
           icon: Settings,
           path: '/admin/settings',
+        },
+        {
+          id: 'support',
+          label: 'Support & Helpdesk',
+          icon: Headphones,
+          path: '/admin/support',
         }
       ]
     }
