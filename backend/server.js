@@ -12,6 +12,7 @@ const path = require('path');
 const fs = require('fs');
 const winston = require('winston');
 const cron = require('node-cron');
+const jwt = require('jsonwebtoken');
 const { formatIST } = require('./utils/timezone');
 
 // Initialize logger with IST timestamps

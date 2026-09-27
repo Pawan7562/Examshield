@@ -44,9 +44,21 @@ const initRedisAdapter = async (io) => {
     subClient = pubClient.duplicate();
     redisClient = pubClient.duplicate();
 
-    pubClient.on('error', (err) => logger.warn(`Redis Pub Error: ${err.message}`));
-    subClient.on('error', (err) => logger.warn(`Redis Sub Error: ${err.message}`));
-    redisClient.on('error', (err) => logger.warn(`Redis Client Error: ${err.message}`));
+    pubClient.on('error', (err) => {
+      if (err.message && !err.message.includes('The client is closed')) {
+        logger.warn(`Redis Pub Error: ${err.message}`);
+      }
+    });
+    subClient.on('error', (err) => {
+      if (err.message && !err.message.includes('The client is closed')) {
+        logger.warn(`Redis Sub Error: ${err.message}`);
+      }
+    });
+    redisClient.on('error', (err) => {
+      if (err.message && !err.message.includes('The client is closed')) {
+        logger.warn(`Redis Client Error: ${err.message}`);
+      }
+    });
 
     await Promise.all([
       pubClient.connect(),
@@ -60,9 +72,9 @@ const initRedisAdapter = async (io) => {
     return true;
   } catch (error) {
     logger.warn(`⚠️ Failed to connect to Redis (${error.message}). Falling back to in-memory mode.`);
-    try { pubClient?.disconnect(); } catch (_) {}
-    try { subClient?.disconnect(); } catch (_) {}
-    try { redisClient?.disconnect(); } catch (_) {}
+    try { await pubClient?.disconnect(); } catch (_) {}
+    try { await subClient?.disconnect(); } catch (_) {}
+    try { await redisClient?.disconnect(); } catch (_) {}
     pubClient = null;
     subClient = null;
     redisClient = null;
