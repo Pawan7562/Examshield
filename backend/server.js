@@ -519,13 +519,51 @@ app.use((err, req, res, next) => {
 // });
 
 // =====================================================
-// START SERVER
+// START SERVER & ENTERPRISE RELIABILITY GUARDS
 // =====================================================
 const PORT = process.env.PORT || 5000;
+
+// Prevent race condition 502 Bad Gateway behind reverse proxies (Cloudflare, Render, Nginx, AWS)
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+
 server.listen(PORT, () => {
   logger.info(`🚀 CollegeExam server running on port ${PORT}`);
   logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`📡 Socket.IO enabled for real-time monitoring`);
+});
+
+// Enterprise Graceful Shutdown (Zero dropped candidate submissions on deploy/restart)
+const gracefulShutdown = (signal) => {
+  logger.info(`Received ${signal}. Starting graceful shutdown...`);
+  server.close(async () => {
+    logger.info('HTTP & WebSocket server closed. Closing database connection pool...');
+    try {
+      const { pool } = require('./config/database');
+      await pool.end();
+      logger.info('Database pool closed gracefully.');
+    } catch (err) {
+      logger.error('Error closing database pool:', err);
+    }
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    logger.error('Forced shutdown due to 15s timeout.');
+    process.exit(1);
+  }, 15000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Process-level Crash Guards: Prevent one bad request from taking down entire active exam
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', err);
 });
 
 module.exports = { app, io };
