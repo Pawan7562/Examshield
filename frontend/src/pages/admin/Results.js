@@ -23,7 +23,11 @@ import {
   User,
   Award,
   Clock,
-  BookOpen
+  BookOpen,
+  RotateCcw,
+  Check,
+  Shield,
+  AlertCircle
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 
@@ -119,6 +123,29 @@ export default function Results() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
+  const fetchResults = async (examId, showLoading = true) => {
+    if (showLoading) setLoading(true);
+    try {
+      const r = await adminAPI.getResults({ examId });
+      const list = r.data.results || [];
+      setResults(list);
+      if (storageKey) {
+        sessionStorage.setItem(storageKey, JSON.stringify(list));
+      }
+    } catch { 
+      toast.error('Failed to load results'); 
+    } finally { 
+      if (showLoading) setLoading(false); 
+    }
+  };
+
+  useEffect(() => {
+    adminAPI.getExams({ limit: 100 })
+      .then(r => setExams(r.data.exams || []))
+      .catch(() => {});
+    fetchResults(selectedExam || undefined, results.length === 0);
+  }, []);
+
   // Modal states
   const [viewModal, setViewModal] = useState({ open: false, result: null });
   const [editModal, setEditModal] = useState({ 
@@ -129,46 +156,128 @@ export default function Results() {
     grade: 'A', 
     saving: false 
   });
+  const [submissionModal, setSubmissionModal] = useState({
+    open: false,
+    loading: false,
+    resultId: null,
+    data: null,
+    activeTab: 'all',
+    reevaluating: false,
+    editingMarks: {},
+    editingRemarks: {},
+    savingAnswerId: null
+  });
 
-  const fetchResults = async (examId, isBackground = false) => {
-    if (!collegeId) return;
-    if (!isBackground) setLoading(true);
+  const handleOpenSubmission = async (result) => {
+    setSubmissionModal({
+      open: true,
+      loading: true,
+      resultId: result.id,
+      data: null,
+      activeTab: 'all',
+      reevaluating: false,
+      editingMarks: {},
+      editingRemarks: {},
+      savingAnswerId: null
+    });
+
     try {
-      const r = await adminAPI.getResults({ examId: examId || undefined, search: search || undefined });
-      const list = r.data?.results || r.data?.data?.results || [];
-      setResults(list);
-      if (storageKey) {
-        try { sessionStorage.setItem(storageKey, JSON.stringify(list)); } catch (_) {}
+      const res = await adminAPI.getSubmission(result.id);
+      const payload = res.data?.data || res.data;
+      if (payload && payload.questions) {
+        // Preload any marks and remarks into editing states
+        const marksInit = {};
+        const remarksInit = {};
+        payload.questions.forEach(q => {
+          if (q.answer?.id) {
+            marksInit[q.answer.id] = q.answer.marks_obtained !== null ? q.answer.marks_obtained : '';
+            remarksInit[q.answer.id] = q.answer.evaluator_remarks || '';
+          }
+        });
+
+        setSubmissionModal(prev => ({
+          ...prev,
+          loading: false,
+          data: payload,
+          editingMarks: marksInit,
+          editingRemarks: remarksInit
+        }));
+      } else {
+        toast.error('Submission copy not found');
+        setSubmissionModal(prev => ({ ...prev, loading: false }));
       }
-    } catch { 
-      toast.error('Failed to load results'); 
-    } finally { 
-      setLoading(false); 
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load candidate answer sheet');
+      setSubmissionModal(prev => ({ ...prev, loading: false }));
     }
   };
 
-  // Immediate fetch on mount or college change
-  useEffect(() => {
-    if (!collegeId) return;
+  const handleReevaluateSubmission = async (resultId) => {
+    setSubmissionModal(prev => ({ ...prev, reevaluating: true }));
     try {
-      const cached = sessionStorage.getItem(`cached_admin_results_${collegeId}`);
-      if (cached) setResults(JSON.parse(cached));
-      else setResults([]);
-    } catch (_) {
-      setResults([]);
+      await adminAPI.reevaluateResult(resultId);
+      toast.success('Exam answers re-evaluated successfully with updated auto-marking!');
+      const res = await adminAPI.getSubmission(resultId);
+      const payload = res.data?.data || res.data;
+      if (payload) {
+        setSubmissionModal(prev => ({
+          ...prev,
+          data: payload,
+          reevaluating: false
+        }));
+      }
+      fetchResults(selectedExam, true);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Re-evaluation failed');
+      setSubmissionModal(prev => ({ ...prev, reevaluating: false }));
     }
-    adminAPI.getExams({ limit: 100 })
-      .then(r => setExams(r.data?.exams || r.data?.data?.exams || []))
-      .catch(() => {});
-    fetchResults(selectedExam, false);
-  }, [collegeId, selectedExam]);
+  };
 
-  // Debounce search
-  useEffect(() => {
-    if (!search) return;
-    const timeout = setTimeout(() => fetchResults(selectedExam, false), 250);
-    return () => clearTimeout(timeout);
-  }, [search]);
+  const handleSaveManualAnswerMarks = async (answerId, questionType) => {
+    if (!answerId) return toast.error('No answer record found for this question');
+    const marks = submissionModal.editingMarks[answerId];
+    const remarks = submissionModal.editingRemarks[answerId] || '';
+
+    try {
+      setSubmissionModal(prev => ({ ...prev, savingAnswerId: answerId }));
+      await adminAPI.evaluateResult(submissionModal.resultId, {
+        evaluations: [{
+          answerId,
+          marksObtained: parseFloat(marks) || 0,
+          remarks: remarks
+        }]
+      });
+      toast.success('Marks updated successfully!');
+      const res = await adminAPI.getSubmission(submissionModal.resultId);
+      const payload = res.data?.data || res.data;
+      if (payload) {
+        setSubmissionModal(prev => ({
+          ...prev,
+          data: payload,
+          savingAnswerId: null
+        }));
+      }
+      fetchResults(selectedExam, true);
+    } catch (err) {
+      toast.error('Failed to update marks');
+      setSubmissionModal(prev => ({ ...prev, savingAnswerId: null }));
+    }
+  };
+
+  const handleBatchReevaluateExam = async () => {
+    if (!selectedExam) return toast.error('Select an exam first');
+    try {
+      setLoading(true);
+      const res = await adminAPI.reevaluateExam(selectedExam);
+      toast.success(res.data?.message || 'Exam submissions re-evaluated successfully!');
+      fetchResults(selectedExam, false);
+    } catch (err) {
+      toast.error('Batch re-evaluation failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const publishAllResults = async () => {
     if (!selectedExam) return toast.error('Select an exam first');
@@ -362,6 +471,16 @@ export default function Results() {
           </p>
         </div>
         <div className="admin-header-actions">
+          {selectedExam && (
+            <Button 
+              variant="secondary" 
+              icon={RotateCcw} 
+              onClick={handleBatchReevaluateExam}
+              title="Re-run automatic evaluation on all submitted answer copies for this exam"
+            >
+              Re-evaluate All
+            </Button>
+          )}
           <Button variant="secondary" icon={Download} onClick={downloadResults} disabled={results.length === 0}>
             Export CSV
           </Button>
@@ -547,6 +666,16 @@ export default function Results() {
                   </td>
                   <td>
                     <div className="admin-table-actions">
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        icon={FileText}
+                        onClick={() => handleOpenSubmission(result)}
+                        title="View Candidate Submitted Answer Copy & Answers"
+                        style={{ color: '#4f46e5', borderColor: '#c7d2fe', background: '#eef2ff' }}
+                      >
+                        Copy
+                      </Button>
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -754,6 +883,19 @@ export default function Results() {
               </Button>
               <div style={{ display: 'flex', gap: 10 }}>
                 <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  icon={FileText}
+                  onClick={() => {
+                    const r = viewModal.result;
+                    setViewModal({ open: false, result: null });
+                    handleOpenSubmission(r);
+                  }}
+                  style={{ color: '#4f46e5', borderColor: '#c7d2fe', background: '#eef2ff' }}
+                >
+                  View Submitted Copy
+                </Button>
+                <Button 
                   variant="primary" 
                   size="sm" 
                   icon={Edit3}
@@ -930,6 +1072,686 @@ export default function Results() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CANDIDATE SUBMITTED ANSWER COPY & EVALUATION MODAL */}
+      {submissionModal.open && (
+        <div 
+          className="admin-modal-overlay" 
+          onClick={() => !submissionModal.reevaluating && setSubmissionModal(prev => ({ ...prev, open: false }))}
+          style={{ zIndex: 1100 }}
+        >
+          <div 
+            className="admin-modal" 
+            style={{ maxWidth: 980, width: '95vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: 16 }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="admin-modal-header" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(79, 70, 229, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5' }}>
+                  <FileText size={22} />
+                </div>
+                <div>
+                  <h3 className="admin-modal-title" style={{ fontSize: '1.2rem', margin: 0 }}>
+                    Candidate Submitted Answer Copy
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
+                    {submissionModal.data?.result ? (
+                      <>
+                        <strong>{submissionModal.data.result.student_name}</strong> (Roll: {submissionModal.data.result.roll_no || 'N/A'}) &bull; {submissionModal.data.result.exam_title}
+                      </>
+                    ) : 'Loading candidate examination copy...'}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {submissionModal.data?.result && (
+                  <>
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      icon={RotateCcw}
+                      loading={submissionModal.reevaluating}
+                      onClick={() => handleReevaluateSubmission(submissionModal.resultId)}
+                      title="Re-run automatic evaluation algorithms on candidate answers"
+                      style={{ color: '#4f46e5', borderColor: '#c7d2fe' }}
+                    >
+                      Re-evaluate Copy
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      icon={Printer}
+                      onClick={() => window.print()}
+                      title="Print Answer Sheet"
+                    >
+                      Print
+                    </Button>
+                  </>
+                )}
+                <button 
+                  onClick={() => setSubmissionModal(prev => ({ ...prev, open: false }))} 
+                  className="admin-modal-close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="admin-modal-content" style={{ padding: '24px 28px', overflowY: 'auto', flex: 1 }}>
+              {submissionModal.loading ? (
+                <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                  <div className="admin-loading-spinner" style={{ margin: '0 auto 16px', borderColor: '#4f46e5', borderTopColor: 'transparent', width: 36, height: 36 }}></div>
+                  <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Loading candidate answer sheet & evaluating marks...</p>
+                </div>
+              ) : !submissionModal.data ? (
+                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+                  <AlertCircle size={36} style={{ color: '#ef4444', margin: '0 auto 12px' }} />
+                  <p>Unable to load candidate submission copy.</p>
+                </div>
+              ) : (
+                (() => {
+                  const { result: subResult, questions = [] } = submissionModal.data;
+                  const totalEarned = subResult.marks_obtained !== undefined ? parseFloat(subResult.marks_obtained) : 0;
+                  const totalExam = parseFloat(subResult.exam_total_marks || subResult.total_marks) || 100;
+                  const percentage = parseFloat(subResult.percentage) || (totalExam > 0 ? (totalEarned / totalExam) * 100 : 0);
+
+                  const filteredQuestions = questions.filter(q => {
+                    if (submissionModal.activeTab === 'mcq') return q.type === 'mcq' || q.type === 'true_false';
+                    if (submissionModal.activeTab === 'coding') return q.type === 'coding';
+                    if (submissionModal.activeTab === 'subjective') return q.type !== 'mcq' && q.type !== 'true_false' && q.type !== 'coding';
+                    return true;
+                  });
+
+                  return (
+                    <div>
+                      {/* Summary Banner */}
+                      <div style={{ 
+                        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', 
+                        borderRadius: 14, 
+                        padding: '20px 24px', 
+                        color: '#ffffff',
+                        marginBottom: 24,
+                        boxShadow: '0 4px 16px rgba(15, 23, 42, 0.2)'
+                      }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
+                          {/* Student Details */}
+                          <div>
+                            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>
+                              Candidate Details
+                            </span>
+                            <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: 4, color: '#ffffff' }}>
+                              {subResult.student_name}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: 4 }}>
+                              Roll: <strong style={{ color: '#ffffff' }}>{subResult.roll_no || 'N/A'}</strong>
+                              {subResult.student_code && ` &bull; Code: ${subResult.student_code}`}
+                            </div>
+                            {subResult.email && (
+                              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 2 }}>
+                                {subResult.email}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Score and Percentage */}
+                          <div>
+                            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>
+                              Evaluation Score
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+                              <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#38bdf8' }}>
+                                {totalEarned.toFixed(2)}
+                              </span>
+                              <span style={{ fontSize: '0.95rem', color: '#94a3b8' }}>
+                                / {totalExam}
+                              </span>
+                              <span style={{ 
+                                marginLeft: 6,
+                                padding: '3px 8px', 
+                                borderRadius: 6, 
+                                fontSize: '0.75rem', 
+                                fontWeight: 700,
+                                background: subResult.status === 'pass' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                color: subResult.status === 'pass' ? '#4ade80' : '#f87171'
+                              }}>
+                                {(subResult.status || 'pending').toUpperCase()}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: 4 }}>
+                              Percentage: <strong>{percentage.toFixed(2)}%</strong> &bull; Grade: <strong style={{ color: '#fbbf24' }}>{subResult.grade || 'N/A'}</strong>
+                            </div>
+                          </div>
+
+                          {/* Proctoring & Integrity */}
+                          <div>
+                            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>
+                              Exam Telemetry & Proctoring
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: '0.85rem' }}>
+                              <Shield size={16} style={{ color: (subResult.session_violation_count || 0) > 0 ? '#f87171' : '#4ade80' }} />
+                              <span>Violations: <strong style={{ color: (subResult.session_violation_count || 0) > 0 ? '#f87171' : '#4ade80' }}>{subResult.session_violation_count || 0}</strong></span>
+                            </div>
+                            {subResult.is_auto_submitted && (
+                              <div style={{ marginTop: 4, display: 'inline-block', padding: '2px 8px', borderRadius: 4, background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', fontSize: '0.75rem', fontWeight: 600 }}>
+                                Auto-Submitted ({subResult.auto_submit_reason || 'Time limit / Violation'})
+                              </div>
+                            )}
+                            <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 4 }}>
+                              Submitted: {subResult.submitted_at ? new Date(subResult.submitted_at).toLocaleString() : 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Question Filter Tabs */}
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: 8, 
+                        borderBottom: '1px solid #e2e8f0', 
+                        marginBottom: 20, 
+                        paddingBottom: 8,
+                        flexWrap: 'wrap'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setSubmissionModal(prev => ({ ...prev, activeTab: 'all' }))}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: 8,
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            background: submissionModal.activeTab === 'all' ? '#4f46e5' : '#f1f5f9',
+                            color: submissionModal.activeTab === 'all' ? '#ffffff' : '#475569'
+                          }}
+                        >
+                          All Questions ({questions.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubmissionModal(prev => ({ ...prev, activeTab: 'mcq' }))}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: 8,
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            background: submissionModal.activeTab === 'mcq' ? '#4f46e5' : '#f1f5f9',
+                            color: submissionModal.activeTab === 'mcq' ? '#ffffff' : '#475569'
+                          }}
+                        >
+                          Objective / MCQ ({questions.filter(q => q.type === 'mcq' || q.type === 'true_false').length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubmissionModal(prev => ({ ...prev, activeTab: 'coding' }))}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: 8,
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            background: submissionModal.activeTab === 'coding' ? '#4f46e5' : '#f1f5f9',
+                            color: submissionModal.activeTab === 'coding' ? '#ffffff' : '#475569'
+                          }}
+                        >
+                          Coding ({questions.filter(q => q.type === 'coding').length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubmissionModal(prev => ({ ...prev, activeTab: 'subjective' }))}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: 8,
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            background: submissionModal.activeTab === 'subjective' ? '#4f46e5' : '#f1f5f9',
+                            color: submissionModal.activeTab === 'subjective' ? '#ffffff' : '#475569'
+                          }}
+                        >
+                          Subjective ({questions.filter(q => q.type !== 'mcq' && q.type !== 'true_false' && q.type !== 'coding').length})
+                        </button>
+                      </div>
+
+                      {/* Questions List */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                        {filteredQuestions.length === 0 ? (
+                          <div style={{ padding: '30px 16px', textAlign: 'center', color: '#64748b' }}>
+                            No questions found under this filter.
+                          </div>
+                        ) : (
+                          filteredQuestions.map((q, idx) => {
+                            const ans = q.answer || {};
+                            const hasAnswer = q.is_answered;
+                            const isCorrect = ans.is_correct === true;
+                            const isMCQ = q.type === 'mcq' || q.type === 'true_false';
+                            const isCoding = q.type === 'coding';
+                            const marksAwarded = ans.marks_obtained !== null && ans.marks_obtained !== undefined ? parseFloat(ans.marks_obtained) : 0;
+
+                            // Parse options if stored as string or array
+                            let optionsList = [];
+                            if (q.options) {
+                              if (Array.isArray(q.options)) {
+                                optionsList = q.options;
+                              } else if (typeof q.options === 'string') {
+                                try {
+                                  const parsed = JSON.parse(q.options);
+                                  if (Array.isArray(parsed)) optionsList = parsed;
+                                } catch (_) {
+                                  optionsList = [];
+                                }
+                              }
+                            }
+
+                            // Normalizing check for selected option vs correct option
+                            const selectedRaw = ans.selected_option !== null && ans.selected_option !== undefined ? String(ans.selected_option).trim() : null;
+                            const correctRaw = q.correct_answer !== null && q.correct_answer !== undefined ? String(q.correct_answer).trim() : null;
+
+                            return (
+                              <div 
+                                key={q.question_id || idx}
+                                style={{
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: 12,
+                                  background: '#ffffff',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                  overflow: 'hidden'
+                                }}
+                              >
+                                {/* Question Header */}
+                                <div style={{
+                                  padding: '12px 18px',
+                                  background: '#f8fafc',
+                                  borderBottom: '1px solid #e2e8f0',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  flexWrap: 'wrap',
+                                  gap: 10
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <span style={{ 
+                                      background: '#0f172a', 
+                                      color: '#ffffff', 
+                                      fontWeight: 800, 
+                                      fontSize: '0.85rem', 
+                                      padding: '2px 8px', 
+                                      borderRadius: 6 
+                                    }}>
+                                      Q{q.order_index || idx + 1}
+                                    </span>
+                                    <span style={{ 
+                                      fontSize: '0.75rem', 
+                                      fontWeight: 700, 
+                                      textTransform: 'uppercase', 
+                                      padding: '2px 8px', 
+                                      borderRadius: 6,
+                                      background: '#e0e7ff',
+                                      color: '#3730a3'
+                                    }}>
+                                      {q.type.replace('_', ' ')}
+                                    </span>
+                                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                                      Max: {q.marks} {q.marks === 1 ? 'mark' : 'marks'}
+                                    </span>
+                                    {q.difficulty && (
+                                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                        &bull; {q.difficulty}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Result Indicator Badge */}
+                                  <div>
+                                    {!hasAnswer ? (
+                                      <span style={{ 
+                                        padding: '4px 10px', 
+                                        borderRadius: 6, 
+                                        fontSize: '0.78rem', 
+                                        fontWeight: 700, 
+                                        background: '#f1f5f9', 
+                                        color: '#64748b',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4
+                                      }}>
+                                        <XCircle size={14} /> Not Answered (0 marks)
+                                      </span>
+                                    ) : isMCQ ? (
+                                      isCorrect ? (
+                                        <span style={{ 
+                                          padding: '4px 10px', 
+                                          borderRadius: 6, 
+                                          fontSize: '0.78rem', 
+                                          fontWeight: 700, 
+                                          background: 'rgba(34, 197, 94, 0.12)', 
+                                          color: '#15803d',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 4
+                                        }}>
+                                          <Check size={14} /> Correct (+{marksAwarded})
+                                        </span>
+                                      ) : (
+                                        <span style={{ 
+                                          padding: '4px 10px', 
+                                          borderRadius: 6, 
+                                          fontSize: '0.78rem', 
+                                          fontWeight: 700, 
+                                          background: 'rgba(239, 68, 68, 0.12)', 
+                                          color: '#b91c1c',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 4
+                                        }}>
+                                          <X size={14} /> Incorrect (0 marks)
+                                        </span>
+                                      )
+                                    ) : (
+                                      <span style={{ 
+                                        padding: '4px 10px', 
+                                        borderRadius: 6, 
+                                        fontSize: '0.78rem', 
+                                        fontWeight: 700, 
+                                        background: ans.is_evaluated ? 'rgba(10, 116, 218, 0.12)' : 'rgba(245, 158, 11, 0.12)', 
+                                        color: ans.is_evaluated ? '#0369a1' : '#b45309',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4
+                                      }}>
+                                        {ans.is_evaluated ? `Evaluated: ${marksAwarded} / ${q.marks}` : 'Manual Evaluation Required'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Question Statement */}
+                                <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                                  <div style={{ fontSize: '0.98rem', fontWeight: 600, color: '#1e293b', lineHeight: 1.5, whiteSpace: 'pre-line' }}>
+                                    {q.question_text}
+                                  </div>
+                                </div>
+
+                                {/* Submission Answer Body */}
+                                <div style={{ padding: '16px 20px', background: '#fafafa' }}>
+                                  {isMCQ ? (
+                                    <div>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 10 }}>
+                                        Options & Candidate Answer:
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {optionsList.map((opt, optIdx) => {
+                                          const optText = typeof opt === 'object' && opt !== null ? (opt.text || opt.label || '') : String(opt);
+                                          const optKey = typeof opt === 'object' && opt !== null && opt.id ? String(opt.id) : String.fromCharCode(97 + optIdx);
+                                          
+                                          // Check if candidate selected this option
+                                          const isCandidateChoice = selectedRaw && (
+                                            selectedRaw === optKey ||
+                                            selectedRaw.toLowerCase() === optKey.toLowerCase() ||
+                                            selectedRaw.trim().toLowerCase() === optText.trim().toLowerCase() ||
+                                            selectedRaw === String(optIdx)
+                                          );
+
+                                          // Check if this option is the correct answer
+                                          const isCorrectKey = correctRaw && (
+                                            correctRaw === optKey ||
+                                            correctRaw.toLowerCase() === optKey.toLowerCase() ||
+                                            correctRaw.trim().toLowerCase() === optText.trim().toLowerCase() ||
+                                            correctRaw === String(optIdx)
+                                          );
+
+                                          let itemBg = '#ffffff';
+                                          let itemBorder = '#e2e8f0';
+                                          let textColor = '#334155';
+
+                                          if (isCorrectKey) {
+                                            itemBg = 'rgba(34, 197, 94, 0.08)';
+                                            itemBorder = '#22c55e';
+                                            textColor = '#14532d';
+                                          } else if (isCandidateChoice && !isCorrectKey) {
+                                            itemBg = 'rgba(239, 68, 68, 0.08)';
+                                            itemBorder = '#ef4444';
+                                            textColor = '#7f1d1d';
+                                          }
+
+                                          return (
+                                            <div 
+                                              key={optIdx}
+                                              style={{
+                                                padding: '10px 14px',
+                                                borderRadius: 8,
+                                                border: `1.5px solid ${itemBorder}`,
+                                                background: itemBg,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                fontSize: '0.88rem'
+                                              }}
+                                            >
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: textColor }}>
+                                                <span style={{ 
+                                                  width: 24, 
+                                                  height: 24, 
+                                                  borderRadius: '50%', 
+                                                  background: isCandidateChoice ? (isCorrectKey ? '#22c55e' : '#ef4444') : '#e2e8f0',
+                                                  color: isCandidateChoice ? '#ffffff' : '#475569',
+                                                  display: 'flex', 
+                                                  alignItems: 'center', 
+                                                  justifyContent: 'center',
+                                                  fontSize: '0.75rem',
+                                                  fontWeight: 700 
+                                                }}>
+                                                  {String.fromCharCode(65 + optIdx)}
+                                                </span>
+                                                <span style={{ fontWeight: isCandidateChoice || isCorrectKey ? 700 : 500 }}>
+                                                  {optText}
+                                                </span>
+                                              </div>
+
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                {isCandidateChoice && (
+                                                  <span style={{ 
+                                                    padding: '2px 8px', 
+                                                    borderRadius: 4, 
+                                                    fontSize: '0.72rem', 
+                                                    fontWeight: 700, 
+                                                    background: isCorrectKey ? '#22c55e' : '#ef4444',
+                                                    color: '#ffffff'
+                                                  }}>
+                                                    Candidate's Choice
+                                                  </span>
+                                                )}
+                                                {isCorrectKey && (
+                                                  <span style={{ 
+                                                    padding: '2px 8px', 
+                                                    borderRadius: 4, 
+                                                    fontSize: '0.72rem', 
+                                                    fontWeight: 700, 
+                                                    background: '#15803d',
+                                                    color: '#ffffff'
+                                                  }}>
+                                                    Correct Key
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+
+                                      {!hasAnswer && (
+                                        <div style={{ marginTop: 10, fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                          Candidate skipped this question.
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : isCoding ? (
+                                    <div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                                          Candidate Code Submission:
+                                        </span>
+                                        {ans.selected_language && (
+                                          <span style={{ padding: '2px 8px', borderRadius: 4, background: '#0f172a', color: '#38bdf8', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                                            {ans.selected_language}
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      <div style={{ 
+                                        background: '#0f172a', 
+                                        borderRadius: 8, 
+                                        padding: '14px', 
+                                        color: '#e2e8f0', 
+                                        fontFamily: 'Consolas, Monaco, monospace', 
+                                        fontSize: '0.85rem',
+                                        maxHeight: 260,
+                                        overflowY: 'auto'
+                                      }}>
+                                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                                          {ans.code_submission || '// No code submitted by candidate'}
+                                        </pre>
+                                      </div>
+
+                                      {q.test_cases && (
+                                        <div style={{ marginTop: 12, padding: '10px 14px', background: '#f1f5f9', borderRadius: 8, fontSize: '0.82rem' }}>
+                                          <strong>Evaluation Test Cases:</strong>
+                                          <pre style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap', color: '#475569' }}>
+                                            {typeof q.test_cases === 'string' ? q.test_cases : JSON.stringify(q.test_cases, null, 2)}
+                                          </pre>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 8 }}>
+                                        Candidate Written Answer:
+                                      </div>
+                                      <div style={{ 
+                                        background: '#ffffff', 
+                                        border: '1px solid #e2e8f0', 
+                                        borderRadius: 8, 
+                                        padding: '14px', 
+                                        fontSize: '0.9rem',
+                                        lineHeight: 1.6,
+                                        color: ans.answer_text ? '#1e293b' : '#94a3b8',
+                                        fontStyle: ans.answer_text ? 'normal' : 'italic',
+                                        whiteSpace: 'pre-wrap'
+                                      }}>
+                                        {ans.answer_text || 'No written response submitted'}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Evaluator Marks & Remarks Adjustment Row */}
+                                  <div style={{ 
+                                    marginTop: 14, 
+                                    paddingTop: 12, 
+                                    borderTop: '1px solid #e2e8f0', 
+                                    display: 'flex', 
+                                    flexWrap: 'wrap', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between', 
+                                    gap: 12 
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
+                                          Award Marks:
+                                        </span>
+                                        <input 
+                                          type="number"
+                                          step="0.5"
+                                          min="0"
+                                          max={q.marks}
+                                          value={submissionModal.editingMarks[ans.id] !== undefined ? submissionModal.editingMarks[ans.id] : marksAwarded}
+                                          onChange={e => {
+                                            const val = e.target.value;
+                                            setSubmissionModal(prev => ({
+                                              ...prev,
+                                              editingMarks: { ...prev.editingMarks, [ans.id]: val }
+                                            }));
+                                          }}
+                                          disabled={!ans.id}
+                                          className="admin-form-input"
+                                          style={{ width: 80, padding: '4px 8px', fontSize: '0.88rem', fontWeight: 700, textAlign: 'center' }}
+                                        />
+                                        <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                                          / {q.marks}
+                                        </span>
+                                      </div>
+
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 260 }}>
+                                        <input 
+                                          type="text"
+                                          placeholder="Evaluator remarks / feedback..."
+                                          value={submissionModal.editingRemarks[ans.id] !== undefined ? submissionModal.editingRemarks[ans.id] : (ans.evaluator_remarks || '')}
+                                          onChange={e => {
+                                            const val = e.target.value;
+                                            setSubmissionModal(prev => ({
+                                              ...prev,
+                                              editingRemarks: { ...prev.editingRemarks, [ans.id]: val }
+                                            }));
+                                          }}
+                                          disabled={!ans.id}
+                                          className="admin-form-input"
+                                          style={{ padding: '4px 10px', fontSize: '0.82rem', flex: 1 }}
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {ans.id && (
+                                      <Button 
+                                        variant="secondary" 
+                                        size="sm" 
+                                        icon={Save}
+                                        loading={submissionModal.savingAnswerId === ans.id}
+                                        onClick={() => handleSaveManualAnswerMarks(ans.id, q.type)}
+                                      >
+                                        Update Marks
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ 
+              padding: '16px 28px', 
+              background: '#f8fafc', 
+              borderTop: '1px solid #e2e8f0', 
+              display: 'flex', 
+              justifyContent: 'flex-end',
+              flexShrink: 0
+            }}>
+              <Button 
+                variant="ghost" 
+                size="md" 
+                onClick={() => setSubmissionModal(prev => ({ ...prev, open: false }))}
+              >
+                Close Copy View
+              </Button>
+            </div>
           </div>
         </div>
       )}

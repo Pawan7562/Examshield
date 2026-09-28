@@ -4,6 +4,7 @@ const { supabase } = require('../config/supabase-clean');
 const { sendExamNotification, sendExamReminder } = require('../services/emailService');
 const { v4: uuidv4 } = require('uuid');
 const { parseToIST, toISTISOString, formatIST, getExamWindowStatus } = require('../utils/timezone');
+const { evaluateMCQAnswer, calculateGrade } = require('../utils/evaluation');
 
 /**
  * Generate unique exam code
@@ -1893,24 +1894,28 @@ exports.submitExam = async (req, res) => {
       }
 
       if (question.type === 'mcq' || question.type === 'true_false') {
-        const isCorrect = (answer.selected_option === question.correct_answer);
-        const marksObtained = isCorrect ? (question.marks || 1) : -Math.abs(question.negative_marks || 0);
-        mcqMarks += Math.max(0, marksObtained);
+        const isCorrect = evaluateMCQAnswer(answer.selected_option, question.correct_answer, question.options);
+        const qMarks = Number(question.marks) || 1;
+        const qNegative = Math.abs(Number(question.negative_marks) || 0);
+        const marksObtained = isCorrect ? qMarks : -qNegative;
+        const finalMarks = Math.max(0, marksObtained);
+        mcqMarks += finalMarks;
 
         try {
           await supabase
             .from('answers')
             .update({
               is_correct: isCorrect,
-              marks_obtained: Math.max(0, marksObtained),
-              is_evaluated: true
+              marks_obtained: finalMarks,
+              is_evaluated: true,
+              updated_at: new Date().toISOString()
             })
             .eq('id', answer.id);
         } catch (updateErr) {
           console.warn(`⚠️ [SUBMIT-EXAM] Could not save evaluation for answer ${answer.id}:`, updateErr.message);
         }
       } else if (question.type === 'coding') {
-        const maxQMarks = question.marks || 10;
+        const maxQMarks = Number(question.marks) || 10;
         let earnedQMarks = 0;
 
         if (answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
@@ -1926,8 +1931,10 @@ exports.submitExam = async (req, res) => {
           await supabase
             .from('answers')
             .update({
+              is_correct: earnedQMarks > 0,
               marks_obtained: earnedQMarks,
-              is_evaluated: true
+              is_evaluated: true,
+              updated_at: new Date().toISOString()
             })
             .eq('id', answer.id);
         } catch (updateErr) {
@@ -1947,18 +1954,23 @@ exports.submitExam = async (req, res) => {
       .eq('id', id)
       .maybeSingle();
 
-    const totalPossibleMarks = examData?.total_marks || (questions || []).reduce((sum, q) => sum + (q.marks || 1), 0);
-    const passingMarks = examData?.passing_marks || 40;
-    const totalEarnedMarks = mcqMarks + codingMarks + subjectiveMarks;
+    const totalPossibleMarks = examData?.total_marks || (questions || []).reduce((sum, q) => sum + (Number(q.marks) || 1), 0);
+    const configuredPassing = Number(examData?.passing_marks);
+    const passThresholdMarks = (configuredPassing && configuredPassing <= totalPossibleMarks)
+      ? configuredPassing
+      : Math.max(1, Math.round(totalPossibleMarks * 0.4));
 
-    const hasSubjective = (questions || []).some(q => q.type === 'subjective');
-    const finalStatus = (totalEarnedMarks >= passingMarks) ? 'pass' : 'fail';
-    const resultStatus = hasSubjective ? 'pending' : finalStatus;
-
+    const totalEarnedMarks = Math.round((mcqMarks + codingMarks + subjectiveMarks) * 100) / 100;
     const percentage = totalPossibleMarks > 0 ? (totalEarnedMarks / totalPossibleMarks) * 100 : 0;
     const roundedPct = Math.round(percentage * 100) / 100;
+    const computedGrade = calculateGrade(roundedPct);
 
-    console.log('📊 [SUBMIT-EXAM] Marking complete:', { totalEarnedMarks, mcqMarks, codingMarks, totalPossibleMarks, resultStatus, percentage: roundedPct });
+    const hasSubjective = (questions || []).some(q => q.type === 'subjective');
+    const isPassed = (totalEarnedMarks >= passThresholdMarks) || (roundedPct >= 40);
+    const finalStatus = isPassed ? 'pass' : 'fail';
+    const resultStatus = hasSubjective ? 'pending' : finalStatus;
+
+    console.log('📊 [SUBMIT-EXAM] Marking complete:', { totalEarnedMarks, mcqMarks, codingMarks, subjectiveMarks, totalPossibleMarks, passThresholdMarks, resultStatus, percentage: roundedPct, grade: computedGrade });
 
     // 6. Update Session Status to 'submitted'
     const submissionTime = new Date().toISOString();
@@ -1988,6 +2000,7 @@ exports.submitExam = async (req, res) => {
           total_marks: totalPossibleMarks,
           marks_obtained: totalEarnedMarks,
           percentage: roundedPct,
+          grade: computedGrade,
           status: resultStatus,
           submitted_at: submissionTime,
           updated_at: submissionTime

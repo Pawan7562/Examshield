@@ -108,8 +108,11 @@ admin.post('/exams/:id/terminate-student', liveMonitoringController.terminateStu
 admin.post('/exams/:id/broadcast', liveMonitoringController.broadcastAnnouncement);
 admin.get('/exams/:id/student-activity/:studentId', liveMonitoringController.getStudentActivity);
 
-// Results management
+// Results management & Answer Sheet inspection
 admin.get('/results', resultController.getResults);
+admin.get('/results/:id/submission', resultController.getAdminStudentSubmission);
+admin.post('/results/:id/re-evaluate', resultController.reevaluateResult);
+admin.post('/results/re-evaluate/:examId', resultController.reevaluateExam);
 admin.put('/results/:id', resultController.updateResult);
 admin.post('/results/:id/evaluate', resultController.evaluateResult);
 admin.post('/results/exam/:examId/publish', resultController.publishResults);

@@ -1,6 +1,7 @@
 // controllers/resultController.js
 const { query, pool } = require('../config/database');
 const { sendResultNotification } = require('../services/emailService');
+const { evaluateMCQAnswer, calculateGrade } = require('../utils/evaluation');
 
 /**
  * GET /api/admin/results
@@ -331,3 +332,371 @@ exports.getStudentResultByKey = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch result by key', error: error.message });
   }
 };
+
+/**
+ * GET /api/admin/results/:id/submission
+ * Full submitted copy / answer sheet for a student result (accessible to college admin)
+ */
+exports.getAdminStudentSubmission = async (req, res) => {
+  try {
+    const { id } = req.params; // result id
+    const collegeId = req.user.id;
+
+    // Fetch result and verify it belongs to this college's exam
+    const resultRes = await query(
+      `SELECT r.*, 
+              s.name as student_name, s.email, s.student_id as student_code, s.roll_no, s.department, s.batch,
+              COALESCE(e.title, e.name, 'Examination') as exam_title, e.type as exam_type, e.subject as exam_subject,
+              COALESCE(NULLIF(r.total_marks, 0), e.total_marks, 100) as exam_total_marks,
+              e.passing_marks as exam_passing_marks, e.duration as exam_duration,
+              e.date_time as exam_date,
+              es.started_at as session_started_at, es.submitted_at as session_submitted_at,
+              es.violation_count as session_violation_count, es.is_auto_submitted, es.auto_submit_reason,
+              es.ip_address as session_ip, es.browser_info as session_browser
+       FROM results r
+       JOIN exams e ON r.exam_id = e.id
+       JOIN students s ON r.student_id = s.id
+       LEFT JOIN exam_sessions es ON r.session_id = es.id
+       WHERE r.id = $1 AND e.college_id = $2`,
+      [id, collegeId]
+    );
+
+    if (resultRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Result not found or unauthorized' });
+    }
+
+    const row = resultRes.rows[0];
+    const examId = row.exam_id;
+    const studentId = row.student_id;
+
+    // Fetch all questions for this exam with student's answers (LEFT JOIN answers)
+    const questionsRes = await query(
+      `SELECT 
+         q.id as question_id,
+         q.question_text,
+         q.type as question_type,
+         q.options,
+         q.correct_answer,
+         q.marks as question_marks,
+         q.negative_marks,
+         q.difficulty,
+         q.order_index,
+         q.code_template,
+         q.test_cases,
+         a.id as answer_id,
+         a.selected_option,
+         a.answer_text,
+         a.code_submission,
+         a.selected_language,
+         a.marks_obtained as answer_marks_obtained,
+         a.is_correct as answer_is_correct,
+         a.is_evaluated as answer_is_evaluated,
+         a.evaluator_remarks,
+         a.submitted_at as answer_submitted_at,
+         a.updated_at as answer_updated_at
+       FROM questions q
+       LEFT JOIN answers a ON q.id = a.question_id AND a.student_id = $1 AND a.exam_id = $2
+       WHERE q.exam_id = $2
+       ORDER BY q.order_index ASC, q.created_at ASC`,
+      [studentId, examId]
+    );
+
+    // Build structured response
+    const questions = questionsRes.rows.map((q, idx) => {
+      let isAnswered = false;
+      if (q.question_type === 'mcq' || q.question_type === 'true_false') {
+        isAnswered = q.selected_option !== null && q.selected_option !== undefined && String(q.selected_option).trim() !== '';
+      } else if (q.question_type === 'coding') {
+        isAnswered = q.code_submission !== null && q.code_submission !== undefined && String(q.code_submission).trim() !== '';
+      } else {
+        isAnswered = q.answer_text !== null && q.answer_text !== undefined && String(q.answer_text).trim() !== '';
+      }
+
+      return {
+        question_id: q.question_id,
+        order_index: q.order_index !== null ? q.order_index : idx + 1,
+        question_text: q.question_text,
+        type: q.question_type,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        marks: Number(q.question_marks) || 1,
+        negative_marks: Number(q.negative_marks) || 0,
+        difficulty: q.difficulty,
+        code_template: q.code_template,
+        test_cases: q.test_cases,
+        is_answered: isAnswered,
+        answer: {
+          id: q.answer_id,
+          selected_option: q.selected_option,
+          answer_text: q.answer_text,
+          code_submission: q.code_submission,
+          selected_language: q.selected_language,
+          marks_obtained: q.answer_marks_obtained !== null ? Number(q.answer_marks_obtained) : null,
+          is_correct: q.answer_is_correct,
+          is_evaluated: q.answer_is_evaluated,
+          evaluator_remarks: q.evaluator_remarks,
+          submitted_at: q.answer_submitted_at || q.answer_updated_at
+        }
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        result: {
+          id: row.id,
+          marks_obtained: Number(row.marks_obtained) || 0,
+          total_marks: Number(row.total_marks) || Number(row.exam_total_marks) || 100,
+          percentage: Number(row.percentage) || 0,
+          grade: row.grade,
+          status: row.status,
+          mcq_marks: Number(row.mcq_marks) || 0,
+          coding_marks: Number(row.coding_marks) || 0,
+          subjective_marks: Number(row.subjective_marks) || 0,
+          is_published: row.is_published,
+          submitted_at: row.submitted_at || row.created_at,
+          created_at: row.created_at,
+          updated_at: row.updated_at
+        },
+        student: {
+          id: row.student_id,
+          name: row.student_name,
+          email: row.email,
+          student_id: row.student_code,
+          roll_no: row.roll_no,
+          department: row.department,
+          batch: row.batch
+        },
+        exam: {
+          id: row.exam_id,
+          title: row.exam_title,
+          type: row.exam_type,
+          subject: row.exam_subject,
+          total_marks: Number(row.exam_total_marks) || 100,
+          passing_marks: Number(row.exam_passing_marks) || 40,
+          duration: row.exam_duration,
+          date_time: row.exam_date
+        },
+        session: {
+          id: row.session_id,
+          started_at: row.session_started_at,
+          submitted_at: row.session_submitted_at,
+          violation_count: row.session_violation_count || 0,
+          is_auto_submitted: row.is_auto_submitted,
+          auto_submit_reason: row.auto_submit_reason,
+          ip_address: row.session_ip,
+          browser_info: row.session_browser
+        },
+        questions
+      }
+    });
+  } catch (error) {
+    console.error('getAdminStudentSubmission error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch student submission', error: error.message });
+  }
+};
+
+/**
+ * POST /api/admin/results/:id/re-evaluate
+ * Auto re-grades a submission using the intelligent evaluation engine
+ */
+exports.reevaluateResult = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const collegeId = req.user.id;
+
+    const resCheck = await query(
+      `SELECT r.*, e.total_marks as exam_total, e.passing_marks as exam_passing
+       FROM results r
+       JOIN exams e ON r.exam_id = e.id
+       WHERE r.id = $1 AND e.college_id = $2`,
+      [id, collegeId]
+    );
+
+    if (resCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Result not found or unauthorized' });
+    }
+
+    const { student_id, exam_id } = resCheck.rows[0];
+
+    // Fetch questions and answers
+    const questionsRes = await query('SELECT * FROM questions WHERE exam_id = $1', [exam_id]);
+    const answersRes = await query('SELECT * FROM answers WHERE exam_id = $1 AND student_id = $2', [exam_id, student_id]);
+
+    const questionMap = new Map(questionsRes.rows.map(q => [q.id, q]));
+    let mcqMarks = 0;
+    let codingMarks = 0;
+    let subjectiveMarks = 0;
+
+    for (const ans of answersRes.rows) {
+      const q = questionMap.get(ans.question_id);
+      if (!q) continue;
+
+      if (q.type === 'mcq' || q.type === 'true_false') {
+        const isCor = evaluateMCQAnswer(ans.selected_option, q.correct_answer, q.options);
+        const marks = isCor ? (Number(q.marks) || 1) : -Math.abs(Number(q.negative_marks) || 0);
+        const finalQMarks = Math.max(0, marks);
+        mcqMarks += finalQMarks;
+
+        await query(
+          'UPDATE answers SET is_correct = $1, marks_obtained = $2, is_evaluated = true, updated_at = NOW() WHERE id = $3',
+          [isCor, finalQMarks, ans.id]
+        );
+      } else if (q.type === 'coding') {
+        const maxM = Number(q.marks) || 10;
+        let earned = 0;
+        if (ans.marks_obtained !== null && ans.marks_obtained !== undefined) {
+          earned = Number(ans.marks_obtained);
+        } else if (ans.code_submission && ans.code_submission.trim().length > 10) {
+          earned = maxM;
+        }
+        codingMarks += earned;
+        await query(
+          'UPDATE answers SET is_correct = $1, marks_obtained = $2, is_evaluated = true, updated_at = NOW() WHERE id = $3',
+          [earned > 0, earned, ans.id]
+        );
+      } else if (q.type === 'subjective') {
+        if (ans.marks_obtained !== null && ans.marks_obtained !== undefined) {
+          subjectiveMarks += Number(ans.marks_obtained);
+        }
+      }
+    }
+
+    const totalPossible = Number(resCheck.rows[0].exam_total) || questionsRes.rows.reduce((sum, q) => sum + (Number(q.marks) || 1), 0);
+    const configuredPassing = Number(resCheck.rows[0].exam_passing);
+    const passThreshold = (configuredPassing && configuredPassing <= totalPossible)
+      ? configuredPassing
+      : Math.max(1, Math.round(totalPossible * 0.4));
+
+    const totalObtained = Math.round((mcqMarks + codingMarks + subjectiveMarks) * 100) / 100;
+    const pct = totalPossible > 0 ? Math.round((totalObtained / totalPossible) * 100 * 100) / 100 : 0;
+    const grade = calculateGrade(pct);
+    const hasSubjective = questionsRes.rows.some(q => q.type === 'subjective');
+    const isPassed = (totalObtained >= passThreshold) || (pct >= 40);
+    const status = isPassed ? 'pass' : (hasSubjective ? 'pending' : 'fail');
+
+    await query(
+      `UPDATE results 
+       SET marks_obtained = $1, mcq_marks = $2, coding_marks = $3, subjective_marks = $4,
+           total_marks = $5, percentage = $6, grade = $7, status = $8, evaluated_at = NOW(), updated_at = NOW()
+       WHERE id = $9`,
+      [totalObtained, mcqMarks, codingMarks, subjectiveMarks, totalPossible, pct, grade, status, id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Result successfully re-evaluated with updated auto-marking.',
+      data: { 
+        marks_obtained: totalObtained, 
+        total_marks: totalPossible, 
+        percentage: pct, 
+        grade, 
+        status, 
+        mcq_marks: mcqMarks, 
+        coding_marks: codingMarks, 
+        subjective_marks: subjectiveMarks 
+      }
+    });
+  } catch (error) {
+    console.error('reevaluateResult error:', error);
+    res.status(500).json({ success: false, message: 'Failed to re-evaluate result', error: error.message });
+  }
+};
+
+/**
+ * POST /api/admin/results/re-evaluate/:examId
+ * Batch re-evaluate all students in an exam
+ */
+exports.reevaluateExam = async (req, res) => {
+  try {
+    const { examId } = req.params;
+    const collegeId = req.user.id;
+
+    const examRes = await query('SELECT * FROM exams WHERE id = $1 AND college_id = $2', [examId, collegeId]);
+    if (examRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Exam not found or unauthorized' });
+    }
+
+    const resultsRes = await query('SELECT id FROM results WHERE exam_id = $1', [examId]);
+    let evaluatedCount = 0;
+
+    for (const r of resultsRes.rows) {
+      // Re-evaluate each result
+      const questionsRes = await query('SELECT * FROM questions WHERE exam_id = $1', [examId]);
+      const resCheck = await query('SELECT student_id FROM results WHERE id = $1', [r.id]);
+      const studentId = resCheck.rows[0].student_id;
+      const answersRes = await query('SELECT * FROM answers WHERE exam_id = $1 AND student_id = $2', [examId, studentId]);
+
+      const questionMap = new Map(questionsRes.rows.map(q => [q.id, q]));
+      let mcqMarks = 0;
+      let codingMarks = 0;
+      let subjectiveMarks = 0;
+
+      for (const ans of answersRes.rows) {
+        const q = questionMap.get(ans.question_id);
+        if (!q) continue;
+
+        if (q.type === 'mcq' || q.type === 'true_false') {
+          const isCor = evaluateMCQAnswer(ans.selected_option, q.correct_answer, q.options);
+          const marks = isCor ? (Number(q.marks) || 1) : -Math.abs(Number(q.negative_marks) || 0);
+          const finalQMarks = Math.max(0, marks);
+          mcqMarks += finalQMarks;
+
+          await query(
+            'UPDATE answers SET is_correct = $1, marks_obtained = $2, is_evaluated = true, updated_at = NOW() WHERE id = $3',
+            [isCor, finalQMarks, ans.id]
+          );
+        } else if (q.type === 'coding') {
+          const maxM = Number(q.marks) || 10;
+          let earned = 0;
+          if (ans.marks_obtained !== null && ans.marks_obtained !== undefined) {
+            earned = Number(ans.marks_obtained);
+          } else if (ans.code_submission && ans.code_submission.trim().length > 10) {
+            earned = maxM;
+          }
+          codingMarks += earned;
+          await query(
+            'UPDATE answers SET is_correct = $1, marks_obtained = $2, is_evaluated = true, updated_at = NOW() WHERE id = $3',
+            [earned > 0, earned, ans.id]
+          );
+        } else if (q.type === 'subjective') {
+          if (ans.marks_obtained !== null && ans.marks_obtained !== undefined) {
+            subjectiveMarks += Number(ans.marks_obtained);
+          }
+        }
+      }
+
+      const totalPossible = Number(examRes.rows[0].total_marks) || questionsRes.rows.reduce((sum, q) => sum + (Number(q.marks) || 1), 0);
+      const configuredPassing = Number(examRes.rows[0].passing_marks);
+      const passThreshold = (configuredPassing && configuredPassing <= totalPossible)
+        ? configuredPassing
+        : Math.max(1, Math.round(totalPossible * 0.4));
+
+      const totalObtained = Math.round((mcqMarks + codingMarks + subjectiveMarks) * 100) / 100;
+      const pct = totalPossible > 0 ? Math.round((totalObtained / totalPossible) * 100 * 100) / 100 : 0;
+      const grade = calculateGrade(pct);
+      const hasSubjective = questionsRes.rows.some(q => q.type === 'subjective');
+      const isPassed = (totalObtained >= passThreshold) || (pct >= 40);
+      const status = isPassed ? 'pass' : (hasSubjective ? 'pending' : 'fail');
+
+      await query(
+        `UPDATE results 
+         SET marks_obtained = $1, mcq_marks = $2, coding_marks = $3, subjective_marks = $4,
+             total_marks = $5, percentage = $6, grade = $7, status = $8, evaluated_at = NOW(), updated_at = NOW()
+         WHERE id = $9`,
+        [totalObtained, mcqMarks, codingMarks, subjectiveMarks, totalPossible, pct, grade, status, r.id]
+      );
+
+      evaluatedCount++;
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully re-evaluated ${evaluatedCount} submissions for this exam.`
+    });
+  } catch (error) {
+    console.error('reevaluateExam error:', error);
+    res.status(500).json({ success: false, message: 'Failed to batch re-evaluate exam', error: error.message });
+  }
+};
+

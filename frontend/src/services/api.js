@@ -246,6 +246,9 @@ export const adminAPI = {
   getStudentActivity: (examId, studentId) => api.get(`/admin/exams/${examId}/student-activity/${studentId}`),
 
   getResults: (params) => api.get('/admin/results', { params }),
+  getSubmission: (id) => api.get(`/admin/results/${id}/submission`),
+  reevaluateResult: (id) => api.post(`/admin/results/${id}/re-evaluate`),
+  reevaluateExam: (examId) => api.post(`/admin/results/re-evaluate/${examId}`),
   updateResult: (id, data) => api.put(`/admin/results/${id}`, data),
   evaluateResult: (id, data) => api.post(`/admin/results/${id}/evaluate`, data),
   publishResults: (examId) => api.post(`/admin/results/exam/${examId}/publish`),
