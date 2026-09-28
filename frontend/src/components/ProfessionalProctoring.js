@@ -1,10 +1,11 @@
 // ProfessionalProctoring.js — Production-Grade AI Face Detection & Voice Proctoring
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
 import toast from 'react-hot-toast';
 import { studentAPI } from '../services/api';
 import {
   Camera,
+  CameraOff,
   Mic,
   MicOff,
   Shield,
@@ -81,7 +82,16 @@ const ProfessionalProctoring = ({
   mode = 'docked', // 'docked' | 'pip'
   pipCorner = 'bottom-left', // 'bottom-left' | 'top-left' | 'top-right' | 'bottom-right'
   socket = null,
+  monitoringConfig = null,
 }) => {
+  const monConfig = useMemo(() => ({
+    face_detection: monitoringConfig?.face_detection !== false,
+    voice_detection: monitoringConfig?.voice_detection !== false,
+    tab_switch: monitoringConfig?.tab_switch !== false,
+    fullscreen: monitoringConfig?.fullscreen !== false,
+    device_camera: monitoringConfig?.device_camera !== false,
+    is_proctored: monitoringConfig?.is_proctored !== false,
+  }), [monitoringConfig]);
   const [cameraStatus, setCameraStatus] = useState('initializing'); // initializing | requesting | active | denied | error
   const [micStatus, setMicStatus] = useState('initializing');       // initializing | requesting | active | denied | unavailable
   const [faceCount, setFaceCount] = useState(-1);                 // -1 = detecting not started yet
@@ -167,8 +177,19 @@ const ProfessionalProctoring = ({
 
   // ─── Throttled Violation Reporter ──────────────────────────────────────────
   const reportViolation = useCallback(async (type, description) => {
+    // If the college admin disabled this feature for this exam, ignore completely
+    if (
+      (type === 'speech_detected' && !monConfig.voice_detection) ||
+      ((type === 'multiple_faces' || type === 'no_face_detected') && !monConfig.face_detection) ||
+      ((type === 'tab_switch' || type === 'window_blur') && !monConfig.tab_switch) ||
+      (type === 'fullscreen_exit' && !monConfig.fullscreen) ||
+      (type === 'camera_off' && !monConfig.device_camera)
+    ) {
+      return;
+    }
+
     const now = Date.now();
-    const COOLDOWN = 8000; // 8 second cooldown per violation type
+    const COOLDOWN = type === 'speech_detected' ? 25000 : 8000; // 25s cooldown for audio, 8s for camera/tab
 
     if (
       lastViolationTimeRef.current[type] &&
@@ -219,10 +240,11 @@ const ProfessionalProctoring = ({
     } catch (err) {
       console.warn('[Proctoring] Backend violation report failed:', err.message);
     }
-  }, []);
+  }, [monConfig]);
 
   // ─── Load Models ────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!monConfig.face_detection || !monConfig.device_camera) return;
     if (modelsLoadedGlobal) {
       setModelsLoaded(true);
       return;
@@ -233,46 +255,66 @@ const ProfessionalProctoring = ({
         console.warn('[Proctoring] AI model unavailable — camera-only monitoring active');
       }
     });
-  }, []);
+  }, [monConfig.face_detection, monConfig.device_camera]);
 
   // ─── Camera & Microphone Initialization ─────────────────────────────────────
   useEffect(() => {
     let mounted = true;
 
     const initDevices = async () => {
+      if (!monConfig.is_proctored || (!monConfig.device_camera && !monConfig.voice_detection)) {
+        setCameraStatus('disabled');
+        setMicStatus('disabled');
+        return;
+      }
+
       try {
-        setCameraStatus('requesting');
-        setMicStatus('requesting');
+        if (monConfig.device_camera) setCameraStatus('requesting');
+        else setCameraStatus('disabled');
+
+        if (monConfig.voice_detection) setMicStatus('requesting');
+        else setMicStatus('disabled');
 
         let stream;
         try {
-          // Request camera AND microphone simultaneously
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
+          const constraints = {};
+          if (monConfig.device_camera) {
+            constraints.video = {
               width: { ideal: 320 },
               height: { ideal: 240 },
               facingMode: 'user',
               frameRate: { ideal: 15 },
-            },
-            audio: {
+            };
+          }
+          if (monConfig.voice_detection) {
+            constraints.audio = {
               echoCancellation: true,
               noiseSuppression: false, // We want raw room noise to detect voice
               autoGainControl: true,
-            }
-          });
-          setMicStatus('active');
+            };
+          }
+
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (monConfig.voice_detection && stream.getAudioTracks().length > 0) {
+            setMicStatus('active');
+          } else if (!monConfig.voice_detection) {
+            setMicStatus('disabled');
+          }
         } catch (mediaErr) {
-          console.warn('[Proctoring] Combined Audio+Video failed, falling back to Video only:', mediaErr);
-          // Fallback to video only
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: { ideal: 320 },
-              height: { ideal: 240 },
-              facingMode: 'user',
-              frameRate: { ideal: 15 },
-            },
-          });
-          setMicStatus('unavailable');
+          console.warn('[Proctoring] Combined media request failed, attempting fallback:', mediaErr);
+          if (monConfig.device_camera) {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: 320 },
+                height: { ideal: 240 },
+                facingMode: 'user',
+                frameRate: { ideal: 15 },
+              },
+            });
+            setMicStatus(monConfig.voice_detection ? 'unavailable' : 'disabled');
+          } else {
+            throw mediaErr;
+          }
         }
 
         if (!mounted) {
@@ -283,13 +325,13 @@ const ProfessionalProctoring = ({
         streamRef.current = stream;
 
         // Attach video stream
-        if (videoRef.current) {
+        if (videoRef.current && monConfig.device_camera) {
           videoRef.current.srcObject = stream;
         }
 
-        // Setup Web Audio Analyser if microphone tracks are present
+        // Setup Web Audio Analyser if microphone tracks are present and voice detection enabled
         const audioTracks = stream.getAudioTracks();
-        if (audioTracks.length > 0) {
+        if (monConfig.voice_detection && audioTracks.length > 0) {
           try {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (AudioCtx) {
@@ -321,10 +363,10 @@ const ProfessionalProctoring = ({
                 const normalized = Math.min(100, Math.round((avg / 128) * 100));
                 setAudioLevel(normalized);
 
-                // Detect sustained speech/voice: volume > 35% for > 10 consecutive frames (~1 second)
-                if (normalized > 35) {
+                // Detect sustained speech/voice: volume > 58% for > 25 consecutive frames (~0.4s sustained voice)
+                if (normalized > 58) {
                   speakingFramesRef.current += 1;
-                  if (speakingFramesRef.current >= 10) {
+                  if (speakingFramesRef.current >= 25) {
                     setVoiceAlert(true);
                     reportViolation('speech_detected', `Voice/speech detected (Audio Level: ${normalized}%)`);
                     speakingFramesRef.current = 0;
@@ -350,15 +392,17 @@ const ProfessionalProctoring = ({
         setCameraStatus(err.name === 'NotAllowedError' ? 'denied' : 'error');
         setMicStatus('denied');
 
-        if (err.name === 'NotAllowedError') {
-          notify.error('Camera/Microphone permission denied — this exam requires proctoring permissions');
-          reportViolation('camera_off', 'Student denied camera/microphone permission');
-        } else if (err.name === 'NotFoundError') {
-          notify.error('No webcam found — please connect a camera device');
-          reportViolation('camera_off', 'No camera device found on this system');
-        } else {
-          notify.error('Camera initialization error — please check device permissions');
-          reportViolation('camera_off', `Camera error: ${err.message}`);
+        if (monConfig.device_camera) {
+          if (err.name === 'NotAllowedError') {
+            notify.error('Camera/Microphone permission denied — this exam requires proctoring permissions');
+            reportViolation('camera_off', 'Student denied camera/microphone permission');
+          } else if (err.name === 'NotFoundError') {
+            notify.error('No webcam found — please connect a camera device');
+            reportViolation('camera_off', 'No camera device found on this system');
+          } else {
+            notify.error('Camera initialization error — please check device permissions');
+            reportViolation('camera_off', `Camera error: ${err.message}`);
+          }
         }
       }
     };
@@ -376,7 +420,7 @@ const ProfessionalProctoring = ({
         streamRef.current = null;
       }
     };
-  }, [reportViolation]);
+  }, [monConfig, reportViolation]);
 
   // ─── Video onLoadedData → set active ───────────────────────────────────────
   const handleVideoReady = useCallback(() => {
@@ -387,7 +431,7 @@ const ProfessionalProctoring = ({
 
   // ─── Face Detection Loop ────────────────────────────────────────────────────
   useEffect(() => {
-    if (!modelsLoaded || cameraStatus !== 'active') return;
+    if (!monConfig.face_detection || !monConfig.device_camera || !modelsLoaded || cameraStatus !== 'active') return;
 
     const detect = async () => {
       const video = videoRef.current;
@@ -773,128 +817,156 @@ const ProfessionalProctoring = ({
       )}
 
       {/* Camera Preview */}
-      <div style={{
-        position: 'relative',
-        width: '100%',
-        aspectRatio: '4/3',
-        borderRadius: 10,
-        overflow: 'hidden',
-        background: '#0a0f1d',
-        border: `2px solid ${borderColor}`,
-        transition: 'border-color 0.4s ease',
-        marginBottom: 10,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-      }}>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          onLoadedData={handleVideoReady}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            transform: 'scaleX(-1)',
-            display: 'block',
-          }}
-        />
-        <canvas
-          ref={canvasRef}
-          style={{
-            position: 'absolute', top: 0, left: 0,
-            width: '100%', height: '100%',
-            transform: 'scaleX(-1)',
-            pointerEvents: 'none',
-          }}
-        />
-
-        {/* REC / LIVE badge */}
+      {!monConfig.device_camera ? (
         <div style={{
-          position: 'absolute', top: 6, left: 6,
-          background: cameraStatus === 'active' ? 'rgba(34,197,94,0.92)' : 'rgba(239,68,68,0.92)',
-          padding: '2px 7px', borderRadius: 5,
-          fontSize: 9, fontWeight: 800, color: '#fff',
-          letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4,
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '4/3',
+          borderRadius: 10,
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #0b1329, #1e293b)',
+          border: '1.5px dashed #475569',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          marginBottom: 10,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          padding: 12
         }}>
-          <div style={{
-            width: 5, height: 5, borderRadius: '50%',
-            background: '#fff',
-            animation: cameraStatus === 'active' ? 'er-pulse 1.5s infinite' : 'none',
-          }} />
-          {cameraStatus === 'active' ? 'LIVE' : 'OFF'}
+          <CameraOff size={26} color="#94a3b8" />
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', textAlign: 'center' }}>
+            Camera Stream Disabled
+          </div>
+          <div style={{ fontSize: 9, color: '#94a3b8', textAlign: 'center' }}>
+            Not monitored for this exam
+          </div>
         </div>
+      ) : (
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '4/3',
+          borderRadius: 10,
+          overflow: 'hidden',
+          background: '#0a0f1d',
+          border: `2px solid ${borderColor}`,
+          transition: 'border-color 0.4s ease',
+          marginBottom: 10,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+        }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            onLoadedData={handleVideoReady}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transform: 'scaleX(-1)',
+              display: 'block',
+            }}
+          />
+          <canvas
+            ref={canvasRef}
+            style={{
+              position: 'absolute', top: 0, left: 0,
+              width: '100%', height: '100%',
+              transform: 'scaleX(-1)',
+              pointerEvents: 'none',
+            }}
+          />
 
-        {/* Face count badge */}
-        {cameraStatus === 'active' && faceCount >= 0 && (
+          {/* REC / LIVE badge */}
           <div style={{
-            position: 'absolute', top: 6, right: 6,
-            background: faceColor + 'dd',
+            position: 'absolute', top: 6, left: 6,
+            background: cameraStatus === 'active' ? 'rgba(34,197,94,0.92)' : 'rgba(239,68,68,0.92)',
             padding: '2px 7px', borderRadius: 5,
             fontSize: 9, fontWeight: 800, color: '#fff',
+            letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            {faceCount === 1 ? '1 FACE' : faceCount > 1 ? `${faceCount} FACES` : 'NO FACE'}
+            <div style={{
+              width: 5, height: 5, borderRadius: '50%',
+              background: '#fff',
+              animation: cameraStatus === 'active' ? 'er-pulse 1.5s infinite' : 'none',
+            }} />
+            {cameraStatus === 'active' ? 'LIVE' : 'OFF'}
           </div>
-        )}
 
-        {/* Multiple faces alert */}
-        {faceCount > 1 && (
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            background: 'rgba(239,68,68,0.95)',
-            padding: '4px 6px', textAlign: 'center',
-            fontSize: 9, fontWeight: 800, color: '#fff',
-            letterSpacing: '0.5px',
-          }}>
-            🚨 MULTIPLE PERSONS DETECTED
-          </div>
-        )}
-
-        {/* No face warning */}
-        {faceCount === 0 && noFaceCount >= 4 && (
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            background: 'rgba(245,158,11,0.95)',
-            padding: '4px 6px', textAlign: 'center',
-            fontSize: 9, fontWeight: 800, color: '#fff',
-          }}>
-            ⚠️ FACE THE CAMERA
-          </div>
-        )}
-
-        {/* Voice detected alert */}
-        {voiceAlert && (
-          <div style={{
-            position: 'absolute', top: 30, left: 6, right: 6,
-            background: 'rgba(239,68,68,0.92)',
-            padding: '4px 8px', borderRadius: 6, textAlign: 'center',
-            fontSize: 9, fontWeight: 800, color: '#fff',
-            letterSpacing: '0.4px',
-            animation: 'er-pulse 1s infinite',
-          }}>
-            🎙️ VOICE / SPEECH DETECTED
-          </div>
-        )}
-
-        {/* Camera denied overlay */}
-        {(cameraStatus === 'denied' || cameraStatus === 'error') && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'rgba(15,23,42,0.94)',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            gap: 6,
-          }}>
-            <Camera size={24} color="#ef4444" />
-            <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 700, textAlign: 'center', padding: '0 8px' }}>
-              {cameraStatus === 'denied' ? 'Camera Access Denied' : 'Camera Error'}
+          {/* Face count badge */}
+          {monConfig.face_detection && cameraStatus === 'active' && faceCount >= 0 && (
+            <div style={{
+              position: 'absolute', top: 6, right: 6,
+              background: faceColor + 'dd',
+              padding: '2px 7px', borderRadius: 5,
+              fontSize: 9, fontWeight: 800, color: '#fff',
+            }}>
+              {faceCount === 1 ? '1 FACE' : faceCount > 1 ? `${faceCount} FACES` : 'NO FACE'}
             </div>
-            <div style={{ fontSize: 9, color: '#94a3b8', textAlign: 'center' }}>
-              Webcam required for monitoring
+          )}
+
+          {/* Multiple faces alert */}
+          {monConfig.face_detection && faceCount > 1 && (
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              background: 'rgba(239,68,68,0.95)',
+              padding: '4px 6px', textAlign: 'center',
+              fontSize: 9, fontWeight: 800, color: '#fff',
+              letterSpacing: '0.5px',
+            }}>
+              🚨 MULTIPLE PERSONS DETECTED
             </div>
-          </div>
-        )}
-      </div>
+          )}
+
+          {/* No face warning */}
+          {monConfig.face_detection && faceCount === 0 && noFaceCount >= 4 && (
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              background: 'rgba(245,158,11,0.95)',
+              padding: '4px 6px', textAlign: 'center',
+              fontSize: 9, fontWeight: 800, color: '#fff',
+            }}>
+              ⚠️ FACE THE CAMERA
+            </div>
+          )}
+
+          {/* Voice detected alert */}
+          {monConfig.voice_detection && voiceAlert && (
+            <div style={{
+              position: 'absolute', top: 30, left: 6, right: 6,
+              background: 'rgba(239,68,68,0.92)',
+              padding: '4px 8px', borderRadius: 6, textAlign: 'center',
+              fontSize: 9, fontWeight: 800, color: '#fff',
+              letterSpacing: '0.4px',
+              animation: 'er-pulse 1s infinite',
+            }}>
+              🎙️ VOICE / SPEECH DETECTED
+            </div>
+          )}
+
+          {/* Camera denied overlay */}
+          {(cameraStatus === 'denied' || cameraStatus === 'error') && (
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(15,23,42,0.94)',
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              gap: 6,
+            }}>
+              <Camera size={24} color="#ef4444" />
+              <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 700, textAlign: 'center', padding: '0 8px' }}>
+                {cameraStatus === 'denied' ? 'Camera Access Denied' : 'Camera Error'}
+              </div>
+              <div style={{ fontSize: 9, color: '#94a3b8', textAlign: 'center' }}>
+                Webcam required for monitoring
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── LIVE VOICE / MICROPHONE MONITORING BAR ── */}
       <div style={{
@@ -902,56 +974,66 @@ const ProfessionalProctoring = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '6px 10px',
-        background: voiceAlert ? 'rgba(239,68,68,0.2)' : 'rgba(30,41,59,0.7)',
-        border: `1px solid ${voiceAlert ? '#ef4444' : 'rgba(255,255,255,0.08)'}`,
+        background: !monConfig.voice_detection ? 'rgba(30,41,59,0.4)' : voiceAlert ? 'rgba(239,68,68,0.2)' : 'rgba(30,41,59,0.7)',
+        border: `1px solid ${!monConfig.voice_detection ? 'rgba(255,255,255,0.05)' : voiceAlert ? '#ef4444' : 'rgba(255,255,255,0.08)'}`,
         borderRadius: 8,
         marginBottom: 8,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: voiceAlert ? '#f87171' : '#e2e8f0' }}>
-          {micStatus === 'active' ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: !monConfig.voice_detection ? '#94a3b8' : voiceAlert ? '#f87171' : '#e2e8f0' }}>
+          {!monConfig.voice_detection ? (
+            <MicOff size={13} color="#64748b" />
+          ) : micStatus === 'active' ? (
             <Mic size={13} color={voiceAlert ? '#ef4444' : '#22c55e'} />
           ) : (
             <MicOff size={13} color="#94a3b8" />
           )}
           <span>
-            {voiceAlert ? 'Speaking Detected!' : micStatus === 'active' ? 'Voice Monitor Active' : 'Mic Unavailable'}
+            {!monConfig.voice_detection ? 'Voice Monitor Disabled' : voiceAlert ? 'Speaking Detected!' : micStatus === 'active' ? 'Voice Monitor Active' : 'Mic Unavailable'}
           </span>
         </div>
 
         {/* Live Audio Equalizer Waveform */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2.5, height: 14 }}>
-          {[0.25, 0.5, 0.9, 1.0, 0.65, 0.35].map((factor, idx) => {
-            const rawH = Math.round((audioLevel / 100) * 14 * (1 + factor * 0.3));
-            const barH = Math.max(3, Math.min(14, rawH));
-            const barColor = voiceAlert || audioLevel > 50 ? '#ef4444' : audioLevel > 22 ? '#f59e0b' : '#22c55e';
-            return (
-              <div
-                key={idx}
-                style={{
-                  width: 3,
-                  height: `${barH}px`,
-                  borderRadius: 2,
-                  background: barColor,
-                  transition: 'height 0.08s ease, background 0.15s ease',
-                }}
-              />
-            );
-          })}
-        </div>
+        {monConfig.voice_detection ? (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2.5, height: 14 }}>
+            {[0.25, 0.5, 0.9, 1.0, 0.65, 0.35].map((factor, idx) => {
+              const rawH = Math.round((audioLevel / 100) * 14 * (1 + factor * 0.3));
+              const barH = Math.max(3, Math.min(14, rawH));
+              const barColor = voiceAlert || audioLevel > 50 ? '#ef4444' : audioLevel > 22 ? '#f59e0b' : '#22c55e';
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    width: 3,
+                    height: `${barH}px`,
+                    borderRadius: 2,
+                    background: barColor,
+                    transition: 'height 0.08s ease, background 0.15s ease',
+                  }}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <span style={{ fontSize: 9, color: '#64748b', fontWeight: 800 }}>OFF</span>
+        )}
       </div>
 
       {/* Status Details */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
-        <StatusRow label="Face Tracking" value={faceText} color={faceColor} />
-        <StatusRow
-          label="Microphone"
-          value={micStatus === 'active' ? (audioLevel > 35 ? 'Voice Detected' : 'Quiet (Silent)') : 'Offline'}
-          color={voiceAlert ? '#ef4444' : micStatus === 'active' ? '#22c55e' : '#94a3b8'}
+        <StatusRow 
+          label="Face Tracking" 
+          value={!monConfig.face_detection ? 'Disabled' : !monConfig.device_camera ? 'Camera Off' : faceText} 
+          color={!monConfig.face_detection || !monConfig.device_camera ? '#94a3b8' : faceColor} 
         />
         <StatusRow
-          label="AI Proctor"
-          value={modelsLoaded ? 'Real-Time Active' : 'Initializing...'}
-          color={modelsLoaded ? '#22c55e' : '#f59e0b'}
+          label="Microphone"
+          value={!monConfig.voice_detection ? 'Disabled' : micStatus === 'active' ? (audioLevel > 35 ? 'Voice Detected' : 'Quiet (Silent)') : 'Offline'}
+          color={!monConfig.voice_detection ? '#94a3b8' : voiceAlert ? '#ef4444' : micStatus === 'active' ? '#22c55e' : '#94a3b8'}
+        />
+        <StatusRow
+          label="Tab Security"
+          value={!monConfig.tab_switch ? 'Disabled' : 'Enforced'}
+          color={!monConfig.tab_switch ? '#94a3b8' : '#22c55e'}
         />
       </div>
 

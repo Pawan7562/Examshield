@@ -497,7 +497,8 @@ exports.createExam = async (req, res) => {
     const {
       title, name, description, type, subject, dateTime, duration, totalMarks,
       passingMarks, instructions, isProctored, maxViolations, studentIds, questions,
-      studentQuestionSets, questionRandomization, aiGenerated
+      studentQuestionSets, questionRandomization, aiGenerated,
+      monitoringConfig, monitoring_config
     } = req.body;
     const collegeId = req.user?.id;
 
@@ -518,7 +519,8 @@ exports.createExam = async (req, res) => {
       studentIdsCount: studentIds?.length || 0,
       hasStudentQuestionSets: !!studentQuestionSets,
       questionRandomization,
-      aiGenerated
+      aiGenerated,
+      monitoringConfig: monitoringConfig || monitoring_config
     });
 
     // Accept both title and name for flexibility
@@ -537,9 +539,22 @@ exports.createExam = async (req, res) => {
     const examQuestionRandomization = questionRandomization || false;
     const examAiGenerated = aiGenerated || false;
 
+    // Granular proctoring / monitoring settings (per-exam)
+    const defaultMonitoringConfig = {
+      face_detection: true,
+      voice_detection: true,
+      tab_switch: true,
+      fullscreen: true,
+      device_camera: true
+    };
+    const resolvedMonitoringConfig = (monitoringConfig || monitoring_config) 
+      ? { ...defaultMonitoringConfig, ...(monitoringConfig || monitoring_config) }
+      : defaultMonitoringConfig;
+
     console.log('Processed exam data:', {
       examTitle, examType, examDateTime, examDuration, examTotalMarks,
-      examSubject, examIsProctored, examQuestionRandomization, examAiGenerated
+      examSubject, examIsProctored, examQuestionRandomization, examAiGenerated,
+      resolvedMonitoringConfig
     });
 
     if (!examType || !examDateTime || !examDuration || !examTotalMarks) {
@@ -565,6 +580,7 @@ exports.createExam = async (req, res) => {
       instructions: examInstructions,
       is_proctored: examIsProctored,
       max_violations: examMaxViolations,
+      monitoring_config: resolvedMonitoringConfig,
       college_id: collegeId,
       status: 'draft'
     };
@@ -631,6 +647,7 @@ exports.createExam = async (req, res) => {
         passing_marks: exam.passing_marks,
         instructions,
         is_proctored: exam.is_proctored,
+        monitoring_config: exam.monitoring_config || resolvedMonitoringConfig,
         status: exam.status,
         question_randomization: examQuestionRandomization,
         ai_generated: examAiGenerated,
@@ -666,7 +683,8 @@ exports.updateExam = async (req, res) => {
     const { 
       name, title, description, subject, dateTime, date_time, 
       duration, totalMarks, total_marks, passingMarks, passing_marks, 
-      instructions, status, type 
+      instructions, status, type,
+      monitoringConfig, monitoring_config, isProctored, is_proctored
     } = req.body;
 
     const examTitle = title || name;
@@ -727,6 +745,17 @@ exports.updateExam = async (req, res) => {
     if (examDate) {
       updateFields.push(`date_time = $${idx}`);
       updateValues.push(new Date(examDate));
+      idx++;
+    }
+    const monConfig = monitoringConfig !== undefined ? monitoringConfig : monitoring_config;
+    if (monConfig !== undefined) {
+      updateFields.push(`monitoring_config = $${idx}`);
+      updateValues.push(typeof monConfig === 'string' ? monConfig : JSON.stringify(monConfig));
+      idx++;
+    }
+    if (isProctored !== undefined || is_proctored !== undefined) {
+      updateFields.push(`is_proctored = $${idx}`);
+      updateValues.push(isProctored !== undefined ? isProctored : is_proctored);
       idx++;
     }
 
@@ -1258,7 +1287,7 @@ exports.getExamDetails = async (req, res) => {
       .select(`
         id, title, type, subject, date_time, duration, total_marks,
         passing_marks, status, is_proctored, instructions,
-        max_violations, created_at, updated_at, exam_code, exam_key
+        max_violations, created_at, updated_at, exam_code, exam_key, monitoring_config
       `)
       .eq('id', id)
       .eq('college_id', collegeId)
@@ -1307,10 +1336,23 @@ exports.getExamDetails = async (req, res) => {
     // Check if student already has a session (active or submitted)
     const { data: existingSession } = await supabase
       .from('exam_sessions')
-      .select('id, status, submitted_at, total_score')
+      .select('id, status, submitted_at, started_at, violation_count, is_auto_submitted, auto_submit_reason')
       .eq('exam_id', id)
       .eq('student_id', studentId)
+      .order('started_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
+
+    let studentResult = null;
+    if (existingSession) {
+      const { data: resRow } = await supabase
+        .from('results')
+        .select('*')
+        .eq('exam_id', id)
+        .eq('student_id', studentId)
+        .maybeSingle();
+      studentResult = resRow;
+    }
 
     console.log('📊 Backend: Exam access check:', { hasAccess, examId: id, studentId, existingStatus: existingSession?.status });
 
@@ -1320,7 +1362,12 @@ exports.getExamDetails = async (req, res) => {
         exam: exam,
         questions: questions || [],
         hasAccess: hasAccess,
-        existingSession: existingSession || null,
+        existingSession: existingSession ? {
+          ...existingSession,
+          total_score: studentResult?.marks_obtained ?? studentResult?.total_marks ?? null,
+          percentage: studentResult?.percentage ?? null,
+          result_status: studentResult?.status ?? null
+        } : null,
       }
     });
 
@@ -1471,7 +1518,7 @@ exports.startExam = async (req, res) => {
 
       const nowMs = Date.now();
       const sessionDurationMs = (examData.duration || 60) * 60 * 1000;
-      const sessionStartMs = new Date(existingSession.start_time || existingSession.created_at || nowMs).getTime();
+      const sessionStartMs = new Date(existingSession.started_at || existingSession.start_time || existingSession.created_at || nowMs).getTime();
       const sessionRemainingSec = Math.max(0, Math.floor((sessionDurationMs - (nowMs - sessionStartMs)) / 1000));
       const windowRemainingSec = windowStatus?.endTime ? Math.max(0, Math.floor((windowStatus.endTime - nowMs) / 1000)) : sessionRemainingSec;
       const timeRemaining = Math.min(sessionRemainingSec, windowRemainingSec);
@@ -1728,69 +1775,116 @@ exports.saveAnswer = async (req, res) => {
 exports.submitExam = async (req, res) => {
   try {
     const { id } = req.params;
-    const { sessionId } = req.body;
+    const { sessionId, autoSubmit, violationCount, tabSwitchCount, terminationReason } = req.body;
     const studentId = req.user.id;
 
-    console.log('🚀 [PROFESSIONAL] Submit exam request:', { examId: id, sessionId, studentId });
+    console.log('🚀 [SUBMIT-EXAM] Processing submission:', { examId: id, sessionId, studentId });
 
-    // 1. Fetch Session (Verifying it's active and belongs to the student)
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('exam_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .eq('student_id', studentId)
-      .eq('exam_id', id)
-      .eq('status', 'active')
-      .single();
-
-    if (sessionError || !sessionData) {
-      console.log('❌ [PROFESSIONAL] Invalid session or session already submitted:', { sessionError, sessionFound: !!sessionData });
-      return res.status(400).json({ success: false, message: 'Invalid or already submitted session. Please contact administrator.' });
+    // 1. Fetch Session (by sessionId or fallback to latest session for this student & exam)
+    let sessionData = null;
+    if (sessionId) {
+      const { data } = await supabase
+        .from('exam_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .eq('student_id', studentId)
+        .maybeSingle();
+      sessionData = data;
     }
 
-    console.log('📊 [PROFESSIONAL] Session validated for submission');
+    if (!sessionData) {
+      const { data } = await supabase
+        .from('exam_sessions')
+        .select('*')
+        .eq('exam_id', id)
+        .eq('student_id', studentId)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      sessionData = data;
+    }
 
-    // 2. Fetch ALL questions for this exam (Reliable fetch, no join)
+    if (!sessionData) {
+      console.log('❌ [SUBMIT-EXAM] No session found for student:', studentId, 'exam:', id);
+      return res.status(404).json({ success: false, message: 'No examination session found for this student.' });
+    }
+
+    const activeSessionId = sessionData.id;
+
+    // If session is ALREADY submitted, fetch existing result and return success immediately
+    if (sessionData.status === 'submitted') {
+      const { data: existingResult } = await supabase
+        .from('results')
+        .select('*')
+        .eq('exam_id', id)
+        .eq('student_id', studentId)
+        .maybeSingle();
+
+      console.log('ℹ️ [SUBMIT-EXAM] Session already sealed as submitted. Returning existing result.');
+      return res.json({
+        success: true,
+        message: 'Exam has already been submitted successfully.',
+        data: {
+          score: existingResult?.marks_obtained ?? existingResult?.total_marks ?? 0,
+          totalMarks: existingResult?.total_marks ?? 0,
+          percentage: existingResult?.percentage ?? 0,
+          status: existingResult?.status || 'completed',
+          result: {
+            id: existingResult?.id || activeSessionId,
+            score: existingResult?.marks_obtained ?? existingResult?.total_marks ?? 0,
+            totalMarks: existingResult?.total_marks ?? 0,
+            marksObtained: existingResult?.marks_obtained ?? 0,
+            percentage: existingResult?.percentage ?? 0,
+            status: existingResult?.status || 'completed',
+            submittedAt: sessionData.submitted_at || new Date().toISOString(),
+            isPending: existingResult?.status === 'pending'
+          }
+        }
+      });
+    }
+
+    // 2. Fetch ALL questions for this exam
     const { data: questions, error: questionsError } = await supabase
       .from('questions')
       .select('*')
       .eq('exam_id', id);
 
     if (questionsError || !questions) {
-      console.error('❌ [PROFESSIONAL] Error fetching questions for marking:', questionsError);
-      return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to retrieve questions for evaluation', error: questionsError.message });
+      console.error('❌ [SUBMIT-EXAM] Error fetching questions for marking:', questionsError);
+      return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to retrieve questions for evaluation', error: questionsError?.message });
     }
 
     // 3. Fetch ALL answers for this session
     const { data: answers, error: answersError } = await supabase
       .from('answers')
       .select('*')
-      .eq('session_id', sessionId);
+      .eq('session_id', activeSessionId);
 
     if (answersError) {
-      console.error('❌ [PROFESSIONAL] Error fetching answers for marking:', answersError);
-      return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to fetch student answers', error: answersError.message });
+      console.error('❌ [SUBMIT-EXAM] Error fetching answers for marking:', answersError);
+      return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to fetch student answers', error: answersError?.message });
     }
 
-    console.log(`📊 [PROFESSIONAL] Marking Engine starting: ${questions.length} questions, ${answers?.length || 0} answers found`);
+    console.log(`📊 [SUBMIT-EXAM] Marking Engine starting: ${questions.length} questions, ${answers?.length || 0} answers found`);
 
-    // 4. MANUAL MARKING ENGINE (memory-based for 100% reliability)
+    // 4. Marking Engine for MCQ, Coding, and Descriptive
     let mcqMarks = 0;
-    const questionMap = new Map(questions.map(q => [q.id, q]));
+    let codingMarks = 0;
+    let subjectiveMarks = 0;
+    const questionMap = new Map((questions || []).map(q => [q.id, q]));
 
     for (const answer of answers || []) {
       const question = questionMap.get(answer.question_id);
       if (!question) {
-        console.warn(`⚠️ [PROFESSIONAL] Answer for unknown question ID: ${answer.question_id}`);
+        console.warn(`⚠️ [SUBMIT-EXAM] Answer for unknown question ID: ${answer.question_id}`);
         continue;
       }
 
       if (question.type === 'mcq' || question.type === 'true_false') {
         const isCorrect = (answer.selected_option === question.correct_answer);
         const marksObtained = isCorrect ? (question.marks || 1) : -Math.abs(question.negative_marks || 0);
-        mcqMarks += marksObtained;
+        mcqMarks += Math.max(0, marksObtained);
 
-        // Perform evaluation update defensively
         try {
           await supabase
             .from('answers')
@@ -1801,96 +1895,130 @@ exports.submitExam = async (req, res) => {
             })
             .eq('id', answer.id);
         } catch (updateErr) {
-          console.warn(`⚠️ [PROFESSIONAL] Could not save evaluation for answer ${answer.id}:`, updateErr.message);
+          console.warn(`⚠️ [SUBMIT-EXAM] Could not save evaluation for answer ${answer.id}:`, updateErr.message);
+        }
+      } else if (question.type === 'coding') {
+        const maxQMarks = question.marks || 10;
+        let earnedQMarks = 0;
+
+        if (answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
+          earnedQMarks = Number(answer.marks_obtained);
+        } else if (answer.code_submission && answer.code_submission.trim().length > 10) {
+          // Grant points for submitted code solution
+          earnedQMarks = maxQMarks;
+        }
+
+        codingMarks += earnedQMarks;
+
+        try {
+          await supabase
+            .from('answers')
+            .update({
+              marks_obtained: earnedQMarks,
+              is_evaluated: true
+            })
+            .eq('id', answer.id);
+        } catch (updateErr) {
+          console.warn(`⚠️ [SUBMIT-EXAM] Could not save coding evaluation for answer ${answer.id}:`, updateErr.message);
+        }
+      } else if (question.type === 'subjective') {
+        if (answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
+          subjectiveMarks += Number(answer.marks_obtained);
         }
       }
     }
 
     // 5. Fetch Exam Meta for Final Result Status
-    const { data: examData, error: examMetaError } = await supabase
+    const { data: examData } = await supabase
       .from('exams')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
-    const totalPossibleMarks = examData?.total_marks || questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const totalPossibleMarks = examData?.total_marks || (questions || []).reduce((sum, q) => sum + (q.marks || 1), 0);
     const passingMarks = examData?.passing_marks || 40;
+    const totalEarnedMarks = mcqMarks + codingMarks + subjectiveMarks;
 
-    const hasIncompleteEvaluation = questions.some(q => q.type === 'subjective' || q.type === 'coding');
-    const finalStatus = (mcqMarks >= passingMarks) ? 'pass' : 'fail';
-    const resultStatus = hasIncompleteEvaluation ? 'pending' : finalStatus;
+    const hasSubjective = (questions || []).some(q => q.type === 'subjective');
+    const finalStatus = (totalEarnedMarks >= passingMarks) ? 'pass' : 'fail';
+    const resultStatus = hasSubjective ? 'pending' : finalStatus;
 
-    const percentage = totalPossibleMarks > 0 ? (mcqMarks / totalPossibleMarks) * 100 : 0;
+    const percentage = totalPossibleMarks > 0 ? (totalEarnedMarks / totalPossibleMarks) * 100 : 0;
+    const roundedPct = Math.round(percentage * 100) / 100;
 
-    console.log('📊 [PROFESSIONAL] Marking complete:', { mcqMarks, totalPossibleMarks, resultStatus, percentage });
+    console.log('📊 [SUBMIT-EXAM] Marking complete:', { totalEarnedMarks, mcqMarks, codingMarks, totalPossibleMarks, resultStatus, percentage: roundedPct });
 
-    // 6. Update Session Status FIRST (to prevent double submission)
-    const { error: sessionUpdateError } = await supabase
+    // 6. Update Session Status to 'submitted'
+    const submissionTime = new Date().toISOString();
+    await supabase
       .from('exam_sessions')
       .update({
         status: 'submitted',
-        submitted_at: new Date().toISOString()
+        submitted_at: submissionTime,
+        is_auto_submitted: !!autoSubmit,
+        auto_submit_reason: terminationReason || sessionData.auto_submit_reason || null
       })
-      .eq('id', sessionId);
+      .eq('id', activeSessionId);
 
-    if (sessionUpdateError) {
-      console.error('❌ [PROFESSIONAL] CRITICAL: Failed to seal session:', sessionUpdateError);
-      return res.status(500).json({ success: false, message: 'Failed to close exam session properly. Your progress is saved but session status is unclear.', error: sessionUpdateError.message });
+    // 7. Upsert Result Record (prevents constraint conflict on student_id, exam_id)
+    console.log('📊 [SUBMIT-EXAM] Saving result record for session', activeSessionId);
+    let resultRecord = null;
+    try {
+      const { data: upsertedResult, error: resultError } = await supabase
+        .from('results')
+        .upsert({
+          session_id: activeSessionId,
+          student_id: studentId,
+          exam_id: id,
+          mcq_marks: mcqMarks,
+          coding_marks: codingMarks,
+          subjective_marks: subjectiveMarks,
+          total_marks: totalPossibleMarks,
+          marks_obtained: totalEarnedMarks,
+          percentage: roundedPct,
+          status: resultStatus,
+          submitted_at: submissionTime,
+          updated_at: submissionTime
+        }, {
+          onConflict: 'student_id,exam_id'
+        })
+        .select()
+        .maybeSingle();
+
+      if (resultError) {
+        console.warn('⚠️ [SUBMIT-EXAM] Results upsert warning:', resultError.message);
+      } else {
+        resultRecord = upsertedResult;
+      }
+    } catch (upsertErr) {
+      console.warn('⚠️ [SUBMIT-EXAM] Results upsert exception:', upsertErr.message);
     }
 
-    // 7. Create Result Record
-    console.log('📊 [PROFESSIONAL] Creating result record for session', sessionId);
-    const { data: resultData, error: resultError } = await supabase
-      .from('results')
-      .insert({
-        session_id: sessionId,
-        student_id: studentId,
-        exam_id: id,
-        mcq_marks: mcqMarks,
-        total_marks: mcqMarks, // Evaluate from memory for now
-        percentage: Math.round(percentage * 100) / 100,
-        status: resultStatus,
-        submitted_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (resultError) {
-      console.error('⚠️ [PROFESSIONAL] Result recorded failure:', resultError);
-      // We still return true because the session IS submitted and answers are evaluated
-      return res.json({
-        success: true,
-        message: 'Exam submitted successfully, but your result profile is being generated. Please check back in a few minutes.',
-        data: {
-          result: {
-            status: resultStatus,
-            percentage: Math.round(percentage * 100) / 100,
-            totalMarks: mcqMarks,
-            isPending: resultStatus === 'pending'
-          }
-        }
-      });
-    }
-
-    console.log('✅ [PROFESSIONAL] Submission sequence complete.');
+    console.log('✅ [SUBMIT-EXAM] Submission sequence complete.');
     res.json({
       success: true,
       message: 'Congratulations! Your exam has been submitted successfully.',
       data: {
+        score: totalEarnedMarks,
+        totalMarks: totalPossibleMarks,
+        percentage: roundedPct,
+        status: resultStatus,
         result: {
-          id: resultData.id,
+          id: resultRecord?.id || activeSessionId,
+          score: totalEarnedMarks,
+          marksObtained: totalEarnedMarks,
+          totalMarks: totalPossibleMarks,
+          percentage: roundedPct,
           status: resultStatus,
-          percentage: resultData.percentage,
-          totalMarks: resultData.total_marks,
-          submittedAt: resultData.submitted_at,
+          submittedAt: submissionTime,
           isPending: resultStatus === 'pending'
         }
       }
     });
 
   } catch (error) {
-    console.error('❌ [PROFESSIONAL] CRITICAL Submission Fault:', error);
-    res.status(500).json({ success: false, message: 'A professional-level fault occurred during submission. Your answers are safe.', error: error.message });
+    console.error('❌ [SUBMIT-EXAM] CRITICAL Submission Fault:', error);
+    res.status(500).json({ success: false, message: 'A server error occurred during submission. Your answers are safe.', error: error.message });
   }
 };
 
@@ -1902,6 +2030,49 @@ exports.reportViolation = async (req, res) => {
   try {
     const { sessionId, examId, type, description } = req.body;
     const studentId = req.user.id;
+
+    // Get exam proctoring configuration
+    const { data: examData, error: examError } = await supabase
+      .from('exams')
+      .select('max_violations, is_proctored, monitoring_config')
+      .eq('id', examId)
+      .single();
+
+    if (examData?.is_proctored === false) {
+      return res.json({
+        success: true,
+        data: { action: 'ignored', message: 'Proctoring disabled for this exam.' },
+        ignored: true
+      });
+    }
+
+    let monConfig = examData?.monitoring_config;
+    if (typeof monConfig === 'string') {
+      try { monConfig = JSON.parse(monConfig); } catch (e) { monConfig = null; }
+    }
+    const defaultMonitoringConfig = {
+      face_detection: true,
+      voice_detection: true,
+      tab_switch: true,
+      fullscreen: true,
+      device_camera: true
+    };
+    monConfig = monConfig ? { ...defaultMonitoringConfig, ...monConfig } : defaultMonitoringConfig;
+
+    // If the college admin unchecked/disabled this monitoring feature for this exam, ignore it!
+    if (
+      (type === 'speech_detected' && monConfig.voice_detection === false) ||
+      ((type === 'multiple_faces' || type === 'no_face_detected') && monConfig.face_detection === false) ||
+      ((type === 'tab_switch' || type === 'window_blur') && monConfig.tab_switch === false) ||
+      (type === 'fullscreen_exit' && monConfig.fullscreen === false) ||
+      (type === 'camera_off' && monConfig.device_camera === false)
+    ) {
+      return res.json({
+        success: true,
+        data: { action: 'ignored', message: `Monitoring feature for ${type} is disabled by admin for this exam.` },
+        ignored: true
+      });
+    }
 
     // Insert violation using Supabase
     const { data: violation, error: violationError } = await supabase
@@ -1920,13 +2091,6 @@ exports.reportViolation = async (req, res) => {
     if (violationError) {
       console.error('Violation insertion error:', violationError);
     }
-
-    // Get max violations limit from exam
-    const { data: examData, error: examError } = await supabase
-      .from('exams')
-      .select('max_violations')
-      .eq('id', examId)
-      .single();
 
     const maxViolations = examData?.max_violations || 3; // 3 warnings then terminate
 
@@ -1949,7 +2113,7 @@ exports.reportViolation = async (req, res) => {
     let message = `⚠️ Warning ${newCount}/${maxViolations}: ${type} detected.`;
     let autoTerminate = false;
 
-    // Professional violation thresholds — 3 strikes and you're out
+    // Violation thresholds — strict on visual/tab cheating, lenient on ambient audio
     if (type === 'multiple_faces' && typeCount >= 3) {
       action = 'terminate';
       message = '🚨 EXAM TERMINATED: Multiple persons detected 3 times. Your exam has been automatically submitted.';
@@ -1958,15 +2122,24 @@ exports.reportViolation = async (req, res) => {
       action = 'terminate';
       message = '🚨 EXAM TERMINATED: You switched tabs 3 times. Your exam has been automatically submitted.';
       autoTerminate = true;
-    } else if (type === 'no_face_detected' && typeCount >= 3) {
+    } else if (type === 'no_face_detected' && typeCount >= 5) {
       action = 'terminate';
-      message = '🚨 EXAM TERMINATED: No face detected 3 times. Your exam has been automatically submitted.';
+      message = '🚨 EXAM TERMINATED: No face detected repeatedly. Your exam has been automatically submitted.';
       autoTerminate = true;
     } else if (type === 'fullscreen_exit' && typeCount >= 3) {
       action = 'terminate';
       message = '🚨 EXAM TERMINATED: You exited full-screen 3 times. Your exam has been automatically submitted.';
       autoTerminate = true;
-    } else if (newCount >= maxViolations) {
+    } else if (type === 'speech_detected') {
+      if (typeCount >= 12) {
+        action = 'terminate';
+        message = '🚨 EXAM TERMINATED: Sustained voice activity detected repeatedly.';
+        autoTerminate = true;
+      } else {
+        action = 'warning';
+        message = `⚠️ Notice (${typeCount}/12): Audio/voice activity detected. Please maintain silence.`;
+      }
+    } else if (newCount >= Math.max(maxViolations, 6) && type !== 'speech_detected') {
       action = 'terminate';
       message = '🚨 EXAM TERMINATED: Maximum violations reached. Your exam has been automatically submitted.';
       autoTerminate = true;

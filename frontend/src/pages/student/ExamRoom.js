@@ -190,9 +190,40 @@ export default function ExamRoom() {
   const tabSwitchCountRef = useRef(0);
   const submittedRef = useRef(false);
   const sessionRef = useRef(null);
+  const answersRef = useRef({});
+  const questionsRef = useRef([]);
 
-  // Keep session ref current
+  // Keep refs current
   useEffect(() => { sessionRef.current = session; }, [session]);
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+  useEffect(() => { questionsRef.current = questions; }, [questions]);
+
+  // ── Compute Normalized Per-Exam Monitoring Config ──
+  const resolvedMonitoringConfig = useMemo(() => {
+    let cfg = examData?.exam?.monitoring_config || examData?.monitoring_config;
+    if (typeof cfg === 'string') {
+      try { cfg = JSON.parse(cfg); } catch (_) { cfg = null; }
+    }
+    const isProctored = examData?.exam?.is_proctored !== false && examData?.is_proctored !== false;
+    if (!isProctored) {
+      return {
+        face_detection: false,
+        voice_detection: false,
+        tab_switch: false,
+        fullscreen: false,
+        device_camera: false,
+        is_proctored: false,
+      };
+    }
+    return {
+      face_detection: cfg?.face_detection !== false,
+      voice_detection: cfg?.voice_detection !== false,
+      tab_switch: cfg?.tab_switch !== false,
+      fullscreen: cfg?.fullscreen !== false,
+      device_camera: cfg?.device_camera !== false,
+      is_proctored: true,
+    };
+  }, [examData]);
 
   // ─── Fullscreen Handlers ──────────────────────────────────────────────────────
   const enterFullScreen = useCallback(() => {
@@ -240,8 +271,30 @@ export default function ExamRoom() {
     if (autoSaveRef.current) clearInterval(autoSaveRef.current);
 
     try {
+      // 1. Flush any pending answers (e.g. coding solutions in the editor)
+      const currentSessionId = sessionRef.current?.id;
+      const currentAnswers = answersRef.current || {};
+      const currentQuestions = questionsRef.current || [];
+
+      if (currentSessionId && Object.keys(currentAnswers).length > 0) {
+        await Promise.allSettled(
+          Object.entries(currentAnswers).map(([qId, ans]) => {
+            if (!ans) return Promise.resolve();
+            const q = currentQuestions.find(item => item.id === qId);
+            return studentAPI.saveAnswer(examId, {
+              sessionId: currentSessionId,
+              questionId: qId,
+              ...(q?.type === 'mcq' ? { selectedOption: ans } :
+                q?.type === 'coding' ? { codeSubmission: ans } :
+                  { answerText: ans }),
+            });
+          })
+        );
+      }
+
+      // 2. Submit the entire examination
       const response = await studentAPI.submitExam(examId, {
-        sessionId: sessionRef.current?.id,
+        sessionId: currentSessionId,
         autoSubmit,
         violationCount,
         tabSwitchCount: tabSwitchCountRef.current,
@@ -251,7 +304,15 @@ export default function ExamRoom() {
 
       if (response.success) {
         notify.success('Exam submitted successfully!');
-        setResult(response.data);
+        const rawResult = response.data?.result || response.data || {};
+        const normalizedResult = {
+          score: rawResult.score ?? rawResult.marksObtained ?? response.data?.score ?? 0,
+          totalMarks: rawResult.totalMarks ?? response.data?.totalMarks ?? 100,
+          percentage: rawResult.percentage ?? response.data?.percentage ?? 0,
+          status: rawResult.status ?? response.data?.status ?? 'Submitted',
+          ...rawResult
+        };
+        setResult(normalizedResult);
         setPhase('submitted');
         setTimeout(exitFullScreen, 1200);
       } else {
@@ -259,14 +320,22 @@ export default function ExamRoom() {
       }
     } catch (err) {
       console.error('Submission error:', err);
-      notify.error('Submission encountered an issue. Please try again.');
-      submittedRef.current = false;
-      setSubmitted(false);
+      const errMsg = err?.response?.data?.message || err?.message || '';
+      if (errMsg.toLowerCase().includes('already submitted') || errMsg.toLowerCase().includes('already completed')) {
+        notify.success('Your examination responses are safely recorded.');
+        setPhase('submitted');
+        setTimeout(exitFullScreen, 1200);
+      } else {
+        notify.error(errMsg || 'Submission encountered an issue. Please try again.');
+        submittedRef.current = false;
+        setSubmitted(false);
+      }
     }
   }, [examId, violationCount, exitFullScreen]);
 
   // ─── Face Violation Handler (from ProfessionalProctoring) ────────────────────
   const handleFaceViolation = useCallback((type) => {
+    if (resolvedMonitoringConfig.face_detection === false) return;
     setFaceAlert(type);
     setViolationCount(prev => {
       const next = prev + 1;
@@ -277,11 +346,12 @@ export default function ExamRoom() {
       return next;
     });
     setTimeout(() => setFaceAlert(null), 5000);
-  }, [handleSubmit]);
+  }, [handleSubmit, resolvedMonitoringConfig.face_detection]);
 
   // ─── Tab Switch Detection ───────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'exam') return;
+    if (resolvedMonitoringConfig.tab_switch === false) return; // Feature disabled by admin
 
     let isBlurred = false;
     let effectStartTime = Date.now();
@@ -336,11 +406,13 @@ export default function ExamRoom() {
       window.removeEventListener('blur', handleHide);
       window.removeEventListener('focus', handleShow);
     };
-  }, [phase, handleSubmit]);
+  }, [phase, handleSubmit, resolvedMonitoringConfig.tab_switch]);
 
   // ─── Fullscreen Event Listener ────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'exam') return;
+    if (resolvedMonitoringConfig.fullscreen === false) return; // Feature disabled by admin
+
     const check = () => {
       const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
       setIsFullscreen(isFs);
@@ -354,7 +426,7 @@ export default function ExamRoom() {
       document.removeEventListener('fullscreenchange', check);
       document.removeEventListener('webkitfullscreenchange', check);
     };
-  }, [phase]);
+  }, [phase, resolvedMonitoringConfig.fullscreen]);
 
   // ─── Context Menu & Shortcut Blocker ─────────────────────────────────────────
   useEffect(() => {
@@ -869,25 +941,40 @@ export default function ExamRoom() {
               <Info size={14} color="#0a74da" />
               <span>Examination Security Protocol</span>
             </div>
-            {[
-              'Webcam permission required for continuous AI proctoring',
-              'Exam automatically locks into full-screen mode',
-              'Tab/window switches monitored (Max 3 switches before auto-submit)',
-              'Answers auto-save every 30 seconds to the cloud',
-            ].map((rule, idx) => (
-              <div key={idx} style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 8,
-                fontSize: '0.8rem',
-                color: '#64748b',
-                lineHeight: 1.5,
-                marginBottom: 6
-              }}>
-                <Check size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
-                <span>{rule}</span>
-              </div>
-            ))}
+              {(() => {
+                const rules = [];
+                if (resolvedMonitoringConfig.device_camera) {
+                  rules.push('Webcam stream active for candidate verification');
+                }
+                if (resolvedMonitoringConfig.face_detection) {
+                  rules.push('AI facial presence & multi-person monitoring active');
+                }
+                if (resolvedMonitoringConfig.voice_detection) {
+                  rules.push('Microphone voice and speech detection enabled');
+                }
+                if (resolvedMonitoringConfig.tab_switch) {
+                  rules.push('Tab/window switches monitored (Max 3 switches before auto-submit)');
+                }
+                if (resolvedMonitoringConfig.fullscreen) {
+                  rules.push('Exam automatically enforces browser full-screen mode');
+                }
+                rules.push('Responses auto-save in real time to the cloud');
+
+                return rules.map((rule, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
+                    fontSize: '0.8rem',
+                    color: '#64748b',
+                    lineHeight: 1.5,
+                    marginBottom: 6
+                  }}>
+                    <Check size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <span>{rule}</span>
+                  </div>
+                ));
+              })()}
           </div>
         </div>
       </div>
@@ -1331,6 +1418,7 @@ export default function ExamRoom() {
               mode="pip"
               pipCorner="bottom-left"
               socket={socketRef.current}
+              monitoringConfig={resolvedMonitoringConfig}
             />
           </div>
         </div>
@@ -1462,6 +1550,7 @@ export default function ExamRoom() {
                   currentQuestion={currentQ + 1}
                   totalQuestions={questions.length}
                   socket={socketRef.current}
+                  monitoringConfig={resolvedMonitoringConfig}
                 />
               </div>
             </div>

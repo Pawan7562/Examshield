@@ -21,7 +21,13 @@ import {
   Monitor,
   X,
   Save,
-  BookOpen
+  BookOpen,
+  Shield,
+  Eye,
+  Mic,
+  Layers,
+  Maximize,
+  Camera
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 
@@ -99,6 +105,14 @@ export default function ExamManagement() {
     passing_marks: 40,
     type: 'coding',
     status: 'draft',
+    is_proctored: true,
+    monitoringConfig: {
+      face_detection: true,
+      voice_detection: true,
+      tab_switch: true,
+      fullscreen: true,
+      device_camera: true
+    },
     saving: false
   });
 
@@ -154,7 +168,30 @@ export default function ExamManagement() {
     }
   };
 
+  const toggleEditMonitoringOption = (key) => {
+    setEditModal(prev => ({
+      ...prev,
+      monitoringConfig: {
+        ...prev.monitoringConfig,
+        [key]: !prev.monitoringConfig?.[key]
+      }
+    }));
+  };
+
   const handleOpenEdit = (exam) => {
+    let monConfig = exam.monitoring_config;
+    if (typeof monConfig === 'string') {
+      try { monConfig = JSON.parse(monConfig); } catch (e) { monConfig = null; }
+    }
+    const defaultMonitoring = {
+      face_detection: true,
+      voice_detection: true,
+      tab_switch: true,
+      fullscreen: true,
+      device_camera: true
+    };
+    monConfig = monConfig ? { ...defaultMonitoring, ...monConfig } : defaultMonitoring;
+
     setEditModal({
       open: true,
       exam,
@@ -165,6 +202,8 @@ export default function ExamManagement() {
       passing_marks: exam.passing_marks || 40,
       type: exam.type || 'coding',
       status: exam.status || 'draft',
+      is_proctored: exam.is_proctored !== false,
+      monitoringConfig: monConfig,
       saving: false
     });
   };
@@ -187,7 +226,9 @@ export default function ExamManagement() {
         total_marks: parseInt(editModal.total_marks) || 100,
         passing_marks: parseInt(editModal.passing_marks) || 40,
         type: editModal.type,
-        status: editModal.status
+        status: editModal.status,
+        is_proctored: editModal.is_proctored,
+        monitoring_config: editModal.monitoringConfig
       };
 
       await adminAPI.updateExam(editModal.exam.id, payload);
@@ -213,8 +254,27 @@ export default function ExamManagement() {
         }
       } catch (_) {}
 
-      toast.success('Exam details updated successfully');
-      setEditModal({ open: false, exam: null, title: '', description: '', duration: 60, total_marks: 100, passing_marks: 40, type: 'coding', status: 'draft', saving: false });
+      toast.success('Exam details & monitoring settings updated successfully');
+      setEditModal({ 
+        open: false, 
+        exam: null, 
+        title: '', 
+        description: '', 
+        duration: 60, 
+        total_marks: 100, 
+        passing_marks: 40, 
+        type: 'coding', 
+        status: 'draft', 
+        is_proctored: true,
+        monitoringConfig: {
+          face_detection: true,
+          voice_detection: true,
+          tab_switch: true,
+          fullscreen: true,
+          device_camera: true
+        },
+        saving: false 
+      });
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || err.message || 'Failed to update exam');
@@ -564,6 +624,83 @@ export default function ExamManagement() {
                     <option value="completed">Completed (Evaluation ready)</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
+                </div>
+
+                {/* Proctoring & Monitoring Policy */}
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Shield size={18} color="#0a74da" />
+                      <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>
+                        AI Proctoring & Monitoring Controls
+                      </span>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
+                      <input 
+                        type="checkbox"
+                        checked={editModal.is_proctored}
+                        onChange={e => setEditModal(prev => ({ ...prev, is_proctored: e.target.checked }))}
+                        style={{ width: 16, height: 16, accentColor: '#0a74da' }}
+                      />
+                      <span>Enable Proctoring</span>
+                    </label>
+                  </div>
+
+                  {editModal.is_proctored ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10, background: '#f8fafc', padding: 14, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                      {[
+                        { key: 'face_detection', label: 'Face & Person Detection', icon: Eye, desc: 'Alerts if face is missing or multiple faces appear' },
+                        { key: 'voice_detection', label: 'Voice & Speech Detection', icon: Mic, desc: 'Detects candidate talking or background speech' },
+                        { key: 'tab_switch', label: 'Tab-Switch Detection', icon: Layers, desc: 'Detects leaving or blurring exam window' },
+                        { key: 'fullscreen', label: 'Full-Screen Enforcement', icon: Maximize, desc: 'Enforces full-screen mode during exam' },
+                        { key: 'device_camera', label: 'Live Camera HUD & Cockpit Feed', icon: Camera, desc: 'Captures candidate webcam frames' },
+                      ].map(item => {
+                        const active = editModal.monitoringConfig?.[item.key] !== false;
+                        const Icon = item.icon;
+                        return (
+                          <div 
+                            key={item.key}
+                            onClick={() => toggleEditMonitoringOption(item.key)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 12px',
+                              background: active ? '#ffffff' : '#f1f5f9',
+                              border: `1.5px solid ${active ? '#0a74da' : '#cbd5e1'}`,
+                              borderRadius: 8,
+                              cursor: 'pointer',
+                              boxShadow: active ? '0 2px 6px rgba(10, 116, 218, 0.08)' : 'none',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Icon size={16} color={active ? '#0a74da' : '#94a3b8'} />
+                              <div>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: active ? '#0f172a' : '#64748b' }}>
+                                  {item.label}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#94a3b8', lineHeight: 1.2 }}>
+                                  {item.desc}
+                                </div>
+                              </div>
+                            </div>
+                            <input 
+                              type="checkbox"
+                              checked={active}
+                              onChange={() => toggleEditMonitoringOption(item.key)}
+                              onClick={e => e.stopPropagation()}
+                              style={{ width: 16, height: 16, accentColor: '#0a74da', marginLeft: 8 }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', background: '#f1f5f9', padding: '10px 14px', borderRadius: 8 }}>
+                      Proctoring is disabled. No camera, audio, or tab monitoring will be enforced for this exam.
+                    </div>
+                  )}
                 </div>
               </div>
 

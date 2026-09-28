@@ -333,6 +333,7 @@ function executeSimulated(code, language, testCases = []) {
 
   const passedCount = results.filter(r => r.passed).length;
   const isAllPassed = passedCount === results.length;
+  const allNoExpected = results.length > 0 && results.every(r => r.expectedOutput === '' || r.expectedOutput === undefined || r.expectedOutput === null);
 
   return {
     status: allNoExpected ? 'Finished' : (isAllPassed ? 'Accepted' : 'Wrong Answer'),

@@ -22,7 +22,12 @@ import {
   Award, 
   Shield, 
   AlertCircle,
-  Search
+  Search,
+  Eye,
+  Mic,
+  Maximize,
+  Camera,
+  Layers
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 import './CreateExam.css';
@@ -238,7 +243,24 @@ export default function CreateExam() {
     instructions: '', 
     isProctored: true, 
     maxViolations: 3,
+    monitoringConfig: {
+      face_detection: true,
+      voice_detection: true,
+      tab_switch: true,
+      fullscreen: true,
+      device_camera: true
+    }
   });
+
+  const toggleMonitoringOption = (key) => {
+    setDetails(prev => ({
+      ...prev,
+      monitoringConfig: {
+        ...prev.monitoringConfig,
+        [key]: !prev.monitoringConfig[key]
+      }
+    }));
+  };
   const [questions, setQuestions] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState([]);
@@ -312,6 +334,8 @@ export default function CreateExam() {
         duration: parseInt(details.duration),
         questions,
         studentIds: selectedStudents,
+        monitoringConfig: details.monitoringConfig,
+        monitoring_config: details.monitoringConfig,
       });
       toast.success('Exam created successfully!');
       navigate('/admin/exams');
@@ -431,7 +455,8 @@ export default function CreateExam() {
                   onChange={setD('instructions')} 
                   placeholder="Rules and guidelines for this exam..." 
                 />
-                <div className="admin-checkbox-group">
+                {/* Master Proctoring Control */}
+                <div className="admin-checkbox-group" style={{ marginBottom: 12 }}>
                   <input 
                     type="checkbox" 
                     id="proctored"
@@ -439,11 +464,167 @@ export default function CreateExam() {
                     onChange={setD('isProctored')} 
                     className="admin-checkbox"
                   />
-                  <label htmlFor="proctored" className="admin-checkbox-label">
-                    <Shield size={16} />
-                    Enable AI Proctoring (webcam + tab monitoring)
+                  <label htmlFor="proctored" className="admin-checkbox-label" style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                    <Shield size={18} color="#0a74da" />
+                    Enable Dedicated AI Proctoring & Live Monitoring
                   </label>
                 </div>
+
+                {/* Granular Per-Exam Monitoring Configuration */}
+                {details.isProctored ? (
+                  <div className="admin-monitoring-card">
+                    <div className="admin-monitoring-header">
+                      <div>
+                        <div className="admin-monitoring-title">
+                          <Shield size={18} color="#0a74da" />
+                          <span>Custom Exam Monitoring Features</span>
+                        </div>
+                        <div className="admin-monitoring-subtitle">
+                          Select the monitoring features to enforce for this specific exam. Leave any feature unchecked to disable it.
+                        </div>
+                      </div>
+                      <span className="admin-monitoring-badge">
+                        {Object.values(details.monitoringConfig).filter(Boolean).length} of 5 Active
+                      </span>
+                    </div>
+
+                    <div className="admin-monitoring-grid">
+                      {/* Face Detection */}
+                      <div 
+                        className={`admin-monitoring-item ${details.monitoringConfig.face_detection ? 'active' : ''}`}
+                        onClick={() => toggleMonitoringOption('face_detection')}
+                      >
+                        <div className="admin-monitoring-icon-wrap">
+                          <Eye size={20} />
+                        </div>
+                        <div className="admin-monitoring-info">
+                          <div className="admin-monitoring-item-title">
+                            <span>Face & Person Detection</span>
+                            <label className="admin-switch" onClick={e => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={details.monitoringConfig.face_detection}
+                                onChange={() => toggleMonitoringOption('face_detection')}
+                              />
+                              <span className="admin-switch-slider"></span>
+                            </label>
+                          </div>
+                          <div className="admin-monitoring-item-desc">
+                            Alerts if candidate leaves the frame, looks away continuously, or multiple faces are detected.
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Voice Detection */}
+                      <div 
+                        className={`admin-monitoring-item ${details.monitoringConfig.voice_detection ? 'active' : ''}`}
+                        onClick={() => toggleMonitoringOption('voice_detection')}
+                      >
+                        <div className="admin-monitoring-icon-wrap">
+                          <Mic size={20} />
+                        </div>
+                        <div className="admin-monitoring-info">
+                          <div className="admin-monitoring-item-title">
+                            <span>Voice & Speech Detection</span>
+                            <label className="admin-switch" onClick={e => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={details.monitoringConfig.voice_detection}
+                                onChange={() => toggleMonitoringOption('voice_detection')}
+                              />
+                              <span className="admin-switch-slider"></span>
+                            </label>
+                          </div>
+                          <div className="admin-monitoring-item-desc">
+                            Monitors candidate microphone and detects talking, whispering, or ambient speech.
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tab-Switch Detection */}
+                      <div 
+                        className={`admin-monitoring-item ${details.monitoringConfig.tab_switch ? 'active' : ''}`}
+                        onClick={() => toggleMonitoringOption('tab_switch')}
+                      >
+                        <div className="admin-monitoring-icon-wrap">
+                          <Layers size={20} />
+                        </div>
+                        <div className="admin-monitoring-info">
+                          <div className="admin-monitoring-item-title">
+                            <span>Tab-Switch & Blur Detection</span>
+                            <label className="admin-switch" onClick={e => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={details.monitoringConfig.tab_switch}
+                                onChange={() => toggleMonitoringOption('tab_switch')}
+                              />
+                              <span className="admin-switch-slider"></span>
+                            </label>
+                          </div>
+                          <div className="admin-monitoring-item-desc">
+                            Tracks when candidate shifts to another browser tab or minimizes the exam browser.
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Full-Screen Mode */}
+                      <div 
+                        className={`admin-monitoring-item ${details.monitoringConfig.fullscreen ? 'active' : ''}`}
+                        onClick={() => toggleMonitoringOption('fullscreen')}
+                      >
+                        <div className="admin-monitoring-icon-wrap">
+                          <Maximize size={20} />
+                        </div>
+                        <div className="admin-monitoring-info">
+                          <div className="admin-monitoring-item-title">
+                            <span>Full-Screen Enforcement</span>
+                            <label className="admin-switch" onClick={e => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={details.monitoringConfig.fullscreen}
+                                onChange={() => toggleMonitoringOption('fullscreen')}
+                              />
+                              <span className="admin-switch-slider"></span>
+                            </label>
+                          </div>
+                          <div className="admin-monitoring-item-desc">
+                            Requires candidates to stay in full-screen mode and alerts immediately on full-screen exit.
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Device Camera Feed */}
+                      <div 
+                        className={`admin-monitoring-item ${details.monitoringConfig.device_camera ? 'active' : ''}`}
+                        onClick={() => toggleMonitoringOption('device_camera')}
+                      >
+                        <div className="admin-monitoring-icon-wrap">
+                          <Camera size={20} />
+                        </div>
+                        <div className="admin-monitoring-info">
+                          <div className="admin-monitoring-item-title">
+                            <span>Live Camera Stream & HUD</span>
+                            <label className="admin-switch" onClick={e => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={details.monitoringConfig.device_camera}
+                                onChange={() => toggleMonitoringOption('device_camera')}
+                              />
+                              <span className="admin-switch-slider"></span>
+                            </label>
+                          </div>
+                          <div className="admin-monitoring-item-desc">
+                            Displays candidate picture-in-picture webcam HUD and streams live snapshots to cockpit.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '12px', marginTop: 12, color: '#64748b', fontSize: '0.85rem' }}>
+                    ℹ️ AI Proctoring is disabled for this exam. Candidates will not be monitored via webcam, microphone, or tab-switch detection.
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -613,6 +794,52 @@ export default function CreateExam() {
                     <div className="admin-review-value">{value}</div>
                   </div>
                 ))}
+              </div>
+
+              {/* Monitoring Feature Breakdown */}
+              <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '18px 22px', marginBottom: 16 }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Shield size={16} color="#0a74da" />
+                  <span>Configured Exam Monitoring Policies</span>
+                </div>
+                {details.isProctored ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    {[
+                      { key: 'face_detection', label: 'Face & Person Detection', icon: Eye },
+                      { key: 'voice_detection', label: 'Voice & Speech Detection', icon: Mic },
+                      { key: 'tab_switch', label: 'Tab-Switch Detection', icon: Layers },
+                      { key: 'fullscreen', label: 'Full-Screen Enforcement', icon: Maximize },
+                      { key: 'device_camera', label: 'Live Camera HUD & Cockpit Feed', icon: Camera },
+                    ].map(feat => {
+                      const active = details.monitoringConfig[feat.key];
+                      const Icon = feat.icon;
+                      return (
+                        <div 
+                          key={feat.key} 
+                          style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: 8, 
+                            padding: '6px 14px', 
+                            borderRadius: '8px',
+                            background: active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(100, 116, 139, 0.08)',
+                            border: `1.5px solid ${active ? '#10b981' : '#cbd5e1'}`,
+                            color: active ? '#065f46' : '#64748b',
+                            fontSize: '0.82rem',
+                            fontWeight: 700
+                          }}
+                        >
+                          <Icon size={14} color={active ? '#10b981' : '#94a3b8'} />
+                          <span>{feat.label}: {active ? 'ENABLED' : 'DISABLED'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    All monitoring features are disabled for this exam.
+                  </div>
+                )}
               </div>
 
               {details.instructions && (
