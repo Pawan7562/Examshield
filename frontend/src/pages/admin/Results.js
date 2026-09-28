@@ -682,23 +682,14 @@ export default function Results() {
                   <td>
                     <div className="admin-table-actions">
                       <Button 
-                        variant="secondary" 
+                        variant="primary" 
                         size="sm" 
                         icon={FileText}
                         onClick={() => handleOpenSubmission(result)}
-                        title="View Candidate Submitted Answer Copy & Answers"
-                        style={{ color: '#4f46e5', borderColor: '#c7d2fe', background: '#eef2ff' }}
+                        title="View Complete Submitted Answer Copy, Questions & Score"
+                        style={{ background: '#4f46e5', borderColor: '#4338ca', color: '#ffffff' }}
                       >
-                        Copy
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        icon={Eye}
-                        onClick={() => setViewModal({ open: true, result })}
-                        title="View Scorecard"
-                      >
-                        View
+                        View Copy & Score
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -1116,7 +1107,7 @@ export default function Results() {
                   <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
                     {submissionModal.data?.result ? (
                       <>
-                        <strong>{submissionModal.data.result.student_name}</strong> (Roll: {submissionModal.data.result.roll_no || 'N/A'}) &bull; {submissionModal.data.result.exam_title}
+                        <strong>{submissionModal.data.result.student_name || submissionModal.data.student?.name || 'Candidate'}</strong> (Roll: {submissionModal.data.result.roll_no || submissionModal.data.student?.roll_no || 'N/A'}) &bull; {submissionModal.data.result.exam_title || submissionModal.data.exam?.title || 'Examination'}
                       </>
                     ) : 'Loading candidate examination copy...'}
                   </p>
@@ -1171,9 +1162,19 @@ export default function Results() {
                 </div>
               ) : (
                 (() => {
-                  const { result: subResult, questions = [] } = submissionModal.data;
+                  const subResult = submissionModal.data.result || {};
+                  const subStudent = submissionModal.data.student || {};
+                  const subExam = submissionModal.data.exam || {};
+                  const subSession = submissionModal.data.session || {};
+                  const questions = submissionModal.data.questions || [];
+
+                  const studentName = subResult.student_name || subStudent.name || 'Candidate';
+                  const studentRoll = subResult.roll_no || subStudent.roll_no || 'N/A';
+                  const studentCode = subResult.student_code || subStudent.student_id;
+                  const studentEmail = subResult.email || subStudent.email;
+
                   const totalEarned = subResult.marks_obtained !== undefined ? parseFloat(subResult.marks_obtained) : 0;
-                  const totalExam = parseFloat(subResult.exam_total_marks || subResult.total_marks) || 100;
+                  const totalExam = parseFloat(subResult.exam_total_marks || subResult.total_marks || subExam.total_marks) || 100;
                   const percentage = parseFloat(subResult.percentage) || (totalExam > 0 ? (totalEarned / totalExam) * 100 : 0);
 
                   const filteredQuestions = questions.filter(q => {
@@ -1201,15 +1202,15 @@ export default function Results() {
                               Candidate Details
                             </span>
                             <div style={{ fontSize: '1.15rem', fontWeight: 800, marginTop: 4, color: '#ffffff' }}>
-                              {subResult.student_name}
+                              {studentName}
                             </div>
                             <div style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: 4 }}>
-                              Roll: <strong style={{ color: '#ffffff' }}>{subResult.roll_no || 'N/A'}</strong>
-                              {subResult.student_code && ` &bull; Code: ${subResult.student_code}`}
+                              Roll: <strong style={{ color: '#ffffff' }}>{studentRoll}</strong>
+                              {studentCode && ` &bull; Code: ${studentCode}`}
                             </div>
-                            {subResult.email && (
+                            {studentEmail && (
                               <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 2 }}>
-                                {subResult.email}
+                                {studentEmail}
                               </div>
                             )}
                           </div>
@@ -1249,16 +1250,16 @@ export default function Results() {
                               Exam Telemetry & Proctoring
                             </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: '0.85rem' }}>
-                              <Shield size={16} style={{ color: (subResult.session_violation_count || 0) > 0 ? '#f87171' : '#4ade80' }} />
-                              <span>Violations: <strong style={{ color: (subResult.session_violation_count || 0) > 0 ? '#f87171' : '#4ade80' }}>{subResult.session_violation_count || 0}</strong></span>
+                              <Shield size={16} style={{ color: (subResult.session_violation_count || subSession.violation_count || 0) > 0 ? '#f87171' : '#4ade80' }} />
+                              <span>Violations: <strong style={{ color: (subResult.session_violation_count || subSession.violation_count || 0) > 0 ? '#f87171' : '#4ade80' }}>{subResult.session_violation_count ?? subSession.violation_count ?? 0}</strong></span>
                             </div>
-                            {subResult.is_auto_submitted && (
+                            {(subResult.is_auto_submitted || subSession.is_auto_submitted) && (
                               <div style={{ marginTop: 4, display: 'inline-block', padding: '2px 8px', borderRadius: 4, background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', fontSize: '0.75rem', fontWeight: 600 }}>
-                                Auto-Submitted ({subResult.auto_submit_reason || 'Time limit / Violation'})
+                                Auto-Submitted ({subResult.auto_submit_reason || subSession.auto_submit_reason || 'Time limit / Violation'})
                               </div>
                             )}
                             <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 4 }}>
-                              Submitted: {subResult.submitted_at ? new Date(subResult.submitted_at).toLocaleString() : 'N/A'}
+                              Submitted: {subResult.submitted_at || subSession.submitted_at ? new Date(subResult.submitted_at || subSession.submitted_at).toLocaleString() : 'N/A'}
                             </div>
                           </div>
                         </div>

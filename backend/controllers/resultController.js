@@ -373,7 +373,7 @@ exports.getAdminStudentSubmission = async (req, res) => {
     const examId = row.exam_id;
     const studentId = row.student_id;
 
-    // Fetch all questions for this exam with student's answers (LEFT JOIN answers)
+    // Fetch all questions for this exam with student's answers (LEFT JOIN answers on session or student+exam)
     const questionsRes = await query(
       `SELECT 
          q.id as question_id,
@@ -399,10 +399,10 @@ exports.getAdminStudentSubmission = async (req, res) => {
          a.submitted_at as answer_submitted_at,
          a.updated_at as answer_updated_at
        FROM questions q
-       LEFT JOIN answers a ON q.id = a.question_id AND a.student_id = $1 AND a.exam_id = $2
+       LEFT JOIN answers a ON q.id = a.question_id AND (a.session_id = $3 OR (a.student_id = $1 AND a.exam_id = $2))
        WHERE q.exam_id = $2
        ORDER BY q.order_index ASC, q.created_at ASC`,
-      [studentId, examId]
+      [studentId, examId, row.session_id]
     );
 
     // Build structured response
@@ -444,24 +444,50 @@ exports.getAdminStudentSubmission = async (req, res) => {
       };
     });
 
+    const fullResult = {
+      id: row.id,
+      student_id: row.student_id,
+      exam_id: row.exam_id,
+      session_id: row.session_id,
+      marks_obtained: Number(row.marks_obtained) || 0,
+      total_marks: Number(row.total_marks) || Number(row.exam_total_marks) || 100,
+      exam_total_marks: Number(row.total_marks) || Number(row.exam_total_marks) || 100,
+      exam_passing_marks: Number(row.exam_passing_marks) || 40,
+      percentage: Number(row.percentage) || 0,
+      grade: row.grade,
+      status: row.status,
+      student_name: row.student_name,
+      student_code: row.student_code,
+      roll_no: row.roll_no,
+      email: row.email,
+      department: row.department,
+      batch: row.batch,
+      exam_title: row.exam_title,
+      exam_name: row.exam_title,
+      exam_type: row.exam_type,
+      exam_subject: row.exam_subject,
+      exam_duration: row.exam_duration,
+      exam_date: row.exam_date,
+      session_started_at: row.session_started_at,
+      session_submitted_at: row.session_submitted_at,
+      session_violation_count: row.session_violation_count || 0,
+      is_auto_submitted: row.is_auto_submitted,
+      auto_submit_reason: row.auto_submit_reason,
+      session_ip: row.session_ip,
+      session_browser: row.session_browser,
+      mcq_marks: Number(row.mcq_marks) || 0,
+      coding_marks: Number(row.coding_marks) || 0,
+      subjective_marks: Number(row.subjective_marks) || 0,
+      is_published: row.is_published,
+      submitted_at: row.submitted_at || row.created_at,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    };
+
     res.json({
       success: true,
       data: {
-        result: {
-          id: row.id,
-          marks_obtained: Number(row.marks_obtained) || 0,
-          total_marks: Number(row.total_marks) || Number(row.exam_total_marks) || 100,
-          percentage: Number(row.percentage) || 0,
-          grade: row.grade,
-          status: row.status,
-          mcq_marks: Number(row.mcq_marks) || 0,
-          coding_marks: Number(row.coding_marks) || 0,
-          subjective_marks: Number(row.subjective_marks) || 0,
-          is_published: row.is_published,
-          submitted_at: row.submitted_at || row.created_at,
-          created_at: row.created_at,
-          updated_at: row.updated_at
-        },
+        result: fullResult,
         student: {
           id: row.student_id,
           name: row.student_name,
