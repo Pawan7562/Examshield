@@ -1282,16 +1282,20 @@ exports.getExamDetails = async (req, res) => {
     console.log('📊 Backend: Getting exam details:', { examId: id, studentId, collegeId });
 
     // Get exam details
-    const { data: exam, error: examError } = await supabase
+    let examQuery = supabase
       .from('exams')
       .select(`
         id, title, type, subject, date_time, duration, total_marks,
         passing_marks, status, is_proctored, instructions,
         max_violations, created_at, updated_at, exam_code, exam_key, monitoring_config
       `)
-      .eq('id', id)
-      .eq('college_id', collegeId)
-      .single();
+      .eq('id', id);
+
+    if (collegeId) {
+      examQuery = examQuery.eq('college_id', collegeId);
+    }
+
+    const { data: exam, error: examError } = await examQuery.maybeSingle();
 
     if (examError) {
       console.error('Exam details error:', examError);
@@ -1299,6 +1303,13 @@ exports.getExamDetails = async (req, res) => {
         success: false,
         message: 'Failed to fetch exam details',
         error: examError.message
+      });
+    }
+
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Exam not found or unauthorized'
       });
     }
 
@@ -1486,8 +1497,9 @@ exports.startExam = async (req, res) => {
       .from('exam_sessions')
       .select('*')
       .eq('exam_id', id)
-      .eq('student_id', studentId)
-      .single();
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (existingSession) {
       if (existingSession.status === 'submitted' || existingSession.status === 'terminated') {

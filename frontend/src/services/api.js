@@ -46,11 +46,16 @@ const handleAuthRedirect = () => {
 api.interceptors.response.use(
   (response) => response.data,
   async (error) => {
-    console.error('=== API ERROR ===');
+    const reqMethod = (error.config?.method || 'UNKNOWN').toUpperCase();
+    const reqUrl = (error.config?.baseURL || '') + (error.config?.url || '');
+    const resStatus = error.response?.status;
+    const resData = error.response?.data;
+
+    console.error(`=== API ERROR [${resStatus || 'NO_STATUS'}] ${reqMethod} ${reqUrl} ===`);
+    console.error('Server Response Data:', resData);
     console.error('Error config:', error.config);
     console.error('Error message:', error.message);
     console.error('Error response:', error.response);
-    console.error('Error request:', error.request);
     
     const original = error.config || {};
     const isAuthRequest = original.url?.includes('/auth/');
