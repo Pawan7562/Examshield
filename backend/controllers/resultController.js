@@ -41,7 +41,11 @@ exports.getResults = async (req, res) => {
       [...params, limit, offset]
     );
 
-    res.json({ success: true, data: { results: result.rows } });
+    res.json({ 
+      success: true, 
+      results: result.rows,
+      data: { results: result.rows } 
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch results', error: error.message });
   }

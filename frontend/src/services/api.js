@@ -245,7 +245,7 @@ export const adminAPI = {
   broadcastAnnouncement: (examId, data) => api.post(`/admin/exams/${examId}/broadcast`, data),
   getStudentActivity: (examId, studentId) => api.get(`/admin/exams/${examId}/student-activity/${studentId}`),
 
-  getResults: (params) => api.get('/admin/results', { params }),
+  getResults: (params, config = {}) => api.get('/admin/results', { params, ...config }),
   getSubmission: (id) => api.get(`/admin/results/${id}/submission`),
   reevaluateResult: (id) => api.post(`/admin/results/${id}/re-evaluate`),
   reevaluateExam: (examId) => api.post(`/admin/results/re-evaluate/${examId}`),

@@ -120,28 +120,43 @@ export default function Results() {
   });
   const [exams, setExams] = useState([]);
   const [selectedExam, setSelectedExam] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    try {
+      if (!storageKey) return true;
+      const cached = sessionStorage.getItem(storageKey);
+      const parsed = cached ? JSON.parse(cached) : [];
+      return !parsed || parsed.length === 0;
+    } catch (_) {
+      return true;
+    }
+  });
   const [search, setSearch] = useState('');
 
   const fetchResults = async (examId, showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const r = await adminAPI.getResults({ examId });
-      const list = r.data.results || [];
+      const r = await adminAPI.getResults({ examId }, { bypassCache: true });
+      const raw = r.data || r;
+      const list = raw.results || raw.data?.results || (Array.isArray(raw) ? raw : []);
       setResults(list);
       if (storageKey) {
         sessionStorage.setItem(storageKey, JSON.stringify(list));
       }
-    } catch { 
+    } catch (err) { 
+      console.error('fetchResults error:', err);
       toast.error('Failed to load results'); 
     } finally { 
-      if (showLoading) setLoading(false); 
+      setLoading(false); 
     }
   };
 
   useEffect(() => {
     adminAPI.getExams({ limit: 100 })
-      .then(r => setExams(r.data.exams || []))
+      .then(r => {
+        const raw = r.data || r;
+        const examList = raw.exams || raw.data?.exams || (Array.isArray(raw) ? raw : []);
+        setExams(examList);
+      })
       .catch(() => {});
     fetchResults(selectedExam || undefined, results.length === 0);
   }, []);
