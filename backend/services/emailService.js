@@ -1,4 +1,6 @@
 // services/emailService.js
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 require('dotenv').config();
 
 const nodemailer = require('nodemailer');
@@ -11,13 +13,6 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-// ─────────────────────────────────────────────────────────────
-// Fresh transporter factory — creates a new SMTP connection
-// per email. Gmail's SMTP rejects subsequent sends on a
-// reused pooled connection (only the first student gets mail).
-// Creating a fresh transporter per send is the correct pattern
-// for transactional email.
-// ─────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────
 // Fresh transporter factory — creates a new SMTP connection
 // per email. Gmail's SMTP rejects subsequent sends on a
@@ -347,6 +342,42 @@ const sendStudentCredentials = async (...args) => {
     </div>
   `;
 
+  const plainText = [
+    `Welcome to ExamShield!`,
+    ``,
+    isReset
+      ? `Your student portal password on ExamShield has been reset by ${collegeName}.`
+      : `Your student account has been created on ExamShield by ${collegeName}.${examKey ? ' You have also been enrolled in an upcoming examination.' : ''}`,
+    ``,
+    `----------------------------------------`,
+    `🔐 YOUR STUDENT LOGIN CREDENTIALS:`,
+    `----------------------------------------`,
+    `Student ID: ${studentId}`,
+    `Registered Email: ${email}`,
+    `${isReset ? 'New Password' : 'Temporary Password'}: ${password}`,
+    `Login Portal: ${loginUrl}`,
+    `----------------------------------------`,
+    examKey ? [
+      ``,
+      `📝 EXAMINATION AUTHORIZATION:`,
+      `Exam Title: ${examName || 'Scheduled Examination'}`,
+      subject ? `Subject: ${subject}` : null,
+      formattedDate ? `Scheduled Date: ${formattedDate} (IST)` : null,
+      examDuration ? `Duration: ${examDuration} Minutes` : null,
+      `YOUR EXAM ACCESS KEY: ${examKey}`,
+      `----------------------------------------`,
+      `Keep this key ready — you will enter it to begin the proctored exam.`,
+    ].filter(Boolean).join('\n') : '',
+    ``,
+    `IMPORTANT INSTRUCTIONS:`,
+    `1. Use a laptop or desktop computer with a functional webcam and microphone.`,
+    `2. Ensure you have a stable internet connection before launching the exam.`,
+    examKey ? `3. Copy your Exam Key (${examKey}) to unlock the exam session.` : null,
+    `4. Do not switch tabs, minimize windows, or use unauthorized secondary devices.`,
+    ``,
+    `Login at: ${loginUrl}`,
+  ].filter(line => line !== null).join('\n');
+
   const subjectLine = isReset
     ? `ExamShield — Your Password Has Been Reset`
     : (examKey
@@ -356,6 +387,7 @@ const sendStudentCredentials = async (...args) => {
   await sendWithRetry({
     to: email,
     subject: subjectLine,
+    text: plainText,
     html: baseTemplate(content),
   }, 3, 3000); // up to 3 attempts, 3 s apart
 
@@ -374,6 +406,20 @@ const sendExamNotification = async ({ name, email, examName, examDate, examDurat
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
   });
+
+  const plainText = [
+    `EXAM SCHEDULED: ${examName}`,
+    `Hello, ${name}`,
+    ``,
+    `Subject: ${subject || 'N/A'}`,
+    `Type: ${type ? type.toUpperCase() : 'EXAM'}`,
+    `Date & Time: ${formattedDate} (IST)`,
+    `Duration: ${examDuration} minutes`,
+    `Exam Key: ${examKey}`,
+    ``,
+    `Portal Login: ${loginUrl}`,
+    `You will need this exam key to start your exam. Do not share this key.`,
+  ].join('\n');
 
   const content = `
     <div class="badge">EXAM SCHEDULED</div>
