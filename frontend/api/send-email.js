@@ -1,12 +1,14 @@
+// api/send-email.js — Vercel Serverless Function (Email Relay)
+// Uses CommonJS module syntax (no "export default") for Vercel compatibility
 const nodemailer = require('nodemailer');
 
-export default async function handler(req, res) {
-  // 1. Setup CORS to allow Render backend to call this function
-  res.setHeader('Access-Control-Allow-Credentials', true);
+module.exports = async function handler(req, res) {
+  // CORS headers so Render backend can POST to this function
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
+
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -18,35 +20,62 @@ export default async function handler(req, res) {
   try {
     const { internalSecret, mailOptions, host, port, user, pass } = req.body;
 
-    // 2. Simple security check so random bots can't abuse the relay
+    // Simple security guard
     if (internalSecret !== 'examshield-secure-relay-9921') {
       return res.status(401).json({ success: false, message: 'Unauthorized Relay Access' });
     }
 
-    if (!user || !pass || !mailOptions) {
-      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    if (!mailOptions || !mailOptions.to || !mailOptions.subject || !mailOptions.html) {
+      return res.status(400).json({ success: false, message: 'Missing required mailOptions fields' });
     }
 
-    console.log(`[Vercel Relay] Sending email to ${mailOptions.to} via ${host}:${port}`);
+    // Resolve SMTP credentials — prefer request body, fall back to env vars
+    const smtpHost = host || process.env.EMAIL_HOST || 'smtp.gmail.com';
+    const smtpPort = parseInt(port) || parseInt(process.env.EMAIL_PORT) || 587;
+    const smtpUser = user || process.env.EMAIL_USER;
+    const smtpPass = pass || process.env.EMAIL_PASS;
 
-    // 3. Create SMTP Transporter natively in Vercel
-    // Vercel does NOT block port 587/465, unlike Render.
+    if (!smtpUser || !smtpPass) {
+      return res.status(400).json({ success: false, message: 'SMTP credentials missing' });
+    }
+
+    console.log(`[Vercel Relay] Sending to ${mailOptions.to} via ${smtpHost}:${smtpPort}`);
+
     const transporter = nodemailer.createTransport({
-      host: host || 'smtp.gmail.com',
-      port: parseInt(port) || 587,
-      secure: parseInt(port) === 465,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false }
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465, // true for SSL; STARTTLS for 587
+      auth: { user: smtpUser, pass: smtpPass },
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 10000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
     });
 
-    // 4. Send email
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[Vercel Relay] Success: ${info.messageId}`);
-    
+    const targetTo = typeof mailOptions.to === 'string' ? mailOptions.to.trim() : mailOptions.to;
+
+    // Ensure a proper "from" address
+    const from =
+      mailOptions.from ||
+      process.env.EMAIL_FROM ||
+      `ExamShield <${smtpUser}>`;
+
+    let info;
+    try {
+      info = await transporter.sendMail({ ...mailOptions, to: targetTo, from });
+      console.log(`[Vercel Relay] ✅ Success: ${info.messageId}`);
+    } finally {
+      transporter.close();
+    }
+
     return res.status(200).json({ success: true, messageId: info.messageId });
 
   } catch (error) {
-    console.error('[Vercel Relay] Error:', error.message);
-    return res.status(500).json({ success: false, error: error.message, code: error.code });
+    console.error('[Vercel Relay] ❌ Error:', error.message, '| code:', error.code);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      code: error.code || 'UNKNOWN',
+    });
   }
-}
+};

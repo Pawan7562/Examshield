@@ -12,79 +12,68 @@ const logger = winston.createLogger({
 });
 
 // ─────────────────────────────────────────────────────────────
-// Singleton transporter — created once at module load time
-// so every sendMail call reuses the same SMTP connection pool
+// Fresh transporter factory — creates a new SMTP connection
+// per email. Gmail's SMTP rejects subsequent sends on a
+// reused pooled connection (only the first student gets mail).
+// Creating a fresh transporter per send is the correct pattern
+// for transactional email.
 // ─────────────────────────────────────────────────────────────
-let _transporter = null;
-
-const getTransporter = () => {
-  if (_transporter) return _transporter;
-
-  const { EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_PORT, RESEND_API_KEY } = process.env;
-
-  if (RESEND_API_KEY) {
-     console.log('✅ Resend API Key detected — SMTP transporter will be bypassed.');
-  }
-
-  console.log('🔧 Email config check:', {
-    EMAIL_HOST: EMAIL_HOST || 'NOT SET',
-    EMAIL_USER: EMAIL_USER || 'NOT SET',
-    EMAIL_PASS: EMAIL_PASS ? '***SET***' : 'NOT SET',
-    EMAIL_PORT: EMAIL_PORT || 'NOT SET',
-    RESEND_API_KEY: RESEND_API_KEY ? '***SET***' : 'NOT SET',
-    NODE_ENV: process.env.NODE_ENV,
-  });
+// ─────────────────────────────────────────────────────────────
+// Fresh transporter factory — creates a new SMTP connection
+// per email. Gmail's SMTP rejects subsequent sends on a
+// reused pooled connection (only the first student gets mail).
+// Creating a fresh transporter per send is the correct pattern
+// for transactional email.
+// ─────────────────────────────────────────────────────────────
+const createFreshTransporter = () => {
+  const { EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_PORT } = process.env;
 
   if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
-    throw new Error('Email delivery is not configured. Set RESEND_API_KEY or EMAIL_HOST, EMAIL_USER, and EMAIL_PASS.');
+    throw new Error(
+      'Email is not configured. Set EMAIL_HOST, EMAIL_USER, and EMAIL_PASS in your .env file.'
+    );
   }
 
-  // PORT 587 + STARTTLS is the most reliable option across all cloud platforms
-  // (Render, Railway, Fly.io, etc.). Port 465 (SSL) is often blocked by egress firewalls.
   const port = parseInt(EMAIL_PORT) || 587;
-  const secure = port === 465; // true only for SSL; 587 uses STARTTLS
+  const secure = port === 465; // true = SSL; false = STARTTLS (port 587)
+  const cleanPass = (EMAIL_PASS || '').trim();
 
-  console.log(`✅ Creating real SMTP transporter — host: ${EMAIL_HOST}, port: ${port}, secure: ${secure}`);
-
-  _transporter = nodemailer.createTransport({
-    host: EMAIL_HOST,   // smtp.gmail.com from env
+  return nodemailer.createTransport({
+    host: EMAIL_HOST,
     port,
-    secure,             // false for 587 (STARTTLS), true for 465
+    secure,
     auth: {
       user: EMAIL_USER,
-      pass: EMAIL_PASS,
+      pass: cleanPass,
     },
     tls: {
-      rejectUnauthorized: false, // allow self-signed certs on some hosts
+      rejectUnauthorized: false,
     },
-    // Connection pool settings (valid nodemailer options only)
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
-    connectionTimeout: 15000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: 12000,
+    greetingTimeout: 8000,
+    socketTimeout: 12000,
   });
-
-  return _transporter;
 };
+
+// Legacy alias so existing code that calls getTransporter() still works.
+const getTransporter = () => createFreshTransporter();
 
 // ─────────────────────────────────────────────────────────────
 // Internal helper: send with retry
 // ─────────────────────────────────────────────────────────────
-const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) => {
+const sendWithRetry = async (mailOptions, maxRetries = 2, retryDelayMs = 2000) => {
   const from =
     mailOptions.from ||
     process.env.EMAIL_FROM ||
     `ExamShield <${process.env.EMAIL_USER || 'noreply@examshield.com'}>`;
 
-  const opts = { ...mailOptions, from };
+  const targetTo = (mailOptions.to || '').trim().toLowerCase();
+  const opts = { ...mailOptions, to: targetTo, from };
 
-  // Prioritize Resend over SMTP if API key exists. Render FREE blocks SMTP completely.
+  // ── Priority 1: Resend API (most reliable if key provided) ────────────────
   if (process.env.RESEND_API_KEY) {
     const resend = new Resend(process.env.RESEND_API_KEY);
-    console.log(`📤 [Resend] Attempting to send to ${opts.to} | Subject: ${opts.subject}`);
-
+    console.log(`📤 [Resend] Sending to ${opts.to} | Subject: ${opts.subject}`);
     try {
       const { data, error } = await resend.emails.send({
         from: opts.from,
@@ -92,107 +81,96 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) =
         subject: opts.subject,
         html: opts.html,
       });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      console.log(`✅ [Resend] Delivered via HTTPS. MessageId: ${data?.id}`);
-      logger.info('Email sent successfully via Resend API', { to: opts.to, id: data?.id });
+      if (error) throw new Error(error.message);
+      console.log(`✅ [Resend] Delivered. MessageId: ${data?.id}`);
+      logger.info('Email sent via Resend API', { to: opts.to, id: data?.id });
       return { messageId: data?.id };
     } catch (err) {
-      console.error(`❌ [Resend] Failed via API: ${err.message}`);
+      console.error(`❌ [Resend] Failed: ${err.message}`);
       throw err;
     }
   }
 
-  // Use Vercel Microservice Relay if in Production or cloud hosting (to bypass Render SMTP block)
-  // Render Free blocks outbound SMTP ports 25, 465, 587; Vercel Serverless executes over HTTPS port 443.
-  const isCloudOrProd = process.env.NODE_ENV === 'production' || !!process.env.RENDER || !!process.env.RENDER_SERVICE_ID;
-  const relayUrl = process.env.EMAIL_RELAY_URL || 'https://examshield.vercel.app/api/send-email';
+  const isCloudOrProd =
+    process.env.NODE_ENV === 'production' ||
+    !!process.env.RENDER ||
+    !!process.env.RENDER_SERVICE_ID;
+  const relayUrl =
+    process.env.EMAIL_RELAY_URL ||
+    'https://examshield.vercel.app/api/send-email';
 
-  if (isCloudOrProd || process.env.USE_EMAIL_RELAY === 'true') {
-    console.log(`📤 [Vercel Relay] Attempting to send to ${opts.to} via ${relayUrl}`);
+  // Helper to send via Vercel HTTPS Relay
+  const sendViaRelay = async () => {
+    console.log(`📤 [Vercel Relay] Sending to ${opts.to} via ${relayUrl}`);
+    const response = await fetch(relayUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(12000), // 12s timeout
+      body: JSON.stringify({
+        internalSecret: 'examshield-secure-relay-9921',
+        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.EMAIL_PORT) || 587,
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+        mailOptions: opts,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || data.message || 'Vercel Relay rejected the request');
+    }
+    console.log(`✅ [Vercel Relay] Delivered! MessageId: ${data.messageId}`);
+    logger.info('Email sent via Vercel Relay', { to: opts.to, messageId: data.messageId });
+    return data;
+  };
 
+  // Helper to send via direct fresh SMTP
+  const sendViaDirectSMTP = async () => {
+    const transporter = createFreshTransporter();
     try {
-      const response = await fetch(relayUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          internalSecret: 'examshield-secure-relay-9921',
-          host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-          port: parseInt(process.env.EMAIL_PORT) || 587,
-          user: process.env.EMAIL_USER || 'pawankumaryadav75628697@gmail.com',
-          pass: process.env.EMAIL_PASS || 'suev oqsh vnuf duqx',
-          mailOptions: opts
-        })
-      });
+      console.log(`📤 [Direct SMTP] Sending to ${opts.to}`);
+      const info = await transporter.sendMail(opts);
+      console.log(`✅ [Direct SMTP] Sent! MessageId: ${info.messageId}`);
+      logger.info('Email sent via SMTP', { to: opts.to, messageId: info.messageId });
+      return info;
+    } finally {
+      transporter.close();
+    }
+  };
 
-      const data = await response.json();
-      
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || data.message || 'Vercel Relay rejected the request');
+  // ── Strategy A: Cloud / Production (Render blocks direct SMTP, so Relay first) ─
+  if (isCloudOrProd || process.env.USE_EMAIL_RELAY === 'true') {
+    try {
+      return await sendViaRelay();
+    } catch (relayErr) {
+      console.error(`❌ [Vercel Relay] Failed: ${relayErr.message}`);
+      console.log('🔄 Falling back to direct SMTP…');
+      try {
+        return await sendViaDirectSMTP();
+      } catch (smtpErr) {
+        console.error(`❌ [SMTP Fallback] Failed: ${smtpErr.message}`);
+        throw new Error(`Email delivery failed via Relay and direct SMTP: ${relayErr.message}`);
       }
-
-      console.log(`✅ [Vercel Relay] Delivered successfully! MessageId: ${data.messageId}`);
-      logger.info('Email sent successfully via Vercel Relay', { to: opts.to, messageId: data.messageId });
-      return data;
-    } catch (err) {
-      console.error(`❌ [Vercel Relay] Failed: ${err.message}`);
-      console.log('🔄 Falling back to standard SMTP (which works locally or on unblocked hosts)...');
     }
   }
 
-  // Fallback to Nodemailer SMTP (works for local development and hosts with open SMTP ports)
-  const transporter = getTransporter();
-
+  // ── Strategy B: Local Development (Direct SMTP first, Relay as instant fallback) ─
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`📤 [SMTP] Attempt ${attempt}/${maxRetries} → ${opts.to} | ${opts.subject}`);
-      const info = await transporter.sendMail(opts);
-      console.log(`✅ [SMTP] Sent! MessageId: ${info.messageId}`);
-      logger.info('Email sent via SMTP', { to: opts.to, subject: opts.subject, messageId: info.messageId });
-      return info;
-    } catch (err) {
-      console.error(`❌ [SMTP] Attempt ${attempt} failed: ${err.message} (code: ${err.code})`);
-
-      // Try HTTPS Relay as immediate fallback before giving up
-      try {
-        console.log(`🔄 [Fallback] Attempting HTTPS relay for ${opts.to}...`);
-        const fallbackRes = await fetch(relayUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            internalSecret: 'examshield-secure-relay-9921',
-            host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-            port: parseInt(process.env.EMAIL_PORT) || 587,
-            user: process.env.EMAIL_USER || 'pawankumaryadav75628697@gmail.com',
-            pass: process.env.EMAIL_PASS || 'suev oqsh vnuf duqx',
-            mailOptions: opts
-          })
-        });
-        const fallbackData = await fallbackRes.json();
-        if (fallbackRes.ok && fallbackData.success) {
-          console.log(`✅ [Relay Fallback] Delivered successfully! MessageId: ${fallbackData.messageId}`);
-          return fallbackData;
+      return await sendViaDirectSMTP();
+    } catch (smtpErr) {
+      console.error(`❌ [SMTP] Attempt ${attempt}/${maxRetries} failed: ${smtpErr.message}`);
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, retryDelayMs));
+      } else {
+        console.log('🔄 Local direct SMTP failed; attempting fallback to Vercel Relay…');
+        try {
+          return await sendViaRelay();
+        } catch (relayErr) {
+          console.error(`❌ [Relay Fallback] Failed: ${relayErr.message}`);
+          throw smtpErr;
         }
-      } catch (relayErr) {
-        console.warn('Relay fallback failed as well:', relayErr.message);
       }
-
-      // Auth errors won't be fixed by retrying
-      if (err.code === 'EAUTH') {
-        logger.error('Email auth failed — check EMAIL_USER and EMAIL_PASS', { error: err.message });
-        throw err;
-      }
-      if (attempt === maxRetries) {
-        logger.error('Email failed after all retries', { to: opts.to, error: err.message });
-        throw err;
-      }
-      // Reset the singleton so the next attempt creates a fresh connection
-      _transporter = null;
-      console.log(`🔄 [SMTP] Retrying in ${retryDelayMs / 1000}s…`);
-      await new Promise((r) => setTimeout(r, retryDelayMs));
     }
   }
 };
@@ -258,15 +236,26 @@ const baseTemplate = (content) => `
 
 /**
  * Send student credentials email
- * NOTE: This is intentionally awaitable so callers can catch real errors.
- * Use .catch() in fire-and-forget contexts.
+ * Supports both object signature: sendStudentCredentials({ name, email, studentId, password, ... })
+ * and positional signature: sendStudentCredentials(email, studentId, password, name, collegeName, loginUrl)
  */
-const sendStudentCredentials = async (firstArg, secondArg) => {
+const sendStudentCredentials = async (...args) => {
   let opts = {};
-  if (typeof firstArg === 'string') {
-    opts = { ...(secondArg || {}), email: firstArg };
-  } else if (firstArg && typeof firstArg === 'object') {
-    opts = firstArg;
+  if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
+    opts = { ...args[0] };
+  } else if (typeof args[0] === 'string') {
+    if (typeof args[1] === 'object' && args[1] !== null) {
+      opts = { ...args[1], email: args[0] };
+    } else {
+      opts = {
+        email: args[0],
+        studentId: args[1],
+        password: args[2],
+        name: args[3],
+        collegeName: args[4] || 'Your Institution',
+        loginUrl: args[5],
+      };
+    }
   }
 
   const { 
@@ -368,7 +357,7 @@ const sendStudentCredentials = async (firstArg, secondArg) => {
     to: email,
     subject: subjectLine,
     html: baseTemplate(content),
-  }, 1, 0);
+  }, 3, 3000); // up to 3 attempts, 3 s apart
 
   logger.info(`Credentials email sent to ${email}`);
 };

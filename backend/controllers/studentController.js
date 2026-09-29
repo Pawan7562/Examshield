@@ -126,14 +126,17 @@ exports.addStudent = async (req, res) => {
 
     // Check if student already exists in this college
     const existingCheck = await pool.query(
-      'SELECT id, email, roll_no FROM students WHERE (LOWER(email) = $1 OR roll_no = $2) AND college_id = $3 LIMIT 1',
+      'SELECT id, email, roll_no, name, student_id FROM students WHERE (LOWER(email) = $1 OR roll_no = $2) AND college_id = $3 LIMIT 1',
       [cleanEmail, cleanRoll, collegeId]
     );
 
     if (existingCheck.rows.length > 0) {
+      const existing = existingCheck.rows[0];
       return res.status(400).json({
         success: false,
-        message: 'A student with this email or roll number is already registered under your college.'
+        isDuplicate: true,
+        existingStudentId: existing.id,
+        message: `Student with this ${existing.email.toLowerCase() === cleanEmail ? 'email' : 'roll number'} is already registered under your college (${existing.name}, ${existing.student_id}). You can use the "Resend Email" option to send their login credentials.`
       });
     }
 
@@ -166,46 +169,39 @@ exports.addStudent = async (req, res) => {
 
     try {
       if (examId) {
-        const { data: specifiedExam } = await supabase
-          .from('exams')
-          .select('*')
-          .eq('id', examId)
-          .eq('college_id', collegeId)
-          .single();
-        targetExam = specifiedExam;
+        const examRes = await pool.query(
+          'SELECT * FROM exams WHERE id = $1 AND college_id = $2 LIMIT 1',
+          [examId, collegeId]
+        );
+        targetExam = examRes.rows[0] || null;
       }
 
       if (!targetExam) {
-        const { data: latestExams } = await supabase
-          .from('exams')
-          .select('*')
-          .eq('college_id', collegeId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        if (latestExams && latestExams.length > 0) {
-          targetExam = latestExams[0];
-        }
+        const latestRes = await pool.query(
+          'SELECT * FROM exams WHERE college_id = $1 ORDER BY created_at DESC LIMIT 1',
+          [collegeId]
+        );
+        targetExam = latestRes.rows[0] || null;
       }
 
       if (targetExam) {
         effectiveExamKey = targetExam.exam_key || targetExam.exam_code;
         if (!effectiveExamKey) {
           effectiveExamKey = `EXAM-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-          await supabase
-            .from('exams')
-            .update({ exam_key: effectiveExamKey, exam_code: effectiveExamKey })
-            .eq('id', targetExam.id);
+          await pool.query(
+            'UPDATE exams SET exam_key = $1, exam_code = $2 WHERE id = $3',
+            [effectiveExamKey, effectiveExamKey, targetExam.id]
+          );
         }
 
-        // Insert exam assignment
-        await supabase
-          .from('exam_assignments')
-          .insert([{
-            exam_id: targetExam.id,
-            student_id: student.id,
-            status: 'assigned',
-            created_at: new Date().toISOString()
-          }]);
+        // Insert exam assignment using schema-compliant assigned_at column
+        const assignUuid = uuidv4();
+        await pool.query(
+          `INSERT INTO exam_assignments (id, exam_id, student_id, status, assigned_at)
+           VALUES ($1, $2, $3, 'assigned', NOW())
+           ON CONFLICT DO NOTHING`,
+          [assignUuid, targetExam.id, student.id]
+        );
 
         console.log(`✅ Assigned student ${student.id} to exam ${targetExam.title || targetExam.name} with key: ${effectiveExamKey}`);
       }
@@ -741,22 +737,29 @@ exports.bulkUploadStudents = async (req, res) => {
                 ...createdStudent,
                 password
               });
-
-              // Send credentials email
-              sendStudentCredentials({
-                name: studentData.name,
-                email: cleanEmail,
-                studentId,
-                password,
-                collegeName: req.user.name || 'Your Institution',
-                loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login'
-              }).catch(emailError => {
-                console.error(`❌ Bulk Upload Email Error for ${cleanEmail}:`, emailError.message);
-              });
             } catch (err) {
               errors.push(`Failed to process ${studentData.email}: ${err.message}`);
             }
           }
+
+          // Dispatch credentials emails sequentially with a 400ms throttle to prevent SMTP rate limiting
+          (async () => {
+            for (const s of results) {
+              try {
+                await sendStudentCredentials({
+                  name: s.name,
+                  email: s.email,
+                  studentId: s.student_id,
+                  password: s.password,
+                  collegeName: req.user.name || 'Your Institution',
+                  loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login'
+                });
+                await new Promise((r) => setTimeout(r, 400));
+              } catch (emailError) {
+                console.error(`❌ Bulk Upload Email Error for ${s.email}:`, emailError.message);
+              }
+            }
+          })();
 
           // Clean up uploaded file
           fs.unlinkSync(req.file.path);
@@ -1036,3 +1039,90 @@ exports.resolvePasswordRequest = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to resolve request', error: error.message });
   }
 };
+
+/**
+ * POST /api/admin/students/:id/resend-credentials
+ * College Admin directly resends welcome registration email with fresh credentials
+ */
+exports.resendCredentials = async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const collegeId = req.user?.id;
+
+    if (!collegeId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized college session' });
+    }
+
+    const studentCheck = await pool.query(
+      'SELECT id, student_id, name, email, roll_no FROM students WHERE id = $1 AND college_id = $2',
+      [studentId, collegeId]
+    );
+
+    if (studentCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Student not found in your institution.' });
+    }
+
+    const student = studentCheck.rows[0];
+
+    // Generate fresh temporary password
+    const newPassword = generatePassword();
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await pool.query(
+      'UPDATE students SET password = $1, updated_at = NOW() WHERE id = $2 AND college_id = $3',
+      [hashedPassword, studentId, collegeId]
+    );
+
+    // Look up latest active exam for this college
+    let targetExam = null;
+    let effectiveExamKey = null;
+    try {
+      const examCheck = await pool.query(
+        'SELECT id, title, name, exam_key, exam_code, date_time, duration, subject FROM exams WHERE college_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [collegeId]
+      );
+      if (examCheck.rows.length > 0) {
+        targetExam = examCheck.rows[0];
+        effectiveExamKey = targetExam.exam_key || targetExam.exam_code;
+      }
+    } catch (_) {}
+
+    console.log(`📨 Resending credentials to student: ${student.email} (${student.student_id})`);
+
+    await sendStudentCredentials({
+      name: student.name,
+      email: student.email,
+      studentId: student.student_id,
+      password: newPassword,
+      collegeName: req.user?.name || req.user?.college_name || 'Your Institution',
+      loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login',
+      examName: targetExam?.title || targetExam?.name || 'Scheduled Examination',
+      examKey: effectiveExamKey,
+      examDate: targetExam?.date_time,
+      examDuration: targetExam?.duration,
+      subject: targetExam?.subject,
+      isReset: false
+    });
+
+    res.json({
+      success: true,
+      message: `Registration credentials email has been sent successfully to ${student.email}`,
+      data: {
+        studentId: student.student_id,
+        email: student.email,
+        name: student.name,
+        temporaryPassword: newPassword,
+        examKey: effectiveExamKey
+      }
+    });
+
+  } catch (error) {
+    console.error('Resend credentials error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resend credentials: ' + error.message,
+      error: error.message
+    });
+  }
+};
+

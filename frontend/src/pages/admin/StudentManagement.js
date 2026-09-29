@@ -131,6 +131,7 @@ export default function StudentManagement() {
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [resendingId, setResendingId] = useState(null);
   const [bulkModal, setBulkModal] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
   const fileRef = useRef();
@@ -375,6 +376,31 @@ export default function StudentManagement() {
     }
   };
 
+  const handleResendEmail = async (student) => {
+    if (!student || !student.id) return;
+    setResendingId(student.id);
+    const toastId = toast.loading(`Sending credentials email to ${student.email}...`);
+    try {
+      const res = await adminAPI.resendStudentCredentials(student.id);
+      const data = res?.data || res;
+      toast.success(res?.message || `Credentials email successfully sent to ${student.email}!`, { id: toastId });
+      if (data?.temporaryPassword) {
+        setCredentialFallback({
+          id: student.id,
+          name: student.name,
+          email: student.email,
+          student_id: student.student_id,
+          password: data.temporaryPassword,
+          exam_key: data.examKey
+        });
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || 'Failed to send credentials email', { id: toastId });
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   const toggleStatus = async (id, name, isActive) => {
     try {
       await adminAPI.toggleStudent(id);
@@ -557,6 +583,17 @@ export default function StudentManagement() {
                   </td>
                   <td>
                     <div className="admin-table-actions">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Mail}
+                        loading={resendingId === student.id}
+                        onClick={() => handleResendEmail(student)}
+                        title="Send or resend login credentials email to student"
+                        style={{ color: '#10b981', fontWeight: 600 }}
+                      >
+                        Send Email
+                      </Button>
                       <Button variant="ghost" size="sm" icon={Edit2} onClick={() => openEdit(student)}>
                         Edit
                       </Button>
@@ -928,6 +965,17 @@ export default function StudentManagement() {
           >
             Copy All Credentials &amp; Key
           </Button>
+          {credentialFallback?.id && (
+            <Button
+              variant="secondary"
+              icon={Mail}
+              loading={resendingId === credentialFallback.id}
+              onClick={() => handleResendEmail(credentialFallback)}
+              style={{ color: '#10b981' }}
+            >
+              Email Credentials
+            </Button>
+          )}
           <Button onClick={() => setCredentialFallback(null)}>Done</Button>
         </div>
       </Modal>
