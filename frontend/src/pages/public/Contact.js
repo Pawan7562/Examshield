@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, Mail, Phone, MessageCircle, MapPin, Clock, CheckCircle2, Building2, Users, Sparkles, ShieldCheck, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PublicLayout from '../../components/public/PublicLayout';
+import SEOHead from '../../components/common/SEOHead';
 import './Contact.css';
 
 const contactReasons = [
@@ -77,6 +78,11 @@ export default function Contact() {
 
   return (
     <PublicLayout>
+      <SEOHead
+        title="Contact ExamShield & Nexify Forge | University Pilot & Support"
+        description="Get in touch with ExamShield by Nexify Forge. Request an institutional university pilot, schedule a live AI proctoring demo, or speak with our academic technology solutions engineers."
+        canonical="https://exam.nexifyforge.in/contact"
+      />
       {/* Hero */}
       <section className="contact-hero-section public-shell" aria-labelledby="contact-hero-h1">
         <div className="contact-hero-eyebrow">

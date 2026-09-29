@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, X, Star, Zap, Shield, Headphones } from 'lucide-react';
 import PublicLayout from '../../components/public/PublicLayout';
+import SEOHead from '../../components/common/SEOHead';
 import { pricingPlans } from './publicContent';
 import './PublicPages.css';
 
@@ -23,6 +24,11 @@ export default function PricingPage() {
 
   return (
     <PublicLayout>
+      <SEOHead
+        title="ExamShield Pricing & Plans | Online Exam Monitoring & Proctoring"
+        description="Transparent institutional pricing for universities, colleges, and training academies. Scalable plans with AI proctoring, browser kiosk lockdown, and multi-hall radar monitoring."
+        canonical="https://exam.nexifyforge.in/pricing"
+      />
       <section className="public-shell public-page-hero pricing-hero">
         <div className="public-page-copy">
           <div className="pricing-badge">

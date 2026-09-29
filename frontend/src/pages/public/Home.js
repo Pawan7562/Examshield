@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import PublicLayout from '../../components/public/PublicLayout';
+import SEOHead from '../../components/common/SEOHead';
 import heroExamMonitoringImg from '../../assets/exam-monitoring-hero.jpeg';
 import './Home.css';
 
@@ -384,8 +385,24 @@ const institutionalTestimonials = [
   },
 ];
 
-// Institutional FAQs
+// Institutional FAQs targeting primary Google searches
 const institutionalFaqs = [
+  {
+    q: "What is ExamShield's AI Online Exam Monitoring System by Nexify Forge?",
+    a: "ExamShield by Nexify Forge is an enterprise online examination monitoring and AI proctoring platform. Engineered for universities, colleges, and certification providers, ExamShield safeguards exam integrity through continuous biometric facial verification, kiosk browser lockdown, multi-hall live invigilation radar, and automated coding & MCQ evaluation.",
+  },
+  {
+    q: 'How does the browser kiosk lockdown prevent cheating during online exams?',
+    a: 'ExamShield activates an enforced fullscreen kiosk sandbox inside standard web browsers. It blocks new tabs and windows, intercepts keyboard shortcuts (Alt+Tab, Windows key, Ctrl+C/Ctrl+V, PrtScn), flags secondary monitors and HDMI splitters, and detects background screen-sharing or remote desktop software without requiring invasive kernel-level downloads.',
+  },
+  {
+    q: 'Can ExamShield monitor online coding assessments and programming exams?',
+    a: 'Yes. ExamShield features an integrated online coding assessment platform with sandboxed code compilation supporting over 20 programming languages (Python, Java, C++, JavaScript, Go, Rust, and more). It evaluates hidden and visible test cases in real time, inspects code velocity, and monitors against tab-switching to external AI or documentation sites.',
+  },
+  {
+    q: 'How does ExamShield scale for college and university exam monitoring?',
+    a: 'ExamShield is built on high-concurrency cloud architecture capable of handling thousands of concurrent students per exam session. Features include resilient 15-second bulk answer syncing, sub-15ms database query speeds, and a centralized College Admin radar where invigilators monitor multiple campus lecture halls simultaneously.',
+  },
   {
     q: 'Does ExamShield require students to install extensions or invasive desktop apps?',
     a: 'No. ExamShield is 100% web-based. It runs natively in Google Chrome, Microsoft Edge, Mozilla Firefox, and Apple Safari using HTML5 WebRTC, Canvas API, and Web Audio. Candidates do not need administrator privileges or invasive root-level software.',
@@ -403,12 +420,8 @@ const institutionalFaqs = [
     a: 'Yes. The Invigilator Cockpit provides a discreet 1-on-1 private audio whisper feature and instant text alert broadcast. Invigilators can clarify instructions, issue calibrated warnings, or pause an exam session immediately without disrupting other candidates.',
   },
   {
-    q: 'Can ExamShield detect dual monitors, HDMI splitters, and screen-sharing tools?',
-    a: 'Yes. Our browser kiosk queries the display environment, flags multiple active display profiles, intercepts keyboard shortcuts (Alt+Tab, Windows key, Ctrl+C/V), prevents virtual machine access, and blocks desktop capture tools.',
-  },
-  {
-    q: 'How does integration work with LMS platforms like Canvas, Moodle, and Blackboard?',
-    a: 'ExamShield natively supports LTI 1.3 standards. Instructors can attach ExamShield proctoring to existing assignments with a single toggle. Student rosters populate automatically and validated grades return directly to your LMS gradebook.',
+    q: 'How does Nexify Forge support institutions onboarding ExamShield?',
+    a: 'Nexify Forge provides dedicated institutional solutions architects, turnkey LMS integration (Canvas, Moodle, Blackboard), automated faculty onboarding workshops, and 24/7 dedicated exam-day mission control support.',
   },
 ];
 
@@ -432,25 +445,47 @@ export default function Home() {
   const selectedDepartment = collegeDepartments.find((d) => d.id === activeDepartment) || collegeDepartments[0];
   const selectedAudience = audienceSolutions.find((item) => item.id === activeAudience) || audienceSolutions[0];
 
+  // Structured Data (JSON-LD) for FAQ Page
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: institutionalFaqs.map((faq) => ({
+      '@type': 'Question',
+      name: faq.q,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.a,
+      },
+    })),
+  };
+
   return (
     <PublicLayout className="exam-landing-theme">
+      {/* Dynamic SEO Meta & Schema */}
+      <SEOHead
+        title="ExamShield by Nexify Forge | Online Exam Monitoring & AI Proctoring System"
+        description="ExamShield by Nexify Forge is an enterprise AI online exam monitoring, remote proctoring, and assessment platform. Featuring browser kiosk lockdown, continuous biometric verification, and live invigilation for colleges and universities."
+        canonical="https://exam.nexifyforge.in/"
+        jsonLd={faqJsonLd}
+      />
+
       {/* Hero Section */}
       <section className="public-shell landing-hero" aria-labelledby="hero-heading">
         <div className="landing-copy">
           <div className="landing-eyebrow-wrapper">
             <span className="landing-eyebrow-pill">
               <ShieldCheck size={14} aria-hidden="true" />
-              Institutional-Grade Exam Integrity
+              Nexify Forge Platform · AI Exam Monitoring &amp; Proctoring
             </span>
           </div>
 
           <h1 id="hero-heading">
-            Secure every exam.<br />
-            <span>Protect institutional integrity.</span>
+            AI Online Exam Monitoring &amp; Proctoring System<br />
+            <span>Secure Assessments for Colleges &amp; Universities</span>
           </h1>
 
           <p className="landing-hero-description">
-            ExamShield is the complete AI and live proctoring platform for high-stakes assessments. Prevent cheating with continuous biometric face verification, browser kiosk lockdown, ambient sound analytics, and court-admissible audit reports.
+            ExamShield by Nexify Forge is an enterprise-grade AI exam monitoring, online proctoring, and secure assessment system. Prevent cheating with continuous biometric face verification, browser kiosk lockdown, ambient sound analytics, and automated coding &amp; MCQ evaluation.
           </p>
 
           <div className="landing-actions" role="group" aria-label="Primary actions">

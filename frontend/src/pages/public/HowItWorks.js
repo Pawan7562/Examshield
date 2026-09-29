@@ -6,6 +6,7 @@ import {
   Clock, ChevronRight, Activity, Monitor, AlertTriangle,
 } from 'lucide-react';
 import PublicLayout from '../../components/public/PublicLayout';
+import SEOHead from '../../components/common/SEOHead';
 import './PublicPages.css';
 
 const lifecycle = [
@@ -129,6 +130,11 @@ export default function HowItWorksPage() {
 
   return (
     <PublicLayout>
+      <SEOHead
+        title="How ExamShield Works | Step-by-Step AI Online Exam Proctoring"
+        description="Learn how ExamShield by Nexify Forge protects exams in 5 structured phases: automated roster import, biometric preflight, kiosk browser lockdown, AI invigilation, and forensic audit dossier export."
+        canonical="https://exam.nexifyforge.in/how-it-works"
+      />
       {/* Hero */}
       <section className="hiw-hero-section public-shell" aria-labelledby="hiw-hero-h1">
         <div className="hiw-hero-eyebrow">

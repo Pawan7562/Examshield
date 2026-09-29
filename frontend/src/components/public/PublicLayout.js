@@ -64,7 +64,9 @@ export default function PublicLayout({ children, className = '' }) {
     { to: '/', label: 'Home', end: true },
     { to: '/features', label: 'Features' },
     { to: '/how-it-works', label: 'How It Works' },
+    { to: '/pricing', label: 'Pricing' },
     { href: '/#college-admin', label: 'Institutions' },
+    { to: '/faq', label: 'FAQ' },
     { to: '/about', label: 'About Us' },
     { to: '/contact', label: 'Contact' },
   ];
@@ -332,14 +334,14 @@ export default function PublicLayout({ children, className = '' }) {
               {/* Brand & Overview Column */}
               <div className="footer-brand-col">
                 <Link to="/" className="footer-brand-link" aria-label="ExamShield home page">
-                  <img src={logoImg} alt="ExamShield Logo" className="footer-brand-logo" />
+                  <img src={logoImg} alt="ExamShield by Nexify Forge - Online Exam Monitoring & AI Proctoring System" className="footer-brand-logo" />
                   <span className="footer-brand-name">
                     Exam<span>Shield</span>
                   </span>
                 </Link>
 
                 <p className="footer-brand-desc">
-                  Autonomous AI proctoring and secure browser-lockdown platform engineered for high-stakes higher education examinations and professional certifications.
+                  ExamShield by Nexify Forge is an enterprise AI online exam monitoring, remote proctoring, and secure assessment system engineered for universities, colleges, and certification providers.
                 </p>
 
                 <div className="footer-compliance-badges">
@@ -406,6 +408,7 @@ export default function PublicLayout({ children, className = '' }) {
               <div className="footer-nav-col">
                 <h4 className="footer-col-title">Trust &amp; Governance</h4>
                 <ul className="footer-links-list">
+                  <li><NavLink to="/faq">Frequently Asked Questions</NavLink></li>
                   <li><NavLink to="/about">About ExamShield</NavLink></li>
                   <li><NavLink to="/about">Security Architecture</NavLink></li>
                   <li><NavLink to="/contact">Support &amp; Contact</NavLink></li>
@@ -420,7 +423,7 @@ export default function PublicLayout({ children, className = '' }) {
             <div className="footer-bottom-bar">
               <div className="footer-bottom-left">
                 <span className="footer-copyright">
-                  &copy; {new Date().getFullYear()} ExamShield Inc. All rights reserved.
+                  &copy; {new Date().getFullYear()} ExamShield · A <a href="https://nexifyforge.in" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Nexify Forge</a> Product. All rights reserved.
                 </span>
                 <span className="footer-uptime-badge">
                   <span className="live-status-dot" />
