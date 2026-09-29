@@ -1964,6 +1964,8 @@ exports.submitExam = async (req, res) => {
     let subjectiveMarks = 0;
     const questionMap = new Map((questions || []).map(q => [q.id, q]));
 
+    const answerUpdates = [];
+
     for (const answer of answers || []) {
       const question = questionMap.get(answer.question_id);
       if (!question) {
@@ -1979,8 +1981,8 @@ exports.submitExam = async (req, res) => {
         const finalMarks = Math.max(0, marksObtained);
         mcqMarks += finalMarks;
 
-        try {
-          await supabase
+        answerUpdates.push(
+          supabase
             .from('answers')
             .update({
               is_correct: isCorrect,
@@ -1988,10 +1990,8 @@ exports.submitExam = async (req, res) => {
               is_evaluated: true,
               updated_at: new Date().toISOString()
             })
-            .eq('id', answer.id);
-        } catch (updateErr) {
-          console.warn(`⚠️ [SUBMIT-EXAM] Could not save evaluation for answer ${answer.id}:`, updateErr.message);
-        }
+            .eq('id', answer.id)
+        );
       } else if (question.type === 'coding') {
         const maxQMarks = Number(question.marks) || 10;
         let earnedQMarks = 0;
@@ -2005,8 +2005,8 @@ exports.submitExam = async (req, res) => {
 
         codingMarks += earnedQMarks;
 
-        try {
-          await supabase
+        answerUpdates.push(
+          supabase
             .from('answers')
             .update({
               is_correct: earnedQMarks > 0,
@@ -2014,15 +2014,18 @@ exports.submitExam = async (req, res) => {
               is_evaluated: true,
               updated_at: new Date().toISOString()
             })
-            .eq('id', answer.id);
-        } catch (updateErr) {
-          console.warn(`⚠️ [SUBMIT-EXAM] Could not save coding evaluation for answer ${answer.id}:`, updateErr.message);
-        }
+            .eq('id', answer.id)
+        );
       } else if (question.type === 'subjective') {
         if (answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
           subjectiveMarks += Number(answer.marks_obtained);
         }
       }
+    }
+
+    // High-concurrency scalability: execute all evaluated answer updates concurrently in parallel
+    if (answerUpdates.length > 0) {
+      await Promise.allSettled(answerUpdates);
     }
 
     // 5. Fetch Exam Meta for Final Result Status
