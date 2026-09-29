@@ -190,24 +190,17 @@ io.on('connection', (socket) => {
     socket.leave(`exam-monitoring-${examId}`);
   });
 
-  // Camera feed stream from student to proctor (optimized for scale: only forward when a proctor is watching)
+  // Camera feed stream from student to proctor
   socket.on('camera-feed', ({ examId, studentId, sessionId, imageData, timestamp }) => {
-    const adminRoom = `admin-exam-${examId}`;
-    const monitorRoom = `exam-monitoring-${examId}`;
-    const hasAdmin = (io.sockets.adapter.rooms.get(adminRoom)?.size || 0) > 0 ||
-                     (io.sockets.adapter.rooms.get(monitorRoom)?.size || 0) > 0;
-
-    if (hasAdmin && imageData) {
-      const feedPayload = {
-        examId,
-        studentId,
-        sessionId,
-        imageData,
-        timestamp: timestamp || new Date().toISOString(),
-      };
-      io.to(adminRoom).emit('camera-feed', feedPayload);
-      io.to(monitorRoom).emit('camera-feed', feedPayload);
-    }
+    const feedPayload = {
+      examId,
+      studentId,
+      sessionId,
+      imageData,
+      timestamp: timestamp || new Date().toISOString(),
+    };
+    io.to(`admin-exam-${examId}`).emit('camera-feed', feedPayload);
+    io.to(`exam-monitoring-${examId}`).emit('camera-feed', feedPayload);
   });
 
   // Student telemetry update (question progress, face count, audio level)
