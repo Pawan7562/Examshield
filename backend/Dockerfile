@@ -1,7 +1,6 @@
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
-# Use --omit=dev for better compatibility; npm ci is the default but needs a lockfile
 RUN npm install --omit=dev
 COPY . .
 RUN mkdir -p uploads
