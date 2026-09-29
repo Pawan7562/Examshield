@@ -92,16 +92,28 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) =
 
   const opts = { ...mailOptions, from, replyTo, headers };
 
-  // ── Priority 1: Resend API (most reliable, works everywhere) ──────────────
+  // ── Priority 1: Resend API (most reliable, inbox delivery, works everywhere) ──────────────
   if (process.env.RESEND_API_KEY) {
     const resend = new Resend(process.env.RESEND_API_KEY);
-    console.log(`📤 [Resend] Sending to ${opts.to} | Subject: ${opts.subject}`);
+    // Use RESEND_FROM if set (verified custom domain), else fallback to onboarding@resend.dev
+    // NOTE: On Resend free plan without a verified domain, you MUST use onboarding@resend.dev
+    // and can only send to your own registered email. Verify a domain at resend.com/domains
+    // to send to any recipient.
+    const resendFrom =
+      process.env.RESEND_FROM ||
+      (process.env.RESEND_DOMAIN
+        ? `ExamShield Portal <noreply@${process.env.RESEND_DOMAIN}>`
+        : 'ExamShield Portal <onboarding@resend.dev>');
+
+    console.log(`📤 [Resend] Sending to ${opts.to} | From: ${resendFrom} | Subject: ${opts.subject}`);
     try {
       const { data, error } = await resend.emails.send({
-        from: opts.from,
+        from: resendFrom,
         to: opts.to,
+        reply_to: process.env.EMAIL_USER || opts.replyTo,
         subject: opts.subject,
         html: opts.html,
+        text: opts.text,
       });
       if (error) throw new Error(error.message);
       console.log(`✅ [Resend] Delivered. MessageId: ${data?.id}`);
@@ -109,7 +121,8 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) =
       return { messageId: data?.id };
     } catch (err) {
       console.error(`❌ [Resend] Failed: ${err.message}`);
-      throw err;
+      // Don't throw — fall through to SMTP so email still gets sent
+      console.log('🔄 Resend failed, falling back to SMTP...');
     }
   }
 
