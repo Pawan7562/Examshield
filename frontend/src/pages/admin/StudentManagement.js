@@ -358,13 +358,30 @@ export default function StudentManagement() {
         toast.success('Student updated successfully');
       } else {
         const response = await adminAPI.addStudent(form);
-        const data = response.data?.data || response.data;
-        if (data?.emailSent) {
-          const keyMsg = data?.exam_key ? ` Exam Key: ${data.exam_key}` : '';
-          toast.success(`Student added! Credentials &${keyMsg} sent to ${data.email}`);
+        const studentInfo = response?.student || response?.data?.student || response?.data || response;
+        const creds = response?.credentials || response?.data?.credentials || {};
+        const isEmailSent = Boolean(studentInfo?.email_sent || creds?.email_sent || response?.emailSent);
+        const tempPassword = creds?.temporary_password || studentInfo?.temporary_password || studentInfo?.password || '';
+        const studentId = studentInfo?.student_id || creds?.student_id || '';
+        const examKey = studentInfo?.exam_key || creds?.exam_key || '';
+        const studentEmail = studentInfo?.email || form.email;
+        const studentName = studentInfo?.name || form.name;
+
+        setCredentialFallback({
+          id: studentInfo?.id,
+          name: studentName,
+          email: studentEmail,
+          student_id: studentId,
+          password: tempPassword,
+          exam_key: examKey,
+          email_sent: isEmailSent
+        });
+
+        if (isEmailSent) {
+          const keyMsg = examKey ? ` & Exam Key (${examKey})` : '';
+          toast.success(`Student added! Credentials${keyMsg} sent to ${studentEmail}`);
         } else {
-          setCredentialFallback(data);
-          toast.success('Student added! Credentials generated below.');
+          toast.success(`Student added! Credentials generated on screen.`);
         }
       }
       setAddModal(false);
@@ -914,9 +931,15 @@ export default function StudentManagement() {
         onClose={() => setCredentialFallback(null)}
         title="Student Credentials & Exam Access"
       >
-        <div className="admin-form-note" style={{ background: '#ecfdf5', borderColor: '#10b981', color: '#065f46' }}>
-          <CheckCircle size={16} style={{ color: '#10b981' }} />
-          Student created successfully! Copy and share these credentials with the student:
+        <div className="admin-form-note" style={{
+          background: credentialFallback?.email_sent ? '#ecfdf5' : '#fffbeb',
+          borderColor: credentialFallback?.email_sent ? '#10b981' : '#f59e0b',
+          color: credentialFallback?.email_sent ? '#065f46' : '#92400e'
+        }}>
+          <CheckCircle size={16} style={{ color: credentialFallback?.email_sent ? '#10b981' : '#f59e0b' }} />
+          {credentialFallback?.email_sent 
+            ? `Credentials successfully emailed to ${credentialFallback.email}! You can also copy them below:`
+            : `Student created! The credentials have been generated below. Copy and provide them to the student:`}
         </div>
         <div className="admin-form-grid">
           <Input label="Student ID" value={credentialFallback?.student_id || ''} readOnly />
