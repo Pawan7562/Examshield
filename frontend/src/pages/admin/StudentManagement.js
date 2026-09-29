@@ -26,7 +26,8 @@ import {
   Key,
   RefreshCw,
   Copy,
-  Clock
+  Clock,
+  Send
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 
@@ -131,7 +132,6 @@ export default function StudentManagement() {
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [resendingId, setResendingId] = useState(null);
   const [bulkModal, setBulkModal] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
   const fileRef = useRef();
@@ -358,30 +358,14 @@ export default function StudentManagement() {
         toast.success('Student updated successfully');
       } else {
         const response = await adminAPI.addStudent(form);
-        const studentInfo = response?.student || response?.data?.student || response?.data || response;
-        const creds = response?.credentials || response?.data?.credentials || {};
-        const isEmailSent = Boolean(studentInfo?.email_sent || creds?.email_sent || response?.emailSent);
-        const tempPassword = creds?.temporary_password || studentInfo?.temporary_password || studentInfo?.password || '';
-        const studentId = studentInfo?.student_id || creds?.student_id || '';
-        const examKey = studentInfo?.exam_key || creds?.exam_key || '';
-        const studentEmail = studentInfo?.email || form.email;
-        const studentName = studentInfo?.name || form.name;
-
-        setCredentialFallback({
-          id: studentInfo?.id,
-          name: studentName,
-          email: studentEmail,
-          student_id: studentId,
-          password: tempPassword,
-          exam_key: examKey,
-          email_sent: isEmailSent
-        });
-
-        if (isEmailSent) {
-          const keyMsg = examKey ? ` & Exam Key (${examKey})` : '';
-          toast.success(`Student added! Credentials${keyMsg} sent to ${studentEmail}`);
+        const data = response.data?.data || response.data;
+        // Always display generated credentials so admin can review and copy them
+        setCredentialFallback(data);
+        const keyMsg = data?.exam_key ? ` Exam Key: ${data.exam_key}` : '';
+        if (data?.emailSent) {
+          toast.success(`Student added! Credentials &${keyMsg} sent to ${data.email}`);
         } else {
-          toast.success(`Student added! Credentials generated on screen.`);
+          toast.info('Student added! Credentials generated below (email delivery pending).');
         }
       }
       setAddModal(false);
@@ -390,31 +374,6 @@ export default function StudentManagement() {
       toast.error(err.message || 'Operation failed');
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleResendEmail = async (student) => {
-    if (!student || !student.id) return;
-    setResendingId(student.id);
-    const toastId = toast.loading(`Sending credentials email to ${student.email}...`);
-    try {
-      const res = await adminAPI.resendStudentCredentials(student.id);
-      const data = res?.data || res;
-      toast.success(res?.message || `Credentials email successfully sent to ${student.email}!`, { id: toastId });
-      if (data?.temporaryPassword) {
-        setCredentialFallback({
-          id: student.id,
-          name: student.name,
-          email: student.email,
-          student_id: student.student_id,
-          password: data.temporaryPassword,
-          exam_key: data.examKey
-        });
-      }
-    } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || 'Failed to send credentials email', { id: toastId });
-    } finally {
-      setResendingId(null);
     }
   };
 
@@ -428,14 +387,53 @@ export default function StudentManagement() {
     }
   };
 
+  const handleResendCredentials = async (student) => {
+    if (!window.confirm(`Resend credentials email to ${student.name} (${student.email})? A fresh login password will be generated and dispatched.`)) return;
+    try {
+      toast.loading(`Sending credentials to ${student.email}...`, { id: 'resend-toast' });
+      const res = await adminAPI.resendStudentCredentials(student.id);
+      const data = res?.data || res;
+      toast.success(res?.message || 'Credentials resent successfully!', { id: 'resend-toast' });
+      setCredentialFallback({
+        ...data,
+        name: student.name,
+        email: student.email,
+        student_id: student.student_id
+      });
+      fetchStudents(pagination.page || 1, true);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to resend credentials', { id: 'resend-toast' });
+    }
+  };
+
   const deleteStudent = async (id, name) => {
     if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return;
+
+    const purgeFromLocal = () => {
+      setStudents(prev => prev.filter(s => s.id !== id && s.student_id !== id));
+      if (storageKey) {
+        try {
+          const cached = JSON.parse(sessionStorage.getItem(storageKey) || '[]');
+          const updated = cached.filter(s => s.id !== id && s.student_id !== id);
+          sessionStorage.setItem(storageKey, JSON.stringify(updated));
+        } catch (_) {}
+      }
+    };
+
     try {
-      await adminAPI.deleteStudent(id);
-      toast.success('Student deleted successfully');
-      fetchStudents(1);
-    } catch {
-      toast.error('Delete failed');
+      const res = await adminAPI.deleteStudent(id);
+      purgeFromLocal();
+      toast.success(res?.message || 'Student deleted successfully');
+      fetchStudents(pagination.page || 1, true);
+    } catch (err) {
+      purgeFromLocal();
+      const status = err?.response?.status;
+      if (status === 404) {
+        toast.info('Student already removed from registry');
+      } else {
+        toast.error(err?.response?.data?.message || err?.message || 'Delete failed');
+      }
+      fetchStudents(pagination.page || 1, true);
     }
   };
 
@@ -600,17 +598,6 @@ export default function StudentManagement() {
                   </td>
                   <td>
                     <div className="admin-table-actions">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={Mail}
-                        loading={resendingId === student.id}
-                        onClick={() => handleResendEmail(student)}
-                        title="Send or resend login credentials email to student"
-                        style={{ color: '#10b981', fontWeight: 600 }}
-                      >
-                        Send Email
-                      </Button>
                       <Button variant="ghost" size="sm" icon={Edit2} onClick={() => openEdit(student)}>
                         Edit
                       </Button>
@@ -623,6 +610,16 @@ export default function StudentManagement() {
                         style={{ color: '#0a74da' }}
                       >
                         Reset Pwd
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Send}
+                        onClick={() => handleResendCredentials(student)}
+                        title="Resend Login Credentials Email"
+                        style={{ color: '#059669' }}
+                      >
+                        Resend Email
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -931,15 +928,9 @@ export default function StudentManagement() {
         onClose={() => setCredentialFallback(null)}
         title="Student Credentials & Exam Access"
       >
-        <div className="admin-form-note" style={{
-          background: credentialFallback?.email_sent ? '#ecfdf5' : '#fffbeb',
-          borderColor: credentialFallback?.email_sent ? '#10b981' : '#f59e0b',
-          color: credentialFallback?.email_sent ? '#065f46' : '#92400e'
-        }}>
-          <CheckCircle size={16} style={{ color: credentialFallback?.email_sent ? '#10b981' : '#f59e0b' }} />
-          {credentialFallback?.email_sent 
-            ? `Credentials successfully emailed to ${credentialFallback.email}! You can also copy them below:`
-            : `Student created! The credentials have been generated below. Copy and provide them to the student:`}
+        <div className="admin-form-note" style={{ background: '#ecfdf5', borderColor: '#10b981', color: '#065f46' }}>
+          <CheckCircle size={16} style={{ color: '#10b981' }} />
+          Student created successfully! Copy and share these credentials with the student:
         </div>
         <div className="admin-form-grid">
           <Input label="Student ID" value={credentialFallback?.student_id || ''} readOnly />
@@ -970,6 +961,9 @@ export default function StudentManagement() {
             </div>
           )}
         </div>
+        <div style={{ marginTop: '16px', padding: '12px 14px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.84rem', color: '#334155' }}>
+          💡 <strong>Delivery Note:</strong> Credentials were sent to <strong>{credentialFallback?.email}</strong>. If not visible in the Primary Inbox, please ask the student to check their <strong>Spam / Junk</strong> folder, or copy and send the details below directly.
+        </div>
         <div className="admin-form-actions">
           <Button
             variant="secondary"
@@ -988,17 +982,6 @@ export default function StudentManagement() {
           >
             Copy All Credentials &amp; Key
           </Button>
-          {credentialFallback?.id && (
-            <Button
-              variant="secondary"
-              icon={Mail}
-              loading={resendingId === credentialFallback.id}
-              onClick={() => handleResendEmail(credentialFallback)}
-              style={{ color: '#10b981' }}
-            >
-              Email Credentials
-            </Button>
-          )}
           <Button onClick={() => setCredentialFallback(null)}>Done</Button>
         </div>
       </Modal>

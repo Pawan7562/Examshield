@@ -52,21 +52,14 @@ module.exports = async function handler(req, res) {
       socketTimeout: 10000,
     });
 
-    const targetTo = typeof mailOptions.to === 'string' ? mailOptions.to.trim() : mailOptions.to;
-
     // Ensure a proper "from" address
     const from =
       mailOptions.from ||
       process.env.EMAIL_FROM ||
       `ExamShield <${smtpUser}>`;
 
-    let info;
-    try {
-      info = await transporter.sendMail({ ...mailOptions, to: targetTo, from });
-      console.log(`[Vercel Relay] ✅ Success: ${info.messageId}`);
-    } finally {
-      transporter.close();
-    }
+    const info = await transporter.sendMail({ ...mailOptions, from });
+    console.log(`[Vercel Relay] ✅ Success: ${info.messageId}`);
 
     return res.status(200).json({ success: true, messageId: info.messageId });
 

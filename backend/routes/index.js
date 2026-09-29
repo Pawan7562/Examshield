@@ -66,7 +66,7 @@ admin.put('/students/:id', studentController.updateStudent);
 admin.patch('/students/:id/toggle-status', studentController.toggleStudentStatus);
 admin.delete('/students/:id', studentController.deleteStudent);
 admin.post('/students/:id/reset-password', studentController.resetStudentPassword);
-admin.post('/students/:id/resend-credentials', studentController.resendCredentials);
+admin.post('/students/:id/resend-credentials', studentController.resendStudentCredentials);
 admin.get('/students/password-requests', studentController.getPasswordRequests);
 admin.post('/students/password-requests/:id/resolve', studentController.resolvePasswordRequest);
 

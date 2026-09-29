@@ -220,16 +220,15 @@ export const authAPI = {
 export const adminAPI = {
   getDashboard: () => api.get('/admin/dashboard'),
   getStudents: (params) => api.get('/admin/students', { params }),
-  addStudent: (data) => api.post('/admin/students', data, { timeout: 60000 }),
+  addStudent: (data) => api.post('/admin/students', data, { timeout: 30000 }),
   bulkUpload: (formData) => api.post('/admin/students/bulk', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 120000,
   }),
   updateStudent: (id, data) => api.put(`/admin/students/${id}`, data),
   toggleStudent: (id) => api.patch(`/admin/students/${id}/toggle-status`),
   deleteStudent: (id) => api.delete(`/admin/students/${id}`),
   resetStudentPassword: (id, data) => api.post(`/admin/students/${id}/reset-password`, data),
-  resendStudentCredentials: (id) => api.post(`/admin/students/${id}/resend-credentials`, {}, { timeout: 45000 }),
+  resendStudentCredentials: (id) => api.post(`/admin/students/${id}/resend-credentials`),
   getStudentPasswordRequests: (params) => api.get('/admin/students/password-requests', { params }),
   resolvePasswordRequest: (id, data) => api.post(`/admin/students/password-requests/${id}/resolve`, data),
 

@@ -1,6 +1,4 @@
 // services/emailService.js
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 require('dotenv').config();
 
 const nodemailer = require('nodemailer');
@@ -29,9 +27,26 @@ const createFreshTransporter = () => {
     );
   }
 
-  const port = parseInt(EMAIL_PORT) || 587;
-  const secure = port === 465; // true = SSL; false = STARTTLS (port 587)
   const cleanPass = (EMAIL_PASS || '').trim();
+  const isGmail = (EMAIL_HOST || '').toLowerCase().includes('gmail.com');
+
+  console.log(`🔧 [SMTP] Creating fresh transporter → ${EMAIL_HOST} | user: ${EMAIL_USER}`);
+
+  if (isGmail) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: EMAIL_USER,
+        pass: cleanPass,
+      },
+      connectionTimeout: 20000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
+    });
+  }
+
+  const port = parseInt(EMAIL_PORT) || 587;
+  const secure = port === 465;
 
   return nodemailer.createTransport({
     host: EMAIL_HOST,
@@ -44,28 +59,40 @@ const createFreshTransporter = () => {
     tls: {
       rejectUnauthorized: false,
     },
-    connectionTimeout: 12000,
-    greetingTimeout: 8000,
-    socketTimeout: 12000,
+    connectionTimeout: 20000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   });
 };
 
 // Legacy alias so existing code that calls getTransporter() still works.
+// It now returns a fresh instance every time (no singleton).
 const getTransporter = () => createFreshTransporter();
 
 // ─────────────────────────────────────────────────────────────
 // Internal helper: send with retry
 // ─────────────────────────────────────────────────────────────
-const sendWithRetry = async (mailOptions, maxRetries = 2, retryDelayMs = 2000) => {
+const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 5000) => {
   const from =
     mailOptions.from ||
     process.env.EMAIL_FROM ||
     `ExamShield <${process.env.EMAIL_USER || 'noreply@examshield.com'}>`;
+  const replyTo =
+    mailOptions.replyTo ||
+    process.env.EMAIL_USER ||
+    'pawankumaryadav75628697@gmail.com';
 
-  const targetTo = (mailOptions.to || '').trim().toLowerCase();
-  const opts = { ...mailOptions, to: targetTo, from };
+  const headers = {
+    'X-Priority': '3',
+    'X-Mailer': 'ExamShield Academic Portal',
+    'List-Unsubscribe': `<mailto:${process.env.EMAIL_USER || 'pawankumaryadav75628697@gmail.com'}?subject=Unsubscribe>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    ...(mailOptions.headers || {})
+  };
 
-  // ── Priority 1: Resend API (most reliable if key provided) ────────────────
+  const opts = { ...mailOptions, from, replyTo, headers };
+
+  // ── Priority 1: Resend API (most reliable, works everywhere) ──────────────
   if (process.env.RESEND_API_KEY) {
     const resend = new Resend(process.env.RESEND_API_KEY);
     console.log(`📤 [Resend] Sending to ${opts.to} | Subject: ${opts.subject}`);
@@ -86,6 +113,9 @@ const sendWithRetry = async (mailOptions, maxRetries = 2, retryDelayMs = 2000) =
     }
   }
 
+  // ── Priority 2: Direct SMTP (works on local dev and many cloud hosts) ─────
+  // Local dev always tries SMTP directly — no relay needed.
+  // Cloud/production (Render) tries relay first since Render blocks SMTP ports.
   const isCloudOrProd =
     process.env.NODE_ENV === 'production' ||
     !!process.env.RENDER ||
@@ -94,13 +124,45 @@ const sendWithRetry = async (mailOptions, maxRetries = 2, retryDelayMs = 2000) =
     process.env.EMAIL_RELAY_URL ||
     'https://examshield.vercel.app/api/send-email';
 
-  // Helper to send via Vercel HTTPS Relay
-  const sendViaRelay = async () => {
-    console.log(`📤 [Vercel Relay] Sending to ${opts.to} via ${relayUrl}`);
+  // ── Priority 2a: Local dev — use direct SMTP ───────────────────────────
+  if (!isCloudOrProd && process.env.USE_EMAIL_RELAY !== 'true') {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // Create a fresh transporter each attempt — reusing the same
+      // connection between students causes Gmail to silently drop emails.
+      const transporter = createFreshTransporter();
+      try {
+        console.log(`📤 [SMTP] Attempt ${attempt}/${maxRetries} → ${opts.to}`);
+        const info = await transporter.sendMail(opts);
+        console.log(`✅ [SMTP] Sent! MessageId: ${info.messageId}`);
+        logger.info('Email sent via SMTP', { to: opts.to, messageId: info.messageId });
+        transporter.close();
+        return info;
+      } catch (err) {
+        console.error(`❌ [SMTP] Attempt ${attempt} failed: ${err.message} (code: ${err.code})`);
+        transporter.close();
+        if (err.code === 'EAUTH') {
+          logger.error('Gmail auth failed — check EMAIL_USER and EMAIL_PASS (use App Password)', { error: err.message });
+          throw new Error(
+            `Gmail authentication failed (EAUTH). Make sure:\n` +
+            `  1. 2-Step Verification is ON for ${process.env.EMAIL_USER}\n` +
+            `  2. EMAIL_PASS is a 16-char Gmail App Password (not your normal password)\n` +
+            `Original: ${err.message}`
+          );
+        }
+        if (attempt === maxRetries) throw err;
+        console.log(`🔄 [SMTP] Retrying in ${retryDelayMs / 1000}s…`);
+        await new Promise((r) => setTimeout(r, retryDelayMs));
+      }
+    }
+    return; // shouldn't reach here
+  }
+
+  // ── Priority 2b: Cloud / production — try Vercel relay first ─────────────
+  console.log(`📤 [Vercel Relay] Sending to ${opts.to} via ${relayUrl}`);
+  try {
     const response = await fetch(relayUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(12000), // 12s timeout
       body: JSON.stringify({
         internalSecret: 'examshield-secure-relay-9921',
         host: process.env.EMAIL_HOST || 'smtp.gmail.com',
@@ -117,55 +179,31 @@ const sendWithRetry = async (mailOptions, maxRetries = 2, retryDelayMs = 2000) =
     console.log(`✅ [Vercel Relay] Delivered! MessageId: ${data.messageId}`);
     logger.info('Email sent via Vercel Relay', { to: opts.to, messageId: data.messageId });
     return data;
-  };
-
-  // Helper to send via direct fresh SMTP
-  const sendViaDirectSMTP = async () => {
-    const transporter = createFreshTransporter();
-    try {
-      console.log(`📤 [Direct SMTP] Sending to ${opts.to}`);
-      const info = await transporter.sendMail(opts);
-      console.log(`✅ [Direct SMTP] Sent! MessageId: ${info.messageId}`);
-      logger.info('Email sent via SMTP', { to: opts.to, messageId: info.messageId });
-      return info;
-    } finally {
-      transporter.close();
-    }
-  };
-
-  // ── Strategy A: Cloud / Production (Render blocks direct SMTP, so Relay first) ─
-  if (isCloudOrProd || process.env.USE_EMAIL_RELAY === 'true') {
-    try {
-      return await sendViaRelay();
-    } catch (relayErr) {
-      console.error(`❌ [Vercel Relay] Failed: ${relayErr.message}`);
-      console.log('🔄 Falling back to direct SMTP…');
-      try {
-        return await sendViaDirectSMTP();
-      } catch (smtpErr) {
-        console.error(`❌ [SMTP Fallback] Failed: ${smtpErr.message}`);
-        throw new Error(`Email delivery failed via Relay and direct SMTP: ${relayErr.message}`);
-      }
-    }
+  } catch (relayErr) {
+    console.error(`❌ [Vercel Relay] Failed: ${relayErr.message}`);
+    console.log('🔄 Falling back to direct SMTP…');
   }
 
-  // ── Strategy B: Local Development (Direct SMTP first, Relay as instant fallback) ─
+  // ── Priority 2c: Fallback to direct SMTP (cloud) ─────────────────────────
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // Fresh transporter each retry so a broken connection doesn't block subsequent emails
+    const transporter = createFreshTransporter();
     try {
-      return await sendViaDirectSMTP();
-    } catch (smtpErr) {
-      console.error(`❌ [SMTP] Attempt ${attempt}/${maxRetries} failed: ${smtpErr.message}`);
-      if (attempt < maxRetries) {
-        await new Promise((r) => setTimeout(r, retryDelayMs));
-      } else {
-        console.log('🔄 Local direct SMTP failed; attempting fallback to Vercel Relay…');
-        try {
-          return await sendViaRelay();
-        } catch (relayErr) {
-          console.error(`❌ [Relay Fallback] Failed: ${relayErr.message}`);
-          throw smtpErr;
-        }
+      console.log(`📤 [SMTP Fallback] Attempt ${attempt}/${maxRetries} → ${opts.to}`);
+      const info = await transporter.sendMail(opts);
+      console.log(`✅ [SMTP Fallback] Sent! MessageId: ${info.messageId}`);
+      logger.info('Email sent via SMTP fallback', { to: opts.to, messageId: info.messageId });
+      transporter.close();
+      return info;
+    } catch (err) {
+      console.error(`❌ [SMTP Fallback] Attempt ${attempt} failed: ${err.message}`);
+      transporter.close();
+      if (err.code === 'EAUTH') {
+        logger.error('Gmail SMTP auth failed', { error: err.message });
+        throw err;
       }
+      if (attempt === maxRetries) throw err;
+      await new Promise((r) => setTimeout(r, retryDelayMs));
     }
   }
 };
@@ -173,54 +211,60 @@ const sendWithRetry = async (mailOptions, maxRetries = 2, retryDelayMs = 2000) =
 // ─────────────────────────────────────────────────────────────
 // HTML base template
 // ─────────────────────────────────────────────────────────────
-const baseTemplate = (content) => `
+// ─────────────────────────────────────────────────────────────
+// HTML base template
+// ─────────────────────────────────────────────────────────────
+const baseTemplate = (content, { title = 'ExamShield Examination Services', collegeName = 'Your Institution' } = {}) => `
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f7fb; color: #333; }
-    .container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
-    .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 32px; text-align: center; }
-    .header h1 { color: #e94560; font-size: 28px; letter-spacing: 2px; font-weight: 800; }
-    .header p { color: #a0aec0; margin-top: 4px; font-size: 13px; letter-spacing: 1px; }
-    .body { padding: 40px 32px; }
-    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #1a1a2e; }
-    .text { font-size: 14px; line-height: 1.7; color: #555; margin-bottom: 20px; }
-    .credentials-box { background: #f8faff; border: 2px dashed #e94560; border-radius: 8px; padding: 24px; margin: 24px 0; }
-    .credential-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
-    .credential-item:last-child { border-bottom: none; }
-    .credential-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 600; }
-    .credential-value { font-size: 15px; font-weight: 700; color: #1a1a2e; font-family: 'Courier New', monospace; }
-    .btn { display: inline-block; background: #e94560; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; margin: 20px 0; letter-spacing: 0.5px; }
-    .warning-box { background: #fff8e1; border-left: 4px solid #ffc107; padding: 16px; border-radius: 4px; margin: 20px 0; }
-    .warning-box p { font-size: 13px; color: #856404; }
-    .exam-card { background: #f0f7ff; border-radius: 8px; padding: 20px; margin: 20px 0; }
-    .exam-card h3 { color: #1a1a2e; font-size: 16px; margin-bottom: 12px; }
-    .exam-detail { font-size: 13px; color: #555; margin: 6px 0; }
-    .exam-detail strong { color: #1a1a2e; }
-    .footer { background: #f8faff; padding: 24px 32px; text-align: center; border-top: 1px solid #eee; }
-    .footer p { font-size: 12px; color: #aaa; line-height: 1.6; }
-    .footer a { color: #e94560; text-decoration: none; }
-    .badge { display: inline-block; background: #e94560; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
-  </style>
+  <title>${title}</title>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>EXAMSHIELD</h1>
-      <p>SECURE ONLINE EXAMINATION PLATFORM</p>
-    </div>
-    <div class="body">
-      ${content}
-    </div>
-    <div class="footer">
-      <p>This is an automated message from ExamShield. Please do not reply to this email.</p>
-      <p>© ${new Date().getFullYear()} ExamShield. All rights reserved.</p>
-    </div>
-  </div>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f1f5f9; padding: 24px 12px;">
+    <tr>
+      <td align="center">
+        <!-- Main Container -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 28px 32px; text-align: left;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td>
+                    <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: 0.5px;">ExamShield</div>
+                    <div style="font-size: 13px; color: #94a3b8; margin-top: 3px;">Online Examination Portal &bull; ${collegeName}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px 32px 24px;">
+              ${content}
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; line-height: 1.6; color: #64748b; text-align: left;">
+              <p style="margin: 0 0 8px; color: #475569;">
+                This is an official administrative notice sent on behalf of <strong>${collegeName}</strong>.
+              </p>
+              <p style="margin: 0 0 8px; color: #64748b;">
+                Need help or have questions regarding your examination? Please contact your college examination administrator or reply directly to this message.
+              </p>
+              <p style="margin: 0; color: #94a3b8; font-size: 11px;">
+                &copy; ${new Date().getFullYear()} ExamShield Assessment Services. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
 `;
@@ -231,26 +275,15 @@ const baseTemplate = (content) => `
 
 /**
  * Send student credentials email
- * Supports both object signature: sendStudentCredentials({ name, email, studentId, password, ... })
- * and positional signature: sendStudentCredentials(email, studentId, password, name, collegeName, loginUrl)
+ * NOTE: This is intentionally awaitable so callers can catch real errors.
+ * Use .catch() in fire-and-forget contexts.
  */
-const sendStudentCredentials = async (...args) => {
+const sendStudentCredentials = async (firstArg, secondArg) => {
   let opts = {};
-  if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
-    opts = { ...args[0] };
-  } else if (typeof args[0] === 'string') {
-    if (typeof args[1] === 'object' && args[1] !== null) {
-      opts = { ...args[1], email: args[0] };
-    } else {
-      opts = {
-        email: args[0],
-        studentId: args[1],
-        password: args[2],
-        name: args[3],
-        collegeName: args[4] || 'Your Institution',
-        loginUrl: args[5],
-      };
-    }
+  if (typeof firstArg === 'string') {
+    opts = { ...(secondArg || {}), email: firstArg };
+  } else if (firstArg && typeof firstArg === 'object') {
+    opts = firstArg;
   }
 
   const { 
@@ -280,115 +313,136 @@ const sendStudentCredentials = async (...args) => {
     hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
   }) : null;
 
-  const badgeText = isReset 
-    ? 'PASSWORD RESET SUCCESSFUL' 
-    : (examKey ? 'ACCOUNT & EXAM ACCESS ISSUED' : 'ACCOUNT CREATED');
-
   const actionNotice = isReset
-    ? `Your student portal password on ExamShield has been reset by <strong>${collegeName}</strong>. Please find your updated login credentials below.`
-    : `Your student account has been created on ExamShield by <strong>${collegeName}</strong>.${examKey ? ' You have also been enrolled in an upcoming examination.' : ' Use the credentials below to log in to your exam portal.'}`;
+    ? `Your student portal password on ExamShield has been reset by <strong>${collegeName}</strong>. Below are your updated access credentials.`
+    : `Your student examination account has been registered on ExamShield by <strong>${collegeName}</strong>.${examKey ? ' You have also been assigned to an upcoming examination.' : ' Use the credentials below to access your student portal.'}`;
 
   const content = `
-    <div class="badge">${badgeText}</div>
-    <p class="greeting">${isReset ? 'Hello' : 'Welcome'}, ${name || 'Candidate'}!</p>
-    <p class="text">${actionNotice}</p>
-
-    <!-- Student Login Credentials -->
-    <div class="credentials-box" style="border: 2px solid #0f3460; background: #f0f7ff; margin-bottom: 20px;">
-      <h3 style="color: #0f3460; font-size: 14px; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 1px;">🔐 Student Portal Login Credentials</h3>
-      <div class="credential-item">
-        <span class="credential-label">Student ID</span>
-        <span class="credential-value" style="color: #0f3460; font-size: 16px;">${studentId}</span>
-      </div>
-      <div class="credential-item">
-        <span class="credential-label">Registered Email</span>
-        <span class="credential-value">${email}</span>
-      </div>
-      <div class="credential-item">
-        <span class="credential-label">${isReset ? 'New Password' : 'Temporary Password'}</span>
-        <span class="credential-value" style="color: #e94560; font-size: 16px;">${password}</span>
-      </div>
+    <div style="display: inline-block; padding: 4px 10px; border-radius: 4px; background-color: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+      ${isReset ? 'Account Password Update' : (examKey ? 'Examination Access Issued' : 'Account Created')}
     </div>
+
+    <h2 style="margin: 0 0 12px; font-size: 19px; font-weight: 700; color: #0f172a;">
+      ${isReset ? 'Hello' : 'Welcome'}, ${name || 'Candidate'}!
+    </h2>
+
+    <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: #334155;">
+      ${actionNotice}
+    </p>
+
+    <!-- Student Login Credentials Box -->
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin: 0 0 24px; padding: 18px 20px;">
+      <tr>
+        <td style="padding-bottom: 12px; border-bottom: 1px solid #e2e8f0;">
+          <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Student ID</div>
+          <div style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 2px; font-family: monospace;">${studentId}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+          <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Registered Email</div>
+          <div style="font-size: 14px; color: #0f172a; margin-top: 2px;">${email}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-top: 12px;">
+          <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">${isReset ? 'New Password' : 'Temporary Password'}</div>
+          <div style="font-size: 16px; font-weight: 700; color: #2563eb; margin-top: 2px; font-family: monospace;">${password}</div>
+        </td>
+      </tr>
+    </table>
 
     ${examKey ? `
-    <!-- Examination Key & Authorization -->
-    <div class="exam-card" style="border: 2px solid #10b981; background: #ecfdf5; border-radius: 8px; padding: 20px; margin: 20px 0;">
-      <h3 style="color: #065f46; font-size: 15px; margin-bottom: 8px;">📝 Examination Authorization</h3>
-      <p class="exam-detail" style="font-size: 14px; color: #1f2937;"><strong>Exam Title:</strong> ${examName || 'Scheduled Examination'}</p>
-      ${subject ? `<p class="exam-detail" style="font-size: 13px; color: #374151;"><strong>Subject:</strong> ${subject}</p>` : ''}
-      ${formattedDate ? `<p class="exam-detail" style="font-size: 13px; color: #374151;"><strong>Scheduled Date:</strong> ${formattedDate} (IST)</p>` : ''}
-      ${examDuration ? `<p class="exam-detail" style="font-size: 13px; color: #374151;"><strong>Duration:</strong> ${examDuration} Minutes</p>` : ''}
-      
-      <div style="background: #ffffff; border: 2px dashed #10b981; border-radius: 6px; padding: 14px; margin-top: 14px; text-align: center;">
-        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #047857; margin-bottom: 4px;">YOUR EXAM ACCESS KEY</div>
-        <div style="font-size: 22px; font-weight: 800; color: #065f46; font-family: 'Courier New', monospace; letter-spacing: 3px;">${examKey}</div>
-        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">Keep this key ready — you will enter it to begin the proctored exam.</div>
-      </div>
-    </div>
+    <!-- Examination Key Box -->
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; margin: 0 0 24px; padding: 18px 20px;">
+      <tr>
+        <td>
+          <div style="font-size: 13px; font-weight: 700; color: #166534; margin-bottom: 8px;">Scheduled Examination Details</div>
+          <div style="font-size: 14px; color: #1e293b; margin-bottom: 4px;"><strong>Exam:</strong> ${examName || 'Scheduled Examination'}</div>
+          ${subject ? `<div style="font-size: 13px; color: #475569; margin-bottom: 4px;"><strong>Subject:</strong> ${subject}</div>` : ''}
+          ${formattedDate ? `<div style="font-size: 13px; color: #475569; margin-bottom: 4px;"><strong>Scheduled Time:</strong> ${formattedDate} (IST)</div>` : ''}
+          ${examDuration ? `<div style="font-size: 13px; color: #475569; margin-bottom: 12px;"><strong>Duration:</strong> ${examDuration} Minutes</div>` : ''}
+          
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border: 1px solid #86efac; border-radius: 4px; padding: 12px; text-align: center;">
+            <tr>
+              <td align="center">
+                <div style="font-size: 11px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px;">Your Exam Access Key</div>
+                <div style="font-size: 20px; font-weight: 800; color: #14532d; font-family: monospace; letter-spacing: 2px; margin-top: 4px;">${examKey}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
     ` : ''}
 
-    <div style="text-align:center; margin: 26px 0;">
-      <a href="${loginUrl}" class="btn" style="background: #0f3460; font-size: 15px; padding: 14px 34px;">Login &amp; Enter Exam Portal →</a>
-    </div>
+    <!-- Call to Action -->
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 24px 0;">
+      <tr>
+        <td align="center">
+          <a href="${loginUrl}" target="_blank" style="background-color: #0f172a; color: #ffffff; display: inline-block; padding: 13px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            Sign In to Exam Portal &rarr;
+          </a>
+        </td>
+      </tr>
+    </table>
 
-    <div class="warning-box">
-      <p>⚠️ <strong>Important Instructions:</strong></p>
-      <ul style="margin: 8px 0 0 18px; font-size: 13px; line-height: 1.6; color: #856404;">
-        <li>Use a laptop or desktop computer with a functional webcam and microphone.</li>
-        <li>Ensure you have a stable internet connection before launching the exam.</li>
-        ${examKey ? `<li>Copy your <strong>Exam Key (${examKey})</strong> to unlock the exam session.</li>` : ''}
-        <li>Do not switch tabs, minimize windows, or use unauthorized secondary devices.</li>
-      </ul>
-    </div>
+    <!-- Guidelines -->
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border-left: 3px solid #3b82f6; border-radius: 0 4px 4px 0; padding: 14px 16px; margin: 20px 0 0;">
+      <tr>
+        <td>
+          <div style="font-size: 13px; font-weight: 700; color: #1e3a8a; margin-bottom: 6px;">Important Candidate Instructions:</div>
+          <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: #475569;">
+            <li>Use a computer or laptop equipped with a functional webcam and microphone.</li>
+            <li>Ensure a reliable high-speed internet connection prior to launching the exam.</li>
+            ${examKey ? `<li>Keep your <strong>Exam Access Key (${examKey})</strong> ready to unlock your exam session.</li>` : ''}
+            <li>Do not navigate away from the test window or switch browser tabs during the session.</li>
+          </ul>
+        </td>
+      </tr>
+    </table>
   `;
 
-  const plainText = [
-    `Welcome to ExamShield!`,
-    ``,
-    isReset
-      ? `Your student portal password on ExamShield has been reset by ${collegeName}.`
-      : `Your student account has been created on ExamShield by ${collegeName}.${examKey ? ' You have also been enrolled in an upcoming examination.' : ''}`,
-    ``,
-    `----------------------------------------`,
-    `🔐 YOUR STUDENT LOGIN CREDENTIALS:`,
-    `----------------------------------------`,
-    `Student ID: ${studentId}`,
-    `Registered Email: ${email}`,
-    `${isReset ? 'New Password' : 'Temporary Password'}: ${password}`,
-    `Login Portal: ${loginUrl}`,
-    `----------------------------------------`,
-    examKey ? [
-      ``,
-      `📝 EXAMINATION AUTHORIZATION:`,
-      `Exam Title: ${examName || 'Scheduled Examination'}`,
-      subject ? `Subject: ${subject}` : null,
-      formattedDate ? `Scheduled Date: ${formattedDate} (IST)` : null,
-      examDuration ? `Duration: ${examDuration} Minutes` : null,
-      `YOUR EXAM ACCESS KEY: ${examKey}`,
-      `----------------------------------------`,
-      `Keep this key ready — you will enter it to begin the proctored exam.`,
-    ].filter(Boolean).join('\n') : '',
-    ``,
-    `IMPORTANT INSTRUCTIONS:`,
-    `1. Use a laptop or desktop computer with a functional webcam and microphone.`,
-    `2. Ensure you have a stable internet connection before launching the exam.`,
-    examKey ? `3. Copy your Exam Key (${examKey}) to unlock the exam session.` : null,
-    `4. Do not switch tabs, minimize windows, or use unauthorized secondary devices.`,
-    ``,
-    `Login at: ${loginUrl}`,
-  ].filter(line => line !== null).join('\n');
-
   const subjectLine = isReset
-    ? `ExamShield — Your Password Has Been Reset`
+    ? `Student Portal Password Update - ${collegeName}`
     : (examKey
-        ? `Welcome to ExamShield — Your Student ID, Password & Exam Key (${examKey})`
-        : `Welcome to ExamShield — Your Login Credentials`);
+        ? `Examination Access & Student Portal Details - ${collegeName}`
+        : `Student Portal Account Details - ${collegeName}`);
+
+  const plainText = [
+    `ExamShield Online Examination Portal`,
+    `Institution: ${collegeName}`,
+    `----------------------------------------`,
+    ``,
+    `${isReset ? 'Hello' : 'Welcome'}, ${name || 'Candidate'}!`,
+    ``,
+    actionNotice.replace(/<[^>]*>?/gm, ''),
+    ``,
+    `Your Student Portal Login Details:`,
+    `- Student ID: ${studentId}`,
+    `- Registered Email: ${email}`,
+    `- ${isReset ? 'New Password' : 'Temporary Password'}: ${password}`,
+    examKey ? `- Exam Access Key: ${examKey}` : '',
+    examName ? `- Exam: ${examName}` : '',
+    formattedDate ? `- Scheduled Date: ${formattedDate} (IST)` : '',
+    examDuration ? `- Duration: ${examDuration} Minutes` : '',
+    ``,
+    `Portal Login URL: ${loginUrl}`,
+    ``,
+    `Candidate Instructions:`,
+    `1. Use a computer with a functional webcam and microphone.`,
+    `2. Ensure a stable internet connection before launching your exam.`,
+    examKey ? `3. Enter your Exam Access Key (${examKey}) to start the exam.` : '',
+    `4. Do not switch tabs or minimize the test window during the session.`,
+    ``,
+    `This is an automated administrative notification sent on behalf of ${collegeName}.`
+  ].filter(Boolean).join('\n');
 
   await sendWithRetry({
     to: email,
     subject: subjectLine,
     text: plainText,
-    html: baseTemplate(content),
+    html: baseTemplate(content, { title: subjectLine, collegeName }),
   }, 3, 3000); // up to 3 attempts, 3 s apart
 
   logger.info(`Credentials email sent to ${email}`);
@@ -406,20 +460,6 @@ const sendExamNotification = async ({ name, email, examName, examDate, examDurat
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
   });
-
-  const plainText = [
-    `EXAM SCHEDULED: ${examName}`,
-    `Hello, ${name}`,
-    ``,
-    `Subject: ${subject || 'N/A'}`,
-    `Type: ${type ? type.toUpperCase() : 'EXAM'}`,
-    `Date & Time: ${formattedDate} (IST)`,
-    `Duration: ${examDuration} minutes`,
-    `Exam Key: ${examKey}`,
-    ``,
-    `Portal Login: ${loginUrl}`,
-    `You will need this exam key to start your exam. Do not share this key.`,
-  ].join('\n');
 
   const content = `
     <div class="badge">EXAM SCHEDULED</div>
