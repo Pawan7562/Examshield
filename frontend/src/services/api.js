@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 // Use direct backend URL for both development and production
 const developmentApiBaseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 // Priority: env var > hardcoded production URL
-const productionApiBaseURL = process.env.REACT_APP_API_URL || 'https://examshield-1-an7c.onrender.com/api';
+const productionApiBaseURL = process.env.REACT_APP_API_URL || 'https://examshield-3-wydj.onrender.com/api';
 
 const API_BASE_URL =
   process.env.NODE_ENV === 'development' ? developmentApiBaseURL : productionApiBaseURL;
@@ -277,6 +277,7 @@ export const studentAPI = {
   getExamDetails: (examId) => api.get(`/student/exams/${examId}`),
   startExam: (id, data) => api.post(`/student/exams/${id}/start`, data),
   saveAnswer: (examId, data) => api.post(`/student/exams/${examId}/save-answer`, data),
+  saveAnswersBulk: (examId, data) => api.post(`/student/exams/${examId}/save-answers-bulk`, data),
   submitExam: (examId, data) => api.post(`/student/exams/${examId}/submit`, data),
   reportViolation: (data) => api.post('/student/violations', data),
   runCode: (data) => api.post('/student/run-code', data),

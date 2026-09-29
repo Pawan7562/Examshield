@@ -1283,20 +1283,15 @@ exports.getExamDetails = async (req, res) => {
     console.log('📊 Backend: Getting exam details:', { examId: id, studentId, collegeId });
 
     // Get exam details
-    let examQuery = supabase
+    const { data: exam, error: examError } = await supabase
       .from('exams')
       .select(`
         id, title, type, subject, date_time, duration, total_marks,
         passing_marks, status, is_proctored, instructions,
-        max_violations, created_at, updated_at, exam_code, exam_key, monitoring_config
+        max_violations, created_at, updated_at, exam_code, exam_key, monitoring_config, college_id
       `)
-      .eq('id', id);
-
-    if (collegeId) {
-      examQuery = examQuery.eq('college_id', collegeId);
-    }
-
-    const { data: exam, error: examError } = await examQuery.maybeSingle();
+      .eq('id', id)
+      .maybeSingle();
 
     if (examError) {
       console.error('Exam details error:', examError);
@@ -1314,11 +1309,28 @@ exports.getExamDetails = async (req, res) => {
       });
     }
 
-    // Get exam questions for this exam
+    // Verify college or explicit assignment authorization
+    if (collegeId && exam.college_id && exam.college_id !== collegeId) {
+      const { data: assignments } = await supabase
+        .from('exam_assignments')
+        .select('student_id')
+        .eq('exam_id', id)
+        .eq('student_id', studentId)
+        .limit(1);
+
+      if (!assignments || assignments.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized for this examination.'
+        });
+      }
+    }
+
+    // Get exam questions for this exam (never leak correct_answer to student)
     const { data: questions, error: questionsError } = await supabase
       .from('questions')
       .select(`
-        id, question_text, type, options, correct_answer,
+        id, question_text, type, options,
         marks, order_index
       `)
       .eq('exam_id', id)
@@ -1493,11 +1505,12 @@ exports.startExam = async (req, res) => {
       console.log('📝 Backend: Flexible / active timing mode, allowing exam start');
     }
 
-    // Check for existing session using Supabase
+    // Check for existing session for THIS student using Supabase
     const { data: existingSession, error: sessionError } = await supabase
       .from('exam_sessions')
       .select('*')
       .eq('exam_id', id)
+      .eq('student_id', studentId)
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -1550,7 +1563,8 @@ exports.startExam = async (req, res) => {
     }
 
     // Create new session using Supabase
-    const { data: sessionResult, error: sessionCreateError } = await supabase
+    let sessionResult = null;
+    const { data: createdSession, error: sessionCreateError } = await supabase
       .from('exam_sessions')
       .insert({
         exam_id: id,
@@ -1560,11 +1574,28 @@ exports.startExam = async (req, res) => {
         status: 'active'
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (sessionCreateError) {
-      console.error('Session creation error:', sessionCreateError);
-      return res.status(500).json({ success: false, message: 'Failed to create exam session' });
+      // Concurrency / duplicate key safety: fetch existing session if already inserted by parallel request
+      console.warn('Session create notice (attempting retry lookup):', sessionCreateError.message);
+      const { data: retrySession } = await supabase
+        .from('exam_sessions')
+        .select('*')
+        .eq('exam_id', id)
+        .eq('student_id', studentId)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (retrySession) {
+        sessionResult = retrySession;
+      } else {
+        console.error('Session creation error:', sessionCreateError);
+        return res.status(500).json({ success: false, message: 'Failed to create exam session', error: sessionCreateError.message });
+      }
+    } else {
+      sessionResult = createdSession;
     }
 
     // Update exam status to active
@@ -1778,6 +1809,53 @@ exports.saveAnswer = async (req, res) => {
     res.json({ success: true, message: 'Answer saved.' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to save answer', error: error.message });
+  }
+};
+
+/**
+ * POST /api/student/exams/:id/save-answers-bulk
+ * High-performance bulk answer autosave for concurrent students
+ */
+exports.saveAnswersBulk = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { sessionId, answers } = req.body;
+    const studentId = req.user.id;
+
+    if (!sessionId) {
+      return res.status(400).json({ success: false, message: 'sessionId is required' });
+    }
+
+    if (!Array.isArray(answers) || answers.length === 0) {
+      return res.json({ success: true, count: 0, message: 'No answers to save.' });
+    }
+
+    const now = new Date().toISOString();
+    const rows = answers.map(a => ({
+      session_id: sessionId,
+      question_id: a.questionId,
+      student_id: studentId,
+      exam_id: id,
+      answer_text: a.answerText ?? null,
+      selected_option: a.selectedOption ?? null,
+      code_submission: a.codeSubmission ?? null,
+      selected_language: a.selectedLanguage ?? null,
+      updated_at: now
+    }));
+
+    const { error: bulkError } = await supabase
+      .from('answers')
+      .upsert(rows, { onConflict: 'session_id,question_id' });
+
+    if (bulkError) {
+      console.error('❌ Backend: Error in bulk answer save:', bulkError);
+      return res.status(500).json({ success: false, message: 'Failed to bulk save answers', error: bulkError.message });
+    }
+
+    res.json({ success: true, count: rows.length, message: `${rows.length} answers saved.` });
+  } catch (error) {
+    console.error('Bulk save answers error:', error);
+    res.status(500).json({ success: false, message: 'Failed to bulk save answers', error: error.message });
   }
 };
 

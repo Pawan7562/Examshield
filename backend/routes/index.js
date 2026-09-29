@@ -148,6 +148,7 @@ student.get('/exams', examController.getStudentExams);
 student.get('/exams/:id', examController.getExamDetails);
 student.post('/exams/:id/start', examController.startExam);
 student.post('/exams/:id/save-answer', examController.saveAnswer);
+student.post('/exams/:id/save-answers-bulk', examController.saveAnswersBulk);
 student.post('/exams/:id/submit', examController.submitExam);
 student.post('/run-code', codeExecutionController.runCode);
 student.post('/submit-code', codeExecutionController.submitCode);

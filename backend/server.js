@@ -357,7 +357,7 @@ app.use(compression());
 // Rate limiting - optimized for 50k-100k users and shared college campus NAT IPs
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5000,
+  max: 20000,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
@@ -374,11 +374,18 @@ const limiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100, // accommodates concurrent class/batch sign-ins from same campus IP
+  max: 5000, // accommodates full college campus batches logging in concurrently from same NAT IP
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip,
-  message: { success: false, message: 'Too many login attempts. Please try again in 15 minutes.' },
+  keyGenerator: (req) => {
+    const accountIdentifier = req.body?.student_id || req.body?.studentId || req.body?.email || req.body?.enrollment_number;
+    if (accountIdentifier) {
+      return `auth_id_${String(accountIdentifier).trim().toLowerCase()}`;
+    }
+    return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip;
+  },
+  skip: (req) => req.method === 'OPTIONS',
+  message: { success: false, message: 'Too many login attempts for this account. Please try again in 15 minutes.' },
 });
 
 app.use('/api/', limiter);

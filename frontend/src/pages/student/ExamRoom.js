@@ -271,25 +271,34 @@ export default function ExamRoom() {
     if (autoSaveRef.current) clearInterval(autoSaveRef.current);
 
     try {
-      // 1. Flush any pending answers (e.g. coding solutions in the editor)
+      // 1. Flush any pending answers efficiently in ONE bulk call
       const currentSessionId = sessionRef.current?.id;
       const currentAnswers = answersRef.current || {};
       const currentQuestions = questionsRef.current || [];
 
       if (currentSessionId && Object.keys(currentAnswers).length > 0) {
-        await Promise.allSettled(
-          Object.entries(currentAnswers).map(([qId, ans]) => {
-            if (!ans) return Promise.resolve();
+        const answersList = Object.entries(currentAnswers)
+          .filter(([, ans]) => ans !== null && ans !== undefined)
+          .map(([qId, ans]) => {
             const q = currentQuestions.find(item => item.id === qId);
-            return studentAPI.saveAnswer(examId, {
-              sessionId: currentSessionId,
+            return {
               questionId: qId,
               ...(q?.type === 'mcq' ? { selectedOption: ans } :
                 q?.type === 'coding' ? { codeSubmission: ans } :
                   { answerText: ans }),
+            };
+          });
+
+        if (answersList.length > 0) {
+          try {
+            await studentAPI.saveAnswersBulk(examId, {
+              sessionId: currentSessionId,
+              answers: answersList,
             });
-          })
-        );
+          } catch (flushErr) {
+            console.warn('Bulk flush notice before submit:', flushErr);
+          }
+        }
       }
 
       // 2. Submit the entire examination
@@ -456,7 +465,7 @@ export default function ExamRoom() {
 
     const token = localStorage.getItem('accessToken');
     const wsUrl = process.env.REACT_APP_WS_URL ||
-      (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-1-an7c.onrender.com');
+      (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-3-wydj.onrender.com');
     const socket = io(wsUrl, { auth: { token }, reconnectionAttempts: 5 });
     socketRef.current = socket;
 
@@ -515,24 +524,33 @@ export default function ExamRoom() {
     };
   }, [phase, session, examId, user?.id, user?.name, handleSubmit]);
 
-  // ─── Periodic Auto-save ──────────────────────────────────────────────────────
+  // ─── Periodic Auto-save (Bulk Batching) ────────────────────────────────────
   useEffect(() => {
     if (phase !== 'exam' || !session || submitted) return;
     autoSaveRef.current = setInterval(() => {
-      Object.entries(answers).forEach(([questionId, answer]) => {
-        if (!answer) return;
-        const q = questions.find(q => q.id === questionId);
-        if (!q) return;
-        studentAPI.saveAnswer(examId, {
-          sessionId: session.id, questionId,
-          ...(q.type === 'mcq' ? { selectedOption: answer } :
-            q.type === 'coding' ? { codeSubmission: answer } :
-              { answerText: answer }),
+      const currentAnswers = answersRef.current || {};
+      const currentQuestions = questionsRef.current || [];
+      const answersList = Object.entries(currentAnswers)
+        .filter(([, ans]) => ans !== null && ans !== undefined)
+        .map(([qId, ans]) => {
+          const q = currentQuestions.find(item => item.id === qId);
+          return {
+            questionId: qId,
+            ...(q?.type === 'mcq' ? { selectedOption: ans } :
+              q?.type === 'coding' ? { codeSubmission: ans } :
+                { answerText: ans }),
+          };
+        });
+
+      if (answersList.length > 0 && session?.id) {
+        studentAPI.saveAnswersBulk(examId, {
+          sessionId: session.id,
+          answers: answersList,
         }).catch(() => { });
-      });
-    }, 30000);
+      }
+    }, 25000);
     return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
-  }, [phase, session, submitted, answers, questions, examId]);
+  }, [phase, session, submitted, examId]);
 
   // ─── Fetch Exam Details ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -614,6 +632,19 @@ export default function ExamRoom() {
         const data = response.data || response;
         setSession(data.session);
         setQuestions(data.questions || []);
+
+        // Restore saved answers if student is resuming session
+        if (Array.isArray(data.savedAnswers) && data.savedAnswers.length > 0) {
+          const restoredAnswers = {};
+          data.savedAnswers.forEach(a => {
+            const val = a.selected_option ?? a.code_submission ?? a.answer_text;
+            if (val !== undefined && val !== null) {
+              restoredAnswers[a.question_id] = val;
+            }
+          });
+          setAnswers(restoredAnswers);
+        }
+
         const secs = data.timeRemaining
           || (data.exam?.duration ? Number(data.exam.duration) * 60 : 0)
           || 3600;
