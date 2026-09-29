@@ -365,7 +365,7 @@ export default function StudentManagement() {
         if (data?.emailSent) {
           toast.success(`Student added! Credentials &${keyMsg} sent to ${data.email}`);
         } else {
-          toast.info('Student added! Credentials generated below (email delivery pending).');
+          toast('Student added! Credentials generated below (email delivery pending).');
         }
       }
       setAddModal(false);
@@ -429,7 +429,7 @@ export default function StudentManagement() {
       purgeFromLocal();
       const status = err?.response?.status;
       if (status === 404) {
-        toast.info('Student already removed from registry');
+        toast('Student already removed from registry');
       } else {
         toast.error(err?.response?.data?.message || err?.message || 'Delete failed');
       }

@@ -215,6 +215,12 @@ exports.addStudent = async (req, res) => {
 
     let emailSent = false;
     try {
+      console.log(`\n📧 [addStudent] Attempting email send...`);
+      console.log(`   → To: ${cleanEmail}`);
+      console.log(`   → EMAIL_USER: ${process.env.EMAIL_USER}`);
+      console.log(`   → EMAIL_PASS set: ${!!process.env.EMAIL_PASS}`);
+      console.log(`   → College: ${req.user?.name || req.user?.college_name}`);
+
       await sendStudentCredentials({
         name: student?.name || name,
         email: cleanEmail,
@@ -230,12 +236,11 @@ exports.addStudent = async (req, res) => {
         isReset: false
       });
       emailSent = true;
-      console.log(`✅ Welcome credentials email sent to student: ${cleanEmail}`);
+      console.log(`✅ [addStudent] Credentials email delivered to: ${cleanEmail}`);
     } catch (emailError) {
-      console.error('Student credentials email failed:', {
-        code: emailError.code,
-        message: emailError.message,
-      });
+      console.error(`❌ [addStudent] Email FAILED for ${cleanEmail}:`);
+      console.error(`   Code: ${emailError.code}`);
+      console.error(`   Message: ${emailError.message}`);
     }
 
     res.status(201).json({
