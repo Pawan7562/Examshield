@@ -498,7 +498,13 @@ export default function Home() {
       <section className="landing-proof-band" aria-label="Institutional scale and metrics">
         <div className="public-shell landing-proof-inner">
           <div className="proof-metric-item">
-            <strong>1.2M+</strong>
+            <strong>10+</strong>
+            <span>Registered Institutions</span>
+          </div>
+          <i aria-hidden="true" />
+
+          <div className="proof-metric-item">
+            <strong>50K+</strong>
             <span>Exams Monitored Safely</span>
           </div>
           <i aria-hidden="true" />
@@ -510,14 +516,8 @@ export default function Home() {
           <i aria-hidden="true" />
 
           <div className="proof-metric-item">
-            <strong>&lt; 180ms</strong>
-            <span>Live Stream Latency</span>
-          </div>
-          <i aria-hidden="true" />
-
-          <div className="proof-metric-item">
-            <strong>150+</strong>
-            <span>Colleges & Testing Boards</span>
+            <strong>Mohali, PB</strong>
+            <span>Global Headquarters</span>
           </div>
         </div>
       </section>

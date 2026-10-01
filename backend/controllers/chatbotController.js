@@ -313,29 +313,62 @@ We offer immediate ways for your institution to experience the platform:
     ]
   },
   {
+    id: 'company_leadership',
+    intents: ['founder', 'ceo', 'pawan', 'pawan kumar', 'yadav', 'prince', 'suraj', 'shruti', 'sachin', 'vishal', 'team', 'leaders', 'leadership', 'mohali', 'headquarters', 'founded', 'feb 2025', 'institution', 'institutes', 'punjab'],
+    title: 'Company Leadership & Mohali Headquarters',
+    summary: 'ExamShield founded Feb 2025 in Mohali by Founder & CEO Pawan Kumar Yadav and core team.',
+    response: `### 🏢 About ExamShield — Company & Leadership
+
+* **Founded**: **February 2025**
+* **Global Headquarters**: **Mohali, Punjab, India** (Phase 8B / Sector 74, Industrial Area — 160055)
+* **Direct Helpline & Founder Office**: **+91 9934290491**
+* **Traction**: **10+ Registered Institutions & Partner Colleges** with 50K+ secured exams.
+
+#### 👥 Core Leadership Team:
+* **Pawan Kumar Yadav** — Founder & Chief Executive Officer (CEO)
+* **Prince** — Co-Founder & Chief Technology Officer (CTO)
+* **Suraj** — Chief Operating Officer (COO)
+* **Shruti** — Chief Design Officer (CDO) & Head of Product Experience
+* **Sachin** — Head of AI & Machine Learning
+* **Vishal** — Head of Infrastructure & Security
+
+For institutional partnerships, campus rollouts, or direct meetings with leadership, call **+91 9934290491** or email **support@examshield.com**.`,
+    suggestions: [
+      'Schedule an Institutional Pilot',
+      'Explore Platform Features',
+      'Contact Founder Office'
+    ],
+    actions: [
+      { label: 'About ExamShield', url: '/about' },
+      { label: 'Contact Founder Office', url: '/contact' }
+    ]
+  },
+  {
     id: 'contact_support',
-    intents: ['contact', 'email', 'phone', 'support', 'helpdesk', 'office', 'call', 'ticket', 'reach', 'sales'],
-    title: 'Support Desk & Institutional Contact Information',
-    summary: '24/7 dedicated support for exams, troubleshooting, and enterprise sales.',
-    response: `### 📞 Contact ExamShield & Mission Control Support
+    intents: ['contact', 'email', 'phone', 'support', 'helpdesk', 'office', 'call', 'ticket', 'reach', 'sales', '9934290491', 'helpline', 'number'],
+    title: 'Support Desk, Direct Helpline & Office Details',
+    summary: 'Direct line +91 9934290491, Mohali HQ, and 24/7 dedicated exam mission control.',
+    response: `### 📞 Contact ExamShield & Founder Helpline
 
-Our institutional support team is available around the clock to support exam operations:
+Our team and headquarters in Mohali, Punjab are ready to assist you:
 
-* **General & Institutional Sales**: \`support@examshield.com\` / \`sales@nexifyforge.in\`
+* **Direct Phone Helpline**: **+91 9934290491** *(Mon–Sat, 9AM–7PM IST · CEO Office: Pawan Kumar Yadav)*
+* **Official Support Email**: \`support@examshield.com\`
+* **Global Headquarters**: Phase 8B / Sector 74, Industrial Area, **Mohali, Punjab — 160055**
+* **Regional Support Hub**: Technology Corridor, Mohali-Chandigarh, Punjab — 160071
+* **Traction**: Over 10+ Registered Colleges & Universities across India.
 * **Exam-Day Mission Control Desk**: Available 24/7 during scheduled institutional exam windows.
-* **Phone & WhatsApp**: +91 (Enterprise Hotline provided on pilot onboarding)
 * **Response SLAs**:
   * Urgent exam-day live issues: **Sub-5 minute response**
-  * Institutional onboarding & LMS sync: **Under 12 hours**
-* **Admin Support Tickets**: College Admins can submit and track priority support tickets directly inside the **Admin Console → Support** tab.`,
+  * Institutional onboarding & LMS sync: **Under 12 hours**`,
     suggestions: [
-      'How to open a support ticket?',
-      'Check system status',
-      'Explore Pricing'
+      'Meet the Leadership Team',
+      'Schedule a Campus Pilot',
+      'Explore Platform Features'
     ],
     actions: [
       { label: 'Open Contact Form', url: '/contact' },
-      { label: 'College Admin Console', url: '/login' }
+      { label: 'About Leadership', url: '/about' }
     ]
   }
 ];

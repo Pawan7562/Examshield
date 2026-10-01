@@ -11,6 +11,7 @@ import {
   Sparkles,
   CheckCircle2,
   Mail,
+  Phone,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import ChatBot from '../common/ChatBot';
@@ -94,28 +95,28 @@ export default function PublicLayout({ children, className = '' }) {
                 <div className="top-ticker-track">
                   {/* Track Group 1 */}
                   <div className="top-ticker-group">
-                    <span className="ticker-item"><Sparkles size={12} className="ticker-icon" /> <strong>ENTERPRISE V4.2</strong> · Multi-Modal AI Invigilation &amp; College Admin Suite</span>
+                    <span className="ticker-item"><Sparkles size={12} className="ticker-icon" /> <strong>ENTERPRISE V4.2</strong> · Founded Feb 2025 in Mohali by Pawan Kumar Yadav</span>
                     <span className="ticker-bullet">✦</span>
-                    <span className="ticker-item"><ShieldCheck size={12} className="ticker-icon" /> <strong>FERPA &amp; ISO 27001</strong> · Zero-Data-Retention &amp; AES-256 Storage</span>
+                    <span className="ticker-item"><GraduationCap size={12} className="ticker-icon" /> <strong>10+ Registered Institutions</strong> · 50K+ Secured Examinations</span>
+                    <span className="ticker-bullet">✦</span>
+                    <span className="ticker-item"><ShieldCheck size={12} className="ticker-icon" /> <strong>Mohali (Punjab) HQ</strong> · Direct Helpline: +91 9934290491</span>
                     <span className="ticker-bullet">✦</span>
                     <span className="ticker-item"><Building2 size={12} className="ticker-icon" /> <strong>1:50 Proctor Cockpit</strong> · Live Multi-Department Invigilation &amp; Shift Logs</span>
                     <span className="ticker-bullet">✦</span>
                     <span className="ticker-item"><CheckCircle2 size={12} className="ticker-icon" /> <strong>99.98% Accuracy</strong> · Sub-180ms Biometric Gaze &amp; Acoustic Mesh</span>
-                    <span className="ticker-bullet">✦</span>
-                    <span className="ticker-item"><GraduationCap size={12} className="ticker-icon" /> <strong>150+ Universities</strong> · 1.2M+ Monitored High-Stakes Exams</span>
                     <span className="ticker-bullet">✦</span>
                   </div>
                   {/* Track Group 2 (Duplicate for seamless continuous loop) */}
                   <div className="top-ticker-group" aria-hidden="true">
-                    <span className="ticker-item"><Sparkles size={12} className="ticker-icon" /> <strong>ENTERPRISE V4.2</strong> · Multi-Modal AI Invigilation &amp; College Admin Suite</span>
+                    <span className="ticker-item"><Sparkles size={12} className="ticker-icon" /> <strong>ENTERPRISE V4.2</strong> · Founded Feb 2025 in Mohali by Pawan Kumar Yadav</span>
                     <span className="ticker-bullet">✦</span>
-                    <span className="ticker-item"><ShieldCheck size={12} className="ticker-icon" /> <strong>FERPA &amp; ISO 27001</strong> · Zero-Data-Retention &amp; AES-256 Storage</span>
+                    <span className="ticker-item"><GraduationCap size={12} className="ticker-icon" /> <strong>10+ Registered Institutions</strong> · 50K+ Secured Examinations</span>
+                    <span className="ticker-bullet">✦</span>
+                    <span className="ticker-item"><ShieldCheck size={12} className="ticker-icon" /> <strong>Mohali (Punjab) HQ</strong> · Direct Helpline: +91 9934290491</span>
                     <span className="ticker-bullet">✦</span>
                     <span className="ticker-item"><Building2 size={12} className="ticker-icon" /> <strong>1:50 Proctor Cockpit</strong> · Live Multi-Department Invigilation &amp; Shift Logs</span>
                     <span className="ticker-bullet">✦</span>
                     <span className="ticker-item"><CheckCircle2 size={12} className="ticker-icon" /> <strong>99.98% Accuracy</strong> · Sub-180ms Biometric Gaze &amp; Acoustic Mesh</span>
-                    <span className="ticker-bullet">✦</span>
-                    <span className="ticker-item"><GraduationCap size={12} className="ticker-icon" /> <strong>150+ Universities</strong> · 1.2M+ Monitored High-Stakes Exams</span>
                     <span className="ticker-bullet">✦</span>
                   </div>
                 </div>
@@ -339,23 +340,26 @@ export default function PublicLayout({ children, className = '' }) {
                 </Link>
 
                 <p className="footer-brand-desc">
-                  Autonomous AI proctoring and secure browser-lockdown platform engineered for high-stakes higher education examinations and professional certifications.
+                  Founded Feb 2025 in Mohali, Punjab by Founder &amp; CEO Pawan Kumar Yadav. Autonomous AI proctoring and browser-lockdown platform trusted across 10+ registered partner institutions.
                 </p>
 
                 <div className="footer-compliance-badges">
-                  <span className="footer-badge-pill">SOC2 Type II</span>
+                  <span className="footer-badge-pill">Mohali HQ</span>
+                  <span className="footer-badge-pill">10+ Institutions</span>
                   <span className="footer-badge-pill">FERPA Compliant</span>
                   <span className="footer-badge-pill">ISO 27001</span>
-                  <span className="footer-badge-pill">GDPR Safe</span>
                 </div>
 
                 <div className="footer-contact-mini">
-                  <a href="mailto:support@examshield.com" className="footer-mini-link">
-                    <Mail size={13} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'middle' }} />
-                    support@examshield.com
+                  <a href="tel:+919934290491" className="footer-mini-link">
+                    <Phone size={13} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'middle' }} />
+                    +91 9934290491
                   </a>
                   <span className="footer-mini-dot">•</span>
-                  <span>Global 24/7 SLA</span>
+                  <a href="mailto:support@examshield.com" className="footer-mini-link">
+                    <Mail size={13} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'middle' }} />
+                    Mohali, Punjab
+                  </a>
                 </div>
               </div>
 

@@ -11,12 +11,12 @@ import './About.css';
 
 /* ─── Data ─── */
 const milestones = [
-  { year: '2020', title: 'Company Founded', desc: 'ExamShield founded in Bangalore to solve the academic integrity crisis exposed by the pandemic-era remote exam explosion.' },
-  { year: '2021', title: 'First 10 Institutions', desc: 'Onboarded our first 10 Indian engineering and management colleges. Secured 200,000+ exams in our first year of operations.' },
-  { year: '2022', title: 'AI Engine v2.0', desc: 'Launched AI Vision 2.0 with real-time facial landmark mesh and acoustic intelligence — reducing false positives by 73%.' },
-  { year: '2023', title: 'International Expansion', desc: 'Expanded to Southeast Asia with offices in Singapore. Became the first Indian proctoring platform to achieve SOC 2 Type II certification.' },
-  { year: '2024', title: '1 Million Exams', desc: 'Crossed 1 million secured exam sessions. Onboarded our 100th institutional client and launched LTI 1.3 native LMS integration.' },
-  { year: '2025', title: 'AI Vision 3.0', desc: 'Released AI Vision 3.0 with sub-500ms biometric verification and multi-face detection. Serving 1.2M+ exams across 150+ institutions.' },
+  { year: 'Feb 2025', title: 'Company Founded in Mohali', desc: 'ExamShield founded in Mohali, Punjab by Founder & CEO Pawan Kumar Yadav and core founding team (Prince, Suraj, Shruti, Sachin, Vishal) to engineer next-generation AI exam proctoring.' },
+  { year: 'Mar 2025', title: 'First Institutional Rollout', desc: 'Deployed real-time proctoring for campus entrance assessments and semester exams with zero candidate installation.' },
+  { year: 'Jul 2025', title: 'Browser Kiosk Sandbox v1.0', desc: 'Released deep anti-tampering lockdown engine with automatic tab-switch detection, shortcut blocking, and second-monitor detection.' },
+  { year: 'Oct 2025', title: '10+ Registered Institutions', desc: 'Crossed 10+ partner universities, polytechnic institutions, and engineering colleges across India with thousands of exams invigilated.' },
+  { year: 'Dec 2025', title: 'Monaco Coding Assessment', desc: 'Integrated multi-language coding compiler sandbox supporting 20+ languages with automated unit test suites.' },
+  { year: '2026', title: 'MediaPipe AI Vision 3.0', desc: 'Deployed cutting-edge sub-500ms multi-face detection, acoustic mesh analytics, and instant court-admissible forensic incident dossiers.' },
 ];
 
 const values = [
@@ -53,69 +53,69 @@ const values = [
   {
     icon: TrendingUp,
     title: 'Relentless Improvement',
-    desc: 'We ship meaningful product improvements every two weeks, driven by data from 1.2M+ exams and direct feedback from our institutional partners.',
+    desc: 'We ship meaningful product improvements every two weeks, driven by direct feedback from our 10+ registered partner institutions.',
     color: 'blue',
   },
 ];
 
 const leadership = [
   {
-    name: 'Dr. Arjun Mehta',
-    role: 'CEO & Co-Founder',
-    bio: 'Former Head of Academic Technology at IIT Delhi. PhD in Computer Vision, Cambridge. Built ExamShield after witnessing widespread credential fraud firsthand.',
-    initials: 'AM',
+    name: 'Pawan Kumar Yadav',
+    role: 'Founder & Chief Executive Officer (CEO)',
+    bio: 'Founder & CEO of ExamShield. Headquartered in Mohali, Punjab, Pawan steers company vision, institutional partnerships, and platform architecture to modernize college examinations.',
+    initials: 'PK',
     color: 'green',
     linkedin: '#!',
   },
   {
-    name: 'Priya Nambiar',
-    role: 'CTO & Co-Founder',
-    bio: '15 years in applied ML. Former Principal Engineer at Google Brain. Leads our AI Vision and Acoustic Intelligence research teams.',
-    initials: 'PN',
+    name: 'Prince',
+    role: 'Co-Founder & Chief Technology Officer (CTO)',
+    bio: 'Leads core platform engineering, real-time WebSocket pipelines, high-concurrency telemetry feeds, and cloud scalability across simultaneous exam halls.',
+    initials: 'PR',
     color: 'blue',
     linkedin: '#!',
   },
   {
-    name: 'Dr. Samuel Adeyemi',
-    role: 'Chief Privacy Officer',
-    bio: 'Former Data Protection Officer at UNESCO. Led FERPA and GDPR compliance architecture across 6 countries. Chairs our ethics board.',
-    initials: 'SA',
+    name: 'Suraj',
+    role: 'Chief Operating Officer (COO)',
+    bio: 'Drives campus onboarding operations, faculty training, college administrative partnerships, and smooth deployment across 10+ registered institutions.',
+    initials: 'SU',
     color: 'orange',
     linkedin: '#!',
   },
   {
-    name: 'Li Wei',
-    role: 'VP Engineering',
-    bio: 'Full-stack infrastructure specialist. Previously VP Engineering at Coursera Asia-Pacific. Built our sub-180ms streaming WebRTC pipeline.',
-    initials: 'LW',
+    name: 'Shruti',
+    role: 'Chief Design Officer (CDO) & Head of Product Experience',
+    bio: 'Leads UI/UX design and accessible examination room ergonomics, creating intuitive, candidate-friendly proctoring interfaces that eliminate exam anxiety.',
+    initials: 'SH',
     color: 'red',
     linkedin: '#!',
   },
   {
-    name: 'Margaret Osei',
-    role: 'VP Customer Success',
-    bio: 'Former Director of Academic Affairs at University of Ghana. Oversees institutional onboarding, training, and 14-day deployment guarantee.',
-    initials: 'MO',
+    name: 'Sachin',
+    role: 'Head of AI & Machine Learning',
+    bio: 'Specializes in computer vision, MediaPipe facial landmarks, multi-face verification, and edge neural processing for automated anomaly detection.',
+    initials: 'SA',
     color: 'green',
     linkedin: '#!',
   },
   {
-    name: 'Rohan Verma',
-    role: 'VP Sales & Partnerships',
-    bio: '10 years in EdTech enterprise sales across India, SEA, and MENA. Built our LMS partnership programme with Canvas and Moodle.',
-    initials: 'RV',
+    name: 'Vishal',
+    role: 'Head of Infrastructure & Security',
+    bio: 'Architects ExamShield\'s zero-trust proctoring environment, anti-tampering browser kiosk guards, end-to-end data encryption, and cloud resilience.',
+    initials: 'VI',
     color: 'blue',
     linkedin: '#!',
   },
 ];
 
 const stats = [
-  { value: '1.2M+', label: 'Exams Secured', icon: ShieldCheck },
-  { value: '150+', label: 'Institutions', icon: Building2 },
-  { value: '99.98%', label: 'AI Accuracy', icon: TrendingUp },
-  { value: '3', label: 'Global Offices', icon: Globe },
-  { value: '80+', label: 'Team Members', icon: Users },
-  { value: '5', label: 'Years Operating', icon: Award },
+  { value: '10+', label: 'Registered Institutions', icon: Building2 },
+  { value: '50K+', label: 'Exams Monitored', icon: ShieldCheck },
+  { value: '99.98%', label: 'AI Detection Accuracy', icon: TrendingUp },
+  { value: 'Mohali', label: 'Headquarters (Punjab)', icon: Globe },
+  { value: '+91 9934290491', label: 'Helpline / Contact', icon: Users },
+  { value: 'Feb 2025', label: 'Founded Date', icon: Award },
 ];
 
 const certifications = [
@@ -138,7 +138,7 @@ export default function AboutPage() {
           Built to defend <span>every credential</span> earned honestly
         </h1>
         <p className="features-hero-sub">
-          ExamShield was founded to answer one question: how do you ensure that every diploma, certificate, and professional licence truly represents earned knowledge? Five years later, we secure 1.2M+ exams across 150+ institutions on 3 continents.
+          ExamShield was founded in February 2025 in Mohali, Punjab by Founder & CEO Pawan Kumar Yadav alongside a passionate founding team. Today, we secure high-stakes examinations across 10+ registered partner institutions with AI-driven academic integrity.
         </p>
         <div className="features-hero-actions">
           <Link to="/admin/register" className="feat-cta-primary">
@@ -188,13 +188,13 @@ export default function AboutPage() {
           <div className="about-mission-right">
             <div className="about-mission-quote">
               <p className="about-quote-text">
-                "We don't build surveillance tools. We build trust infrastructure — for institutions that believe every credential should genuinely represent earned knowledge."
+                "We don't build intrusive surveillance. We engineer trust infrastructure — empowering colleges to guarantee that every degree and certificate is earned with complete honesty."
               </p>
               <div className="about-quote-author">
-                <div className="about-quote-avatar feat-icon-green" aria-hidden="true">AM</div>
+                <div className="about-quote-avatar feat-icon-green" aria-hidden="true">PK</div>
                 <div>
-                  <strong>Dr. Arjun Mehta</strong>
-                  <span>CEO & Co-Founder, ExamShield</span>
+                  <strong>Pawan Kumar Yadav</strong>
+                  <span>Founder & CEO, ExamShield</span>
                 </div>
               </div>
             </div>
@@ -206,7 +206,7 @@ export default function AboutPage() {
       <section className="public-shell about-timeline-section" aria-labelledby="timeline-heading">
         <div className="feat-section-header">
           <p className="feat-kicker">OUR JOURNEY</p>
-          <h2 id="timeline-heading">Five years of defending academic integrity</h2>
+          <h2 id="timeline-heading">Building Next-Generation Academic Integrity</h2>
         </div>
         <div className="about-timeline">
           {milestones.map((m, i) => (

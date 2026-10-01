@@ -102,6 +102,23 @@ class ChatBotService {
   generateLocalFallback(input) {
     const q = input.toLowerCase();
 
+    if (q.includes('founder') || q.includes('ceo') || q.includes('pawan') || q.includes('mohali') || q.includes('team') || q.includes('prince') || q.includes('suraj') || q.includes('shruti') || q.includes('sachin') || q.includes('vishal') || q.includes('location') || q.includes('office') || q.includes('phone') || q.includes('9934290491') || q.includes('address') || q.includes('headquarters') || q.includes('call') || q.includes('contact number')) {
+      return {
+        response: `### 🏢 About ExamShield — Company & Leadership\n\n* **Founded**: **February 2025**\n* **Global Headquarters**: **Mohali, Punjab, India** (Phase 8B / Sector 74, Industrial Area — 160055)\n* **Direct Helpline**: **+91 9934290491**\n* **Traction**: **10+ Registered Institutions & Partner Colleges** with 50K+ secured exams.\n\n#### 👥 Core Leadership Team:\n* **Pawan Kumar Yadav** — Founder & Chief Executive Officer (CEO)\n* **Prince** — Co-Founder & Chief Technology Officer (CTO)\n* **Suraj** — Chief Operating Officer (COO)\n* **Shruti** — Chief Design Officer (CDO) & Head of Product Experience\n* **Sachin** — Head of AI & Machine Learning\n* **Vishal** — Head of Infrastructure & Security\n\nFor institutional inquiries, campus pilots, or direct founder meetings, call **+91 9934290491** or email **support@examshield.com**.`,
+        confidence: 0.99,
+        intent: 'company_info',
+        suggestions: [
+          'Schedule an Institutional Pilot',
+          'Explore Platform Features',
+          'How does AI proctoring work?'
+        ],
+        actions: [
+          { label: 'About ExamShield', url: '/about' },
+          { label: 'Contact Founder Office', url: '/contact' }
+        ]
+      };
+    }
+
     if (/^(hi|hello|hey|greetings|hola)\b/i.test(q)) {
       return {
         response: `Hello! 👋 Welcome to **ExamShield**. I'm your dedicated AI Academic & Technical Assistant.\n\nI can assist you with:\n* **AI Proctoring & Anti-Cheat Controls** (Face mesh, audio analytics, kiosk lockdown)\n* **Student Exam Room & Login Assistance** (Camera check, timers, question navigation)\n* **College Admin Console** (Scheduling exams, student management, live cockpit)\n* **Online Coding Assessments** (Languages, test cases, sandboxed execution)\n* **Institutional Pricing & Licensing**\n\nHow can I help you today?`,

@@ -44,18 +44,18 @@ const teamCards = [
 
 const officeLocations = [
   {
-    city: 'Bangalore',
-    country: 'India (HQ)',
-    address: '12th Floor, Prestige Tech Park,\nOuter Ring Road, Bangalore — 560103',
-    phone: '+91 80 4567 8900',
-    hours: 'Mon–Fri: 9AM–7PM IST',
+    city: 'Mohali',
+    country: 'Punjab, India (Global HQ)',
+    address: 'Phase 8B / Sector 74, Industrial Area, Mohali, Punjab — 160055',
+    phone: '+91 9934290491',
+    hours: 'Mon–Sat: 9AM–7PM IST · Founder & CEO: Pawan Kumar Yadav',
   },
   {
-    city: 'Singapore',
-    country: 'Asia-Pacific',
-    address: 'Level 30, Ocean Financial Centre,\n10 Collyer Quay, Singapore — 049315',
-    phone: '+65 6801 2345',
-    hours: 'Mon–Fri: 9AM–6PM SGT',
+    city: 'Chandigarh Tricity',
+    country: 'Campus Operations Hub',
+    address: 'Technology Corridor, Mohali-Chandigarh, Punjab — 160071',
+    phone: '+91 9934290491',
+    hours: '24/7 Dedicated Exam Support SLA',
   },
 ];
 
@@ -142,14 +142,14 @@ export default function Contact() {
             <p>Our institutional team will route your message to the right specialist and respond within one business day.</p>
 
             <div className="contact-methods-list">
-              <a href="tel:+918045678900" className="contact-method-row" aria-label="Call ExamShield support">
+              <a href="tel:+919934290491" className="contact-method-row" aria-label="Call ExamShield direct helpline">
                 <div className="contact-method-icon-wrap green" aria-hidden="true">
                   <Phone size={18} />
                 </div>
                 <div>
-                  <strong>Phone Support</strong>
-                  <span>+91 80 4567 8900</span>
-                  <small>Mon–Fri, 9AM–7PM IST</small>
+                  <strong>Direct Helpline & Founder Office</strong>
+                  <span>+91 9934290491</span>
+                  <small>Mon–Sat, 9AM–7PM IST · Pawan Kumar Yadav (Founder & CEO)</small>
                 </div>
                 <ChevronRight size={16} className="contact-method-arrow" aria-hidden="true" />
               </a>
