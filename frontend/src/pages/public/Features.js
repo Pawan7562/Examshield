@@ -8,7 +8,6 @@ import {
   TrendingUp, Award, Shield, Cpu, Wifi, RefreshCcw, X,
 } from 'lucide-react';
 import PublicLayout from '../../components/public/PublicLayout';
-import SEOHead from '../../components/common/SEOHead';
 import './PublicPages.css';
 
 /* ─── Data ─── */
@@ -337,11 +336,6 @@ export default function FeaturesPage() {
 
   return (
     <PublicLayout>
-      <SEOHead
-        title="AI Exam Monitoring & Proctoring Features | ExamShield by Nexify Forge"
-        description="Explore ExamShield's AI online proctoring features: continuous biometric face mesh, browser kiosk lockdown, acoustic whisper detection, sandboxed coding compiler, and forensic audit reports."
-        canonical="https://exam.nexifyforge.in/features"
-      />
       {/* ── Hero ── */}
       <section className="features-hero-section public-shell" aria-labelledby="features-hero-h1">
         <div className="features-hero-eyebrow">

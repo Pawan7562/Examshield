@@ -12,12 +12,10 @@ import HowItWorksPage from './pages/public/HowItWorks';
 import PricingPage from './pages/public/Pricing';
 import ContactPage from './pages/public/Contact';
 import AboutPage from './pages/public/About';
-import FAQPage from './pages/public/FAQ';
 
 import AdminLayout from './components/admin/AdminLayout';
 import StudentLayout from './components/student/StudentLayout';
 import SuperAdminLayout from './components/admin/SuperAdminLayout';
-import SEOHead from './components/common/SEOHead';
 
 // Route-level code-splitting: loads heavy page components only on demand
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
@@ -102,8 +100,6 @@ function App() {
           }}
         />
 
-        <SEOHead />
-
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -112,7 +108,6 @@ function App() {
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/about" element={<AboutPage />} />
-          <Route path="/faq" element={<FAQPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<Login role="admin" />} />
           <Route path="/register" element={<Register />} />

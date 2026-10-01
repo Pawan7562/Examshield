@@ -6,7 +6,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import PublicLayout from '../../components/public/PublicLayout';
-import SEOHead from '../../components/common/SEOHead';
 import './PublicPages.css';
 import './About.css';
 
@@ -129,11 +128,6 @@ export default function AboutPage() {
 
   return (
     <PublicLayout>
-      <SEOHead
-        title="About ExamShield & Nexify Forge | Online Exam Security & Proctoring"
-        description="ExamShield is a flagship AI online exam monitoring and proctoring platform developed by Nexify Forge. Dedicated to safeguarding academic integrity for universities and colleges worldwide."
-        canonical="https://exam.nexifyforge.in/about"
-      />
       {/* ── Hero ── */}
       <section className="about-hero-section public-shell" aria-labelledby="about-h1">
         <div className="features-hero-eyebrow">
