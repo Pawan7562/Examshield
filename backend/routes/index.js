@@ -20,6 +20,7 @@ const supportController = require('../controllers/supportController');
 
 // Student password routes
 const studentPasswordRoutes = require('./studentPasswordRoutes');
+const chatbotRoutes = require('./chatbotRoutes');
 
 // Multer config for CSV uploads
 const storage = multer.diskStorage({
@@ -232,6 +233,11 @@ router.use('/super-admin', superAdmin);
 // STUDENT PASSWORD ROUTES (Public - No authentication required)
 // =====================================================
 router.use('/student-password', studentPasswordRoutes);
+
+// =====================================================
+// CHATBOT SUPPORT & KNOWLEDGE BASE (Public)
+// =====================================================
+router.use('/chatbot', chatbotRoutes);
 
 // =====================================================
 // CODE EXECUTION (Sandboxed - basic implementation)

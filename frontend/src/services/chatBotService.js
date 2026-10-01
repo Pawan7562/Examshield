@@ -1,347 +1,259 @@
-// ChatBot Service - Production-ready chatbot backend integration
+// frontend/src/services/chatBotService.js
+// Enterprise-Grade ChatBot Client Service with Hybrid Network + Local Knowledge Fallback
+
+const getApiBaseUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  return process.env.NODE_ENV === 'development'
+    ? 'http://localhost:5000/api'
+    : 'https://examshield-3-wydj.onrender.com/api';
+};
 
 class ChatBotService {
   constructor() {
-    this.apiEndpoint = process.env.REACT_APP_CHATBOT_API || '/api/chatbot';
-    this.sessionId = this.generateSessionId();
+    this.apiEndpoint = `${getApiBaseUrl()}/chatbot`;
+    this.sessionId = this.getOrInitSessionId();
     this.conversationHistory = [];
-    this.userProfile = {};
-    this.isOnline = true;
   }
 
-  // Generate unique session ID
-  generateSessionId() {
-    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
-
-  // Initialize user session
-  async initializeSession(userInfo = {}) {
+  getOrInitSessionId() {
     try {
-      this.userProfile = {
-        sessionId: this.sessionId,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        ...userInfo
-      };
-
-      const response = await fetch(`${this.apiEndpoint}/init`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(this.userProfile)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to initialize chat session');
+      let stored = sessionStorage.getItem('examshield_chat_session_id');
+      if (!stored) {
+        stored = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        sessionStorage.setItem('examshield_chat_session_id', stored);
       }
-
-      const data = await response.json();
-      this.conversationHistory = data.history || [];
-      return data;
-    } catch (error) {
-      console.error('Chat session initialization failed:', error);
-      return this.getFallbackResponse();
+      return stored;
+    } catch (e) {
+      return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     }
   }
 
-  // Send message to chatbot
-  async sendMessage(message, context = {}) {
+  async checkStatus() {
     try {
-      const messageData = {
-        sessionId: this.sessionId,
-        message: message,
-        timestamp: new Date().toISOString(),
-        context: {
-          ...context,
-          conversationHistory: this.conversationHistory.slice(-10), // Last 10 messages
-          userProfile: this.userProfile
-        }
-      };
+      const res = await fetch(`${this.apiEndpoint}/status`, { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        const data = await res.json();
+        return { online: true, ...data };
+      }
+    } catch (e) {
+      // Return local ready
+    }
+    return { online: true, engine: 'Client Hybrid NLP Engine' };
+  }
 
+  async sendMessage(messageText, context = {}) {
+    const trimmed = (messageText || '').trim();
+    if (!trimmed) return null;
+
+    // Record user history
+    this.conversationHistory.push({
+      role: 'user',
+      content: trimmed,
+      timestamp: new Date().toISOString()
+    });
+
+    try {
       const response = await fetch(`${this.apiEndpoint}/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(messageData)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      const data = await response.json();
-      
-      // Update conversation history
-      this.conversationHistory.push({
-        type: 'user',
-        message: message,
-        timestamp: new Date().toISOString()
-      });
-      
-      this.conversationHistory.push({
-        type: 'bot',
-        message: data.response,
-        timestamp: new Date().toISOString(),
-        confidence: data.confidence || 0.8,
-        intent: data.intent || null
-      });
-
-      return {
-        response: data.response,
-        confidence: data.confidence || 0.8,
-        intent: data.intent || null,
-        suggestions: data.suggestions || [],
-        isTyping: false
-      };
-    } catch (error) {
-      console.error('Chat message failed:', error);
-      return this.getFallbackResponse(message);
-    }
-  }
-
-  // Get fallback response when API fails
-  getFallbackResponse(message = '') {
-    const fallbackResponses = [
-      "I'm experiencing some technical difficulties. Please try again in a moment.",
-      "I'm unable to connect right now. Please contact our support team for immediate assistance.",
-      "Something went wrong on my end. Let me try to help you differently."
-    ];
-
-    const response = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-    
-    return {
-      response: response,
-      confidence: 0.3,
-      intent: 'error',
-      suggestions: [
-        'Contact Support',
-        'Try Again',
-        'View FAQ'
-      ],
-      isTyping: false
-    };
-  }
-
-  // Advanced AI response generation
-  async generateIntelligentResponse(userMessage, context = {}) {
-    try {
-      // Analyze user intent
-      const intent = await this.analyzeIntent(userMessage);
-      
-      // Get personalized response based on user history
-      const personalizedContext = this.getPersonalizedContext(context);
-      
-      // Generate response
-      const response = await this.generateContextualResponse(userMessage, intent, personalizedContext);
-      
-      return response;
-    } catch (error) {
-      console.error('Intelligent response generation failed:', error);
-      return this.getFallbackResponse(userMessage);
-    }
-  }
-
-  // Analyze user intent
-  async analyzeIntent(message) {
-    const messageLower = message.toLowerCase();
-    
-    // Intent patterns
-    const intents = {
-      pricing: ['price', 'cost', 'pricing', 'plan', 'subscription', 'fee'],
-      features: ['feature', 'capability', 'what can', 'functionality', 'option'],
-      demo: ['demo', 'trial', 'test', 'preview', 'showcase'],
-      support: ['help', 'support', 'issue', 'problem', 'trouble'],
-      technical: ['technical', 'requirement', 'system', 'compatibility', 'browser'],
-      security: ['security', 'privacy', 'safe', 'protect', 'encrypt'],
-      integration: ['integration', 'lms', 'connect', 'api', 'moodle'],
-      contact: ['contact', 'phone', 'email', 'address', 'office'],
-      mobile: ['mobile', 'app', 'phone', 'tablet', 'ios', 'android'],
-      report: ['report', 'analytics', 'result', 'data', 'insight']
-    };
-
-    for (const [intent, keywords] of Object.entries(intents)) {
-      if (keywords.some(keyword => messageLower.includes(keyword))) {
-        return intent;
-      }
-    }
-
-    return 'general';
-  }
-
-  // Get personalized context
-  getPersonalizedContext(context) {
-    const recentHistory = this.conversationHistory.slice(-5);
-    const userIntents = recentHistory
-      .filter(msg => msg.intent)
-      .map(msg => msg.intent);
-    
-    return {
-      recentTopics: userIntents,
-      messageCount: this.conversationHistory.length,
-      sessionDuration: Date.now() - (this.userProfile.timestamp ? new Date(this.userProfile.timestamp).getTime() : Date.now()),
-      ...context
-    };
-  }
-
-  // Generate contextual response
-  async generateContextualResponse(message, intent, context) {
-    const responses = {
-      pricing: {
-        main: "I can help you with our pricing! We offer three flexible plans designed for different needs:\n\n🎯 **Starter Plan** - ₹4,999/month\n• Up to 100 students\n• Basic monitoring features\n• Email support\n\n🚀 **Professional Plan** - ₹9,999/month\n• Up to 500 students\n• Advanced AI monitoring\n• Priority support\n\n💎 **Enterprise Plan** - Custom pricing\n• Unlimited students\n• Custom features\n• Dedicated support\n\nWhich plan interests you most?",
-        followups: ['Tell me more about Starter', 'Professional features?', 'Enterprise pricing?']
-      },
-      
-      features: {
-        main: "CollegeExam offers comprehensive exam monitoring features:\n\n🔍 **Live Proctoring**\nReal-time video monitoring with AI-powered alerts\n\n🤖 **Smart Detection**\nAutomated violation detection for unfair practices\n\n📊 **Advanced Analytics**\nDetailed performance insights and reports\n\n🔒 **Bank-level Security**\n256-bit encryption and GDPR compliance\n\n📱 **Multi-platform Support**\nWorks on web, mobile, and desktop\n\nWhich feature would you like to explore?",
-        followups: ['How does AI detection work?', 'Security details?', 'Mobile app features?']
-      },
-      
-      demo: {
-        main: "Great choice! I can help you experience CollegeExam:\n\n🎮 **Interactive Demo**\nSchedule a personalized walkthrough with our team\n\n📅 **14-Day Free Trial**\nFull access to all features\n\n📹 **Video Tour**\nWatch our platform in action\n\n🎯 **Quick Start**\nBegin monitoring exams in minutes\n\nWhich option works best for you?",
-        followups: ['Schedule demo', 'Start free trial', 'Watch video tour']
-      },
-      
-      support: {
-        main: "I'm here to help! Here's how you can reach us:\n\n📧 **Email Support**\nsupport@exammonitoring.com\nResponse within 24 hours\n\n📞 **Phone Support**\n+91 98765 43210\nMon-Fri, 9AM-6PM IST\n\n💬 **Live Chat**\nAvailable 24/7 for immediate help\n\n🏢 **Office Visit**\nBangalore, Karnataka\nWhat specific issue can I help you with?",
-        followups: ['Technical issue', 'Billing question', 'Account help']
-      },
-      
-      technical: {
-        main: "Here are our technical requirements:\n\n💻 **Browser Support**\nChrome, Firefox, Safari, Edge (latest versions)\n\n📱 **Mobile Requirements**\niOS 12+, Android 8+\nStable internet connection (3Mbps+)\n\n📹 **Hardware Requirements**\nWeb camera (built-in or external)\nMicrophone for audio monitoring\n\n🌐 **Network**\nMinimum 3Mbps upload speed\nLow latency connection preferred\n\nNeed help with setup?",
-        followups: ['Browser setup help', 'Mobile app download', 'Connection test']
-      },
-      
-      security: {
-        main: "Security is our highest priority:\n\n🔐 **Encryption**\n256-bit SSL encryption for all data\nEnd-to-end encryption for video streams\n\n🛡️ **Compliance**\nGDPR compliant data handling\nFERPA compliant for educational data\n\n👥 **Privacy Controls**\nStudent data anonymization\nRole-based access control\n\n🔒 **Data Protection**\nRegular security audits\nPenetration testing\n24/7 security monitoring\n\nYour data is completely safe with us!",
-        followups: ['Privacy policy details', 'Data storage locations', 'Compliance certificates']
-      },
-      
-      integration: {
-        main: "CollegeExam integrates seamlessly with popular LMS platforms:\n\n🎓 **Moodle**\nOne-click integration\nSingle sign-on support\nGrade book sync\n\n📚 **Canvas**\nNative integration\nReal-time sync\nMobile app support\n\n🏫 **Blackboard**\nEnterprise integration\nCustom workflows\nAPI access\n\n🔧 **Custom Integration**\nRESTful API\nWebhook support\nDeveloper documentation\n\nWhich LMS are you using?",
-        followups: ['Moodle setup guide', 'Canvas integration', 'Custom API docs']
-      },
-      
-      contact: {
-        main: "Get in touch with our team:\n\n📧 **Email**\nsupport@exammonitoring.com\nGeneral inquiries and support\n\n📞 **Phone**\n+91 98765 43210\nSales and urgent support\n\n🏢 **Office**\n123 Tech Park, Bangalore\nKarnataka 560001, India\n\n🕐 **Business Hours**\nMon-Fri: 9AM-6PM IST\nSaturday: 10AM-2PM\n\nHow can we help you today?",
-        followups: ['Sales inquiry', 'Technical support', 'Partnership opportunity']
-      },
-      
-      mobile: {
-        main: "Yes! CollegeExam works perfectly on mobile:\n\n📱 **Mobile Apps**\nAvailable on iOS App Store & Google Play\nNative performance and features\n\n💻 **Responsive Web**\nWorks on any mobile browser\nTouch-optimized interface\n\n📟 **Tablet Support**\niPad and Android tablet optimized\nSplit-screen multitasking\n\n🔔 **Push Notifications**\nExam reminders and alerts\nReal-time status updates\n\nDownload our apps and monitor on the go!",
-        followups: ['iOS app features', 'Android download', 'Web mobile guide']
-      },
-      
-      report: {
-        main: "Our comprehensive reporting system provides:\n\n📊 **Real-time Analytics**\nLive exam monitoring dashboard\nStudent participation tracking\n\n📈 **Performance Insights**\nIndividual and class performance\nTrend analysis over time\n\n📋 **Detailed Reports**\nExam completion rates\nTime analysis\nViolation incidents\n\n🎯 **Custom Reports**\nTailored metrics for your needs\nExport to PDF/Excel\nScheduled reports\n\nWhich type of report interests you?",
-        followups: ['Sample report demo', 'Custom report setup', 'Data export options']
-      },
-      
-      general: {
-        main: "Welcome to CollegeExam! I'm your AI assistant and I'm here to help you with:\n\n💰 **Pricing Plans**\n⚡ **Platform Features**\n🎮 **Demo & Trial**\n🛡️ **Security & Privacy**\n📱 **Mobile Apps**\n🔧 **Technical Support**\n📞 **Contact Information**\n\nWhat would you like to know about our exam monitoring platform?",
-        followups: ['Show me pricing', 'Platform features', 'Start free trial']
-      }
-    };
-
-    const responseSet = responses[intent] || responses.general;
-    
-    return {
-      response: responseSet.main,
-      confidence: 0.85,
-      intent: intent,
-      suggestions: responseSet.followups,
-      isTyping: false
-    };
-  }
-
-  // Track user analytics
-  async trackUserAction(action, data = {}) {
-    try {
-      await fetch(`${this.apiEndpoint}/track`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          message: trimmed,
           sessionId: this.sessionId,
-          action: action,
-          timestamp: new Date().toISOString(),
-          data: data
-        })
+          context: {
+            ...context,
+            url: window.location.pathname,
+            history: this.conversationHistory.slice(-6)
+          }
+        }),
+        signal: AbortSignal.timeout(8000)
       });
-    } catch (error) {
-      console.error('Analytics tracking failed:', error);
+
+      if (response.ok) {
+        const data = await response.json();
+        this.conversationHistory.push({
+          role: 'bot',
+          content: data.response,
+          timestamp: new Date().toISOString()
+        });
+        return {
+          response: data.response,
+          confidence: data.confidence || 0.9,
+          intent: data.intent || 'general',
+          suggestions: data.suggestions || [],
+          actions: data.actions || []
+        };
+      }
+    } catch (err) {
+      console.warn('Backend chatbot API unreachable, using resilient client NLP engine:', err.message);
     }
+
+    // High-fidelity client NLP fallback
+    const localResult = this.generateLocalFallback(trimmed);
+    this.conversationHistory.push({
+      role: 'bot',
+      content: localResult.response,
+      timestamp: new Date().toISOString()
+    });
+    return localResult;
   }
 
-  // Get conversation summary
-  getConversationSummary() {
-    const totalMessages = this.conversationHistory.length;
-    const userMessages = this.conversationHistory.filter(msg => msg.type === 'user').length;
-    const botMessages = this.conversationHistory.filter(msg => msg.type === 'bot').length;
-    const sessionDuration = Date.now() - (this.userProfile.timestamp ? new Date(this.userProfile.timestamp).getTime() : Date.now());
-    
-    const intents = this.conversationHistory
-      .filter(msg => msg.intent)
-      .reduce((acc, msg) => {
-        acc[msg.intent] = (acc[msg.intent] || 0) + 1;
-        return acc;
-      }, {});
+  generateLocalFallback(input) {
+    const q = input.toLowerCase();
+
+    if (/^(hi|hello|hey|greetings|hola)\b/i.test(q)) {
+      return {
+        response: `Hello! 👋 Welcome to **ExamShield**. I'm your dedicated AI Academic & Technical Assistant.\n\nI can assist you with:\n* **AI Proctoring & Anti-Cheat Controls** (Face mesh, audio analytics, kiosk lockdown)\n* **Student Exam Room & Login Assistance** (Camera check, timers, question navigation)\n* **College Admin Console** (Scheduling exams, student management, live cockpit)\n* **Online Coding Assessments** (Languages, test cases, sandboxed execution)\n* **Institutional Pricing & Licensing**\n\nHow can I help you today?`,
+        confidence: 0.95,
+        intent: 'greeting',
+        suggestions: [
+          'How does AI proctoring work?',
+          'How does browser kiosk lockdown work?',
+          'How do students log in for an exam?',
+          'Can instructors monitor exams live?'
+        ],
+        actions: [
+          { label: 'Register College', url: '/admin/register' },
+          { label: 'Student Login', url: '/student/login' }
+        ]
+      };
+    }
+
+    if (q.includes('proctor') || q.includes('cheat') || q.includes('camera') || q.includes('face') || q.includes('gaze') || q.includes('biometric')) {
+      return {
+        response: `### 🛡️ Autonomous AI Proctoring & Biometric Engine\n\nExamShield delivers continuous, non-invasive assessment surveillance running **100% in-browser** via WebRTC and HTML5 Canvas:\n\n* **Biometric Face Mesh**: Maps 468 3D facial landmarks at 30 fps to ensure continuous candidate identity verification.\n* **Absence & Multi-Person Alerts**: Flags when a candidate leaves the camera frame or when unauthorized secondary individuals appear.\n* **Gaze & Head Pose Tracking**: Detects abnormal, persistent looking away from the screen.\n* **Acoustic Whisper Filter**: Web Audio API analyzes ambient microphone frequencies to detect whispering and dictation.\n* **Automated Violation Logs**: Every event is captured with a high-resolution snapshot, millisecond timestamp, and severity rating.`,
+        confidence: 0.98,
+        intent: 'proctoring',
+        suggestions: [
+          'How does browser kiosk lockdown work?',
+          'Can it detect secondary monitors?',
+          'What are the minimum system requirements?'
+        ],
+        actions: [
+          { label: 'Explore Features', url: '/features' },
+          { label: 'View How It Works', url: '/how-it-works' }
+        ]
+      };
+    }
+
+    if (q.includes('lockdown') || q.includes('kiosk') || q.includes('tab') || q.includes('fullscreen') || q.includes('alt tab') || q.includes('monitor')) {
+      return {
+        response: `### 🔒 Browser Kiosk Lockdown & Sandbox\n\nExamShield transforms any standard modern browser into a secure test kiosk without requiring kernel-level drivers:\n\n* **Fullscreen Enforcement**: Candidates must maintain fullscreen mode throughout the test.\n* **Tab & Window Interception**: Detects tab-switching, app switching, window blur, and secondary application launches.\n* **Keystroke & Shortcut Blocking**: Intercepts \`Alt+Tab\`, \`Windows key\`, \`Cmd+Tab\`, \`Ctrl+C / Ctrl+V\`, and \`PrtScn\`.\n* **Multi-Display & Splitter Detection**: Queries display profile APIs to detect secondary monitors, HDMI splitters, and virtual machines.`,
+        confidence: 0.96,
+        intent: 'lockdown',
+        suggestions: [
+          'What are the minimum system requirements?',
+          'Can students take coding tests?',
+          'How does the Live Cockpit work?'
+        ],
+        actions: [
+          { label: 'How It Works Guide', url: '/how-it-works' }
+        ]
+      };
+    }
+
+    if (q.includes('price') || q.includes('pricing') || q.includes('cost') || q.includes('plan') || q.includes('subscription')) {
+      return {
+        response: `### 🏛️ Institutional Licensing & Custom Quotes\n\nExamShield provides custom institutional licensing tailored to your campus or testing board's scale:\n\n* **Academic & State Boards**: Unlimited department seats, dedicated Neon/AWS compute isolation, and volume-based licensing.\n* **Turnkey LMS Integration**: LTI 1.3 single sign-on with Moodle, Canvas, and Blackboard.\n* **24/7 Mission Control SLA**: Dedicated technical account manager and exam-day live support.\n\nTo request a tailored institutional proposal or schedule a faculty pilot, please contact our solutions team.`,
+        confidence: 0.95,
+        intent: 'institutional_licensing',
+        suggestions: [
+          'How to schedule an institutional pilot?',
+          'How does AI proctoring work?',
+          'What are the minimum system requirements?'
+        ],
+        actions: [
+          { label: 'Request Institutional Proposal', url: '/contact' },
+          { label: 'Register College', url: '/admin/register' }
+        ]
+      };
+    }
+
+    if (q.includes('code') || q.includes('coding') || q.includes('compiler') || q.includes('python') || q.includes('java') || q.includes('programming')) {
+      return {
+        response: `### 💻 Integrated Online Coding Assessment Platform\n\n* **20+ Languages**: Python, Java, C++, C, JavaScript, TypeScript, Go, Rust, C#, and PHP.\n* **Monaco Code Editor**: Professional VS Code editing experience with syntax highlighting.\n* **Real-time Compilation**: Sandboxed backend execution with isolated memory and execution limits.\n* **Visible & Hidden Test Cases**: Test public sample cases with explanations and secret edge-case test suites for automated grading.\n* **Clipboard Protection**: Blocks external copy-pasting and monitors typing velocity against AI code generators.`,
+        confidence: 0.96,
+        intent: 'coding',
+        suggestions: [
+          'How are coding questions auto-graded?',
+          'What are the pricing plans?',
+          'Try Student Login'
+        ],
+        actions: [
+          { label: 'Explore Features', url: '/features' },
+          { label: 'Student Login', url: '/student/login' }
+        ]
+      };
+    }
+
+    if (q.includes('student') || q.includes('login') || q.includes('exam key') || q.includes('instructions')) {
+      return {
+        response: `### 🎓 Student Exam Experience & Instructions\n\n1. **Sign In**: Navigate to \`/student/login\` using your **Student ID / Email** and **Password** provided by your college.\n2. **Select Exam**: Enter the unique **Exam Key** if prompted.\n3. **Hardware Readiness**: Allow browser permissions for **Webcam** and **Microphone**.\n4. **Exam Room**: Answer questions using the interactive palette. Answers are continuously auto-saved.\n5. **Submission**: Click **Submit Exam** or allow timer auto-submit. Your result and score breakdown will be generated immediately.`,
+        confidence: 0.94,
+        intent: 'student',
+        suggestions: [
+          'Forgot student password?',
+          'What are the minimum system requirements?',
+          'How does AI proctoring work?'
+        ],
+        actions: [
+          { label: 'Go to Student Login', url: '/student/login' },
+          { label: 'Student Password Help', url: '/student/password-reset' }
+        ]
+      };
+    }
 
     return {
-      sessionId: this.sessionId,
-      totalMessages,
-      userMessages,
-      botMessages,
-      sessionDuration,
-      intents,
-      timestamp: new Date().toISOString()
+      response: `I'm here to help with any aspect of **ExamShield**:\n\n* **Live AI Proctoring**: Face tracking, whisper detection, browser kiosk lockdown.\n* **Student Support**: Accessing exams, hardware readiness, password resets.\n* **College Admin & Faculty**: Creating exams, bulk CSV student upload, live invigilator cockpit.\n* **Pricing & Institutional Pilots**: Starter/Pro/Enterprise plans and custom quotes.\n* **Technical Requirements**: Supported browsers and minimum network speeds.\n\nClick any topic below or type your question!`,
+      confidence: 0.7,
+      intent: 'general',
+      suggestions: [
+        'How does AI proctoring work?',
+        'What are the pricing plans?',
+        'How do students take an exam?',
+        'How to contact support?'
+      ],
+      actions: [
+        { label: 'View How It Works', url: '/how-it-works' },
+        { label: 'Contact Support', url: '/contact' }
+      ]
     };
   }
 
-  // Export conversation
-  exportConversation() {
-    const summary = this.getConversationSummary();
-    const exportData = {
-      summary: summary,
-      conversation: this.conversationHistory,
-      userProfile: this.userProfile,
-      exportTimestamp: new Date().toISOString()
-    };
+  clearHistory() {
+    this.conversationHistory = [];
+    try {
+      sessionStorage.removeItem('examshield_chat_session_id');
+      this.sessionId = this.getOrInitSessionId();
+    } catch (e) {}
+  }
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  exportHistory() {
+    const lines = [
+      `# ExamShield Academic Assistant - Conversation Transcript`,
+      `Session ID: ${this.sessionId}`,
+      `Exported: ${new Date().toLocaleString()}`,
+      `-------------------------------------------------------`,
+      ''
+    ];
+    this.conversationHistory.forEach((msg, idx) => {
+      lines.push(`[${msg.role === 'user' ? 'Candidate/User' : 'ExamShield Assistant'}] ${msg.timestamp}`);
+      lines.push(msg.content);
+      lines.push('');
+    });
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `chat-export-${this.sessionId}.json`;
+    a.download = `ExamShield-Chat-Transcript-${Date.now()}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
-
-  // Clear conversation
-  clearConversation() {
-    this.conversationHistory = [];
-    this.sessionId = this.generateSessionId();
-  }
-
-  // Check service status
-  async checkServiceStatus() {
-    try {
-      const response = await fetch(`${this.apiEndpoint}/status`);
-      const status = await response.json();
-      this.isOnline = status.online;
-      return status;
-    } catch (error) {
-      this.isOnline = false;
-      return { online: false, message: 'Service unavailable' };
-    }
-  }
 }
 
-// Create singleton instance
 const chatBotService = new ChatBotService();
-
 export default chatBotService;

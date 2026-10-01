@@ -583,7 +583,7 @@ exports.createExam = async (req, res) => {
       max_violations: examMaxViolations,
       monitoring_config: resolvedMonitoringConfig,
       college_id: collegeId,
-      status: 'draft'
+      status: req.body.status || (questions && questions.length > 0 ? 'published' : 'draft')
     };
 
     // Only add new fields if they exist in the database
@@ -1603,7 +1603,7 @@ exports.startExam = async (req, res) => {
       .from('exams')
       .update({ status: 'active' })
       .eq('id', id)
-      .eq('status', 'published');
+      .in('status', ['published', 'draft']);
 
     // Get questions for the exam
     let questions = [];
@@ -1783,6 +1783,10 @@ exports.saveAnswer = async (req, res) => {
     const { sessionId, questionId, answerText, selectedOption, codeSubmission, selectedLanguage } = req.body;
     const studentId = req.user.id;
 
+    if (!sessionId || !questionId) {
+      return res.status(400).json({ success: false, message: 'sessionId and questionId are required' });
+    }
+
     // Use Supabase upsert with explicit onConflict constraint
     const { data: saveData, error: saveError } = await supabase
       .from('answers')
@@ -1791,10 +1795,10 @@ exports.saveAnswer = async (req, res) => {
         question_id: questionId,
         student_id: studentId,
         exam_id: id,
-        answer_text: answerText,
-        selected_option: selectedOption,
-        code_submission: codeSubmission,
-        selected_language: selectedLanguage,
+        answer_text: answerText ?? null,
+        selected_option: selectedOption ?? null,
+        code_submission: codeSubmission ?? null,
+        selected_language: selectedLanguage ?? null,
         updated_at: new Date().toISOString()
       }, { 
         onConflict: 'session_id,question_id' 
@@ -1808,6 +1812,7 @@ exports.saveAnswer = async (req, res) => {
 
     res.json({ success: true, message: 'Answer saved.' });
   } catch (error) {
+    console.error('❌ Backend: Save answer exception:', error);
     res.status(500).json({ success: false, message: 'Failed to save answer', error: error.message });
   }
 };
@@ -1831,17 +1836,23 @@ exports.saveAnswersBulk = async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    const rows = answers.map(a => ({
-      session_id: sessionId,
-      question_id: a.questionId,
-      student_id: studentId,
-      exam_id: id,
-      answer_text: a.answerText ?? null,
-      selected_option: a.selectedOption ?? null,
-      code_submission: a.codeSubmission ?? null,
-      selected_language: a.selectedLanguage ?? null,
-      updated_at: now
-    }));
+    const rows = answers
+      .filter(a => a && a.questionId)
+      .map(a => ({
+        session_id: sessionId,
+        question_id: a.questionId,
+        student_id: studentId,
+        exam_id: id,
+        answer_text: a.answerText ?? null,
+        selected_option: a.selectedOption ?? null,
+        code_submission: a.codeSubmission ?? null,
+        selected_language: a.selectedLanguage ?? null,
+        updated_at: now
+      }));
+
+    if (rows.length === 0) {
+      return res.json({ success: true, count: 0, message: 'No valid answers to save.' });
+    }
 
     const { error: bulkError } = await supabase
       .from('answers')
@@ -1866,10 +1877,10 @@ exports.saveAnswersBulk = async (req, res) => {
 exports.submitExam = async (req, res) => {
   try {
     const { id } = req.params;
-    const { sessionId, autoSubmit, violationCount, tabSwitchCount, terminationReason } = req.body;
+    const { sessionId, autoSubmit, violationCount, tabSwitchCount, terminationReason, answers: submittedAnswers } = req.body;
     const studentId = req.user.id;
 
-    console.log('🚀 [SUBMIT-EXAM] Processing submission:', { examId: id, sessionId, studentId });
+    console.log('🚀 [SUBMIT-EXAM] Processing submission:', { examId: id, sessionId, studentId, finalAnswersInPayload: Array.isArray(submittedAnswers) ? submittedAnswers.length : 0 });
 
     // 1. Fetch Session (by sessionId or fallback to latest session for this student & exam)
     let sessionData = null;
@@ -1911,6 +1922,22 @@ exports.submitExam = async (req, res) => {
         .eq('student_id', studentId)
         .maybeSingle();
 
+      const { data: totalQs } = await supabase
+        .from('questions')
+        .select('id')
+        .eq('exam_id', id);
+
+      const { data: sessionAnswers } = await supabase
+        .from('answers')
+        .select('id, selected_option, answer_text, code_submission')
+        .eq('session_id', activeSessionId);
+
+      const attemptedCount = (sessionAnswers || []).filter(a => 
+        (a.selected_option !== null && a.selected_option !== undefined && String(a.selected_option).trim() !== '') ||
+        (a.answer_text !== null && a.answer_text !== undefined && String(a.answer_text).trim() !== '') ||
+        (a.code_submission !== null && a.code_submission !== undefined && String(a.code_submission).trim() !== '')
+      ).length;
+
       console.log('ℹ️ [SUBMIT-EXAM] Session already sealed as submitted. Returning existing result.');
       return res.json({
         success: true,
@@ -1920,6 +1947,8 @@ exports.submitExam = async (req, res) => {
           totalMarks: existingResult?.total_marks ?? 0,
           percentage: existingResult?.percentage ?? 0,
           status: existingResult?.status || 'completed',
+          questionsTotal: totalQs?.length || 0,
+          questionsAttempted: attemptedCount,
           result: {
             id: existingResult?.id || activeSessionId,
             score: existingResult?.marks_obtained ?? existingResult?.total_marks ?? 0,
@@ -1928,13 +1957,54 @@ exports.submitExam = async (req, res) => {
             percentage: existingResult?.percentage ?? 0,
             status: existingResult?.status || 'completed',
             submittedAt: sessionData.submitted_at || new Date().toISOString(),
+            questionsTotal: totalQs?.length || 0,
+            questionsAttempted: attemptedCount,
             isPending: existingResult?.status === 'pending'
           }
         }
       });
     }
 
-    // 2. Fetch ALL questions for this exam
+    // 2. ATOMIC ANSWER UPSERT — If the frontend sent final answers in the payload,
+    //    upsert them NOW before evaluation. This is the critical safety net that
+    //    ensures no answer is lost due to prior network failures or silent errors.
+    if (Array.isArray(submittedAnswers) && submittedAnswers.length > 0) {
+      console.log(`💾 [SUBMIT-EXAM] Atomically upserting ${submittedAnswers.length} final answers from payload...`);
+      const now = new Date().toISOString();
+      const answerRows = submittedAnswers
+        .filter(a => a && a.questionId)
+        .map(a => ({
+          session_id: activeSessionId,
+          question_id: a.questionId,
+          student_id: studentId,
+          exam_id: id,
+          answer_text: a.answerText ?? null,
+          selected_option: a.selectedOption ?? null,
+          code_submission: a.codeSubmission ?? null,
+          selected_language: a.selectedLanguage ?? null,
+          updated_at: now,
+        }));
+
+      if (answerRows.length > 0) {
+        try {
+          const { error: upsertAnswersError } = await supabase
+            .from('answers')
+            .upsert(answerRows, { onConflict: 'session_id,question_id' });
+
+          if (upsertAnswersError) {
+            console.error('❌ [SUBMIT-EXAM] Final answer upsert error:', upsertAnswersError.message);
+            // Do NOT abort — proceed with whatever is in DB
+          } else {
+            console.log(`✅ [SUBMIT-EXAM] Atomically saved ${answerRows.length} final answers.`);
+          }
+        } catch (upsertErr) {
+          console.error('❌ [SUBMIT-EXAM] Final answer upsert exception:', upsertErr.message);
+          // Do NOT abort — proceed with whatever is in DB
+        }
+      }
+    }
+
+    // 3. Fetch ALL questions for this exam
     const { data: questions, error: questionsError } = await supabase
       .from('questions')
       .select('*')
@@ -1945,7 +2015,7 @@ exports.submitExam = async (req, res) => {
       return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to retrieve questions for evaluation', error: questionsError?.message });
     }
 
-    // 3. Fetch ALL answers for this session
+    // 4. Fetch ALL answers for this session from DB (now includes atomically upserted ones)
     const { data: answers, error: answersError } = await supabase
       .from('answers')
       .select('*')
@@ -1956,23 +2026,35 @@ exports.submitExam = async (req, res) => {
       return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to fetch student answers', error: answersError?.message });
     }
 
-    console.log(`📊 [SUBMIT-EXAM] Marking Engine starting: ${questions.length} questions, ${answers?.length || 0} answers found`);
+    console.log(`📊 [SUBMIT-EXAM] Marking Engine starting: ${questions.length} questions, ${answers?.length || 0} answers in DB`);
 
-    // 4. Marking Engine for MCQ, Coding, and Descriptive
+    // 5. Marking Engine for MCQ, Coding, and Descriptive
     let mcqMarks = 0;
     let codingMarks = 0;
     let subjectiveMarks = 0;
-    const questionMap = new Map((questions || []).map(q => [q.id, q]));
+    let questionsAttempted = 0;
+    const questionMap = new Map((questions || []).map(q => [String(q.id), q]));
 
     for (const answer of answers || []) {
-      const question = questionMap.get(answer.question_id);
+      const question = questionMap.get(String(answer.question_id));
       if (!question) {
         console.warn(`⚠️ [SUBMIT-EXAM] Answer for unknown question ID: ${answer.question_id}`);
         continue;
       }
 
+      // Count as attempted if any response was recorded
+      const hasResponse = (
+        (answer.selected_option !== null && answer.selected_option !== undefined && String(answer.selected_option).trim() !== '') ||
+        (answer.answer_text !== null && answer.answer_text !== undefined && String(answer.answer_text).trim() !== '') ||
+        (answer.code_submission !== null && answer.code_submission !== undefined && String(answer.code_submission).trim() !== '')
+      );
+      if (hasResponse) questionsAttempted++;
+
       if (question.type === 'mcq' || question.type === 'true_false') {
-        const isCorrect = evaluateMCQAnswer(answer.selected_option, question.correct_answer, question.options);
+        const candidateAnswer = (answer.selected_option !== null && answer.selected_option !== undefined && String(answer.selected_option).trim() !== '')
+          ? answer.selected_option
+          : answer.answer_text;
+        const isCorrect = evaluateMCQAnswer(candidateAnswer, question.correct_answer, question.options);
         const qMarks = Number(question.marks) || 1;
         const qNegative = Math.abs(Number(question.negative_marks) || 0);
         const marksObtained = isCorrect ? qMarks : -qNegative;
@@ -2025,7 +2107,7 @@ exports.submitExam = async (req, res) => {
       }
     }
 
-    // 5. Fetch Exam Meta for Final Result Status
+    // 6. Fetch Exam Meta for Final Result Status
     const { data: examData } = await supabase
       .from('exams')
       .select('*')
@@ -2048,9 +2130,9 @@ exports.submitExam = async (req, res) => {
     const finalStatus = isPassed ? 'pass' : 'fail';
     const resultStatus = hasSubjective ? 'pending' : finalStatus;
 
-    console.log('📊 [SUBMIT-EXAM] Marking complete:', { totalEarnedMarks, mcqMarks, codingMarks, subjectiveMarks, totalPossibleMarks, passThresholdMarks, resultStatus, percentage: roundedPct, grade: computedGrade });
+    console.log('📊 [SUBMIT-EXAM] Marking complete:', { totalEarnedMarks, mcqMarks, codingMarks, subjectiveMarks, totalPossibleMarks, passThresholdMarks, resultStatus, percentage: roundedPct, grade: computedGrade, questionsAttempted, questionsTotal: questions.length, answersInDB: answers?.length || 0 });
 
-    // 6. Update Session Status to 'submitted'
+    // 7. Update Session Status to 'submitted'
     const submissionTime = new Date().toISOString();
     await supabase
       .from('exam_sessions')
@@ -2062,7 +2144,7 @@ exports.submitExam = async (req, res) => {
       })
       .eq('id', activeSessionId);
 
-    // 7. Upsert Result Record (prevents constraint conflict on student_id, exam_id)
+    // 8. Upsert Result Record (prevents constraint conflict on student_id, exam_id)
     console.log('📊 [SUBMIT-EXAM] Saving result record for session', activeSessionId);
     let resultRecord = null;
     try {
@@ -2106,6 +2188,9 @@ exports.submitExam = async (req, res) => {
         totalMarks: totalPossibleMarks,
         percentage: roundedPct,
         status: resultStatus,
+        questionsTotal: questions.length,
+        questionsAttempted,
+        answersRecorded: answers?.length || 0,
         result: {
           id: resultRecord?.id || activeSessionId,
           score: totalEarnedMarks,
@@ -2114,6 +2199,8 @@ exports.submitExam = async (req, res) => {
           percentage: roundedPct,
           status: resultStatus,
           submittedAt: submissionTime,
+          questionsTotal: questions.length,
+          questionsAttempted,
           isPending: resultStatus === 'pending'
         }
       }

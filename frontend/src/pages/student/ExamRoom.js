@@ -31,7 +31,18 @@ import {
   User,
   Check,
   FileText,
-  AlertCircle
+  AlertCircle,
+  ArrowRight,
+  BookOpen,
+  Award,
+  CheckSquare,
+  Square,
+  Monitor,
+  Wifi,
+  Camera,
+  Mic,
+  Code2,
+  Sparkles
 } from 'lucide-react';
 
 // ─── Toast Notification Helpers ───────────────────────────────────────────────
@@ -158,7 +169,9 @@ export default function ExamRoom() {
   const { user } = useAuth();
 
   // ── Core State ──
-  const [phase, setPhase] = useState('key'); // 'key' | 'waiting' | 'exam' | 'submitted'
+  const [phase, setPhase] = useState('key'); // 'key' | 'intro' | 'waiting' | 'exam' | 'submitted'
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [introTab, setIntroTab] = useState('general'); // 'general' | 'proctoring' | 'palette' | 'instructor'
   const [examData, setExamData] = useState(null);
   const [session, setSession] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -171,6 +184,8 @@ export default function ExamRoom() {
   const [isStartingExam, setIsStartingExam] = useState(false);
   const [examKey, setExamKey] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [waitingCountdown, setWaitingCountdown] = useState({ hours: 0, minutes: 0, seconds: 0, totalMs: 1, isReady: false });
+  const [waitingStatus, setWaitingStatus] = useState('');
 
   // ── Modals State ──
   const [showSubmitModal, setShowSubmitModal] = useState(false);
@@ -271,19 +286,23 @@ export default function ExamRoom() {
     if (autoSaveRef.current) clearInterval(autoSaveRef.current);
 
     try {
-      // 1. Flush any pending answers efficiently in ONE bulk call
+      // 1. Build answersList from current in-memory state, then flush via bulk save
       const currentSessionId = sessionRef.current?.id;
-      const currentAnswers = answersRef.current || {};
-      const currentQuestions = questionsRef.current || [];
+      const currentAnswers = { ...(answersRef.current || {}), ...(answers || {}) };
+      const currentQuestions = (questionsRef.current && questionsRef.current.length > 0)
+        ? questionsRef.current
+        : (questions || []);
 
+      let answersList = [];
       if (currentSessionId && Object.keys(currentAnswers).length > 0) {
-        const answersList = Object.entries(currentAnswers)
-          .filter(([, ans]) => ans !== null && ans !== undefined)
+        answersList = Object.entries(currentAnswers)
+          .filter(([, ans]) => ans !== null && ans !== undefined && String(ans).trim() !== '')
           .map(([qId, ans]) => {
-            const q = currentQuestions.find(item => item.id === qId);
+            const q = currentQuestions.find(item => String(item.id) === String(qId));
+            const isMcqOrTf = q?.type === 'mcq' || q?.type === 'true_false';
             return {
               questionId: qId,
-              ...(q?.type === 'mcq' ? { selectedOption: ans } :
+              ...(isMcqOrTf ? { selectedOption: ans } :
                 q?.type === 'coding' ? { codeSubmission: ans } :
                   { answerText: ans }),
             };
@@ -309,6 +328,7 @@ export default function ExamRoom() {
         tabSwitchCount: tabSwitchCountRef.current,
         terminationReason: autoSubmit ? 'auto_submit' : 'manual',
         submissionTime: new Date().toISOString(),
+        answers: answersList,
       });
 
       if (response.success) {
@@ -319,6 +339,8 @@ export default function ExamRoom() {
           totalMarks: rawResult.totalMarks ?? response.data?.totalMarks ?? 100,
           percentage: rawResult.percentage ?? response.data?.percentage ?? 0,
           status: rawResult.status ?? response.data?.status ?? 'Submitted',
+          questionsAttempted: rawResult.questionsAttempted ?? response.data?.questionsAttempted ?? Object.keys(currentAnswers).length,
+          questionsTotal: rawResult.questionsTotal ?? response.data?.questionsTotal ?? currentQuestions.length,
           ...rawResult
         };
         setResult(normalizedResult);
@@ -528,15 +550,19 @@ export default function ExamRoom() {
   useEffect(() => {
     if (phase !== 'exam' || !session || submitted) return;
     autoSaveRef.current = setInterval(() => {
-      const currentAnswers = answersRef.current || {};
-      const currentQuestions = questionsRef.current || [];
+      const currentAnswers = { ...(answersRef.current || {}), ...(answers || {}) };
+      const currentQuestions = (questionsRef.current && questionsRef.current.length > 0)
+        ? questionsRef.current
+        : (questions || []);
+
       const answersList = Object.entries(currentAnswers)
-        .filter(([, ans]) => ans !== null && ans !== undefined)
+        .filter(([, ans]) => ans !== null && ans !== undefined && String(ans).trim() !== '')
         .map(([qId, ans]) => {
-          const q = currentQuestions.find(item => item.id === qId);
+          const q = currentQuestions.find(item => String(item.id) === String(qId));
+          const isMcqOrTf = q?.type === 'mcq' || q?.type === 'true_false';
           return {
             questionId: qId,
-            ...(q?.type === 'mcq' ? { selectedOption: ans } :
+            ...(isMcqOrTf ? { selectedOption: ans } :
               q?.type === 'coding' ? { codeSubmission: ans } :
                 { answerText: ans }),
           };
@@ -546,11 +572,13 @@ export default function ExamRoom() {
         studentAPI.saveAnswersBulk(examId, {
           sessionId: session.id,
           answers: answersList,
-        }).catch(() => { });
+        }).catch((err) => {
+          console.warn('Periodic bulk autosave background notice:', err);
+        });
       }
     }, 25000);
     return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
-  }, [phase, session, submitted, examId]);
+  }, [phase, session, submitted, examId, answers]);
 
   // ─── Fetch Exam Details ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -580,19 +608,27 @@ export default function ExamRoom() {
 
   // ─── Answer Handler ───────────────────────────────────────────────────────────
   const handleAnswer = useCallback((questionId, answer) => {
+    answersRef.current = { ...answersRef.current, [questionId]: answer };
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
-    const q = questions.find(q => q.id === questionId);
+    const q = questions.find(q => String(q.id) === String(questionId));
     if (!q || !session) return;
+    const isMcqOrTf = q.type === 'mcq' || q.type === 'true_false';
     studentAPI.saveAnswer(examId, {
-      sessionId: session.id, questionId,
-      ...(q.type === 'mcq' ? { selectedOption: answer } :
+      sessionId: session.id,
+      questionId,
+      ...(isMcqOrTf ? { selectedOption: answer } :
         q.type === 'coding' ? { codeSubmission: answer } :
           { answerText: answer }),
-    }).catch(() => { });
+    }).catch((err) => {
+      console.warn('Realtime save notice (will be flushed on next interval/submit):', err);
+    });
   }, [questions, session, examId]);
 
   // ─── Clear Answer ─────────────────────────────────────────────────────────────
   const handleClearAnswer = (questionId) => {
+    if (answersRef.current) {
+      delete answersRef.current[questionId];
+    }
     setAnswers(prev => {
       const next = { ...prev };
       delete next[questionId];
@@ -608,9 +644,10 @@ export default function ExamRoom() {
 
   // ─── Start Exam Logic ─────────────────────────────────────────────────────────
   const triggerBackendStart = useCallback(async (keyToUse) => {
+    const finalKey = (keyToUse || examKey || examData?.exam?.exam_code || examData?.exam?.exam_key || '').trim();
     setIsStartingExam(true);
     try {
-      const response = await studentAPI.startExam(examId, { examKey: keyToUse });
+      const response = await studentAPI.startExam(examId, { examKey: finalKey });
       if (response.alreadySubmitted || response.data?.alreadySubmitted || response.message?.includes('already completed') || response.message?.includes('already submitted')) {
         exitFullScreen();
         setPhase('submitted');
@@ -643,6 +680,7 @@ export default function ExamRoom() {
             }
           });
           setAnswers(restoredAnswers);
+          answersRef.current = restoredAnswers;
         }
 
         const secs = data.timeRemaining
@@ -652,12 +690,19 @@ export default function ExamRoom() {
         setPhase('exam');
         notify.success('Exam session initiated. Good luck!');
       } else {
-        if (response.message && response.message.includes('Exam accessible from')) {
-          notify.error('Waiting for server scheduled start authorization...');
+        const msg = response.message || '';
+        const isTimingNotice = msg.toLowerCase().includes('scheduled') || 
+                               msg.toLowerCase().includes('accessible') || 
+                               msg.toLowerCase().includes('access period') ||
+                               msg.toLowerCase().includes('not accessible') ||
+                               msg.toLowerCase().includes('waiting');
+
+        if (phase === 'waiting' || isTimingNotice) {
+          setWaitingStatus(msg || 'Synchronizing with exam server...');
         } else {
           exitFullScreen();
           setPhase('key');
-          notify.error(response.message || 'Invalid exam key. Please verify and try again.');
+          notify.error(msg || 'Invalid exam key. Please verify and try again.');
         }
       }
     } catch (err) {
@@ -679,8 +724,15 @@ export default function ExamRoom() {
         });
         return;
       }
-      if (errMsg.includes('Exam accessible from')) {
-        notify.error('Waiting for server authorization... retrying shortly.');
+
+      const isTimingNotice = errMsg.toLowerCase().includes('scheduled') || 
+                             errMsg.toLowerCase().includes('accessible') || 
+                             errMsg.toLowerCase().includes('access period') ||
+                             errMsg.toLowerCase().includes('not accessible') ||
+                             errMsg.toLowerCase().includes('waiting');
+
+      if (phase === 'waiting' || isTimingNotice) {
+        setWaitingStatus(errMsg || 'Synchronizing with server start authorization...');
       } else {
         exitFullScreen();
         setPhase('key');
@@ -690,11 +742,64 @@ export default function ExamRoom() {
     } finally {
       setIsStartingExam(false);
     }
-  }, [examId, exitFullScreen]);
+  }, [examId, examKey, examData, phase, exitFullScreen]);
 
-  const handleStartExam = useCallback(() => {
-    const key = examKey.trim();
-    if (!key) { notify.warn('Please enter your exam security key'); return; }
+  // ─── Step 1: Validate Key & Open Introduction ─────────────────────────────
+  const handleEnterExamination = useCallback(async () => {
+    const key = (examKey || '').trim();
+    if (!key) {
+      notify.warn('Please enter your examination access key');
+      return;
+    }
+
+    setIsStartingExam(true);
+    try {
+      let currentData = examData;
+      if (!currentData || !currentData.exam) {
+        const res = await studentAPI.getExamDetails(examId);
+        if (res.success && res.data) {
+          currentData = res.data;
+          setExamData(res.data);
+        }
+      }
+
+      if (currentData?.existingSession?.status === 'submitted') {
+        setPhase('submitted');
+        setResult({
+          score: currentData.existingSession.total_score,
+          totalMarks: currentData.exam?.total_marks,
+          status: 'Submitted'
+        });
+        return;
+      }
+
+      const validKeys = [
+        currentData?.exam?.exam_code,
+        currentData?.exam?.exam_key
+      ].filter(Boolean).map(k => String(k).trim().toUpperCase());
+
+      if (validKeys.length > 0 && !validKeys.includes(key.toUpperCase())) {
+        notify.error('Invalid examination access key. Please verify your credentials and try again.');
+        return;
+      }
+
+      setPhase('intro');
+      notify.success('Key verified. Please review the examination instructions.');
+    } catch (err) {
+      console.error('Key verification error:', err);
+      // Fallback: proceed to introduction
+      setPhase('intro');
+    } finally {
+      setIsStartingExam(false);
+    }
+  }, [examKey, examData, examId]);
+
+  // ─── Step 2: Proceed from Introduction to Live Exam / Waiting Room ────────
+  const handleProceedFromIntro = useCallback(() => {
+    if (!agreedToTerms) {
+      notify.warn('Please accept the candidate declaration before proceeding.');
+      return;
+    }
 
     enterFullScreen();
 
@@ -706,28 +811,42 @@ export default function ExamRoom() {
       }
     }
 
+    const key = (examKey || examData?.exam?.exam_code || examData?.exam?.exam_key || '').trim();
     triggerBackendStart(key);
-  }, [examKey, examData, enterFullScreen, triggerBackendStart]);
+  }, [agreedToTerms, examData, examKey, enterFullScreen, triggerBackendStart]);
 
-  // Waiting Room Auto-Start Effect (Strictly anchored to IST)
+  // Live Countdown & Resilient Auto-Start Effect for Waiting Room (Strictly anchored to IST)
   useEffect(() => {
-    if (phase !== 'waiting' || !examData?.exam?.date_time || isStartingExam) return;
+    if (phase !== 'waiting' || !examData?.exam?.date_time) return;
 
     const start = parseToIST(examData.exam.date_time);
     if (!start) return;
     const targetTime = start.getTime();
 
-    const checkAndTrigger = () => {
-      if (Date.now() >= targetTime) {
-        triggerBackendStart(examKey.trim());
+    const updateCountdownAndCheck = () => {
+      const now = Date.now();
+      const diff = targetTime - now;
+
+      if (diff <= 1000) {
+        // Scheduled start time reached!
+        setWaitingCountdown({ hours: 0, minutes: 0, seconds: 0, totalMs: 0, isReady: true });
+        if (!isStartingExam) {
+          const key = (examKey || examData?.exam?.exam_code || examData?.exam?.exam_key || '').trim();
+          triggerBackendStart(key);
+        }
+      } else {
+        const totalSecs = Math.floor(diff / 1000);
+        const hours = Math.floor(totalSecs / 3600);
+        const minutes = Math.floor((totalSecs % 3600) / 60);
+        const seconds = totalSecs % 60;
+        setWaitingCountdown({ hours, minutes, seconds, totalMs: diff, isReady: false });
       }
     };
 
-    const interval = setInterval(checkAndTrigger, 3000);
-    checkAndTrigger();
-
-    return () => clearInterval(interval);
-  }, [phase, examData, examKey, triggerBackendStart, isStartingExam]);
+    updateCountdownAndCheck();
+    const timer = setInterval(updateCountdownAndCheck, 1000);
+    return () => clearInterval(timer);
+  }, [phase, examData, examKey, isStartingExam, triggerBackendStart]);
 
   // ─── Computed Statistics ──────────────────────────────────────────────────────
   const answeredCount = useMemo(() => {
@@ -749,6 +868,19 @@ export default function ExamRoom() {
 
   // ─── Navigation Handlers ──────────────────────────────────────────────────────
   const handleSaveAndNext = () => {
+    const curQ = questions[currentQ];
+    if (curQ && answers[curQ.id] !== undefined && session?.id) {
+      const ans = answers[curQ.id];
+      const isMcqOrTf = curQ.type === 'mcq' || curQ.type === 'true_false';
+      studentAPI.saveAnswer(examId, {
+        sessionId: session.id,
+        questionId: curQ.id,
+        ...(isMcqOrTf ? { selectedOption: ans } :
+          curQ.type === 'coding' ? { codeSubmission: ans } :
+            { answerText: ans }),
+      }).catch(() => {});
+    }
+
     if (currentQ < questions.length - 1) {
       setCurrentQ(prev => prev + 1);
     } else {
@@ -888,7 +1020,7 @@ export default function ExamRoom() {
               onChange={e => setExamKey(e.target.value.toUpperCase())}
               placeholder="e.g. EXAM-8942-ABC"
               disabled={isStartingExam}
-              onKeyDown={e => e.key === 'Enter' && handleStartExam()}
+              onKeyDown={e => e.key === 'Enter' && handleEnterExamination()}
               style={{
                 width: '100%',
                 padding: '14px 18px',
@@ -916,9 +1048,9 @@ export default function ExamRoom() {
             />
           </div>
 
-          {/* Start Exam Button */}
+          {/* Enter Examination Button */}
           <button
-            onClick={handleStartExam}
+            onClick={handleEnterExamination}
             disabled={isStartingExam || !examKey.trim()}
             style={{
               width: '100%',
@@ -945,7 +1077,7 @@ export default function ExamRoom() {
             ) : (
               <>
                 <Send size={18} />
-                <span>Verify Key & Enter Examination</span>
+                <span>Enter Examination</span>
               </>
             )}
           </button>
@@ -972,42 +1104,796 @@ export default function ExamRoom() {
               <Info size={14} color="#0a74da" />
               <span>Examination Security Protocol</span>
             </div>
-              {(() => {
-                const rules = [];
-                if (resolvedMonitoringConfig.device_camera) {
-                  rules.push('Webcam stream active for candidate verification');
-                }
-                if (resolvedMonitoringConfig.face_detection) {
-                  rules.push('AI facial presence & multi-person monitoring active');
-                }
-                if (resolvedMonitoringConfig.voice_detection) {
-                  rules.push('Microphone voice and speech detection enabled');
-                }
-                if (resolvedMonitoringConfig.tab_switch) {
-                  rules.push('Tab/window switches monitored (Max 3 switches before auto-submit)');
-                }
-                if (resolvedMonitoringConfig.fullscreen) {
-                  rules.push('Exam automatically enforces browser full-screen mode');
-                }
-                rules.push('Responses auto-save in real time to the cloud');
+            {(() => {
+              const rules = [];
+              if (resolvedMonitoringConfig.device_camera) {
+                rules.push('Webcam stream active for candidate verification');
+              }
+              if (resolvedMonitoringConfig.face_detection) {
+                rules.push('AI facial presence & multi-person monitoring active');
+              }
+              if (resolvedMonitoringConfig.voice_detection) {
+                rules.push('Microphone voice and speech detection enabled');
+              }
+              if (resolvedMonitoringConfig.tab_switch) {
+                rules.push('Tab/window switches monitored (Max 3 switches before auto-submit)');
+              }
+              if (resolvedMonitoringConfig.fullscreen) {
+                rules.push('Exam automatically enforces browser full-screen mode');
+              }
+              rules.push('Responses auto-save in real time to the cloud');
 
-                return rules.map((rule, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 8,
-                    fontSize: '0.8rem',
-                    color: '#64748b',
-                    lineHeight: 1.5,
-                    marginBottom: 6
-                  }}>
-                    <Check size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
-                    <span>{rule}</span>
-                  </div>
-                ));
-              })()}
+              return rules.map((rule, idx) => (
+                <div key={idx} style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  fontSize: '0.8rem',
+                  color: '#64748b',
+                  lineHeight: 1.5,
+                  marginBottom: 6
+                }}>
+                  <Check size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <span>{rule}</span>
+                </div>
+              ));
+            })()}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ─── PHASE: EXAM INTRODUCTION & INSTRUCTIONS PAGE ─────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
+  if (phase === 'intro') {
+    const exam = examData?.exam || {};
+    const questionCount = questions.length || examData?.questions?.length || 0;
+    const durationMins = exam.duration ? Number(exam.duration) : 60;
+    const totalMarks = exam.total_marks ?? 100;
+    const passingMarks = exam.passing_marks ?? (totalMarks ? Math.round(totalMarks * 0.4) : 40);
+    const passPercentage = totalMarks > 0 ? Math.round((passingMarks / totalMarks) * 100) : 40;
+
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#f8fafc',
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        color: '#0f172a',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Top Enterprise Header Bar */}
+        <header style={{
+          height: 68,
+          background: '#ffffff',
+          borderBottom: '1.5px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 32px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 40
+        }}>
+          {/* Brand & Suite */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #0a74da 0%, #0656a3 100%)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(10, 116, 218, 0.25)'
+            }}>
+              <Shield size={22} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  fontSize: '0.96rem',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  letterSpacing: '-0.02em',
+                  fontFamily: "'Space Grotesk', sans-serif"
+                }}>
+                  ExamShield™
+                </span>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  padding: '2px 7px',
+                  borderRadius: 6,
+                  border: '1px solid #e2e8f0'
+                }}>
+                  CBT Environment
+                </span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                Computer-Based Examination System
+              </div>
+            </div>
+          </div>
+
+          {/* Stepper Progress Bar in Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: '0.76rem',
+              fontWeight: 600,
+              color: '#15803d',
+              background: '#f0fdf4',
+              padding: '4px 10px',
+              borderRadius: 20,
+              border: '1px solid #bbf7d0'
+            }}>
+              <Check size={13} />
+              <span>1. Key Verified</span>
+            </div>
+            <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>→</span>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: '0.76rem',
+              fontWeight: 700,
+              color: '#0a74da',
+              background: '#eff6ff',
+              padding: '4px 12px',
+              borderRadius: 20,
+              border: '1.5px solid #bfdbfe'
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0a74da', animation: 'er-pulse 1.5s infinite' }} />
+              <span>2. Candidate Briefing</span>
+            </div>
+            <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>→</span>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: '0.76rem',
+              fontWeight: 500,
+              color: '#94a3b8'
+            }}>
+              <span>3. Live Assessment</span>
+            </div>
+          </div>
+
+          {/* Candidate Profile Chip */}
+          {user && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              padding: '4px 14px 4px 6px',
+              borderRadius: 30
+            }}>
+              <div style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #0a74da, #0656a3)',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {user.name ? user.name.charAt(0).toUpperCase() : 'S'}
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>
+                  {user.name || 'Candidate'}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}>
+                  ID: {user.roll_number || user.enrollment_number || user.email || 'ES-STUDENT'}
+                </div>
+              </div>
+            </div>
+          )}
+        </header>
+
+        {/* Main Content Area */}
+        <main style={{
+          flex: 1,
+          maxWidth: 1200,
+          width: '100%',
+          margin: '0 auto',
+          padding: '28px 24px 40px',
+          boxSizing: 'border-box'
+        }}>
+          {/* Top Title Banner */}
+          <div style={{
+            background: '#ffffff',
+            borderRadius: 18,
+            border: '1.5px solid #e2e8f0',
+            padding: '22px 28px',
+            marginBottom: 24,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 16,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: '#0a74da',
+                  background: '#eff6ff',
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #bfdbfe'
+                }}>
+                  {exam.subject || 'General Assessment'}
+                </span>
+                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  • {exam.type || 'Standard Format'} • Key: <strong style={{ fontFamily: 'monospace', color: '#0f172a' }}>{examKey || exam.exam_code || 'VERIFIED'}</strong>
+                </span>
+              </div>
+              <h1 style={{
+                fontSize: '1.5rem',
+                fontWeight: 800,
+                color: '#0f172a',
+                margin: 0,
+                letterSpacing: '-0.02em'
+              }}>
+                {exam.title || 'Official Examination'}
+              </h1>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 14px',
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: 10,
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: '#15803d'
+            }}>
+              <CheckCircle2 size={16} />
+              <span>Ready for Candidate Briefing</span>
+            </div>
+          </div>
+
+          {/* Professional 2-Column Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.6fr) minmax(340px, 1fr)',
+            gap: 24,
+            alignItems: 'start'
+          }}>
+            {/* ═══ LEFT COLUMN: Tabbed Guidelines & Declaration ═══ */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Instructions Tabbed Hub Card */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: 18,
+                border: '1.5px solid #e2e8f0',
+                boxShadow: '0 4px 16px -4px rgba(0,0,0,0.04)',
+                overflow: 'hidden'
+              }}>
+                {/* Tab Navigation Header */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#f8fafc',
+                  borderBottom: '1px solid #e2e8f0',
+                  padding: '6px 8px',
+                  gap: 6,
+                  overflowX: 'auto'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setIntroTab('general')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 16px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: introTab === 'general' ? '#ffffff' : 'transparent',
+                      color: introTab === 'general' ? '#0a74da' : '#64748b',
+                      fontSize: '0.84rem',
+                      fontWeight: introTab === 'general' ? 700 : 600,
+                      cursor: 'pointer',
+                      boxShadow: introTab === 'general' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <BookOpen size={16} />
+                    <span>General Guidelines</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIntroTab('proctoring')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 16px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: introTab === 'proctoring' ? '#ffffff' : 'transparent',
+                      color: introTab === 'proctoring' ? '#0a74da' : '#64748b',
+                      fontSize: '0.84rem',
+                      fontWeight: introTab === 'proctoring' ? 700 : 600,
+                      cursor: 'pointer',
+                      boxShadow: introTab === 'proctoring' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <Shield size={16} />
+                    <span>Security & Anti-Cheating</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIntroTab('palette')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 16px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: introTab === 'palette' ? '#ffffff' : 'transparent',
+                      color: introTab === 'palette' ? '#0a74da' : '#64748b',
+                      fontSize: '0.84rem',
+                      fontWeight: introTab === 'palette' ? 700 : 600,
+                      cursor: 'pointer',
+                      boxShadow: introTab === 'palette' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>Palette & Navigation</span>
+                  </button>
+
+                  {exam.instructions && exam.instructions.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIntroTab('instructor')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '10px 16px',
+                        borderRadius: 10,
+                        border: 'none',
+                        background: introTab === 'instructor' ? '#ffffff' : 'transparent',
+                        color: introTab === 'instructor' ? '#0a74da' : '#64748b',
+                        fontSize: '0.84rem',
+                        fontWeight: introTab === 'instructor' ? 700 : 600,
+                        cursor: 'pointer',
+                        boxShadow: introTab === 'instructor' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                        transition: 'all 0.15s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <FileText size={16} />
+                      <span>Examiner Notice</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Tab Body Content */}
+                <div style={{ padding: '24px 28px', minHeight: 280 }}>
+                  {introTab === 'general' && (
+                    <div>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: '0 0 14px' }}>
+                        Standard Examination Protocol
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 8, background: '#eff6ff', color: '#0a74da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                            <Clock size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b' }}>Server-Synchronized Timer</div>
+                            <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.55 }}>
+                              The examination timer starts automatically once you proceed. The countdown is anchored to the server clock and cannot be paused. When time reaches 00:00:00, responses are auto-submitted.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f0fdf4', color: '#15803d', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                            <Wifi size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b' }}>Continuous Real-Time Cloud Save</div>
+                            <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.55 }}>
+                              Your responses are encrypted and automatically saved as you select answers or type code. If you experience unexpected network latency, answers remain safely stored.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                            <Code2 size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b' }}>Multi-Format Question Paper</div>
+                            <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.55 }}>
+                              This exam may contain Multiple Choice (MCQ), Short Descriptive, and Interactive Coding questions with built-in sandbox execution.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {introTab === 'proctoring' && (
+                    <div>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: '0 0 14px' }}>
+                        Academic Integrity & Anti-Cheating Regulations
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 8, background: '#fef2f2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                            <Monitor size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b' }}>Enforced Full-Screen Mode</div>
+                            <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.55 }}>
+                              The assessment launches into locked full-screen mode. Attempting to exit full-screen will trigger an immediate compliance flag.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 8, background: '#fffbeb', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                            <AlertTriangle size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b' }}>Tab & Window Switch Tracking (3-Strike Policy)</div>
+                            <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.55 }}>
+                              Switching away from the examination browser, opening developer tools, or focusing on other windows is strictly logged. <strong>3 tab switches will result in immediate automatic submission.</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 8, background: '#eff6ff', color: '#0a74da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                            <Camera size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b' }}>Background AI Biometric & Acoustic Telemetry</div>
+                            <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.55 }}>
+                              Face detection and voice level monitoring operate silently in the background. The webcam stream is hidden from candidate view to maintain a calm, distraction-free environment.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {introTab === 'palette' && (
+                    <div>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: '0 0 14px' }}>
+                        Question Navigation & Palette Guide
+                      </h3>
+                      <div style={{ fontSize: '0.84rem', color: '#64748b', marginBottom: 16 }}>
+                        Use the question palette on the right side of the exam room to navigate between questions at any time. Color status indicators:
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 18 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0' }}>
+                          <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534' }}>Answered</div>
+                            <div style={{ fontSize: '0.72rem', color: '#15803d' }}>Response saved securely</div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#f5f3ff', borderRadius: 10, border: '1px solid #ddd6fe' }}>
+                          <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#8b5cf6', flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#5b21b6' }}>Marked for Review</div>
+                            <div style={{ fontSize: '0.72rem', color: '#6d28d9' }}>Flagged to revisit later</div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                          <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#e2e8f0', border: '1px solid #cbd5e1', flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Unanswered</div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Not yet attempted</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.5, background: '#f8fafc', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                        💡 <strong>Tip:</strong> You can clear your selected option using the "Clear Choice" button, or edit your code submission at any time prior to clicking final submit.
+                      </div>
+                    </div>
+                  )}
+
+                  {introTab === 'instructor' && exam.instructions && (
+                    <div>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e40af', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Info size={18} />
+                        <span>Special Instructions from the Examiner</span>
+                      </h3>
+                      <div style={{
+                        background: '#eff6ff',
+                        border: '1.5px solid #bfdbfe',
+                        borderRadius: 12,
+                        padding: '16px 20px',
+                        fontSize: '0.9rem',
+                        lineHeight: 1.65,
+                        color: '#1e3a8a',
+                        whiteSpace: 'pre-line'
+                      }}>
+                        {exam.instructions}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Solemn Candidate Honor Code Pledge Card */}
+              <div
+                onClick={() => setAgreedToTerms(prev => !prev)}
+                style={{
+                  background: agreedToTerms ? '#f0fdf4' : '#ffffff',
+                  borderRadius: 18,
+                  border: agreedToTerms ? '2px solid #86efac' : '1.5px solid #cbd5e1',
+                  padding: '20px 24px',
+                  display: 'flex',
+                  gap: 16,
+                  alignItems: 'flex-start',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: agreedToTerms ? '0 4px 14px rgba(22, 101, 52, 0.08)' : '0 2px 6px rgba(0,0,0,0.02)'
+                }}
+              >
+                <div style={{ color: agreedToTerms ? '#15803d' : '#94a3b8', marginTop: 2, flexShrink: 0 }}>
+                  {agreedToTerms ? <CheckSquare size={24} /> : <Square size={24} />}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: agreedToTerms ? '#166534' : '#0f172a', marginBottom: 4 }}>
+                    Candidate Honor Code Declaration
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: agreedToTerms ? '#15803d' : '#64748b', lineHeight: 1.6 }}>
+                    I solemnly declare that I am the verified candidate enrolled for this assessment. I certify that I will uphold the highest standards of academic integrity, will not use unauthorized devices or external assistance, and agree to automated telemetry recording under institutional examination regulations.
+                  </div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 600, color: agreedToTerms ? '#166534' : '#0a74da', marginTop: 8 }}>
+                    {agreedToTerms ? '✓ Declaration acknowledged and accepted' : 'Click checkbox to accept and enable examination launch'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ═══ RIGHT COLUMN: Exam Specs, Pre-Flight Checklist, Action Hub ═══ */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Card 1: Assessment Specifications Matrix */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: 18,
+                border: '1.5px solid #e2e8f0',
+                padding: '22px 24px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+              }}>
+                <div style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: '#475569',
+                  marginBottom: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <Award size={16} color="#0a74da" />
+                  <span>Assessment Specifications</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Duration</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>{durationMins} Minutes</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Total Questions</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>{questionCount > 0 ? questionCount : 'Scheduled'} Items</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Maximum Marks</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>{totalMarks} Marks</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Passing Threshold</span>
+                    <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: 6 }}>
+                      {passingMarks} Marks ({passPercentage}%)
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Proctoring Standard</span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0a74da', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Shield size={14} />
+                      {resolvedMonitoringConfig.is_proctored ? 'AI Monitored' : 'Standard'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: System Pre-Flight Readiness Checklist */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: 18,
+                border: '1.5px solid #e2e8f0',
+                padding: '20px 24px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+              }}>
+                <div style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: '#475569',
+                  marginBottom: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <Sparkles size={16} color="#10b981" />
+                  <span>Pre-Flight Readiness Check</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Camera size={14} color="#10b981" />
+                      Camera Telemetry
+                    </span>
+                    <span style={{ color: '#15803d', fontWeight: 700 }}>Background Active</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Mic size={14} color="#10b981" />
+                      Microphone Audio
+                    </span>
+                    <span style={{ color: '#15803d', fontWeight: 700 }}>Calibrated</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Monitor size={14} color="#10b981" />
+                      Fullscreen Protocol
+                    </span>
+                    <span style={{ color: '#15803d', fontWeight: 700 }}>Armed on Launch</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Wifi size={14} color="#10b981" />
+                      Cloud Synchronization
+                    </span>
+                    <span style={{ color: '#15803d', fontWeight: 700 }}>Online</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Action Launchpad Hub */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: 18,
+                border: '1.5px solid #e2e8f0',
+                padding: '24px',
+                boxShadow: '0 8px 24px -6px rgba(0,0,0,0.06)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14
+              }}>
+                <button
+                  type="button"
+                  onClick={handleProceedFromIntro}
+                  disabled={!agreedToTerms || isStartingExam}
+                  style={{
+                    width: '100%',
+                    height: 50,
+                    borderRadius: 12,
+                    background: !agreedToTerms || isStartingExam
+                      ? '#cbd5e1'
+                      : 'linear-gradient(135deg, #0a74da 0%, #0656a3 100%)',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontSize: '0.98rem',
+                    fontWeight: 700,
+                    cursor: !agreedToTerms || isStartingExam ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 10,
+                    boxShadow: agreedToTerms && !isStartingExam ? '0 6px 20px rgba(10, 116, 218, 0.3)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {isStartingExam ? (
+                    <span>Launching Assessment Session...</span>
+                  ) : (
+                    <>
+                      <span>Proceed to Examination</span>
+                      <ArrowRight size={18} />
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPhase('key')}
+                  style={{
+                    width: '100%',
+                    height: 40,
+                    borderRadius: 10,
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    color: '#475569',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <ChevronLeft size={16} />
+                  <span>Re-enter Examination Key</span>
+                </button>
+
+                <div style={{
+                  fontSize: '0.72rem',
+                  color: '#94a3b8',
+                  textAlign: 'center',
+                  marginTop: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6
+                }}>
+                  <Shield size={12} color="#10b981" />
+                  <span>256-Bit Encrypted Session · Institutional Supervised</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -1017,6 +1903,7 @@ export default function ExamRoom() {
   // ══════════════════════════════════════════════════════════════════════════════
   if (phase === 'waiting') {
     const scheduledTime = parseToIST(examData?.exam?.date_time) || new Date();
+    const isNowReady = waitingCountdown.isReady || (Date.now() >= scheduledTime.getTime());
 
     return (
       <div style={{
@@ -1024,55 +1911,152 @@ export default function ExamRoom() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f8fafc',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
         fontFamily: "'Inter', sans-serif",
         padding: '24px'
       }}>
-        <div className="er-modal-card" style={{ maxWidth: 520, textAlign: 'center' }}>
-          <div className="er-modal-icon-wrap" style={{ background: '#fffbeb', color: '#f59e0b' }}>
-            <Clock size={32} />
+        <div className="er-modal-card" style={{ maxWidth: 540, width: '100%', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.12)', borderRadius: 24, padding: '36px 32px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+          
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            background: isNowReady ? '#f0fdf4' : '#fef3c7',
+            color: isNowReady ? '#15803d' : '#92400e',
+            padding: '6px 16px',
+            borderRadius: 999,
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+            marginBottom: 20
+          }}>
+            <span style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: isNowReady ? '#22c55e' : '#f59e0b',
+              boxShadow: isNowReady ? '0 0 10px #22c55e' : '0 0 10px #f59e0b'
+            }} />
+            {isNowReady ? 'Ready — Starting Exam' : 'Exam Waiting Room'}
           </div>
-          <h1 className="er-modal-title">Waiting Room</h1>
-          <p className="er-modal-subtitle">
-            You have verified your credentials for <strong>{examData?.exam?.title || 'the examination'}</strong>.
-            The exam will launch automatically once the scheduled start time arrives.
+
+          <h1 className="er-modal-title" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+            {examData?.exam?.title || 'Examination Session'}
+          </h1>
+          <p className="er-modal-subtitle" style={{ fontSize: '0.92rem', color: '#64748b', maxWidth: 440, margin: '0 auto 24px' }}>
+            Credentials verified. Your examination will launch automatically once the scheduled start time arrives.
           </p>
 
+          {/* Digital Live Countdown Cards */}
           <div style={{
-            margin: '24px 0',
-            padding: '20px',
-            background: '#f8fafc',
-            border: '1.5px solid #e2e8f0',
-            borderRadius: 14,
-            display: 'inline-block',
-            width: '100%',
-            boxSizing: 'border-box'
+            background: '#ffffff',
+            border: '2px solid #e2e8f0',
+            borderRadius: 18,
+            padding: '24px 20px',
+            marginBottom: 24,
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)'
           }}>
-            <div style={{
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: '#b45309',
-              marginBottom: 6
-            }}>
-              Scheduled Start Time (IST)
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#64748b', marginBottom: 14 }}>
+              {isNowReady ? 'Exam Launch Status' : 'Live Countdown to Start'}
             </div>
-            <div style={{
-              fontSize: '1.85rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              fontFamily: "'JetBrains Mono', monospace"
-            }}>
-              {formatIST(scheduledTime, 'timeOnlySeconds')}
-            </div>
-            <div style={{ marginTop: 6, fontSize: '0.92rem', color: '#475569', fontWeight: 600 }}>
-              📅 {formatIST(scheduledTime, 'dateOnly')} (India Standard Time)
-            </div>
-            <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#64748b' }}>
-              Keep this browser tab open. Do not refresh or close.
+
+            {isNowReady ? (
+              <div style={{ padding: '12px 0' }}>
+                <div style={{
+                  display: 'inline-block',
+                  width: 36,
+                  height: 36,
+                  border: '3px solid #e2e8f0',
+                  borderTop: '3px solid #0a74da',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  marginBottom: 12
+                }} />
+                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>
+                  Launching Examination...
+                </div>
+                <div style={{ fontSize: '0.84rem', color: '#64748b', marginTop: 4 }}>
+                  Securing proctoring feed & preparing question paper
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+                <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: 12, padding: '12px 14px', minWidth: 70 }}>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
+                    {String(waitingCountdown.hours).padStart(2, '0')}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', marginTop: 4, letterSpacing: '0.05em' }}>HOURS</div>
+                </div>
+
+                <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#94a3b8' }}>:</span>
+
+                <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: 12, padding: '12px 14px', minWidth: 70 }}>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
+                    {String(waitingCountdown.minutes).padStart(2, '0')}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', marginTop: 4, letterSpacing: '0.05em' }}>MINUTES</div>
+                </div>
+
+                <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#94a3b8' }}>:</span>
+
+                <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: 12, padding: '12px 14px', minWidth: 70 }}>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: '#2563eb', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
+                    {String(waitingCountdown.seconds).padStart(2, '0')}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', marginTop: 4, letterSpacing: '0.05em' }}>SECONDS</div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                📅 Scheduled Start: <strong>{formatIST(scheduledTime, 'full')}</strong>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                Keep this browser tab open. The exam will start automatically at 00:00:00.
+              </div>
             </div>
           </div>
+
+          {waitingStatus && (
+            <div style={{
+              background: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              color: '#1e40af',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              padding: '10px 14px',
+              borderRadius: 10,
+              marginBottom: 16
+            }}>
+              ⚡ {waitingStatus}
+            </div>
+          )}
+
+          {isNowReady && (
+            <button
+              onClick={() => {
+                const key = (examKey || examData?.exam?.exam_code || examData?.exam?.exam_key || '').trim();
+                triggerBackendStart(key);
+              }}
+              disabled={isStartingExam}
+              className="er-btn-save-next"
+              style={{
+                width: '100%',
+                justifyContent: 'center',
+                height: 46,
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #0a74da 0%, #0656a3 100%)',
+                boxShadow: '0 8px 20px rgba(10, 116, 218, 0.25)',
+                cursor: 'pointer'
+              }}
+            >
+              {isStartingExam ? 'Starting Session...' : 'Enter Exam Room Now'}
+            </button>
+          )}
+
         </div>
       </div>
     );
@@ -1108,6 +2092,12 @@ export default function ExamRoom() {
 
           {result && (
             <div className="er-summary-grid">
+              <div className="er-summary-item">
+                <span className="er-summary-label">Questions Attempted</span>
+                <span className="er-summary-value" style={{ color: '#0a74da' }}>
+                  {result.questionsAttempted ?? answeredCount} / {result.questionsTotal ?? questions.length}
+                </span>
+              </div>
               <div className="er-summary-item">
                 <span className="er-summary-label">Marks Awarded</span>
                 <span className="er-summary-value" style={{ color: '#0a74da' }}>
@@ -1156,6 +2146,20 @@ export default function ExamRoom() {
 
   return (
     <div className="er-shell">
+      {/* ── Continuous Background Proctoring Engine (Camera & Audio 100% active, hidden from student) ── */}
+      <ProfessionalProctoring
+        sessionId={session?.id}
+        examId={examId}
+        studentId={user?.id}
+        onViolation={handleFaceViolation}
+        currentQuestion={currentQ + 1}
+        totalQuestions={questions.length}
+        socket={socketRef.current}
+        monitoringConfig={resolvedMonitoringConfig}
+        mode="background"
+        hidden={true}
+      />
+
       {/* ── Security Tab Warning Dialog ── */}
       {showTabWarning && (
         <TabWarningOverlay
@@ -1438,19 +2442,6 @@ export default function ExamRoom() {
               answer={answers[currentQuestion.id] || ''}
               onAnswer={(code) => handleAnswer(currentQuestion.id, code)}
             />
-            {/* Live Camera & Voice Proctoring PiP HUD */}
-            <ProfessionalProctoring
-              sessionId={session?.id}
-              examId={examId}
-              studentId={user?.id}
-              onViolation={handleFaceViolation}
-              currentQuestion={currentQ + 1}
-              totalQuestions={questions.length}
-              mode="pip"
-              pipCorner="bottom-left"
-              socket={socketRef.current}
-              monitoringConfig={resolvedMonitoringConfig}
-            />
           </div>
         </div>
       ) : (
@@ -1560,30 +2551,37 @@ export default function ExamRoom() {
 
           {/* ── Right Side Panel: Proctoring & Question Palette ── */}
           <aside className="er-side-panel">
-            {/* Live Proctoring Webcam Box */}
-            <div className="er-proctor-box">
-              <div className="er-proctor-header">
-                <div className="er-proctor-title">
-                  <Shield size={14} color="#0a74da" />
-                  <span>AI Proctoring Stream</span>
-                </div>
-                <span className="er-proctor-status-tag">
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#15803d' }} />
-                  Monitoring Active
-                </span>
+            {/* Industry-Grade Background Proctoring Status Indicator */}
+            <div style={{
+              margin: '16px 16px 0 16px',
+              padding: '12px 14px',
+              background: '#f8fafc',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
+                <Shield size={16} color="#0a74da" />
+                <span>AI Proctoring Active</span>
               </div>
-              <div className="er-proctor-feed-wrap">
-                <ProfessionalProctoring
-                  sessionId={session?.id}
-                  examId={examId}
-                  studentId={user?.id}
-                  onViolation={handleFaceViolation}
-                  currentQuestion={currentQ + 1}
-                  totalQuestions={questions.length}
-                  socket={socketRef.current}
-                  monitoringConfig={resolvedMonitoringConfig}
-                />
-              </div>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#15803d',
+                background: '#dcfce7',
+                padding: '3px 9px',
+                borderRadius: 999,
+                border: '1px solid #bbf7d0'
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                Secured
+              </span>
             </div>
 
             {/* Question Palette Box */}

@@ -1,4 +1,4 @@
-// ProfessionalProctoring.js — Production-Grade AI Face Detection & Voice Proctoring
+// ProfessionalProctoring.js — Production-Grade AI Face Detection & Voice Proctoring — v2
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
 import toast from 'react-hot-toast';
@@ -11,29 +11,34 @@ import {
   Shield,
   Maximize2,
   Minimize2,
-  Move
+  Move,
+  AlertTriangle,
 } from 'lucide-react';
 
 // ─── Toast helpers (react-hot-toast compatible) ───────────────────────────────
 const notify = {
-  warn: (msg) => toast(msg, {
+  warn: (msg, id) => toast(msg, {
+    id,
     icon: '⚠️',
     style: {
       background: '#1c1400', color: '#fbbf24',
-      border: '1px solid rgba(251,191,36,0.3)',
+      border: '1px solid rgba(251,191,36,0.4)',
       fontWeight: 600, fontSize: 13,
       fontFamily: "'Inter', sans-serif",
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
     },
-    duration: 5000,
+    duration: 7000,
   }),
-  error: (msg) => toast.error(msg, {
+  error: (msg, id) => toast.error(msg, {
+    id,
     style: {
       background: '#1a0000', color: '#f87171',
-      border: '1px solid rgba(239,68,68,0.3)',
+      border: '1px solid rgba(239,68,68,0.4)',
       fontFamily: "'Inter', sans-serif",
       fontSize: 13,
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
     },
-    duration: 6000,
+    duration: 9000,
   }),
 };
 
@@ -57,13 +62,14 @@ async function loadFaceModels() {
           delegate: "GPU"
         },
         runningMode: "VIDEO",
-        minDetectionConfidence: 0.5
+        minDetectionConfidence: 0.45,  // more sensitive: catches faces at angles
       });
       modelsLoadedGlobal = true;
       console.log('✅ [Proctoring] MediaPipe Face detection model loaded');
       return true;
     } catch (err) {
       console.error('❌ [Proctoring] Model load failed:', err);
+      modelLoadingPromise = null; // allow retry on next call
       return false;
     }
   })();
@@ -79,10 +85,11 @@ const ProfessionalProctoring = ({
   studentId,
   currentQuestion,
   totalQuestions,
-  mode = 'docked', // 'docked' | 'pip'
+  mode = 'docked', // 'docked' | 'pip' | 'background'
   pipCorner = 'bottom-left', // 'bottom-left' | 'top-left' | 'top-right' | 'bottom-right'
   socket = null,
   monitoringConfig = null,
+  hidden = false,
 }) => {
   const monConfig = useMemo(() => ({
     face_detection: monitoringConfig?.face_detection !== false,
@@ -92,12 +99,13 @@ const ProfessionalProctoring = ({
     device_camera: monitoringConfig?.device_camera !== false,
     is_proctored: monitoringConfig?.is_proctored !== false,
   }), [monitoringConfig]);
-  const [cameraStatus, setCameraStatus] = useState('initializing'); // initializing | requesting | active | denied | error
+  const [cameraStatus, setCameraStatus] = useState('initializing'); // initializing|requesting|active|denied|error|off
   const [micStatus, setMicStatus] = useState('initializing');       // initializing | requesting | active | denied | unavailable
-  const [faceCount, setFaceCount] = useState(-1);                 // -1 = detecting not started yet
+  const [faceCount, setFaceCount] = useState(-1);                   // -1 = detecting not started yet
   const [modelsLoaded, setModelsLoaded] = useState(modelsLoadedGlobal);
   const [noFaceCount, setNoFaceCount] = useState(0);
-  const [audioLevel, setAudioLevel] = useState(0);                // 0 to 100
+  const [consecutiveNoFace, setConsecutiveNoFace] = useState(0);    // persists across report cycles
+  const [audioLevel, setAudioLevel] = useState(0);                  // 0 to 100
   const [voiceAlert, setVoiceAlert] = useState(false);
   const [isPipMinimized, setIsPipMinimized] = useState(false);
   const [activeCorner, setActiveCorner] = useState(pipCorner);
@@ -105,6 +113,7 @@ const ProfessionalProctoring = ({
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ offsetX: 0, offsetY: 0 });
   const [violationLog, setViolationLog] = useState([]);
+  const [cameraOff, setCameraOff] = useState(false);                // physical camera switched off mid-exam
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -115,11 +124,14 @@ const ProfessionalProctoring = ({
   const audioAnimRef = useRef(null);
   const speakingFramesRef = useRef(0);
   const noFaceCountRef = useRef(0);
+  const consecutiveNoFaceRef = useRef(0);       // never resets between per-report resets
   const lastViolationTimeRef = useRef({});
   const sessionIdRef = useRef(sessionId);
   const examIdRef = useRef(examId);
   const onViolationRef = useRef(onViolation);
   const socketRef = useRef(socket);
+  const cameraOffRef = useRef(false);
+  const cameraStatusRef = useRef('initializing');
 
   useEffect(() => { socketRef.current = socket; }, [socket]);
 
@@ -127,33 +139,36 @@ const ProfessionalProctoring = ({
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
   useEffect(() => { examIdRef.current = examId; }, [examId]);
   useEffect(() => { onViolationRef.current = onViolation; }, [onViolation]);
+  useEffect(() => { cameraStatusRef.current = cameraStatus; }, [cameraStatus]);
+  useEffect(() => { cameraOffRef.current = cameraOff; }, [cameraOff]);
 
   // ─── Periodic Camera Frame & Telemetry Transmitter to Admin Cockpit ───
   useEffect(() => {
-    if (!socket || cameraStatus !== 'active') return;
+    if (!socket) return;
+    if (cameraStatus !== 'active' && cameraStatus !== 'off') return;
 
     const transmitInterval = setInterval(() => {
       try {
+        const isActive = cameraStatus === 'active' && !cameraOffRef.current;
         const video = videoRef.current;
-        if (!video || video.readyState < 2 || !video.videoWidth) return;
 
-        const offscreen = document.createElement('canvas');
-        offscreen.width = 240;
-        offscreen.height = 180;
-        const ctx = offscreen.getContext('2d');
-        ctx.drawImage(video, 0, 0, 240, 180);
-
-        const dataUrl = offscreen.toDataURL('image/jpeg', 0.42);
-        const base64Data = dataUrl.split(',')[1];
-
-        if (base64Data) {
-          socket.emit('camera-feed', {
-            examId: examIdRef.current,
-            studentId,
-            sessionId: sessionIdRef.current,
-            imageData: base64Data,
-            timestamp: new Date().toISOString(),
-          });
+        if (isActive && video && video.readyState >= 2 && video.videoWidth) {
+          const offscreen = document.createElement('canvas');
+          offscreen.width = 240;
+          offscreen.height = 180;
+          const ctx = offscreen.getContext('2d');
+          ctx.drawImage(video, 0, 0, 240, 180);
+          const dataUrl = offscreen.toDataURL('image/jpeg', 0.42);
+          const base64Data = dataUrl.split(',')[1];
+          if (base64Data) {
+            socket.emit('camera-feed', {
+              examId: examIdRef.current,
+              studentId,
+              sessionId: sessionIdRef.current,
+              imageData: base64Data,
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
 
         socket.emit('student-activity', {
@@ -163,7 +178,8 @@ const ProfessionalProctoring = ({
           activity: {
             currentQuestion,
             totalQuestions,
-            cameraActive: true,
+            cameraActive: isActive,
+            cameraOff: cameraOffRef.current,
             audioLevel,
             faceCount,
             status: 'active',
@@ -173,23 +189,29 @@ const ProfessionalProctoring = ({
     }, 3500);
 
     return () => clearInterval(transmitInterval);
-  }, [socket, cameraStatus, studentId, currentQuestion, totalQuestions, audioLevel, faceCount]);
+  }, [socket, cameraStatus, cameraOff, studentId, currentQuestion, totalQuestions, audioLevel, faceCount]);
 
   // ─── Throttled Violation Reporter ──────────────────────────────────────────
   const reportViolation = useCallback(async (type, description) => {
-    // If the college admin disabled this feature for this exam, ignore completely
     if (
       (type === 'speech_detected' && !monConfig.voice_detection) ||
       ((type === 'multiple_faces' || type === 'no_face_detected') && !monConfig.face_detection) ||
       ((type === 'tab_switch' || type === 'window_blur') && !monConfig.tab_switch) ||
       (type === 'fullscreen_exit' && !monConfig.fullscreen) ||
       (type === 'camera_off' && !monConfig.device_camera)
-    ) {
-      return;
-    }
+    ) return;
 
     const now = Date.now();
-    const COOLDOWN = type === 'speech_detected' ? 25000 : 8000; // 25s cooldown for audio, 8s for camera/tab
+    const COOLDOWN_MAP = {
+      camera_off: 15000,
+      multiple_faces: 8000,
+      no_face_detected: 8000,
+      speech_detected: 25000,
+      tab_switch: 10000,
+      window_blur: 10000,
+      fullscreen_exit: 10000,
+    };
+    const COOLDOWN = COOLDOWN_MAP[type] ?? 8000;
 
     if (
       lastViolationTimeRef.current[type] &&
@@ -202,10 +224,8 @@ const ProfessionalProctoring = ({
       ...prev.slice(0, 4),
     ]);
 
-    // Notify parent component immediately (UI update)
     onViolationRef.current?.(type);
 
-    // Emit live to proctor socket
     if (socketRef.current) {
       socketRef.current.emit('violation', {
         sessionId: sessionIdRef.current,
@@ -217,18 +237,17 @@ const ProfessionalProctoring = ({
       });
     }
 
-    // Show in-UI notification
+    // Toast with unique IDs to prevent stacking duplicates
     if (type === 'multiple_faces') {
-      notify.warn('Multiple persons detected in camera — violation logged');
+      notify.warn('⚠️ Multiple persons detected in camera — violation recorded', 'vio-multi-face');
     } else if (type === 'no_face_detected') {
-      notify.warn('Face not visible — please ensure your face remains in camera frame');
+      notify.warn('⚠️ Face not visible — keep your face in the camera frame at all times', 'vio-no-face');
     } else if (type === 'speech_detected') {
-      notify.warn('Voice/speech detected — please maintain complete silence during examination');
+      notify.warn('🎙️ Voice/speech detected — maintain complete silence during examination', 'vio-voice');
     } else if (type === 'camera_off') {
-      notify.error('Camera is required for this proctored exam');
+      notify.error('📷 Camera is OFF — you must keep your camera enabled throughout the exam', 'vio-cam-off');
     }
 
-    // Report to backend
     if (!sessionIdRef.current || !examIdRef.current) return;
     try {
       await studentAPI.reportViolation({
@@ -240,7 +259,7 @@ const ProfessionalProctoring = ({
     } catch (err) {
       console.warn('[Proctoring] Backend violation report failed:', err.message);
     }
-  }, [monConfig]);
+  }, [monConfig, studentId]);
 
   // ─── Load Models ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -327,6 +346,32 @@ const ProfessionalProctoring = ({
         // Attach video stream
         if (videoRef.current && monConfig.device_camera) {
           videoRef.current.srcObject = stream;
+        }
+
+        // ── Monitor video tracks for physical camera being turned off ──
+        if (monConfig.device_camera) {
+          const videoTracks = stream.getVideoTracks();
+          videoTracks.forEach(track => {
+            track.addEventListener('ended', () => {
+              if (!mounted) return;
+              console.warn('[Proctoring] Video track ended — camera was disconnected/disabled');
+              setCameraStatus('off');
+              setCameraOff(true);
+              setFaceCount(0);
+              reportViolation('camera_off', 'Student turned off or disconnected their camera during the exam');
+            });
+            track.addEventListener('mute', () => {
+              if (!mounted) return;
+              console.warn('[Proctoring] Video track muted — camera may be off');
+              setCameraOff(true);
+              reportViolation('camera_off', 'Camera feed was interrupted or muted');
+            });
+            track.addEventListener('unmute', () => {
+              if (!mounted) return;
+              console.log('[Proctoring] Video track unmuted — camera restored');
+              setCameraOff(false);
+            });
+          });
         }
 
         // Setup Web Audio Analyser if microphone tracks are present and voice detection enabled
@@ -425,32 +470,105 @@ const ProfessionalProctoring = ({
   // ─── Video onLoadedData → set active ───────────────────────────────────────
   const handleVideoReady = useCallback(() => {
     setCameraStatus('active');
+    setCameraOff(false);
     setFaceCount(0);
+    consecutiveNoFaceRef.current = 0;
+    setConsecutiveNoFace(0);
     console.log('📸 [Proctoring] Camera & Microphone stream active');
   }, []);
 
+  // ─── Periodic Camera-Off Watchdog ──────────────────────────────────────────
+  // Catches browsers that don't reliably fire 'ended'/'mute' events
+  useEffect(() => {
+    if (!monConfig.device_camera || !monConfig.is_proctored) return;
+
+    const watchdog = setInterval(() => {
+      const stream = streamRef.current;
+      if (!stream) return;
+
+      const videoTracks = stream.getVideoTracks();
+      if (videoTracks.length === 0) {
+        if (!cameraOffRef.current) {
+          setCameraOff(true);
+          setCameraStatus('off');
+          reportViolation('camera_off', 'No video tracks available — camera may be disconnected');
+        }
+        return;
+      }
+
+      const track = videoTracks[0];
+      const isOff = track.readyState === 'ended' || track.muted;
+
+      if (isOff && !cameraOffRef.current) {
+        setCameraOff(true);
+        if (track.readyState === 'ended') setCameraStatus('off');
+        reportViolation('camera_off', `Camera track ${track.readyState === 'ended' ? 'disconnected' : 'muted'}`);
+      } else if (!isOff && cameraOffRef.current) {
+        // Camera came back — clear the off state
+        setCameraOff(false);
+      }
+    }, 2000);
+
+    return () => clearInterval(watchdog);
+  }, [monConfig.device_camera, monConfig.is_proctored, reportViolation]);
+
   // ─── Face Detection Loop ────────────────────────────────────────────────────
   useEffect(() => {
-    if (!monConfig.face_detection || !monConfig.device_camera || !modelsLoaded || cameraStatus !== 'active') return;
+    if (!monConfig.face_detection || !monConfig.device_camera || !modelsLoaded) return;
+
+    // If camera is off/denied, keep reporting periodically
+    if (cameraStatus === 'off' || cameraStatus === 'denied' || cameraStatus === 'error') {
+      const offInterval = setInterval(() => {
+        reportViolation('camera_off', `Camera not active (status: ${cameraStatusRef.current})`);
+      }, 12000);
+      return () => clearInterval(offInterval);
+    }
+
+    if (cameraStatus !== 'active') return;
+
+    // Reset counters when detection (re)starts
+    noFaceCountRef.current = 0;
+    consecutiveNoFaceRef.current = 0;
+    setConsecutiveNoFace(0);
 
     const detect = async () => {
+      // Skip frame analysis if camera physically off
+      if (cameraOffRef.current) {
+        reportViolation('camera_off', 'Camera switched off during proctored examination');
+        return;
+      }
+
       const video = videoRef.current;
       const canvas = canvasRef.current;
       if (!video || video.readyState < 2 || video.paused || video.ended) return;
 
+      // Double-check stream tracks are alive
+      const stream = streamRef.current;
+      if (stream) {
+        const tracks = stream.getVideoTracks();
+        if (tracks.length > 0 && (tracks[0].readyState === 'ended' || tracks[0].muted)) {
+          if (!cameraOffRef.current) {
+            setCameraOff(true);
+            reportViolation('camera_off', 'Camera track became inactive during exam');
+          }
+          return;
+        }
+      }
+
       try {
         if (!faceDetectorGlobal) return;
-        
+
         const timestampMs = performance.now();
         const results = faceDetectorGlobal.detectForVideo(video, timestampMs);
-        
+
         const rawDetections = (results?.detections || []).map(det => ({
           box: {
             x: det.boundingBox.originX,
             y: det.boundingBox.originY,
             width: det.boundingBox.width,
-            height: det.boundingBox.height
-          }
+            height: det.boundingBox.height,
+          },
+          score: det.categories?.[0]?.score ?? 1,
         }));
 
         if (canvas) {
@@ -458,40 +576,32 @@ const ProfessionalProctoring = ({
           canvas.height = video.videoHeight || 240;
         }
 
-        // Filter out absurdly small boxes (e.g. noise smaller than 30px)
-        let validDetections = rawDetections.filter(det => det.box.width >= 30 && det.box.height >= 30);
+        // Filter noise: boxes smaller than 25px or confidence below 0.45
+        let validDetections = rawDetections.filter(
+          det => det.box.width >= 25 && det.box.height >= 25 && det.score >= 0.45
+        );
 
+        // Deduplicate overlapping boxes (IoU > 28%)
         if (validDetections.length > 1) {
           validDetections.sort((a, b) => (b.box.width * b.box.height) - (a.box.width * a.box.height));
-          const maxArea = validDetections[0].box.width * validDetections[0].box.height;
           const filtered = [];
-
           for (let i = 0; i < validDetections.length; i++) {
             const current = validDetections[i];
             const currentArea = current.box.width * current.box.height;
-            if (currentArea < maxArea * 0.15) continue;
+            const maxArea = validDetections[0].box.width * validDetections[0].box.height;
+            if (currentArea < maxArea * 0.12) continue;
 
             let isDuplicate = false;
-            for (let j = 0; j < filtered.length; j++) {
-              const keep = filtered[j];
+            for (const keep of filtered) {
               const xA = Math.max(current.box.x, keep.box.x);
               const yA = Math.max(current.box.y, keep.box.y);
               const xB = Math.min(current.box.x + current.box.width, keep.box.x + keep.box.width);
               const yB = Math.min(current.box.y + current.box.height, keep.box.y + keep.box.height);
-
               const w = Math.max(0, xB - xA);
               const h = Math.max(0, yB - yA);
-              const intersection = w * h;
-              
-              if (intersection / currentArea > 0.3) {
-                isDuplicate = true;
-                break;
-              }
+              if ((w * h) / currentArea > 0.28) { isDuplicate = true; break; }
             }
-
-            if (!isDuplicate) {
-              filtered.push(current);
-            }
+            if (!isDuplicate) filtered.push(current);
           }
           validDetections = filtered;
         }
@@ -499,52 +609,55 @@ const ProfessionalProctoring = ({
         const faces = validDetections.length;
         setFaceCount(faces);
 
-        // Draw detection boxes
+        // Draw detection overlays
         if (canvas && video) {
           try {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             validDetections.forEach((det, idx) => {
               const box = det.box;
               const isExtra = faces > 1;
               const color = isExtra ? '#ef4444' : '#22c55e';
-
               ctx.strokeStyle = color;
               ctx.lineWidth = 2.5;
               roundRect(ctx, box.x, box.y, box.width, box.height, 6);
               ctx.stroke();
-
               drawCorners(ctx, box.x, box.y, box.width, box.height, color);
-
+              const label = isExtra ? `Person ${idx + 1} ⚠` : '✓ Candidate';
+              const labelW = isExtra ? 84 : 68;
               ctx.fillStyle = color + 'dd';
-              ctx.fillRect(box.x, box.y - 20, isExtra ? 80 : 60, 20);
+              ctx.fillRect(box.x, box.y - 20, labelW, 20);
               ctx.fillStyle = '#fff';
               ctx.font = 'bold 11px Inter, sans-serif';
-              ctx.fillText(
-                isExtra ? `Person ${idx + 1} ⚠` : '✓ Candidate',
-                box.x + 6, box.y - 5
-              );
+              ctx.fillText(label, box.x + 5, box.y - 5);
             });
           } catch (_) {}
         }
 
-        // Violation logic
+        // ── Violation logic ──
         if (faces > 1) {
           noFaceCountRef.current = 0;
+          consecutiveNoFaceRef.current = 0;
           setNoFaceCount(0);
-          reportViolation('multiple_faces', `${faces} faces detected simultaneously`);
+          setConsecutiveNoFace(0);
+          reportViolation('multiple_faces', `${faces} faces detected simultaneously in frame`);
         } else if (faces === 0) {
           noFaceCountRef.current += 1;
+          consecutiveNoFaceRef.current += 1;
           setNoFaceCount(noFaceCountRef.current);
-          if (noFaceCountRef.current >= 6) {
-            reportViolation('no_face_detected', 'Candidate face not detected in frame');
-            noFaceCountRef.current = 0;
+          setConsecutiveNoFace(consecutiveNoFaceRef.current);
+          // Trigger violation after 4 consecutive misses (~7.2s at 1.8s interval)
+          if (noFaceCountRef.current >= 4) {
+            reportViolation('no_face_detected', `Candidate face absent for ~${Math.round(noFaceCountRef.current * 1.8)}s`);
+            noFaceCountRef.current = 0; // reset per-report cycle, but consecutiveNoFaceRef keeps going
             setNoFaceCount(0);
           }
         } else {
+          // Face found — reset all
           noFaceCountRef.current = 0;
+          consecutiveNoFaceRef.current = 0;
           setNoFaceCount(0);
+          setConsecutiveNoFace(0);
         }
       } catch (err) {
         console.error('❌ [Proctoring] Face detection loop error:', err);
@@ -552,12 +665,12 @@ const ProfessionalProctoring = ({
     };
 
     detect();
-    detectionIntervalRef.current = setInterval(detect, 2000);
+    detectionIntervalRef.current = setInterval(detect, 1800); // every 1.8s for responsiveness
 
     return () => {
       if (detectionIntervalRef.current) clearInterval(detectionIntervalRef.current);
     };
-  }, [modelsLoaded, cameraStatus, reportViolation]);
+  }, [modelsLoaded, cameraStatus, reportViolation, monConfig.face_detection, monConfig.device_camera]);
 
   // ─── Helpers: Rounded rect & cross-hairs ────────────────────────────────────
   function roundRect(ctx, x, y, w, h, r) {
@@ -590,18 +703,21 @@ const ProfessionalProctoring = ({
   }
 
   // ─── Derived UI values ──────────────────────────────────────────────────────
-  const isViolation = faceCount > 1 || (faceCount === 0 && noFaceCount >= 4) || voiceAlert;
-  const borderColor = isViolation ? 'rgba(239,68,68,0.8)'
-    : faceCount === 1 ? 'rgba(34,197,94,0.6)'
+  const isNoFaceActive = consecutiveNoFace > 0 || (faceCount === 0 && noFaceCount >= 2);
+  const isViolation = faceCount > 1 || isNoFaceActive || voiceAlert || cameraOff;
+  const borderColor = isViolation ? 'rgba(239,68,68,0.85)'
+    : faceCount === 1 ? 'rgba(34,197,94,0.65)'
     : 'rgba(255,255,255,0.15)';
 
-  const faceColor = faceCount === 1 ? '#22c55e'
+  const faceColor = cameraOff ? '#ef4444'
+    : faceCount === 1 ? '#22c55e'
     : faceCount > 1 ? '#ef4444'
-    : noFaceCount >= 4 ? '#ef4444' : '#f59e0b';
+    : noFaceCount >= 2 ? '#ef4444' : '#f59e0b';
 
-  const faceText = faceCount === 1 ? '✓ Candidate Present'
+  const faceText = cameraOff ? '⛔ Camera OFF'
+    : faceCount === 1 ? '✓ Candidate Present'
     : faceCount > 1 ? `⚠ ${faceCount} Faces Detected!`
-    : faceCount === 0 ? (noFaceCount >= 4 ? '⚠ Face Missing' : 'Detecting...')
+    : faceCount === 0 ? (noFaceCount >= 2 ? '⚠ Face Missing' : 'Detecting...')
     : 'Initializing...';
 
   // ─── PIP DRAGGING & CORNER MANAGEMENT ──────────────────────────────────────
@@ -696,12 +812,14 @@ const ProfessionalProctoring = ({
         style={{
           ...pillPos,
           cursor: isDragging ? 'grabbing' : 'grab',
-          background: 'rgba(15, 23, 42, 0.95)',
+          background: isViolation ? 'rgba(80,0,0,0.97)' : 'rgba(15, 23, 42, 0.95)',
           border: `1.5px solid ${isViolation ? '#ef4444' : 'rgba(10, 116, 218, 0.5)'}`,
           backdropFilter: 'blur(12px)',
           borderRadius: 30,
           padding: '8px 14px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)',
+          boxShadow: isViolation
+            ? '0 0 20px rgba(239,68,68,0.45), 0 8px 32px rgba(0,0,0,0.5)'
+            : '0 8px 32px rgba(0, 0, 0, 0.45)',
           display: 'flex',
           alignItems: 'center',
           gap: 8,
@@ -714,11 +832,14 @@ const ProfessionalProctoring = ({
       >
         <div style={{
           width: 8, height: 8, borderRadius: '50%',
-          background: cameraStatus === 'active' ? '#22c55e' : '#ef4444',
-          boxShadow: cameraStatus === 'active' ? '0 0 8px #22c55e' : 'none'
+          background: cameraOff ? '#ef4444' : cameraStatus === 'active' ? '#22c55e' : '#ef4444',
+          boxShadow: cameraStatus === 'active' && !cameraOff ? '0 0 8px #22c55e' : '0 0 8px #ef4444',
+          animation: isViolation ? 'er-pulse 1s infinite' : 'none',
         }} />
-        <Camera size={14} color="#38bdf8" />
-        <span style={{ cursor: 'pointer' }} onClick={() => setIsPipMinimized(false)}>AI Proctoring</span>
+        <Camera size={14} color={isViolation ? '#f87171' : '#38bdf8'} />
+        <span style={{ cursor: 'pointer' }} onClick={() => setIsPipMinimized(false)}>
+          {isViolation ? '⚠ Violation!' : 'AI Proctoring'}
+        </span>
         <button
           onClick={cycleCorner}
           style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 2, display: 'flex' }}
@@ -737,15 +858,54 @@ const ProfessionalProctoring = ({
     );
   }
 
+  // ─── BACKGROUND / HIDDEN PROCTORING MODE ─────────────────────────────────
+  // Fully captures webcam & mic, transmits telemetry & frames to proctor,
+  // runs face detection & voice analysis, but keeps camera/image section
+  // completely invisible to the candidate for a clean, professional exam experience.
+  if (mode === 'background' || mode === 'hidden' || hidden) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: -9999,
+          left: -9999,
+          width: 320,
+          height: 240,
+          opacity: 0,
+          pointerEvents: 'none',
+          visibility: 'visible',
+          zIndex: -9999,
+        }}
+        aria-hidden="true"
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          onLoadedData={handleVideoReady}
+          style={{ width: 320, height: 240, display: 'block' }}
+        />
+        <canvas
+          ref={canvasRef}
+          style={{ width: 320, height: 240 }}
+        />
+      </div>
+    );
+  }
+
   // ─── PIP FLOATING WINDOW WRAPPER ───────────────────────────────────────────
   const containerStyle = mode === 'pip' ? {
+    animation: isViolation ? 'er-border-pulse 2s infinite' : 'none',
     ...getPipPos(250),
     background: 'rgba(15, 23, 42, 0.96)',
     border: `1.5px solid ${borderColor}`,
     backdropFilter: 'blur(14px)',
     borderRadius: 14,
     padding: '12px',
-    boxShadow: '0 12px 40px rgba(0, 0, 0, 0.55)',
+    boxShadow: isViolation
+      ? '0 0 24px rgba(239,68,68,0.35), 0 12px 40px rgba(0,0,0,0.55)'
+      : '0 12px 40px rgba(0, 0, 0, 0.55)',
     fontFamily: "'Inter', sans-serif",
     transition: isDragging ? 'none' : 'border-color 0.3s ease',
   } : {
@@ -772,9 +932,12 @@ const ProfessionalProctoring = ({
           }}
           title="Drag to reposition anywhere, or click corner button"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: '#38bdf8', letterSpacing: '0.04em' }}>
-            <Shield size={13} color="#38bdf8" />
-            <span>AI MONITOR HUD</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: isViolation ? '#f87171' : '#38bdf8', letterSpacing: '0.04em' }}>
+            {isViolation
+              ? <AlertTriangle size={13} color="#f87171" />
+              : <Shield size={13} color="#38bdf8" />
+            }
+            <span>{isViolation ? 'VIOLATION ALERT' : 'AI MONITOR HUD'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button
@@ -852,9 +1015,11 @@ const ProfessionalProctoring = ({
           overflow: 'hidden',
           background: '#0a0f1d',
           border: `2px solid ${borderColor}`,
-          transition: 'border-color 0.4s ease',
+          transition: 'border-color 0.4s ease, box-shadow 0.4s ease',
           marginBottom: 10,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          boxShadow: isViolation
+            ? `0 0 18px ${borderColor}, 0 4px 16px rgba(0,0,0,0.3)`
+            : '0 4px 16px rgba(0,0,0,0.3)',
         }}>
           <video
             ref={videoRef}
@@ -868,6 +1033,8 @@ const ProfessionalProctoring = ({
               objectFit: 'cover',
               transform: 'scaleX(-1)',
               display: 'block',
+              opacity: cameraOff ? 0.3 : 1,
+              transition: 'opacity 0.3s',
             }}
           />
           <canvas
@@ -880,10 +1047,12 @@ const ProfessionalProctoring = ({
             }}
           />
 
-          {/* REC / LIVE badge */}
+          {/* REC / LIVE / OFF badge */}
           <div style={{
             position: 'absolute', top: 6, left: 6,
-            background: cameraStatus === 'active' ? 'rgba(34,197,94,0.92)' : 'rgba(239,68,68,0.92)',
+            background: cameraOff
+              ? 'rgba(239,68,68,0.97)'
+              : cameraStatus === 'active' ? 'rgba(34,197,94,0.92)' : 'rgba(239,68,68,0.92)',
             padding: '2px 7px', borderRadius: 5,
             fontSize: 9, fontWeight: 800, color: '#fff',
             letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4,
@@ -891,43 +1060,80 @@ const ProfessionalProctoring = ({
             <div style={{
               width: 5, height: 5, borderRadius: '50%',
               background: '#fff',
-              animation: cameraStatus === 'active' ? 'er-pulse 1.5s infinite' : 'none',
+              animation: cameraStatus === 'active' && !cameraOff ? 'er-pulse 1.5s infinite' : 'none',
             }} />
-            {cameraStatus === 'active' ? 'LIVE' : 'OFF'}
+            {cameraOff ? 'CAM OFF' : cameraStatus === 'active' ? 'LIVE' : 'OFF'}
           </div>
 
           {/* Face count badge */}
-          {monConfig.face_detection && cameraStatus === 'active' && faceCount >= 0 && (
+          {monConfig.face_detection && (cameraStatus === 'active' || cameraOff) && (
             <div style={{
               position: 'absolute', top: 6, right: 6,
               background: faceColor + 'dd',
               padding: '2px 7px', borderRadius: 5,
               fontSize: 9, fontWeight: 800, color: '#fff',
             }}>
-              {faceCount === 1 ? '1 FACE' : faceCount > 1 ? `${faceCount} FACES` : 'NO FACE'}
+              {cameraOff
+                ? '⛔ CAM OFF'
+                : faceCount === 1 ? '1 FACE'
+                : faceCount > 1 ? `${faceCount} FACES`
+                : 'NO FACE'}
+            </div>
+          )}
+
+          {/* Camera OFF full overlay */}
+          {cameraOff && (
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(15,0,0,0.88)',
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              gap: 8,
+            }}>
+              <CameraOff size={28} color="#ef4444" />
+              <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 800, textAlign: 'center', padding: '0 10px' }}>
+                Camera is OFF
+              </div>
+              <div style={{ fontSize: 10, color: '#fca5a5', textAlign: 'center', padding: '0 10px' }}>
+                Re-enable your camera immediately
+              </div>
+              <div style={{
+                background: 'rgba(239,68,68,0.15)',
+                border: '1px solid rgba(239,68,68,0.4)',
+                borderRadius: 6,
+                padding: '3px 8px',
+                fontSize: 9,
+                color: '#fca5a5',
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+              }}>
+                ⚠ VIOLATION RECORDED
+              </div>
             </div>
           )}
 
           {/* Multiple faces alert */}
-          {monConfig.face_detection && faceCount > 1 && (
+          {monConfig.face_detection && faceCount > 1 && !cameraOff && (
             <div style={{
               position: 'absolute', bottom: 0, left: 0, right: 0,
-              background: 'rgba(239,68,68,0.95)',
-              padding: '4px 6px', textAlign: 'center',
+              background: 'rgba(239,68,68,0.97)',
+              padding: '5px 6px', textAlign: 'center',
               fontSize: 9, fontWeight: 800, color: '#fff',
               letterSpacing: '0.5px',
+              animation: 'er-pulse 1s infinite',
             }}>
               🚨 MULTIPLE PERSONS DETECTED
             </div>
           )}
 
           {/* No face warning */}
-          {monConfig.face_detection && faceCount === 0 && noFaceCount >= 4 && (
+          {monConfig.face_detection && faceCount === 0 && noFaceCount >= 2 && !cameraOff && (
             <div style={{
               position: 'absolute', bottom: 0, left: 0, right: 0,
-              background: 'rgba(245,158,11,0.95)',
-              padding: '4px 6px', textAlign: 'center',
+              background: 'rgba(245,158,11,0.97)',
+              padding: '5px 6px', textAlign: 'center',
               fontSize: 9, fontWeight: 800, color: '#fff',
+              animation: 'er-pulse 1.5s infinite',
             }}>
               ⚠️ FACE THE CAMERA
             </div>
@@ -1020,10 +1226,15 @@ const ProfessionalProctoring = ({
 
       {/* Status Details */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
-        <StatusRow 
-          label="Face Tracking" 
-          value={!monConfig.face_detection ? 'Disabled' : !monConfig.device_camera ? 'Camera Off' : faceText} 
-          color={!monConfig.face_detection || !monConfig.device_camera ? '#94a3b8' : faceColor} 
+        <StatusRow
+          label="Face Tracking"
+          value={!monConfig.face_detection ? 'Disabled' : !monConfig.device_camera ? 'Camera Off' : faceText}
+          color={!monConfig.face_detection || !monConfig.device_camera ? '#94a3b8' : faceColor}
+        />
+        <StatusRow
+          label="Camera"
+          value={cameraOff ? '⛔ Turned Off' : cameraStatus === 'active' ? 'Active' : cameraStatus === 'denied' ? 'Denied' : cameraStatus === 'requesting' ? 'Requesting…' : 'Offline'}
+          color={cameraOff ? '#ef4444' : cameraStatus === 'active' ? '#22c55e' : '#ef4444'}
         />
         <StatusRow
           label="Microphone"
@@ -1041,17 +1252,18 @@ const ProfessionalProctoring = ({
       {violationLog.length > 0 && (
         <div style={{
           background: 'rgba(239,68,68,0.08)',
-          border: '1px solid rgba(239,68,68,0.2)',
+          border: '1px solid rgba(239,68,68,0.22)',
           borderRadius: 8,
           padding: '6px 8px',
         }}>
           <div style={{ fontSize: 9, fontWeight: 800, color: '#f87171', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Alert History ({violationLog.length})
           </div>
-          {violationLog.slice(0, 2).map((v, i) => (
+          {violationLog.slice(0, 3).map((v, i) => (
             <div key={i} style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              fontSize: 10, color: '#fca5a5', padding: '1px 0',
+              fontSize: 10, color: '#fca5a5', padding: '2px 0',
+              borderBottom: i < Math.min(violationLog.length, 3) - 1 ? '1px solid rgba(239,68,68,0.12)' : 'none',
             }}>
               <span style={{ fontWeight: 600 }}>
                 {v.type === 'multiple_faces' ? '👥 Multi-face' :
@@ -1075,7 +1287,10 @@ function StatusRow({ label, value, color }) {
       <div style={{
         width: 5, height: 5, borderRadius: '50%',
         background: color, flexShrink: 0,
-        boxShadow: color === '#22c55e' ? '0 0 6px #22c55e' : 'none',
+        boxShadow: color === '#22c55e' ? '0 0 6px #22c55e'
+          : color === '#ef4444' ? '0 0 6px rgba(239,68,68,0.7)'
+          : 'none',
+        animation: color === '#ef4444' ? 'er-pulse 1.5s infinite' : 'none',
       }} />
       <span style={{ color: '#94a3b8', flexShrink: 0 }}>{label}:</span>
       <span style={{ color, fontWeight: 700, marginLeft: 'auto', textAlign: 'right', whiteSpace: 'nowrap' }}>

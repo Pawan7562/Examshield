@@ -114,6 +114,42 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000).unref();
 
+// Automatic scheduled exam lifecycle synchronizer (activates scheduled exams when start time arrives)
+setInterval(async () => {
+  try {
+    const { supabase } = require('./config/supabase-clean');
+    const { parseToIST } = require('./utils/timezone');
+    const now = Date.now();
+
+    // Find scheduled exams that should now be active
+    const { data: upcomingExams } = await supabase
+      .from('exams')
+      .select('id, date_time, duration, status')
+      .in('status', ['published', 'draft'])
+      .not('date_time', 'is', null);
+
+    if (Array.isArray(upcomingExams) && upcomingExams.length > 0) {
+      for (const ex of upcomingExams) {
+        const start = parseToIST(ex.date_time);
+        if (!start) continue;
+        const startTime = start.getTime();
+        const endTime = startTime + (ex.duration || 60) * 60000;
+
+        // If current time is past start time (with 30s early skew margin) and before end time:
+        if (now >= startTime - 30000 && now <= endTime) {
+          await supabase
+            .from('exams')
+            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .eq('id', ex.id);
+          logger.info(`Auto-activated scheduled exam ${ex.id} (start: ${ex.date_time})`);
+        }
+      }
+    }
+  } catch (_) {
+    // Non-blocking background sync
+  }
+}, 30 * 1000).unref();
+
 // Socket.IO authentication middleware
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token || 

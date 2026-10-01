@@ -593,6 +593,7 @@ export default function Results() {
               <tr>
                 <th>Student</th>
                 <th>Exam</th>
+                <th>Attempted</th>
                 <th>Marks</th>
                 <th>Percentage</th>
                 <th>Grade</th>
@@ -604,14 +605,14 @@ export default function Results() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="admin-table-loading">
+                  <td colSpan={9} className="admin-table-loading">
                     <div className="admin-loading-spinner"></div>
                     Loading results...
                   </td>
                 </tr>
               ) : results.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="admin-table-empty">
+                  <td colSpan={9} className="admin-table-empty">
                     <Trophy size={48} />
                     <h3>No results found</h3>
                     <p>
@@ -634,6 +635,14 @@ export default function Results() {
                       <FileText size={16} style={{ color: '#0a74da', flexShrink: 0 }} />
                       <span>{result.exam_name || result.exam_title || 'Examination'}</span>
                     </div>
+                  </td>
+                  <td className="admin-attempted">
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      {result.questions_attempted !== undefined && result.questions_attempted !== null ? result.questions_attempted : '—'}
+                    </span>
+                    <span style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                      /{result.total_questions || '—'}
+                    </span>
                   </td>
                   <td className="admin-marks">
                     <span className="admin-marks-obtained" style={{ fontWeight: 700, color: '#0f172a' }}>
@@ -1240,6 +1249,9 @@ export default function Results() {
                             </div>
                             <div style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: 4 }}>
                               Percentage: <strong>{percentage.toFixed(2)}%</strong> &bull; Grade: <strong style={{ color: '#fbbf24' }}>{subResult.grade || 'N/A'}</strong>
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: '#93c5fd', marginTop: 4 }}>
+                              Attempted: <strong>{questions.filter(q => q.is_answered).length}</strong> of <strong>{questions.length}</strong> Questions
                             </div>
                           </div>
 

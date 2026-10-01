@@ -1,218 +1,509 @@
-import React, { useState } from 'react';
-import { Send, Minimize2, Maximize2, X, Bot, User, Clock, Check, CheckCheck } from 'lucide-react';
+// frontend/src/components/common/ChatBot.js
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Send,
+  Minimize2,
+  Maximize2,
+  X,
+  Bot,
+  User,
+  Clock,
+  Check,
+  Sparkles,
+  RefreshCw,
+  Download,
+  Volume2,
+  VolumeX,
+  ExternalLink,
+  Copy,
+  ChevronRight
+} from 'lucide-react';
+import chatBotService from '../../services/chatBotService';
 import './ChatBot.css';
 
-const ChatBot = () => {
+// Audio feedback using Web Audio API
+const playChime = (enabled) => {
+  if (!enabled || typeof window === 'undefined') return;
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
+    gain.gain.setValueAtTime(0.04, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  } catch (e) {
+    // Ignore audio permission errors
+  }
+};
+
+// Markdown renderer for rich messages
+const FormattedMessage = ({ text }) => {
+  if (!text) return null;
+
+  // Split lines
+  const lines = text.split('\n');
+
+  return (
+    <div className="formatted-message-body">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+
+        // Headers
+        if (trimmed.startsWith('### ')) {
+          return <h4 key={idx} className="msg-h4">{renderInline(trimmed.substring(4))}</h4>;
+        }
+        if (trimmed.startsWith('## ')) {
+          return <h3 key={idx} className="msg-h3">{renderInline(trimmed.substring(3))}</h3>;
+        }
+
+        // Bullet points
+        if (trimmed.startsWith('* ') || trimmed.startsWith('• ') || trimmed.startsWith('- ')) {
+          return (
+            <div key={idx} className="msg-bullet">
+              <span className="msg-bullet-dot">•</span>
+              <span className="msg-bullet-text">{renderInline(trimmed.substring(2))}</span>
+            </div>
+          );
+        }
+
+        // Numbered list
+        const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+        if (numMatch) {
+          return (
+            <div key={idx} className="msg-bullet">
+              <span className="msg-bullet-num">{numMatch[1]}.</span>
+              <span className="msg-bullet-text">{renderInline(numMatch[2])}</span>
+            </div>
+          );
+        }
+
+        // Empty lines
+        if (!trimmed) {
+          return <div key={idx} className="msg-spacer" />;
+        }
+
+        // Normal paragraph
+        return <p key={idx} className="msg-p">{renderInline(line)}</p>;
+      })}
+    </div>
+  );
+};
+
+// Render inline markdown: bold, code, links
+const renderInline = (str) => {
+  if (!str) return '';
+  const parts = [];
+  let remaining = str;
+
+  // Pattern for **bold**, `code`, or [text](url)
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  let match;
+  let lastIndex = 0;
+
+  while ((match = regex.exec(str)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(str.substring(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(<strong key={match.index}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith('`') && token.endsWith('`')) {
+      parts.push(<code key={match.index} className="msg-inline-code">{token.slice(1, -1)}</code>);
+    } else if (token.startsWith('[')) {
+      const linkMatch = token.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      if (linkMatch) {
+        parts.push(
+          <a key={match.index} href={linkMatch[2]} className="msg-inline-link">
+            {linkMatch[1]}
+          </a>
+        );
+      }
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < str.length) {
+    parts.push(str.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : str;
+};
+
+const INITIAL_MESSAGE = {
+  id: 'welcome',
+  type: 'bot',
+  content: `Hello! 👋 Welcome to **ExamShield**. I am your dedicated AI Academic & Technical Assistant.\n\nI can assist you with:\n* **AI Proctoring & Anti-Cheat Controls** (Face mesh, audio analytics, kiosk lockdown)\n* **Student Exam Room & Login Assistance** (Camera check, timers, question navigation)\n* **College Admin Console** (Scheduling exams, student management, live cockpit)\n* **Online Coding Assessments** (Languages, test cases, sandboxed execution)\n* **Campus Governance & Security Architecture**\n\nHow can I help you today?`,
+  timestamp: new Date(),
+  suggestions: [
+    'How does AI proctoring work?',
+    'How does browser kiosk lockdown work?',
+    'How do students log in for an exam?',
+    'Can instructors monitor exams live?'
+  ],
+  actions: [
+    { label: 'Register College', url: '/admin/register' },
+    { label: 'Student Login', url: '/student/login' }
+  ]
+};
+
+export default function ChatBot() {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: 'bot',
-      content: 'Hello! I\'m your CollegeExam assistant. How can I help you today?',
-      timestamp: new Date(),
-      status: 'delivered'
-    }
-  ]);
+  const [messages, setMessages] = useState([INITIAL_MESSAGE]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [copiedId, setCopiedId] = useState(null);
+  const [hasUnread, setHasUnread] = useState(false);
 
-  const sendMessage = () => {
-    if (!inputValue.trim()) return;
+  const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (isOpen && !isMinimized) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isTyping, isOpen, isMinimized]);
+
+  // Focus input when opened
+  useEffect(() => {
+    if (isOpen && !isMinimized && inputRef.current) {
+      inputRef.current.focus();
+      setHasUnread(false);
+    }
+  }, [isOpen, isMinimized]);
+
+  // Keyboard shortcut Ctrl+K to toggle chat
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsOpen((prev) => !prev);
+      }
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  const handleSend = async (textToSend) => {
+    const text = (textToSend || inputValue).trim();
+    if (!text || isTyping) return;
 
     const userMessage = {
-      id: Date.now(),
+      id: `usr_${Date.now()}`,
       type: 'user',
-      content: inputValue,
-      timestamp: new Date(),
-      status: 'sent'
+      content: text,
+      timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate bot response
-    setTimeout(() => {
-      const botMessage = {
-        id: Date.now() + 1,
+    try {
+      const result = await chatBotService.sendMessage(text);
+      if (result) {
+        const botMessage = {
+          id: `bot_${Date.now()}`,
+          type: 'bot',
+          content: result.response,
+          timestamp: new Date(),
+          suggestions: result.suggestions || [],
+          actions: result.actions || [],
+          confidence: result.confidence
+        };
+
+        setMessages((prev) => [...prev, botMessage]);
+        playChime(soundEnabled);
+
+        if (!isOpen || isMinimized) {
+          setHasUnread(true);
+        }
+      }
+    } catch (err) {
+      const errorMsg = {
+        id: `err_${Date.now()}`,
         type: 'bot',
-        content: 'Thanks for your message! I\'m here to help you with CollegeExam. What would you like to know about our exam monitoring platform?',
+        content: `I ran into a temporary issue connecting. Please try asking again or explore our [How It Works](/how-it-works) guide.`,
         timestamp: new Date(),
-        status: 'delivered'
+        suggestions: ['How does AI proctoring work?', 'How does browser kiosk lockdown work?']
       };
-      setMessages(prev => [...prev, botMessage]);
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
-  const formatTimestamp = (timestamp) => {
-    return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const handleActionClick = (action) => {
+    if (!action?.url) return;
+    if (action.url.startsWith('http')) {
+      window.open(action.url, '_blank');
+    } else {
+      navigate(action.url);
+      // On mobile screen, close chat upon navigation
+      if (window.innerWidth < 768) {
+        setIsOpen(false);
+      }
+    }
   };
 
-  const suggestedQuestions = [
-    'What are your pricing plans?',
-    'How does the AI monitoring work?',
-    'Can I get a demo?',
-    'What are the system requirements?'
-  ];
+  const handleCopy = (id, text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleClearChat = () => {
+    chatBotService.clearHistory();
+    setMessages([INITIAL_MESSAGE]);
+  };
+
+  const handleExport = () => {
+    chatBotService.exportHistory();
+  };
 
   return (
-    <>
-      {/* Chat Button */}
-      <div className={`chatbot-widget ${isOpen ? 'open' : ''}`}>
+    <div className={`cb-container ${isOpen ? 'cb-open' : ''}`}>
+      {/* Floating Chat Launcher Button */}
+      {!isOpen && (
         <button
-          className="chatbot-button"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label="Open chat"
+          className="cb-launcher"
+          onClick={() => {
+            setIsOpen(true);
+            setIsMinimized(false);
+            setHasUnread(false);
+          }}
+          aria-label="Open ExamShield Support Chat"
         >
-          <Bot size={24} />
-          <span className="chatbot-button-text">Chat with us</span>
-          {messages.length > 1 && (
-            <span className="chatbot-badge">{messages.length - 1}</span>
-          )}
+          <div className="cb-launcher-icon">
+            <Bot size={24} />
+          </div>
+          <span className="cb-launcher-text">Ask ExamShield AI</span>
+          <span className="cb-launcher-pulse" />
+          {hasUnread && <span className="cb-launcher-badge">1</span>}
         </button>
+      )}
 
-        {/* Chat Window */}
-        {isOpen && (
-          <div className={`chatbot-window ${isMinimized ? 'minimized' : ''}`}>
-            {/* Header */}
-            <div className="chatbot-header">
-              <div className="chatbot-header-content">
-                <div className="chatbot-avatar">
-                  <Bot size={20} />
-                </div>
-                <div className="chatbot-info">
-                  <h3>CollegeExam Assistant</h3>
-                  <span className="chatbot-status">
-                    <span className="status-dot online"></span>
-                    Online - Typically responds instantly
-                  </span>
-                </div>
+      {/* Chat Window */}
+      {isOpen && (
+        <div className={`cb-window ${isMinimized ? 'cb-minimized' : ''}`}>
+          {/* Header */}
+          <div className="cb-header">
+            <div className="cb-header-brand">
+              <div className="cb-header-avatar">
+                <Bot size={20} />
+                <span className="cb-status-beacon" />
               </div>
-              <div className="chatbot-header-actions">
-                <button
-                  className="header-action-btn"
-                  onClick={() => setIsMinimized(!isMinimized)}
-                  aria-label={isMinimized ? 'Maximize' : 'Minimize'}
-                >
-                  {isMinimized ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
-                </button>
-                <button
-                  className="header-action-btn close"
-                  onClick={() => setIsOpen(false)}
-                  aria-label="Close chat"
-                >
-                  <X size={16} />
-                </button>
+              <div className="cb-header-titles">
+                <div className="cb-header-title-row">
+                  <h3 className="cb-title">ExamShield AI Assistant</h3>
+                  <span className="cb-pro-badge">PRO v2.4</span>
+                </div>
+                <p className="cb-subtitle">
+                  <span className="cb-live-dot" /> Instant Academic &amp; Proctoring Help
+                </p>
               </div>
             </div>
 
-            {/* Messages Area */}
-            {!isMinimized && (
-              <>
-                <div className="chatbot-messages">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`message ${message.type}`}
-                    >
-                      <div className="message-avatar">
-                        {message.type === 'bot' ? <Bot size={16} /> : <User size={16} />}
-                      </div>
-                      <div className="message-content">
-                        <div className="message-bubble">
-                          <div className="message-text">{message.content}</div>
-                        </div>
-                        <div className="message-meta">
-                          <span className="message-time">
-                            <Clock size={12} />
-                            {formatTimestamp(message.timestamp)}
-                          </span>
-                          {message.type === 'user' && (
-                            <span className="message-status">
-                              <Check size={12} />
-                            </span>
-                          )}
-                        </div>
-                      </div>
+            <div className="cb-header-controls">
+              <button
+                className={`cb-ctrl-btn ${soundEnabled ? 'active' : ''}`}
+                onClick={() => setSoundEnabled((prev) => !prev)}
+                title={soundEnabled ? 'Mute Chime' : 'Enable Chime'}
+                aria-label="Toggle Audio Feedback"
+              >
+                {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+              </button>
+
+              <button
+                className="cb-ctrl-btn"
+                onClick={handleExport}
+                title="Download Chat Transcript"
+                aria-label="Export conversation"
+              >
+                <Download size={15} />
+              </button>
+
+              <button
+                className="cb-ctrl-btn"
+                onClick={handleClearChat}
+                title="Reset Conversation"
+                aria-label="Clear chat"
+              >
+                <RefreshCw size={14} />
+              </button>
+
+              <button
+                className="cb-ctrl-btn"
+                onClick={() => setIsMinimized((prev) => !prev)}
+                title={isMinimized ? 'Expand' : 'Minimize'}
+                aria-label="Minimize or Expand Chat"
+              >
+                {isMinimized ? <Maximize2 size={15} /> : <Minimize2 size={15} />}
+              </button>
+
+              <button
+                className="cb-ctrl-btn close-btn"
+                onClick={() => setIsOpen(false)}
+                title="Close Chat"
+                aria-label="Close Chat Window"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Main Body */}
+          {!isMinimized && (
+            <>
+              <div className="cb-messages-stream">
+                {messages.map((msg) => (
+                  <div key={msg.id} className={`cb-msg-row ${msg.type}`}>
+                    <div className="cb-msg-avatar">
+                      {msg.type === 'bot' ? <Bot size={16} /> : <User size={16} />}
                     </div>
-                  ))}
-                  
-                  {isTyping && (
-                    <div className="message bot">
-                      <div className="message-avatar">
-                        <Bot size={16} />
+
+                    <div className="cb-msg-bubble-wrap">
+                      <div className="cb-msg-bubble">
+                        <FormattedMessage text={msg.content} />
+
+                        {/* Interactive Action Buttons */}
+                        {msg.actions && msg.actions.length > 0 && (
+                          <div className="cb-msg-actions">
+                            {msg.actions.map((act, aIdx) => (
+                              <button
+                                key={aIdx}
+                                className="cb-action-btn"
+                                onClick={() => handleActionClick(act)}
+                              >
+                                {act.label}
+                                <ChevronRight size={13} />
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className="message-content">
-                        <div className="message-bubble typing">
-                          <div className="typing-indicator">
-                            <span></span>
-                            <span></span>
-                            <span></span>
+
+                      {/* Message Footer Meta & Copy */}
+                      <div className="cb-msg-meta">
+                        <span className="cb-msg-time">
+                          <Clock size={11} />
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+
+                        {msg.type === 'bot' && (
+                          <button
+                            className="cb-copy-btn"
+                            onClick={() => handleCopy(msg.id, msg.content)}
+                            title="Copy text"
+                          >
+                            {copiedId === msg.id ? (
+                              <span className="cb-copied-label"><Check size={11} /> Copied</span>
+                            ) : (
+                              <Copy size={11} />
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Dynamic Follow-up Suggestions Chips */}
+                      {msg.suggestions && msg.suggestions.length > 0 && msg.type === 'bot' && (
+                        <div className="cb-chips-group">
+                          <span className="cb-chips-label">
+                            <Sparkles size={11} /> Suggested Follow-ups:
+                          </span>
+                          <div className="cb-chips-list">
+                            {msg.suggestions.map((sug, sIdx) => (
+                              <button
+                                key={sIdx}
+                                className="cb-chip-btn"
+                                onClick={() => handleSend(sug)}
+                              >
+                                {sug}
+                              </button>
+                            ))}
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                ))}
 
-                {/* Quick Actions */}
-                {messages.length <= 2 && (
-                  <div className="chatbot-quick-actions">
-                    <div className="quick-actions-title">Quick Questions:</div>
-                    <div className="quick-actions-grid">
-                      {suggestedQuestions.map((question, index) => (
-                        <button
-                          key={index}
-                          className="quick-action-btn"
-                          onClick={() => setInputValue(question)}
-                        >
-                          {question}
-                        </button>
-                      ))}
+                {/* Typing Indicator */}
+                {isTyping && (
+                  <div className="cb-msg-row bot">
+                    <div className="cb-msg-avatar">
+                      <Bot size={16} />
+                    </div>
+                    <div className="cb-msg-bubble-wrap">
+                      <div className="cb-msg-bubble cb-typing-bubble">
+                        <div className="cb-typing-dots">
+                          <span />
+                          <span />
+                          <span />
+                        </div>
+                        <span className="cb-typing-status">ExamShield AI is writing...</span>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Input Area */}
-                <div className="chatbot-input">
-                  <div className="input-container">
-                    <input
-                      type="text"
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                      placeholder="Type your message..."
-                      className="chat-input"
-                      disabled={isTyping}
-                    />
-                    <button
-                      className="send-button"
-                      onClick={sendMessage}
-                      disabled={!inputValue.trim() || isTyping}
-                      aria-label="Send message"
-                    >
-                      <Send size={18} />
-                    </button>
-                  </div>
-                  <div className="input-actions">
-                    <button
-                      className="input-action-btn"
-                      onClick={() => setMessages([messages[0]])}
-                      aria-label="Clear chat"
-                    >
-                      Clear chat
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </>
-  );
-};
+                <div ref={messagesEndRef} />
+              </div>
 
-export default ChatBot;
+              {/* Chat Input Bar */}
+              <div className="cb-footer">
+                <form
+                  className="cb-input-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSend();
+                  }}
+                >
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    className="cb-input"
+                    placeholder="Ask about proctoring, coding, pricing, or exams..."
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    disabled={isTyping}
+                  />
+                  <button
+                    type="submit"
+                    className="cb-send-btn"
+                    disabled={!inputValue.trim() || isTyping}
+                    aria-label="Send message"
+                  >
+                    <Send size={16} />
+                  </button>
+                </form>
+
+                <div className="cb-footer-hint">
+                  <span>Powered by ExamShield Neural AI</span>
+                  <span className="cb-footer-dot">•</span>
+                  <span>Press Enter ↵ to send</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

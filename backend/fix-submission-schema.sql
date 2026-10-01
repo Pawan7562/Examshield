@@ -7,19 +7,25 @@ DROP POLICY IF EXISTS "Students can maintain their own answers" ON answers;
 CREATE POLICY "Students can maintain their own answers" ON answers 
 FOR ALL USING (student_id = auth.uid());
 
--- 2. Add missing evaluation columns to answers (with individual checks)
+-- 2. Add missing evaluation columns to answers (with individual checks) and widen text columns
 DO $$ 
 BEGIN 
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='answers' AND column_name='is_correct') THEN
         ALTER TABLE answers ADD COLUMN is_correct BOOLEAN DEFAULT false;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='answers' AND column_name='marks_obtained') THEN
-        ALTER TABLE answers ADD COLUMN marks_obtained INTEGER DEFAULT 0;
+        ALTER TABLE answers ADD COLUMN marks_obtained NUMERIC DEFAULT 0;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='answers' AND column_name='is_evaluated') THEN
         ALTER TABLE answers ADD COLUMN is_evaluated BOOLEAN DEFAULT false;
     END IF;
 END $$;
+
+-- 2b. Widen columns to support full-length option texts, languages, and reasons
+ALTER TABLE IF EXISTS answers ALTER COLUMN selected_option TYPE TEXT;
+ALTER TABLE IF EXISTS answers ALTER COLUMN selected_language TYPE VARCHAR(100);
+ALTER TABLE IF EXISTS results ALTER COLUMN grade TYPE VARCHAR(50);
+ALTER TABLE IF EXISTS exam_sessions ALTER COLUMN auto_submit_reason TYPE TEXT;
 
 -- 3. Create or Update results table (Industrial Strength)
 CREATE TABLE IF NOT EXISTS results (

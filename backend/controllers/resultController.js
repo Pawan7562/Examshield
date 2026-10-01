@@ -31,7 +31,13 @@ exports.getResults = async (req, res) => {
               COALESCE(e.title, e.name, 'Examination') as exam_name, 
               COALESCE(e.name, e.title, 'Examination') as exam_title,
               COALESCE(NULLIF(r.total_marks, 0), e.total_marks, 100) as total_marks,
-              e.total_marks as exam_total_marks, e.passing_marks as exam_passing_marks, e.type as exam_type
+              e.total_marks as exam_total_marks, e.passing_marks as exam_passing_marks, e.type as exam_type,
+              (SELECT COUNT(*) FROM questions q WHERE q.exam_id = r.exam_id) as total_questions,
+              (SELECT COUNT(*) FROM answers a WHERE (a.session_id = r.session_id OR (a.student_id = r.student_id AND a.exam_id = r.exam_id)) AND (
+                 (a.selected_option IS NOT NULL AND TRIM(a.selected_option) != '') OR
+                 (a.answer_text IS NOT NULL AND TRIM(a.answer_text) != '') OR
+                 (a.code_submission IS NOT NULL AND TRIM(a.code_submission) != '')
+              )) as questions_attempted
        FROM results r
        JOIN students s ON r.student_id = s.id
        JOIN exams e ON r.exam_id = e.id
@@ -211,7 +217,13 @@ exports.getStudentResults = async (req, res) => {
     const studentId = req.user.id;
 
     const result = await query(
-      `SELECT r.*, COALESCE(e.title, e.name, 'Examination') as exam_name, e.type as exam_type, e.subject, e.date_time
+      `SELECT r.*, COALESCE(e.title, e.name, 'Examination') as exam_name, e.type as exam_type, e.subject, e.date_time,
+              (SELECT COUNT(*) FROM questions q WHERE q.exam_id = r.exam_id) as total_questions,
+              (SELECT COUNT(*) FROM answers a WHERE (a.session_id = r.session_id OR (a.student_id = r.student_id AND a.exam_id = r.exam_id)) AND (
+                 (a.selected_option IS NOT NULL AND TRIM(a.selected_option) != '') OR
+                 (a.answer_text IS NOT NULL AND TRIM(a.answer_text) != '') OR
+                 (a.code_submission IS NOT NULL AND TRIM(a.code_submission) != '')
+              )) as questions_attempted
        FROM results r JOIN exams e ON r.exam_id = e.id
        WHERE r.student_id = $1 AND r.is_published = true
        ORDER BY r.created_at DESC`,
@@ -444,6 +456,8 @@ exports.getAdminStudentSubmission = async (req, res) => {
       };
     });
 
+    const attemptedQuestionsCount = questions.filter(q => q.is_answered).length;
+
     const fullResult = {
       id: row.id,
       student_id: row.student_id,
@@ -456,6 +470,8 @@ exports.getAdminStudentSubmission = async (req, res) => {
       percentage: Number(row.percentage) || 0,
       grade: row.grade,
       status: row.status,
+      total_questions: questions.length,
+      questions_attempted: attemptedQuestionsCount,
       student_name: row.student_name,
       student_code: row.student_code,
       roll_no: row.roll_no,
@@ -563,7 +579,10 @@ exports.reevaluateResult = async (req, res) => {
       if (!q) continue;
 
       if (q.type === 'mcq' || q.type === 'true_false') {
-        const isCor = evaluateMCQAnswer(ans.selected_option, q.correct_answer, q.options);
+        const candidateAnswer = (ans.selected_option !== null && ans.selected_option !== undefined && String(ans.selected_option).trim() !== '')
+          ? ans.selected_option
+          : ans.answer_text;
+        const isCor = evaluateMCQAnswer(candidateAnswer, q.correct_answer, q.options);
         const marks = isCor ? (Number(q.marks) || 1) : -Math.abs(Number(q.negative_marks) || 0);
         const finalQMarks = Math.max(0, marks);
         mcqMarks += finalQMarks;
@@ -667,7 +686,10 @@ exports.reevaluateExam = async (req, res) => {
         if (!q) continue;
 
         if (q.type === 'mcq' || q.type === 'true_false') {
-          const isCor = evaluateMCQAnswer(ans.selected_option, q.correct_answer, q.options);
+          const candidateAnswer = (ans.selected_option !== null && ans.selected_option !== undefined && String(ans.selected_option).trim() !== '')
+            ? ans.selected_option
+            : ans.answer_text;
+          const isCor = evaluateMCQAnswer(candidateAnswer, q.correct_answer, q.options);
           const marks = isCor ? (Number(q.marks) || 1) : -Math.abs(Number(q.negative_marks) || 0);
           const finalQMarks = Math.max(0, marks);
           mcqMarks += finalQMarks;

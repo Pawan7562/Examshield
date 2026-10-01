@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import CodingQuestionForm from '../../components/CodingQuestionForm';
-import { formatIST, toISTISOString } from '../../utils/timezone';
+import { formatIST, toISTISOString, toDateTimeLocalValue } from '../../utils/timezone';
 import { 
   FileText, 
   ChevronLeft, 
@@ -236,7 +236,7 @@ export default function CreateExam() {
     name: '', 
     type: 'mcq', 
     subject: '', 
-    dateTime: '', 
+    dateTime: toDateTimeLocalValue(new Date(Date.now() + 10 * 60000)), 
     duration: 60,
     totalMarks: 100, 
     passingMarks: 40, 
@@ -299,6 +299,25 @@ export default function CreateExam() {
 
   const setD = (k) => (e) => setDetails(d => ({ ...d, [k]: e.type === 'checkbox' ? e.target.checked : e.target.value }));
 
+  const setQuickSchedule = (type) => {
+    const now = new Date();
+    let target = new Date();
+    if (type === 'now') {
+      target = new Date(now.getTime() + 60000); // 1 min from now
+    } else if (type === '10m') {
+      target = new Date(now.getTime() + 10 * 60000);
+    } else if (type === '30m') {
+      target = new Date(now.getTime() + 30 * 60000);
+    } else if (type === '1h') {
+      target = new Date(now.getTime() + 60 * 60000);
+    } else if (type === 'tomorrow') {
+      target = new Date(now.getTime() + 24 * 60 * 60000);
+      target.setHours(10, 0, 0, 0);
+    }
+    setDetails(d => ({ ...d, dateTime: toDateTimeLocalValue(target) }));
+    toast.success('Exam schedule updated');
+  };
+
   const addQuestion = (type) => {
     const base = { type, questionText: '', marks: type === 'mcq' ? 1 : 5, difficulty: 'medium' };
     if (type === 'mcq') base.options = [{id:'a',text:''},{id:'b',text:''},{id:'c',text:''},{id:'d',text:''}];
@@ -324,11 +343,23 @@ export default function CreateExam() {
 
   const handleCreate = async () => {
     if (!details.name || !details.dateTime || !details.duration) return toast.error('Fill all required exam details');
+    
+    // Check for accidental far-future or past year typos (e.g. 2028 when current year is 2026)
+    if (details.dateTime) {
+      const selectedYear = new Date(details.dateTime).getFullYear();
+      const currentYear = new Date().getFullYear();
+      if (selectedYear > currentYear + 1) {
+        const confirmed = window.confirm(`Notice: You have scheduled this exam for the year ${selectedYear} (${selectedYear - currentYear} year(s) in the future). Do you want to proceed?`);
+        if (!confirmed) return;
+      }
+    }
+
     setLoading(true);
     try {
       await adminAPI.createExam({
         ...details,
         dateTime: toISTISOString(details.dateTime),
+        status: 'published',
         totalMarks: totalCalc || parseInt(details.totalMarks),
         passingMarks: parseInt(details.passingMarks),
         duration: parseInt(details.duration),
@@ -337,7 +368,7 @@ export default function CreateExam() {
         monitoringConfig: details.monitoringConfig,
         monitoring_config: details.monitoringConfig,
       });
-      toast.success('Exam created successfully!');
+      toast.success('Exam created and published successfully!');
       navigate('/admin/exams');
     } catch (err) {
       toast.error(err.message || 'Failed to create exam');
@@ -402,14 +433,35 @@ export default function CreateExam() {
                   />
                 </div>
                 <div className="admin-form-row">
-                  <Input 
-                    label="Date & Time" 
-                    required 
-                    type="datetime-local" 
-                    icon={Calendar}
-                    value={details.dateTime} 
-                    onChange={setD('dateTime')} 
-                  />
+                  <div style={{ flex: 1, minWidth: 260 }}>
+                    <Input 
+                      label="Date & Time (IST)" 
+                      required 
+                      type="datetime-local" 
+                      icon={Calendar}
+                      value={details.dateTime} 
+                      onChange={setD('dateTime')} 
+                      min={toDateTimeLocalValue(new Date(Date.now() - 3600000))}
+                    />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: -8, marginBottom: 10 }}>
+                      <span style={{ fontSize: '0.73rem', color: '#64748b', alignSelf: 'center', fontWeight: 600 }}>Quick:</span>
+                      <button type="button" onClick={() => setQuickSchedule('now')} style={{ padding: '3px 8px', fontSize: '0.73rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>Live (Now)</button>
+                      <button type="button" onClick={() => setQuickSchedule('10m')} style={{ padding: '3px 8px', fontSize: '0.73rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>+10 Mins</button>
+                      <button type="button" onClick={() => setQuickSchedule('30m')} style={{ padding: '3px 8px', fontSize: '0.73rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>+30 Mins</button>
+                      <button type="button" onClick={() => setQuickSchedule('1h')} style={{ padding: '3px 8px', fontSize: '0.73rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>+1 Hour</button>
+                      <button type="button" onClick={() => setQuickSchedule('tomorrow')} style={{ padding: '3px 8px', fontSize: '0.73rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>Tomorrow 10 AM</button>
+                    </div>
+                    {details.dateTime && (
+                      <div style={{ fontSize: '0.76rem', color: '#0369a1', background: '#f0f9ff', padding: '5px 8px', borderRadius: 6, marginBottom: 12, border: '1px solid #bae6fd' }}>
+                        📅 <strong>Scheduled:</strong> {formatIST(details.dateTime, 'full')}
+                      </div>
+                    )}
+                    {details.dateTime && new Date(details.dateTime).getFullYear() > new Date().getFullYear() + 1 && (
+                      <div style={{ fontSize: '0.76rem', color: '#b91c1c', background: '#fef2f2', padding: '6px 8px', borderRadius: 6, marginBottom: 12, border: '1px solid #fecaca', fontWeight: 600 }}>
+                        ⚠️ Warning: Year {new Date(details.dateTime).getFullYear()} is {new Date(details.dateTime).getFullYear() - new Date().getFullYear()} year(s) in the future! Please check if this is intended.
+                      </div>
+                    )}
+                  </div>
                   <Input 
                     label="Duration (minutes)" 
                     required 
