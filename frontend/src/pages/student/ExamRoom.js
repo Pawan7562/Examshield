@@ -47,56 +47,64 @@ import {
 
 // ─── Toast Notification Helpers ───────────────────────────────────────────────
 const notify = {
-  warn: (msg) => toast(msg, {
-    icon: '⚠️',
-    style: {
-      background: '#fffbeb',
-      color: '#b45309',
-      border: '1.5px solid #fde68a',
-      fontWeight: 600,
-      fontSize: '0.88rem',
-      borderRadius: '10px',
-      boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
-    },
-    duration: 5000,
-  }),
-  error: (msg) => toast.error(msg, {
-    style: {
-      background: '#fef2f2',
-      color: '#b91c1c',
-      border: '1.5px solid #fecaca',
-      fontWeight: 600,
-      fontSize: '0.88rem',
-      borderRadius: '10px',
-      boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
-    },
-    duration: 6000,
-  }),
-  success: (msg) => toast.success(msg, {
-    style: {
-      background: '#f0fdf4',
-      color: '#15803d',
-      border: '1.5px solid #bbf7d0',
-      fontWeight: 600,
-      fontSize: '0.88rem',
-      borderRadius: '10px',
-      boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
-    },
-    duration: 4000,
-  }),
-  info: (msg) => toast(msg, {
-    icon: 'ℹ️',
-    style: {
-      background: '#eff6ff',
-      color: '#1d4ed8',
-      border: '1.5px solid #bfdbfe',
-      fontWeight: 600,
-      fontSize: '0.88rem',
-      borderRadius: '10px',
-      boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
-    },
-    duration: 4000,
-  }),
+  warn: (msg) => setTimeout(() => {
+    toast(msg, {
+      icon: '⚠️',
+      style: {
+        background: '#fffbeb',
+        color: '#b45309',
+        border: '1.5px solid #fde68a',
+        fontWeight: 600,
+        fontSize: '0.88rem',
+        borderRadius: '10px',
+        boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
+      },
+      duration: 5000,
+    });
+  }, 0),
+  error: (msg) => setTimeout(() => {
+    toast.error(msg, {
+      style: {
+        background: '#fef2f2',
+        color: '#b91c1c',
+        border: '1.5px solid #fecaca',
+        fontWeight: 600,
+        fontSize: '0.88rem',
+        borderRadius: '10px',
+        boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
+      },
+      duration: 6000,
+    });
+  }, 0),
+  success: (msg) => setTimeout(() => {
+    toast.success(msg, {
+      style: {
+        background: '#f0fdf4',
+        color: '#15803d',
+        border: '1.5px solid #bbf7d0',
+        fontWeight: 600,
+        fontSize: '0.88rem',
+        borderRadius: '10px',
+        boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
+      },
+      duration: 4000,
+    });
+  }, 0),
+  info: (msg) => setTimeout(() => {
+    toast(msg, {
+      icon: 'ℹ️',
+      style: {
+        background: '#eff6ff',
+        color: '#1d4ed8',
+        border: '1.5px solid #bfdbfe',
+        fontWeight: 600,
+        fontSize: '0.88rem',
+        borderRadius: '10px',
+        boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
+      },
+      duration: 4000,
+    });
+  }, 0),
 };
 
 // ─── Tab Warning Overlay Component ─────────────────────────────────────────────
@@ -371,8 +379,10 @@ export default function ExamRoom() {
     setViolationCount(prev => {
       const next = prev + 1;
       if (next >= 5) {
-        notify.error('Too many proctoring violations recorded. Exam is being auto-submitted.');
-        handleSubmit(true);
+        setTimeout(() => {
+          notify.error('Too many proctoring violations recorded. Exam is being auto-submitted.');
+          handleSubmit(true);
+        }, 0);
       }
       return next;
     });
@@ -651,18 +661,20 @@ export default function ExamRoom() {
       if (response.alreadySubmitted || response.data?.alreadySubmitted || response.message?.includes('already completed') || response.message?.includes('already submitted')) {
         exitFullScreen();
         setPhase('submitted');
-        toast('This examination has already been completed and locked.', {
-          icon: '📋',
-          style: {
-            background: '#f0fdf4',
-            color: '#15803d',
-            border: '1.5px solid #bbf7d0',
-            fontWeight: 600,
-            fontSize: '0.88rem',
-            borderRadius: '10px'
-          },
-          duration: 6000
-        });
+        setTimeout(() => {
+          toast('This examination has already been completed and locked.', {
+            icon: '📋',
+            style: {
+              background: '#f0fdf4',
+              color: '#15803d',
+              border: '1.5px solid #bbf7d0',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              borderRadius: '10px'
+            },
+            duration: 6000
+          });
+        }, 0);
         return;
       }
       if (response.success) {
@@ -710,18 +722,20 @@ export default function ExamRoom() {
       if (errMsg.toLowerCase().includes('already submitted') || errMsg.toLowerCase().includes('already completed')) {
         exitFullScreen();
         setPhase('submitted');
-        toast('This examination has already been completed and locked.', {
-          icon: '📋',
-          style: {
-            background: '#f0fdf4',
-            color: '#15803d',
-            border: '1.5px solid #bbf7d0',
-            fontWeight: 600,
-            fontSize: '0.88rem',
-            borderRadius: '10px'
-          },
-          duration: 6000
-        });
+        setTimeout(() => {
+          toast('This examination has already been completed and locked.', {
+            icon: '📋',
+            style: {
+              background: '#f0fdf4',
+              color: '#15803d',
+              border: '1.5px solid #bbf7d0',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              borderRadius: '10px'
+            },
+            duration: 6000
+          });
+        }, 0);
         return;
       }
 

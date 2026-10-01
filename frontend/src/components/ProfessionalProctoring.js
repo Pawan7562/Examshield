@@ -17,29 +17,37 @@ import {
 
 // ─── Toast helpers (react-hot-toast compatible) ───────────────────────────────
 const notify = {
-  warn: (msg, id) => toast(msg, {
-    id,
-    icon: '⚠️',
-    style: {
-      background: '#1c1400', color: '#fbbf24',
-      border: '1px solid rgba(251,191,36,0.4)',
-      fontWeight: 600, fontSize: 13,
-      fontFamily: "'Inter', sans-serif",
-      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-    },
-    duration: 7000,
-  }),
-  error: (msg, id) => toast.error(msg, {
-    id,
-    style: {
-      background: '#1a0000', color: '#f87171',
-      border: '1px solid rgba(239,68,68,0.4)',
-      fontFamily: "'Inter', sans-serif",
-      fontSize: 13,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-    },
-    duration: 9000,
-  }),
+  warn: (msg, id) => {
+    setTimeout(() => {
+      toast(msg, {
+        id,
+        icon: '⚠️',
+        style: {
+          background: '#1c1400', color: '#fbbf24',
+          border: '1px solid rgba(251,191,36,0.4)',
+          fontWeight: 600, fontSize: 13,
+          fontFamily: "'Inter', sans-serif",
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        },
+        duration: 7000,
+      });
+    }, 0);
+  },
+  error: (msg, id) => {
+    setTimeout(() => {
+      toast.error(msg, {
+        id,
+        style: {
+          background: '#1a0000', color: '#f87171',
+          border: '1px solid rgba(239,68,68,0.4)',
+          fontFamily: "'Inter', sans-serif",
+          fontSize: 13,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        },
+        duration: 9000,
+      });
+    }, 0);
+  },
 };
 
 // ─── Model loading state (module-level singleton — only load once) ────────────
@@ -224,7 +232,9 @@ const ProfessionalProctoring = ({
       ...prev.slice(0, 4),
     ]);
 
-    onViolationRef.current?.(type);
+    setTimeout(() => {
+      onViolationRef.current?.(type);
+    }, 0);
 
     if (socketRef.current) {
       socketRef.current.emit('violation', {
