@@ -1,7 +1,21 @@
-import React, { useState } from 'react';
+import React from 'react';
+import {
+  Code2,
+  Trash2,
+  Plus,
+  FileCode,
+  Award,
+  Sliders,
+  Terminal,
+  Check,
+  CheckCircle2,
+  Info,
+  Sparkles,
+} from 'lucide-react';
 
 const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
   const set = (k) => (e) => onChange(idx, { ...q, [k]: e.target.value });
+
   const setTestCase = (i, field, value) => {
     const testCases = [...(q.testCases || [{ input: '', output: '', explanation: '' }])];
     testCases[i] = { ...testCases[i], [field]: value };
@@ -21,337 +35,624 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
   };
 
   const toggleLanguage = (lang) => {
-    const languages = q.allowedLanguages || ['javascript'];
+    const languages = q.allowedLanguages || ['javascript', 'python', 'java', 'cpp'];
     const newLanguages = languages.includes(lang)
       ? languages.filter(l => l !== lang)
       : [...languages, lang];
     onChange(idx, { ...q, allowedLanguages: newLanguages });
   };
 
-  const testCases = q.testCases || [{ input: '', output: '', explanation: '' }];
-  const allowedLanguages = q.allowedLanguages || ['javascript'];
+  const selectAllLanguages = (e) => {
+    e.preventDefault();
+    const all = programmingLanguages.map(l => l.id);
+    onChange(idx, { ...q, allowedLanguages: all });
+  };
+
+  const resetLanguages = (e) => {
+    e.preventDefault();
+    onChange(idx, { ...q, allowedLanguages: ['javascript', 'python', 'java', 'cpp'] });
+  };
+
+  const testCases = q.testCases && q.testCases.length > 0
+    ? q.testCases
+    : [{ input: '', output: '', explanation: '' }];
+
+  const allowedLanguages = q.allowedLanguages && q.allowedLanguages.length > 0
+    ? q.allowedLanguages
+    : ['javascript', 'python', 'java', 'cpp'];
 
   const programmingLanguages = [
-    { id: 'javascript', name: 'JavaScript', icon: '🟨' },
-    { id: 'python', name: 'Python', icon: '🐍' },
-    { id: 'java', name: 'Java', icon: '☕' },
-    { id: 'cpp', name: 'C++', icon: '⚙️' },
-    { id: 'c', name: 'C', icon: '🔧' },
-    { id: 'csharp', name: 'C#', icon: '🔷' },
-    { id: 'ruby', name: 'Ruby', icon: '💎' },
-    { id: 'go', name: 'Go', icon: '🐹' }
+    { id: 'javascript', name: 'JavaScript', icon: '🟨', badge: 'JS' },
+    { id: 'python', name: 'Python', icon: '🐍', badge: 'PY' },
+    { id: 'java', name: 'Java', icon: '☕', badge: 'JAVA' },
+    { id: 'cpp', name: 'C++', icon: '⚙️', badge: 'C++' },
+    { id: 'c', name: 'C', icon: '🔧', badge: 'C' },
+    { id: 'csharp', name: 'C#', icon: '🔷', badge: 'C#' },
+    { id: 'ruby', name: 'Ruby', icon: '💎', badge: 'RB' },
+    { id: 'go', name: 'Go', icon: '🐹', badge: 'GO' },
+    { id: 'typescript', name: 'TypeScript', icon: '🔷', badge: 'TS' },
+    { id: 'rust', name: 'Rust', icon: '🦀', badge: 'RS' },
   ];
 
-  const getDifficultyColor = (difficulty) => {
+  const getDifficultyMeta = (difficulty) => {
     switch (difficulty) {
-      case 'easy': return '#22c55e';
-      case 'medium': return '#f59e0b';
-      case 'hard': return '#ef4444';
-      default: return '#6b7280';
+      case 'easy':
+        return { label: 'Easy', bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' };
+      case 'hard':
+        return { label: 'Hard', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' };
+      case 'medium':
+      default:
+        return { label: 'Medium', bg: '#fffbeb', color: '#d97706', border: '#fde68a' };
     }
   };
 
+  const currentDiff = getDifficultyMeta(q.difficulty || 'medium');
+
   return (
-    <div style={{ 
-      background: 'rgba(255,255,255,0.02)', 
-      border: `1px solid ${q.questionText ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'}`, 
-      borderRadius: 12, 
-      padding: 24, 
-      marginBottom: 20,
-      transition: 'all 0.2s ease'
+    <div style={{
+      background: '#ffffff',
+      border: '1.5px solid #e2e8f0',
+      borderRadius: 16,
+      padding: '24px 28px',
+      marginBottom: 24,
+      boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03)',
+      transition: 'all 0.2s ease',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#8b5cf6' }}>Q{idx + 1}</span>
-          <span style={{ 
-            fontSize: 11, 
-            fontWeight: 600, 
-            padding: '3px 10px', 
-            borderRadius: 12, 
-            background: 'rgba(139,92,246,0.15)', 
-            color: '#8b5cf6' 
+      {/* ── Header Bar ── */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingBottom: 18,
+        borderBottom: '1.5px solid #f1f5f9',
+        marginBottom: 22,
+        flexWrap: 'wrap',
+        gap: 12
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {/* Question Number */}
+          <span style={{
+            background: 'linear-gradient(135deg, #0a74da 0%, #0656a3 100%)',
+            color: '#ffffff',
+            borderRadius: 8,
+            padding: '5px 12px',
+            fontSize: '0.85rem',
+            fontWeight: 800,
+            letterSpacing: '0.02em',
+            boxShadow: '0 2px 6px rgba(10, 116, 218, 0.25)'
           }}>
-            CODING
+            Q{idx + 1}
           </span>
-          {q.difficulty && (
-            <span style={{ 
-              fontSize: 11, 
-              fontWeight: 600, 
-              padding: '3px 10px', 
-              borderRadius: 12, 
-              background: `${getDifficultyColor(q.difficulty)}15`, 
-              color: getDifficultyColor(q.difficulty) 
-            }}>
-              {q.difficulty?.toUpperCase()}
-            </span>
-          )}
+
+          {/* Type Badge */}
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            padding: '5px 12px',
+            borderRadius: 20,
+            background: '#f5f3ff',
+            color: '#7c3aed',
+            border: '1.2px solid #ddd6fe',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em'
+          }}>
+            <Code2 size={13} strokeWidth={2.5} />
+            Coding Assessment
+          </span>
+
+          {/* Difficulty Badge */}
+          <span style={{
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            padding: '5px 12px',
+            borderRadius: 20,
+            background: currentDiff.bg,
+            color: currentDiff.color,
+            border: `1.2px solid ${currentDiff.border}`,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em'
+          }}>
+            {currentDiff.label}
+          </span>
+
+          {/* Enabled Languages Counter */}
+          <span style={{
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            color: '#64748b',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            padding: '4px 10px',
+            borderRadius: 16
+          }}>
+            {allowedLanguages.length} Languages Enabled
+          </span>
         </div>
-        <button 
-          onClick={() => onRemove(idx)} 
-          style={{ 
-            background: 'rgba(239,68,68,0.1)', 
-            border: '1px solid rgba(239,68,68,0.3)', 
-            borderRadius: 6, 
-            color: '#ef4444', 
-            cursor: 'pointer', 
-            fontSize: 12,
-            padding: '6px 12px',
-            transition: 'all 0.2s ease'
+
+        {/* Remove Button */}
+        <button
+          type="button"
+          onClick={() => onRemove(idx)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            background: '#ffffff',
+            border: '1.5px solid #fecaca',
+            borderRadius: 8,
+            color: '#dc2626',
+            cursor: 'pointer',
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            padding: '7px 14px',
+            transition: 'all 0.15s ease',
+            boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#fef2f2';
+            e.currentTarget.style.borderColor = '#ef4444';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#ffffff';
+            e.currentTarget.style.borderColor = '#fecaca';
           }}
         >
+          <Trash2 size={14} />
           Remove
         </button>
       </div>
 
-      {/* Question Details */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 20 }}>
+      {/* ── Problem Statement & Meta Row ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 2fr) minmax(240px, 1fr)',
+        gap: 20,
+        marginBottom: 22
+      }}>
+        {/* Left: Problem Statement */}
         <div>
-          <label style={{ 
-            display: 'block', 
-            fontSize: 11, 
-            fontWeight: 600, 
-            color: '#718096', 
-            marginBottom: 6,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            color: '#1e293b',
+            marginBottom: 8,
+            letterSpacing: '0.02em'
           }}>
-            Problem Statement
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <FileCode size={15} color="#0a74da" />
+              <span>PROBLEM STATEMENT</span>
+              <span style={{ color: '#ef4444' }}>*</span>
+            </span>
+            <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 500 }}>
+              Markdown & math expressions supported
+            </span>
           </label>
-          <textarea 
-            value={q.questionText || ''} 
+          <textarea
+            value={q.questionText || ''}
             onChange={set('questionText')}
-            placeholder="Describe the coding problem here..." 
+            placeholder="Describe the problem, input format, output specifications, and any algorithmic nuances..."
             rows={6}
-            style={{ 
-              width: '100%', 
-              background: 'rgba(255,255,255,0.03)', 
-              border: '1px solid rgba(255,255,255,0.08)', 
-              borderRadius: 8, 
-              padding: '12px 16px', 
-              color: '#e2e8f0', 
-              fontSize: 14, 
-              fontFamily: 'Sora, sans-serif',
+            style={{
+              width: '100%',
+              background: '#f8fafc',
+              border: '1.5px solid #cbd5e1',
+              borderRadius: 10,
+              padding: '14px 16px',
+              color: '#0f172a',
+              fontSize: '0.92rem',
+              lineHeight: 1.6,
+              fontFamily: "'Inter', -apple-system, sans-serif",
               resize: 'vertical',
-              transition: 'border-color 0.2s ease'
+              boxSizing: 'border-box',
+              outline: 'none',
+              transition: 'all 0.15s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.background = '#ffffff';
+              e.target.style.borderColor = '#0a74da';
+              e.target.style.boxShadow = '0 0 0 3px rgba(10, 116, 218, 0.12)';
+            }}
+            onBlur={(e) => {
+              e.target.style.background = '#f8fafc';
+              e.target.style.borderColor = '#cbd5e1';
+              e.target.style.boxShadow = 'none';
             }}
           />
         </div>
-        
-        <div>
-          <label style={{ 
-            display: 'block', 
-            fontSize: 11, 
-            fontWeight: 600, 
-            color: '#718096', 
-            marginBottom: 6,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5
-          }}>
-            Difficulty
-          </label>
-          <select 
-            value={q.difficulty || ''} 
-            onChange={set('difficulty')}
-            style={{ 
-              width: '100%',
-              background: q.difficulty 
-                ? `${getDifficultyColor(q.difficulty)}15` 
-                : '#0e0e1a', 
-              border: q.difficulty 
-                ? `1px solid ${getDifficultyColor(q.difficulty)}30` 
-                : '1px solid rgba(255,255,255,0.1)', 
-              borderRadius: 8, 
-              padding: '10px 12px', 
-              color: q.difficulty ? getDifficultyColor(q.difficulty) : '#e2e8f0', 
-              fontSize: 14,
-              fontFamily: 'Sora, sans-serif',
-              cursor: 'pointer',
-              marginBottom: 16
-            }}
-          >
-            <option value="">Select difficulty</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
 
-          <label style={{ 
-            display: 'block', 
-            fontSize: 11, 
-            fontWeight: 600, 
-            color: '#718096', 
-            marginBottom: 6,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5
+        {/* Right: Difficulty & Marks */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          background: '#f8fafc',
+          border: '1.5px solid #e2e8f0',
+          borderRadius: 12,
+          padding: 16
+        }}>
+          {/* Difficulty */}
+          <div>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: '#1e293b',
+              marginBottom: 6
+            }}>
+              <Sliders size={14} color="#f59e0b" />
+              <span>DIFFICULTY LEVEL</span>
+            </label>
+            <select
+              value={q.difficulty || 'medium'}
+              onChange={set('difficulty')}
+              style={{
+                width: '100%',
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 9,
+                padding: '9px 12px',
+                color: '#0f172a',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            >
+              <option value="easy">🟢 Easy (Basic Logic & Control)</option>
+              <option value="medium">🟡 Medium (Data Structures & Search)</option>
+              <option value="hard">🔴 Hard (DP, Graphs & Advanced Trees)</option>
+            </select>
+          </div>
+
+          {/* Marks */}
+          <div>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: '#1e293b',
+              marginBottom: 6
+            }}>
+              <Award size={14} color="#10b981" />
+              <span>MARKS / WEIGHTAGE</span>
+            </label>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: '#ffffff',
+              border: '1.5px solid #cbd5e1',
+              borderRadius: 9,
+              padding: '0 12px',
+              transition: 'border-color 0.15s ease'
+            }}>
+              <input
+                type="number"
+                value={q.marks || 10}
+                onChange={set('marks')}
+                min={1}
+                max={100}
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  padding: '9px 0',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                points
+              </span>
+            </div>
+          </div>
+
+          {/* Runtime Sandbox Guarantee Pill */}
+          <div style={{
+            background: '#ffffff',
+            borderRadius: 8,
+            border: '1px solid #e2e8f0',
+            padding: '8px 10px',
+            fontSize: '0.73rem',
+            color: '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
           }}>
-            Marks
-          </label>
-          <input 
-            type="number" 
-            value={q.marks || 10} 
-            onChange={set('marks')} 
-            min={1}
-            style={{ 
-              width: '100%',
-              background: 'rgba(255,255,255,0.04)', 
-              border: '1px solid rgba(255,255,255,0.1)', 
-              borderRadius: 8, 
-              padding: '10px 12px', 
-              color: '#e2e8f0', 
-              fontSize: 14, 
-              fontFamily: 'Sora, sans-serif',
-              textAlign: 'center',
-              marginBottom: 16
-            }} 
-          />
+            <Sparkles size={12} color="#0a74da" />
+            <span>Isolated Container: 2.0s limit, 256MB RAM</span>
+          </div>
         </div>
       </div>
 
-      {/* Constraints */}
-      <div style={{ marginBottom: 20 }}>
-        <label style={{ 
-          display: 'block', 
-          fontSize: 11, 
-          fontWeight: 600, 
-          color: '#718096', 
-          marginBottom: 6,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5
+      {/* ── Constraints Section ── */}
+      <div style={{ marginBottom: 22 }}>
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: '0.82rem',
+          fontWeight: 700,
+          color: '#1e293b',
+          marginBottom: 8,
+          letterSpacing: '0.02em'
         }}>
-          Constraints
+          <Terminal size={14} color="#6366f1" />
+          <span>CONSTRAINTS &amp; COMPLEXITY EXPECTATIONS</span>
+          <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 500 }}>(Optional)</span>
         </label>
-        <textarea 
-          value={q.constraints || ''} 
+        <textarea
+          value={q.constraints || ''}
           onChange={set('constraints')}
-          placeholder="Example:&#10;1 ≤ nums.length ≤ 10^4&#10;-10^4 ≤ nums[i] ≤ 10^4&#10;Time complexity: O(n)" 
-          rows={4}
-          style={{ 
-            width: '100%', 
-            background: 'rgba(255,255,255,0.03)', 
-            border: '1px solid rgba(255,255,255,0.08)', 
-            borderRadius: 8, 
-            padding: '12px 16px', 
-            color: '#e2e8f0', 
-            fontSize: 13, 
-            fontFamily: 'Sora, sans-serif',
-            resize: 'vertical'
+          placeholder={"1 ≤ nums.length ≤ 10^5\n-10^9 ≤ nums[i] ≤ 10^9\nExpected Time Complexity: O(n log n)\nExpected Space Complexity: O(1)"}
+          rows={3}
+          style={{
+            width: '100%',
+            background: '#f8fafc',
+            border: '1.5px solid #cbd5e1',
+            borderRadius: 10,
+            padding: '12px 16px',
+            color: '#0f172a',
+            fontSize: '0.86rem',
+            fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+            resize: 'vertical',
+            boxSizing: 'border-box',
+            outline: 'none',
+            lineHeight: 1.5
+          }}
+          onFocus={(e) => {
+            e.target.style.background = '#ffffff';
+            e.target.style.borderColor = '#0a74da';
+          }}
+          onBlur={(e) => {
+            e.target.style.background = '#f8fafc';
+            e.target.style.borderColor = '#cbd5e1';
           }}
         />
       </div>
 
-      {/* Test Cases */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <label style={{ 
-            fontSize: 11, 
-            fontWeight: 600, 
-            color: '#718096',
-            textTransform: 'uppercase',
-            letterSpacing: 0.5
-          }}>
-            Test Cases ({testCases.length})
-          </label>
-          <button 
+      {/* ── Test Cases Section ── */}
+      <div style={{
+        marginBottom: 22,
+        background: '#f8fafc',
+        border: '1.5px solid #e2e8f0',
+        borderRadius: 14,
+        padding: '18px 20px'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 14,
+          flexWrap: 'wrap',
+          gap: 10
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <CheckCircle2 size={16} color="#10b981" />
+            <span style={{
+              fontSize: '0.85rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              letterSpacing: '0.02em',
+              textTransform: 'uppercase'
+            }}>
+              Test Cases ({testCases.length})
+            </span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              Used for real-time automated candidate evaluation
+            </span>
+          </div>
+
+          <button
+            type="button"
             onClick={addTestCase}
-            style={{ 
-              background: 'rgba(34,197,94,0.1)', 
-              border: '1px solid rgba(34,197,94,0.3)', 
-              borderRadius: 6, 
-              color: '#22c55e', 
-              cursor: 'pointer', 
-              fontSize: 12,
-              padding: '4px 12px'
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: '#f0fdf4',
+              border: '1.5px solid #86efac',
+              borderRadius: 8,
+              color: '#15803d',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              padding: '6px 14px',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#dcfce7';
+              e.currentTarget.style.borderColor = '#4ade80';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#f0fdf4';
+              e.currentTarget.style.borderColor = '#86efac';
             }}
           >
-            + Add Test Case
+            <Plus size={14} strokeWidth={2.5} />
+            Add Test Case
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* List of Test Cases */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {testCases.map((testCase, i) => (
-            <div key={i} style={{ 
-              background: 'rgba(255,255,255,0.02)', 
-              border: '1px solid rgba(255,255,255,0.06)', 
-              borderRadius: 8, 
-              padding: 16 
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#8b5cf6' }}>Test Case {i + 1}</span>
+            <div
+              key={i}
+              style={{
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 10,
+                padding: '16px 18px',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 12
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: '#0a74da',
+                    background: '#eff6ff',
+                    padding: '3px 9px',
+                    borderRadius: 6
+                  }}>
+                    Case #{i + 1}
+                  </span>
+                  {i === 0 && (
+                    <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 600 }}>
+                      (Public Sample Case)
+                    </span>
+                  )}
+                </div>
+
                 {testCases.length > 1 && (
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => removeTestCase(i)}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#ef4444', 
-                      cursor: 'pointer', 
-                      fontSize: 14 
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      background: 'none',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#dc2626';
+                      e.currentTarget.style.background = '#fef2f2';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = '#94a3b8';
+                      e.currentTarget.style.background = 'none';
                     }}
                   >
-                    ×
+                    <Trash2 size={13} />
+                    Delete Case
                   </button>
                 )}
               </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+
+              {/* Input & Output Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 14,
+                marginBottom: 12
+              }}>
                 <div>
-                  <label style={{ fontSize: 10, color: '#718096', marginBottom: 4, display: 'block' }}>Input</label>
-                  <textarea 
-                    value={testCase.input} 
-                    onChange={e => setTestCase(i, 'input', e.target.value)}
-                    placeholder="Input data..." 
+                  <label style={{
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                    marginBottom: 5,
+                    display: 'block'
+                  }}>
+                    INPUT (STDIN)
+                  </label>
+                  <textarea
+                    value={testCase.input}
+                    onChange={(e) => setTestCase(i, 'input', e.target.value)}
+                    placeholder="e.g. 5&#10;2 7 11 15&#10;9"
                     rows={3}
-                    style={{ 
-                      width: '100%', 
-                      background: 'rgba(255,255,255,0.03)', 
-                      border: '1px solid rgba(255,255,255,0.08)', 
-                      borderRadius: 6, 
-                      padding: '8px 12px', 
-                      color: '#e2e8f0', 
-                      fontSize: 12, 
-                      fontFamily: 'monospace',
-                      resize: 'vertical'
+                    style={{
+                      width: '100%',
+                      background: '#f8fafc',
+                      border: '1.2px solid #cbd5e1',
+                      borderRadius: 8,
+                      padding: '9px 12px',
+                      color: '#0f172a',
+                      fontSize: '0.82rem',
+                      fontFamily: "'JetBrains Mono', Consolas, monospace",
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                      outline: 'none'
                     }}
                   />
                 </div>
+
                 <div>
-                  <label style={{ fontSize: 10, color: '#718096', marginBottom: 4, display: 'block' }}>Expected Output</label>
-                  <textarea 
-                    value={testCase.output} 
-                    onChange={e => setTestCase(i, 'output', e.target.value)}
-                    placeholder="Expected output..." 
+                  <label style={{
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                    marginBottom: 5,
+                    display: 'block'
+                  }}>
+                    EXPECTED OUTPUT (STDOUT)
+                  </label>
+                  <textarea
+                    value={testCase.output}
+                    onChange={(e) => setTestCase(i, 'output', e.target.value)}
+                    placeholder="e.g. [0, 1]"
                     rows={3}
-                    style={{ 
-                      width: '100%', 
-                      background: 'rgba(255,255,255,0.03)', 
-                      border: '1px solid rgba(255,255,255,0.08)', 
-                      borderRadius: 6, 
-                      padding: '8px 12px', 
-                      color: '#e2e8f0', 
-                      fontSize: 12, 
-                      fontFamily: 'monospace',
-                      resize: 'vertical'
+                    style={{
+                      width: '100%',
+                      background: '#f8fafc',
+                      border: '1.2px solid #cbd5e1',
+                      borderRadius: 8,
+                      padding: '9px 12px',
+                      color: '#0f172a',
+                      fontSize: '0.82rem',
+                      fontFamily: "'JetBrains Mono', Consolas, monospace",
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                      outline: 'none'
                     }}
                   />
                 </div>
               </div>
-              
+
+              {/* Explanation Field */}
               <div>
-                <label style={{ fontSize: 10, color: '#718096', marginBottom: 4, display: 'block' }}>Explanation (Optional)</label>
-                <input 
-                  type="text" 
-                  value={testCase.explanation} 
-                  onChange={e => setTestCase(i, 'explanation', e.target.value)}
-                  placeholder="Explain what this test case checks..." 
-                  style={{ 
-                    width: '100%', 
-                    background: 'rgba(255,255,255,0.03)', 
-                    border: '1px solid rgba(255,255,255,0.08)', 
-                    borderRadius: 6, 
-                    padding: '8px 12px', 
-                    color: '#e2e8f0', 
-                    fontSize: 12 
+                <label style={{
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  color: '#64748b',
+                  marginBottom: 4,
+                  display: 'block'
+                }}>
+                  Explanation / Test Target (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={testCase.explanation}
+                  onChange={(e) => setTestCase(i, 'explanation', e.target.value)}
+                  placeholder="e.g. nums[0] + nums[1] = 2 + 7 = 9, so return [0, 1]"
+                  style={{
+                    width: '100%',
+                    background: '#f8fafc',
+                    border: '1.2px solid #cbd5e1',
+                    borderRadius: 8,
+                    padding: '8px 12px',
+                    color: '#0f172a',
+                    fontSize: '0.84rem',
+                    boxSizing: 'border-box',
+                    outline: 'none'
                   }}
                 />
               </div>
@@ -360,55 +661,117 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
         </div>
       </div>
 
-      {/* Programming Languages */}
+      {/* ── Allowed Programming Languages ── */}
       <div>
-        <label style={{ 
-          display: 'block', 
-          fontSize: 11, 
-          fontWeight: 600, 
-          color: '#718096', 
-          marginBottom: 8,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 10,
+          flexWrap: 'wrap',
+          gap: 8
         }}>
-          Allowed Programming Languages
-        </label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          {programmingLanguages.map(lang => (
-            <label 
-              key={lang.id}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 6,
-                padding: '8px 12px',
-                background: allowedLanguages.includes(lang.id) 
-                  ? 'rgba(139,92,246,0.1)' 
-                  : 'rgba(255,255,255,0.02)',
-                border: allowedLanguages.includes(lang.id) 
-                  ? '1px solid rgba(139,92,246,0.3)' 
-                  : '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 6,
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            color: '#1e293b',
+            letterSpacing: '0.02em',
+            textTransform: 'uppercase'
+          }}>
+            <Code2 size={15} color="#0a74da" />
+            <span>ALLOWED PROGRAMMING LANGUAGES</span>
+          </label>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.78rem' }}>
+            <button
+              type="button"
+              onClick={selectAllLanguages}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#0a74da',
+                fontWeight: 700,
                 cursor: 'pointer',
-                transition: 'all 0.2s ease'
+                padding: 0
               }}
             >
-              <input 
-                type="checkbox" 
-                checked={allowedLanguages.includes(lang.id)}
-                onChange={() => toggleLanguage(lang.id)}
-                style={{ display: 'none' }}
-              />
-              <span style={{ fontSize: 14 }}>{lang.icon}</span>
-              <span style={{ 
-                fontSize: 11, 
-                fontWeight: 500,
-                color: allowedLanguages.includes(lang.id) ? '#8b5cf6' : '#718096'
-              }}>
-                {lang.name}
-              </span>
-            </label>
-          ))}
+              Select All
+            </button>
+            <span style={{ color: '#cbd5e1' }}>•</span>
+            <button
+              type="button"
+              onClick={resetLanguages}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#64748b',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: 0
+              }}
+            >
+              Reset Defaults
+            </button>
+          </div>
+        </div>
+
+        {/* Language Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+          gap: 10
+        }}>
+          {programmingLanguages.map((lang) => {
+            const isSelected = allowedLanguages.includes(lang.id);
+            return (
+              <div
+                key={lang.id}
+                onClick={() => toggleLanguage(lang.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  padding: '9px 12px',
+                  background: isSelected ? '#eff6ff' : '#ffffff',
+                  border: isSelected ? '1.5px solid #3b82f6' : '1.5px solid #e2e8f0',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  userSelect: 'none',
+                  boxShadow: isSelected ? '0 2px 8px rgba(59, 130, 246, 0.12)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>{lang.icon}</span>
+                  <span style={{
+                    fontSize: '0.84rem',
+                    fontWeight: isSelected ? 700 : 600,
+                    color: isSelected ? '#1e40af' : '#475569'
+                  }}>
+                    {lang.name}
+                  </span>
+                </div>
+
+                <div style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 5,
+                  background: isSelected ? '#2563eb' : '#f1f5f9',
+                  border: isSelected ? 'none' : '1.5px solid #cbd5e1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff'
+                }}>
+                  {isSelected && <Check size={12} strokeWidth={3} />}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

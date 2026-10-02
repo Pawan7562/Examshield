@@ -1,6 +1,17 @@
 // server.js — Configured for India Standard Time (IST — Asia/Kolkata)
 // env loaded: 2026-09-29 (restart trigger)
 process.env.TZ = 'Asia/Kolkata';
+
+// Prevent Node.js autoSelectFamily timeout issues on Windows dual-stack networks
+const net = require('net');
+const dns = require('dns');
+if (net.setDefaultAutoSelectFamily) {
+  net.setDefaultAutoSelectFamily(false);
+}
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 require('dotenv').config();
 const express = require('express');
 const http = require('http');

@@ -1,8 +1,19 @@
 // config/database.js
 const { Pool } = require('pg');
+const net = require('net');
+const dns = require('dns');
 const path = require('path');
 const dotenv = require('dotenv');
 const winston = require('winston');
+
+// Force IPv4 and disable Node's Happy Eyeballs autoSelectFamily algorithm,
+// which causes ETIMEDOUT on Windows dual-stack networks when IPv6 routing is unavailable.
+if (net.setDefaultAutoSelectFamily) {
+  net.setDefaultAutoSelectFamily(false);
+}
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 if (!process.env.DATABASE_URL || !process.env.DATABASE_URL_UNPOOLED) {
   dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
@@ -34,10 +45,13 @@ const pool = new Pool({
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD,
       }),
-  min: 2, // Pre-warmed persistent connections to eliminate cold TLS handshake latency
-  max: Number.parseInt(process.env.PG_POOL_MAX || '30', 10),
+  lookup: (hostname, options, callback) => {
+    return dns.lookup(hostname, { ...options, family: 4 }, callback);
+  },
+  min: 1, // Keep 1 persistent connection to eliminate cold TLS handshake latency
+  max: Number.parseInt(process.env.PG_POOL_MAX || '20', 10),
   idleTimeoutMillis: 60000, // Keep warm connections alive for 60 seconds
-  connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '10000', 10),
+  connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '15000', 10),
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),

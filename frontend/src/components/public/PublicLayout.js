@@ -99,7 +99,7 @@ export default function PublicLayout({ children, className = '' }) {
                     <span className="ticker-bullet">✦</span>
                     <span className="ticker-item"><GraduationCap size={12} className="ticker-icon" /> <strong>10+ Registered Institutions</strong> · 50K+ Secured Examinations</span>
                     <span className="ticker-bullet">✦</span>
-                    <span className="ticker-item"><ShieldCheck size={12} className="ticker-icon" /> <strong>Mohali (Punjab) HQ</strong> · Direct Helpline: +91 9934290491</span>
+                    <span className="ticker-item"><ShieldCheck size={12} className="ticker-icon" /> <strong>Mohali (Punjab) HQ</strong> · Zero-Data-Retention Architecture</span>
                     <span className="ticker-bullet">✦</span>
                     <span className="ticker-item"><Building2 size={12} className="ticker-icon" /> <strong>1:50 Proctor Cockpit</strong> · Live Multi-Department Invigilation &amp; Shift Logs</span>
                     <span className="ticker-bullet">✦</span>
@@ -112,7 +112,7 @@ export default function PublicLayout({ children, className = '' }) {
                     <span className="ticker-bullet">✦</span>
                     <span className="ticker-item"><GraduationCap size={12} className="ticker-icon" /> <strong>10+ Registered Institutions</strong> · 50K+ Secured Examinations</span>
                     <span className="ticker-bullet">✦</span>
-                    <span className="ticker-item"><ShieldCheck size={12} className="ticker-icon" /> <strong>Mohali (Punjab) HQ</strong> · Direct Helpline: +91 9934290491</span>
+                    <span className="ticker-item"><ShieldCheck size={12} className="ticker-icon" /> <strong>Mohali (Punjab) HQ</strong> · Zero-Data-Retention Architecture</span>
                     <span className="ticker-bullet">✦</span>
                     <span className="ticker-item"><Building2 size={12} className="ticker-icon" /> <strong>1:50 Proctor Cockpit</strong> · Live Multi-Department Invigilation &amp; Shift Logs</span>
                     <span className="ticker-bullet">✦</span>
