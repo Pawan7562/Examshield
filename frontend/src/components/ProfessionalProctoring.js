@@ -175,18 +175,33 @@ const ProfessionalProctoring = ({
     const ctx = offscreen.getContext('2d', { alpha: false, desynchronized: true });
 
     let isBusyEncoding = false;
+    let lastEncodingTime = 0;
 
     // High-responsiveness video frame streamer: 125ms (~8 FPS) with volatile non-blocking emit
     const videoStreamInterval = setInterval(() => {
       try {
+        const now = Date.now();
+        // Force unlock if previous encode cycle somehow got hung for > 400ms
+        if (isBusyEncoding && now - lastEncodingTime > 400) {
+          isBusyEncoding = false;
+        }
         if (isBusyEncoding) return; // Drop frame if previous is still processing (zero buffer bloat)
-        const isActive = cameraStatusRef.current === 'active' && !cameraOffRef.current;
-        const video = videoRef.current;
 
-        if (isActive && video && video.readyState >= 2 && video.videoWidth > 0) {
+        const video = videoRef.current;
+        if (!video) return;
+
+        // Auto-recovery watchdog: ensure browser didn't pause video during tab blur or backgrounding
+        if (video.paused && streamRef.current && streamRef.current.active) {
+          video.play().catch(() => {});
+        }
+
+        const isActive = cameraStatusRef.current === 'active' && !cameraOffRef.current;
+
+        if (isActive && video.readyState >= 2 && video.videoWidth > 0) {
           isBusyEncoding = true;
+          lastEncodingTime = now;
           ctx.drawImage(video, 0, 0, 240, 180);
-          const dataUrl = offscreen.toDataURL('image/jpeg', 0.40);
+          const dataUrl = offscreen.toDataURL('image/jpeg', 0.42);
           const base64Data = dataUrl.split(',')[1];
           if (base64Data && socketRef.current && socketRef.current.connected) {
             // Volatile emit drops stale frames on congested networks rather than queueing lag
@@ -196,7 +211,7 @@ const ProfessionalProctoring = ({
               studentId: studentIdRef.current,
               sessionId: sessionIdRef.current,
               imageData: base64Data,
-              timestamp: Date.now(),
+              timestamp: now,
             });
           }
           isBusyEncoding = false;
@@ -234,99 +249,6 @@ const ProfessionalProctoring = ({
       clearInterval(telemetryInterval);
     };
   }, [socket, cameraStatus, cameraOff]);
-
-  // ─── WebRTC P2P Direct Video Stream Server ──────────────────────────────────
-  useEffect(() => {
-    if (!socket) return;
-    const peerConnections = new Map(); // adminSocketId -> RTCPeerConnection
-
-    const iceServers = [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-    ];
-
-    const handleRequestFeed = async ({ adminSocketId }) => {
-      try {
-        const stream = streamRef.current;
-        if (!stream) return;
-
-        if (peerConnections.has(adminSocketId)) {
-          try { peerConnections.get(adminSocketId).close(); } catch (_) {}
-        }
-
-        const pc = new RTCPeerConnection({ iceServers });
-        peerConnections.set(adminSocketId, pc);
-
-        stream.getVideoTracks().forEach(track => {
-          pc.addTrack(track, stream);
-        });
-
-        pc.onicecandidate = (event) => {
-          if (event.candidate && socketRef.current?.connected) {
-            socketRef.current.emit('webrtc-ice-candidate', {
-              targetSocketId: adminSocketId,
-              studentId: studentIdRef.current,
-              candidate: event.candidate,
-            });
-          }
-        };
-
-        const offer = await pc.createOffer({
-          offerToReceiveVideo: false,
-          offerToReceiveAudio: false,
-        });
-        await pc.setLocalDescription(offer);
-
-        if (socketRef.current?.connected) {
-          socketRef.current.emit('webrtc-offer', {
-            targetSocketId: adminSocketId,
-            targetStudentId: studentIdRef.current,
-            examId: examIdRef.current,
-            offer,
-          });
-        }
-      } catch (err) {
-        console.warn('[WebRTC] Student P2P offer error, fallback to Canvas stream:', err);
-      }
-    };
-
-    const handleAnswer = async ({ fromSocketId, answer }) => {
-      const pc = peerConnections.get(fromSocketId);
-      if (pc && answer) {
-        try {
-          await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        } catch (e) {
-          console.warn('[WebRTC] Set remote description failed:', e);
-        }
-      }
-    };
-
-    const handleCandidate = async ({ fromSocketId, candidate }) => {
-      const pc = peerConnections.get(fromSocketId);
-      if (pc && candidate) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {
-          console.warn('[WebRTC] Add ICE candidate failed:', e);
-        }
-      }
-    };
-
-    socket.on('webrtc-request-feed', handleRequestFeed);
-    socket.on('webrtc-answer', handleAnswer);
-    socket.on('webrtc-ice-candidate', handleCandidate);
-
-    return () => {
-      socket.off('webrtc-request-feed', handleRequestFeed);
-      socket.off('webrtc-answer', handleAnswer);
-      socket.off('webrtc-ice-candidate', handleCandidate);
-      peerConnections.forEach(pc => {
-        try { pc.close(); } catch (_) {}
-      });
-      peerConnections.clear();
-    };
-  }, [socket]);
 
   // ─── Throttled Violation Reporter ──────────────────────────────────────────
   const reportViolation = useCallback(async (type, description) => {
@@ -482,12 +404,13 @@ const ProfessionalProctoring = ({
 
         streamRef.current = stream;
 
-        // Attach video stream
+        // Attach video stream with auto-play initiation
         if (videoRef.current && monConfig.device_camera) {
           videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
         }
 
-        // ── Monitor video tracks for physical camera being turned off ──
+        // ── Monitor video tracks for physical camera being disconnected ──
         if (monConfig.device_camera) {
           const videoTracks = stream.getVideoTracks();
           videoTracks.forEach(track => {
@@ -499,15 +422,8 @@ const ProfessionalProctoring = ({
               setFaceCount(0);
               reportViolation('camera_off', 'Student turned off or disconnected their camera during the exam');
             });
-            track.addEventListener('mute', () => {
-              if (!mounted) return;
-              console.warn('[Proctoring] Video track muted — camera may be off');
-              setCameraOff(true);
-              reportViolation('camera_off', 'Camera feed was interrupted or muted');
-            });
             track.addEventListener('unmute', () => {
               if (!mounted) return;
-              console.log('[Proctoring] Video track unmuted — camera restored');
               setCameraOff(false);
             });
           });
@@ -1014,14 +930,15 @@ const ProfessionalProctoring = ({
       <div
         style={{
           position: 'fixed',
-          top: -9999,
-          left: -9999,
-          width: 320,
-          height: 240,
-          opacity: 0,
+          top: 0,
+          left: 0,
+          width: 4,
+          height: 4,
+          opacity: 0.01,
           pointerEvents: 'none',
           visibility: 'visible',
           zIndex: -9999,
+          overflow: 'hidden',
         }}
         aria-hidden="true"
       >

@@ -283,52 +283,6 @@ io.on('connection', (socket) => {
     io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).volatile.emit('camera-feed', feedPayload);
   });
 
-  // WebRTC P2P Direct Video Signaling Relays
-  socket.on('webrtc-request-feed', ({ studentId, examId }) => {
-    if (studentId) {
-      io.to(`student-${studentId}`).emit('webrtc-request-feed', {
-        adminSocketId: socket.id,
-        studentId,
-        examId,
-      });
-    }
-  });
-
-  socket.on('webrtc-offer', ({ targetSocketId, targetStudentId, examId, offer }) => {
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('webrtc-offer', {
-        fromSocketId: socket.id,
-        studentId: targetStudentId || socket.user?.id,
-        offer,
-      });
-    } else if (examId) {
-      io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('webrtc-offer', {
-        fromSocketId: socket.id,
-        studentId: targetStudentId || socket.user?.id,
-        offer,
-      });
-    }
-  });
-
-  socket.on('webrtc-answer', ({ targetSocketId, studentId, answer }) => {
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('webrtc-answer', {
-        fromSocketId: socket.id,
-        studentId,
-        answer,
-      });
-    }
-  });
-
-  socket.on('webrtc-ice-candidate', ({ targetSocketId, studentId, candidate }) => {
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('webrtc-ice-candidate', {
-        fromSocketId: socket.id,
-        studentId,
-        candidate,
-      });
-    }
-  });
 
   // Student telemetry update (question progress, face count, audio level)
   socket.on('student-activity', ({ examId, studentId, sessionId, activity }) => {
