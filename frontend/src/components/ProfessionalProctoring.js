@@ -98,14 +98,16 @@ const ProfessionalProctoring = ({
   socket = null,
   monitoringConfig = null,
   hidden = false,
+  onCameraStatusChange = null,
+  mediaStream = null,
 }) => {
   const monConfig = useMemo(() => ({
     face_detection: monitoringConfig?.face_detection !== false,
-    voice_detection: monitoringConfig?.voice_detection !== false,
+    voice_detection: true, // Always mandatory across all exams
     tab_switch: monitoringConfig?.tab_switch !== false,
     fullscreen: monitoringConfig?.fullscreen !== false,
-    device_camera: monitoringConfig?.device_camera !== false,
-    is_proctored: monitoringConfig?.is_proctored !== false,
+    device_camera: true,  // Always mandatory across all exams
+    is_proctored: true,   // Always mandatory across all exams
   }), [monitoringConfig]);
   const [cameraStatus, setCameraStatus] = useState('initializing'); // initializing|requesting|active|denied|error|off
   const [micStatus, setMicStatus] = useState('initializing');       // initializing | requesting | active | denied | unavailable
@@ -159,6 +161,19 @@ const ProfessionalProctoring = ({
   useEffect(() => { currentQuestionRef.current = currentQuestion; }, [currentQuestion]);
   useEffect(() => { totalQuestionsRef.current = totalQuestions; }, [totalQuestions]);
   useEffect(() => { faceCountRef.current = faceCount; }, [faceCount]);
+
+  // Notify parent component on device status changes (e.g. camera or mic denied, revoked, or disconnected)
+  useEffect(() => {
+    const isCameraBlocked = cameraStatus === 'denied' || cameraStatus === 'error' || cameraStatus === 'off' || cameraOff;
+    const isMicBlocked = micStatus === 'denied' || micStatus === 'unavailable' || micStatus === 'error';
+    onCameraStatusChange?.({
+      cameraStatus,
+      micStatus,
+      cameraOff,
+      isBlocked: isCameraBlocked || isMicBlocked,
+      blockedReason: isCameraBlocked ? 'camera' : isMicBlocked ? 'microphone' : null,
+    });
+  }, [cameraStatus, micStatus, cameraOff, onCameraStatusChange]);
 
   // ─── Continuous High-Performance Live Video Streaming Loop ───
   useEffect(() => {
@@ -356,7 +371,27 @@ const ProfessionalProctoring = ({
         else setMicStatus('disabled');
 
         let stream;
-        try {
+        // If an active stream was passed in from the verified gate, use it directly!
+        if (
+          mediaStream &&
+          mediaStream.active &&
+          mediaStream.getVideoTracks().length > 0 &&
+          mediaStream.getVideoTracks()[0].readyState === 'live'
+        ) {
+          stream = mediaStream;
+          setCameraStatus('active');
+          if (monConfig.voice_detection) {
+            const hasAudio = stream.getAudioTracks().length > 0 && stream.getAudioTracks()[0].readyState === 'live';
+            if (hasAudio) {
+              setMicStatus('active');
+            } else {
+              setMicStatus('denied');
+              throw new Error('Microphone audio track is missing from the provided media stream');
+            }
+          } else {
+            setMicStatus('disabled');
+          }
+        } else {
           const constraints = {};
           if (monConfig.device_camera) {
             constraints.video = {
@@ -375,30 +410,23 @@ const ProfessionalProctoring = ({
           }
 
           stream = await navigator.mediaDevices.getUserMedia(constraints);
-          if (monConfig.voice_detection && stream.getAudioTracks().length > 0) {
-            setMicStatus('active');
-          } else if (!monConfig.voice_detection) {
-            setMicStatus('disabled');
+          const hasVideo = !monConfig.device_camera || (stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].readyState === 'live');
+          const hasAudio = !monConfig.voice_detection || (stream.getAudioTracks().length > 0 && stream.getAudioTracks()[0].readyState === 'live');
+
+          if (!hasVideo || !hasAudio) {
+            if (!hasVideo) setCameraStatus('denied');
+            if (!hasAudio) setMicStatus('denied');
+            throw new Error('Required media devices failed to start active live tracks.');
           }
-        } catch (mediaErr) {
-          console.warn('[Proctoring] Combined media request failed, attempting fallback:', mediaErr);
-          if (monConfig.device_camera) {
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                width: { ideal: 320 },
-                height: { ideal: 240 },
-                facingMode: 'user',
-                frameRate: { ideal: 15 },
-              },
-            });
-            setMicStatus(monConfig.voice_detection ? 'unavailable' : 'disabled');
-          } else {
-            throw mediaErr;
-          }
+
+          if (monConfig.device_camera) setCameraStatus('active');
+          if (monConfig.voice_detection) setMicStatus('active');
         }
 
         if (!mounted) {
-          stream.getTracks().forEach(t => t.stop());
+          if (stream !== mediaStream) {
+            stream.getTracks().forEach(t => t.stop());
+          }
           return;
         }
 
@@ -422,9 +450,34 @@ const ProfessionalProctoring = ({
               setFaceCount(0);
               reportViolation('camera_off', 'Student turned off or disconnected their camera during the exam');
             });
+            track.addEventListener('mute', () => {
+              if (!mounted) return;
+              setCameraOff(true);
+            });
             track.addEventListener('unmute', () => {
               if (!mounted) return;
               setCameraOff(false);
+            });
+          });
+        }
+
+        // ── Monitor audio tracks for physical mic being disconnected/muted ──
+        if (monConfig.voice_detection) {
+          const audioTracks = stream.getAudioTracks();
+          audioTracks.forEach(track => {
+            track.addEventListener('ended', () => {
+              if (!mounted) return;
+              console.warn('[Proctoring] Audio track ended — microphone disconnected');
+              setMicStatus('denied');
+              reportViolation('speech_detected', 'Microphone was disconnected during examination');
+            });
+            track.addEventListener('mute', () => {
+              if (!mounted) return;
+              setMicStatus('denied');
+            });
+            track.addEventListener('unmute', () => {
+              if (!mounted) return;
+              setMicStatus('active');
             });
           });
         }
@@ -523,12 +576,12 @@ const ProfessionalProctoring = ({
       if (audioContextRef.current) {
         try { audioContextRef.current.close(); } catch (_) {}
       }
-      if (streamRef.current) {
+      if (streamRef.current && streamRef.current !== mediaStream) {
         streamRef.current.getTracks().forEach(t => t.stop());
         streamRef.current = null;
       }
     };
-  }, [monConfig, reportViolation]);
+  }, [monConfig, reportViolation, mediaStream]);
 
   // ─── Video onLoadedData → set active ───────────────────────────────────────
   const handleVideoReady = useCallback(() => {
