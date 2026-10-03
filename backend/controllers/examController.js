@@ -5,6 +5,7 @@ const { sendExamNotification, sendExamReminder } = require('../services/emailSer
 const { v4: uuidv4 } = require('uuid');
 const { parseToIST, toISTISOString, formatIST, getExamWindowStatus } = require('../utils/timezone');
 const { evaluateMCQAnswer, calculateGrade } = require('../utils/evaluation');
+const { autoCloseExpiredExams, checkAndCloseSpecificExam } = require('../services/examLifecycleService');
 
 /**
  * Generate unique exam code
@@ -82,6 +83,29 @@ const formatQuestionForStudent = (q) => {
     parsedExamples = parsedTestCases;
   }
 
+  // Strictly filter for public test cases for the student payload
+  // Confidential hidden test cases must NEVER be leaked to student
+  let studentVisibleCases = [];
+  if (Array.isArray(parsedTestCases) && parsedTestCases.length > 0) {
+    const explicitlyPublic = parsedTestCases.filter(tc => !tc.is_hidden && !tc.isHidden);
+    if (explicitlyPublic.length > 0) {
+      studentVisibleCases = explicitlyPublic;
+    } else {
+      // If none explicitly marked, only expose the first 1 or 2 as public sample testcases
+      studentVisibleCases = parsedTestCases.slice(0, 2).map(tc => ({ ...tc, is_hidden: false }));
+    }
+  } else if (Array.isArray(parsedExamples) && parsedExamples.length > 0) {
+    studentVisibleCases = parsedExamples;
+  }
+
+  // Sanitize studentVisibleCases so that only input, output, and explanation are exposed
+  const sanitizedSampleCases = studentVisibleCases.map(tc => ({
+    input: tc.input !== undefined ? tc.input : '',
+    output: tc.output !== undefined ? tc.output : (tc.expectedOutput || tc.expected_output || ''),
+    explanation: tc.explanation || '',
+    is_hidden: false
+  }));
+
   const isCoding = q.type === 'coding' ||
     !!q.problemStatement ||
     !!meta.problemStatement ||
@@ -92,6 +116,7 @@ const formatQuestionForStudent = (q) => {
     (q.question_text ? q.question_text.split('\n')[0].replace(/^#+\s*/, '').replace(/^[Q0-9:.-]+\s*/, '') : 'Coding Challenge');
 
   const problemStatement = q.problemStatement || meta.problemStatement || q.question_text || 'Problem Statement';
+  const totalTestCasesCount = Array.isArray(parsedTestCases) ? parsedTestCases.length : sanitizedSampleCases.length;
 
   return {
     id: q.id,
@@ -100,20 +125,36 @@ const formatQuestionForStudent = (q) => {
     problemStatement: problemStatement,
     inputFormat: q.inputFormat || meta.inputFormat || '',
     outputFormat: q.outputFormat || meta.outputFormat || '',
-    constraints: Array.isArray(q.constraints) ? q.constraints : (meta.constraints || []),
-    examples: parsedExamples,
-    testCases: parsedTestCases,
+    constraints: Array.isArray(q.constraints) && q.constraints.length > 0 ? q.constraints : (Array.isArray(meta.constraints) ? meta.constraints : (meta.constraints ? [meta.constraints] : [])),
+    examples: sanitizedSampleCases,
+    sampleTestCases: sanitizedSampleCases,
+    testCases: sanitizedSampleCases,
+    totalTestCases: totalTestCasesCount,
+    total_test_cases: totalTestCasesCount,
+    hiddenTestCasesCount: Math.max(0, totalTestCasesCount - sanitizedSampleCases.length),
     hints: Array.isArray(q.hints) ? q.hints : (meta.hints || []),
     solutionApproach: q.solutionApproach || meta.solutionApproach || '',
     timeComplexity: q.timeComplexity || meta.timeComplexity || '',
     spaceComplexity: q.spaceComplexity || meta.spaceComplexity || '',
     allowedLanguages: q.allowedLanguages || meta.allowedLanguages || ['javascript', 'python', 'java', 'cpp'],
+    executionFormat: q.executionFormat || meta.executionFormat || 'stdin_stdout',
     type: isCoding ? 'coding' : (q.type || 'mcq'),
-    options: parsedOptions,
+    options: isCoding ? {
+      ...meta,
+      inputFormat: q.inputFormat || meta.inputFormat || '',
+      outputFormat: q.outputFormat || meta.outputFormat || '',
+      constraints: Array.isArray(q.constraints) ? q.constraints : (meta.constraints || []),
+      examples: sanitizedSampleCases,
+      testCases: sanitizedSampleCases,
+      totalTestCases: totalTestCasesCount,
+      executionFormat: q.executionFormat || meta.executionFormat || 'stdin_stdout',
+      allowedLanguages: q.allowedLanguages || meta.allowedLanguages || ['javascript', 'python', 'java', 'cpp']
+    } : parsedOptions,
     marks: q.marks || (isCoding ? 10 : 1),
     order_index: q.order_index,
     code_template: q.code_template || q.codeTemplate || meta.codeTemplate || null,
     time_limit: q.time_limit || q.timeLimit || meta.timeLimit || 2000,
+    memory_limit: q.memory_limit || q.memoryLimit || meta.memoryLimit || 256,
     difficulty: q.difficulty || meta.difficulty || 'medium'
   };
 };
@@ -163,7 +204,8 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
               solutionApproach: q.solutionApproach || q.solution_approach || '',
               timeComplexity: q.timeComplexity || '',
               spaceComplexity: q.spaceComplexity || '',
-              allowedLanguages: q.allowedLanguages || ['javascript', 'python', 'java', 'cpp']
+              allowedLanguages: q.allowedLanguages || ['javascript', 'python', 'java', 'cpp'],
+              executionFormat: q.executionFormat || q.execution_format || 'stdin_stdout'
             });
           } else {
             const options = q.options || [];
@@ -180,6 +222,7 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
             order_index: index + 1,
             code_template: codeTemplate,
             time_limit: timeLimit,
+            memory_limit: q.memoryLimit || q.memory_limit || (type === 'coding' ? 256 : null),
             difficulty: difficulty,
             test_cases: testCasesJson
           };
@@ -577,7 +620,14 @@ exports.createExam = async (req, res) => {
       date_time: examDateTime,
       duration: examDuration,
       total_marks: examTotalMarks,
-      passing_marks: passingMarks || Math.floor(examTotalMarks * 0.4),
+      passing_marks: (() => {
+        const num = passingMarks !== undefined && passingMarks !== null && !isNaN(passingMarks) ? Number(passingMarks) : null;
+        if (num !== null && num > 0) {
+          if (num <= examTotalMarks) return num;
+          if (num <= 100) return Math.round((examTotalMarks * num) / 100);
+        }
+        return Math.floor(examTotalMarks * 0.4);
+      })(),
       instructions: examInstructions,
       is_proctored: examIsProctored,
       max_violations: examMaxViolations,
@@ -690,9 +740,14 @@ exports.updateExam = async (req, res) => {
 
     const examTitle = title || name;
     const examDuration = duration !== undefined ? parseInt(duration) : undefined;
-    const examTotal = totalMarks !== undefined ? parseInt(totalMarks) : (total_marks !== undefined ? parseInt(total_marks) : undefined);
-    const examPass = passingMarks !== undefined ? parseInt(passingMarks) : (passing_marks !== undefined ? parseInt(passing_marks) : undefined);
-    const examDate = dateTime || date_time;
+    let examPass = passingMarks !== undefined ? parseInt(passingMarks) : (passing_marks !== undefined ? parseInt(passing_marks) : undefined);
+    if (examPass !== undefined && !isNaN(examPass) && examTotal !== undefined && examTotal > 0) {
+      if (examPass > examTotal && examPass <= 100) {
+        examPass = Math.round((examTotal * examPass) / 100);
+      } else if (examPass > examTotal) {
+        examPass = Math.round(examTotal * 0.4);
+      }
+    }
 
     const updateFields = [];
     const updateValues = [id, collegeId];
@@ -971,20 +1026,61 @@ exports.addQuestions = async (req, res) => {
     const existingQuestionCount = existingQuestions?.length || 0;
     console.log('📊 Backend: Existing questions count:', existingQuestionCount);
 
-    // Prepare questions for Supabase insertion (only using existing columns)
+    // Prepare questions for insertion (with full coding metadata support)
     const questionsToInsert = questions.map((q, i) => {
       let qType = (q.type || q.questionType || q.question_type || 'mcq').toLowerCase();
       if (qType === 'multiple_choice' || qType === 'multiple-choice') qType = 'mcq';
       if (!['mcq', 'subjective', 'coding', 'true_false'].includes(qType)) qType = 'mcq';
 
+      const isCoding = qType === 'coding' || !!q.problemStatement || !!q.testCases || !!q.test_cases;
+      const type = isCoding ? 'coding' : qType;
+      const marks = q.marks || (type === 'coding' ? 10 : 1);
+      const questionText = q.problemStatement || q.questionText || q.question_text || q.text || 'Question';
+      const codeTemplate = q.codeTemplate || q.code_template || null;
+      const timeLimit = q.timeLimit || q.time_limit || (type === 'coding' ? 2000 : null);
+      const memoryLimit = q.memoryLimit || q.memory_limit || (type === 'coding' ? 256 : null);
+      const difficulty = q.difficulty || 'medium';
+
+      const rawTestCases = q.testCases || q.test_cases || q.examples || [];
+      const testCasesJson = Array.isArray(rawTestCases) && rawTestCases.length > 0
+        ? JSON.stringify(rawTestCases)
+        : (typeof rawTestCases === 'string' ? rawTestCases : null);
+
+      let optionsPayload;
+      if (isCoding) {
+        optionsPayload = JSON.stringify({
+          title: q.title || '',
+          problemStatement: q.problemStatement || questionText,
+          inputFormat: q.inputFormat || q.input_format || '',
+          outputFormat: q.outputFormat || q.output_format || '',
+          constraints: Array.isArray(q.constraints) ? q.constraints : (q.constraints ? [q.constraints] : []),
+          examples: Array.isArray(q.examples) ? q.examples : [],
+          testCases: Array.isArray(rawTestCases) ? rawTestCases : [],
+          hints: Array.isArray(q.hints) ? q.hints : [],
+          solutionApproach: q.solutionApproach || '',
+          timeComplexity: q.timeComplexity || '',
+          spaceComplexity: q.spaceComplexity || '',
+          allowedLanguages: q.allowedLanguages || ['javascript', 'python', 'java', 'cpp'],
+          executionFormat: q.executionFormat || q.execution_format || 'stdin_stdout'
+        });
+      } else {
+        const options = q.options || [];
+        optionsPayload = typeof options === 'string' ? options : JSON.stringify(options);
+      }
+
       return {
         exam_id: id,
-        question_text: q.questionText || q.question_text || q.text,
-        type: qType,
-        options: q.options ? (typeof q.options === 'string' ? q.options : JSON.stringify(q.options)) : null,
+        question_text: questionText,
+        type: type,
+        options: optionsPayload,
         correct_answer: q.correctAnswer || q.correct_answer || '',
-        marks: q.marks || 1,
-        order_index: q.orderIndex || q.order_index || i
+        marks: marks,
+        order_index: q.orderIndex || q.order_index || (existingQuestionCount + i + 1),
+        code_template: codeTemplate,
+        time_limit: timeLimit,
+        memory_limit: memoryLimit,
+        difficulty: difficulty,
+        test_cases: testCasesJson
       };
     });
 
@@ -1243,15 +1339,18 @@ exports.getStudentExams = async (req, res) => {
     const studentId = req.user.id;
     const collegeId = req.user.college_id;
 
-    // Get all exams for the student's college (simplified for now)
+    // Run auto-close on expired exams first
+    await autoCloseExpiredExams().catch(() => {});
+
+    // Get all candidate-accessible exams for the student's college
     const { data: exams, error } = await supabase
       .from('exams')
       .select(`
-        id, title, type, subject, date_time, duration, total_marks,
+        id, title, type, subject, date_time, duration, total_marks, passing_marks,
         status, is_proctored, instructions, created_at, exam_code, exam_key
       `)
       .eq('college_id', collegeId)
-      .in('status', ['draft', 'published', 'active', 'completed'])
+      .in('status', ['published', 'active', 'completed'])
       .order('date_time', { ascending: false });
 
     if (error) {
@@ -1263,7 +1362,44 @@ exports.getStudentExams = async (req, res) => {
       });
     }
 
-    res.json({ success: true, data: { exams: exams || [] } });
+    // Get all student's sessions to attach accurate session_status
+    const { data: studentSessions } = await supabase
+      .from('exam_sessions')
+      .select('exam_id, status, submitted_at')
+      .eq('student_id', studentId);
+
+    const sessionMap = new Map();
+    (studentSessions || []).forEach(s => {
+      const existing = sessionMap.get(s.exam_id);
+      if (!existing || s.status === 'submitted' || s.status === 'terminated') {
+        sessionMap.set(s.exam_id, s);
+      }
+    });
+
+    const now = Date.now();
+    const enrichedExams = (exams || []).map(exam => {
+      const session = sessionMap.get(exam.id);
+      let effectiveStatus = exam.status;
+
+      if (exam.date_time) {
+        const start = parseToIST(exam.date_time);
+        if (start) {
+          const endTime = start.getTime() + (Number(exam.duration) || 60) * 60000;
+          if (now > endTime) {
+            effectiveStatus = 'completed';
+          }
+        }
+      }
+
+      return {
+        ...exam,
+        status: effectiveStatus,
+        session_status: session?.status || null,
+        submitted_at: session?.submitted_at || null,
+      };
+    });
+
+    res.json({ success: true, data: { exams: enrichedExams } });
   } catch (error) {
     console.error('Student exams error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch exams', error: error.message });
@@ -1327,14 +1463,16 @@ exports.getExamDetails = async (req, res) => {
     }
 
     // Get exam questions for this exam (never leak correct_answer to student)
-    const { data: questions, error: questionsError } = await supabase
+    const { data: rawQuestions, error: questionsError } = await supabase
       .from('questions')
       .select(`
         id, question_text, type, options,
-        marks, order_index
+        marks, order_index, code_template, time_limit, memory_limit, difficulty, test_cases
       `)
       .eq('exam_id', id)
-      .order('created_at', { ascending: true });
+      .order('order_index', { ascending: true });
+
+    const questions = (rawQuestions || []).map(formatQuestionForStudent);
 
     if (questionsError) {
       console.error('Exam questions error:', questionsError);
@@ -1378,19 +1516,33 @@ exports.getExamDetails = async (req, res) => {
       studentResult = resRow;
     }
 
-    console.log('📊 Backend: Exam access check:', { hasAccess, examId: id, studentId, existingStatus: existingSession?.status });
+    // Check timing strictly
+    const windowStatus = getExamWindowStatus(exam.date_time, exam.duration || 60, 15);
+    let effectiveStatus = exam.status;
+    const isEnded = exam.status === 'completed' || !!windowStatus?.isEnded;
+    if (isEnded) {
+      effectiveStatus = 'completed';
+      if (exam.status !== 'completed') {
+        checkAndCloseSpecificExam(id).catch(() => {});
+      }
+    }
+
+    console.log('📊 Backend: Exam access check:', { hasAccess, examId: id, studentId, existingStatus: existingSession?.status, isEnded });
 
     res.json({
       success: true,
       data: {
-        exam: exam,
+        exam: { ...exam, status: effectiveStatus },
+        isEnded: isEnded,
         questions: questions || [],
         hasAccess: hasAccess,
         existingSession: existingSession ? {
           ...existingSession,
-          total_score: studentResult?.marks_obtained ?? studentResult?.total_marks ?? null,
-          percentage: studentResult?.percentage ?? null,
-          result_status: studentResult?.status ?? null
+          total_score: studentResult?.marks_obtained !== undefined && studentResult?.marks_obtained !== null ? Number(studentResult.marks_obtained) : null,
+          percentage: studentResult?.percentage !== undefined && studentResult?.percentage !== null ? Number(studentResult.percentage) : null,
+          result_status: studentResult?.status ?? null,
+          questionsTotal: questions?.length || 0,
+          questionsAttempted: questions?.length || 0
         } : null,
       }
     });
@@ -1476,33 +1628,24 @@ exports.startExam = async (req, res) => {
       isEnded: windowStatus.isEnded,
     });
 
-    console.log('✅ Backend: Exam timing validated');
+    // 1. Strict End Time Check: Students must NOT be allowed to enter or start after scheduled time has expired
+    if (examData.status === 'completed' || windowStatus.isEnded) {
+      console.log('❌ Backend: Attempt to start an exam that has ended. Blocking entry.');
+      await checkAndCloseSpecificExam(id).catch(() => {});
+      return res.status(400).json({
+        success: false,
+        isEnded: true,
+        message: 'This examination has ended. Students are not allowed to enter or start an exam after its scheduled time has expired.'
+      });
+    }
 
-    // Timing validation:
-    // Allow starting if:
-    // 1. In development mode OR
-    // 2. Exam is in draft/active/published status OR
-    // 3. Current time is within acceptable start window
-    const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
-    const canBypassStrictWindow = isDev || examData.status === 'draft' || examData.status === 'active';
-
-    if (examData.date_time && !canBypassStrictWindow) {
-      if (windowStatus.isBeforeEarlyAccess) {
-        console.log('❌ Backend: Exam not accessible yet. Returning 400 ERROR.');
-        return res.status(400).json({
-          success: false,
-          message: `Exam scheduled for ${windowStatus.formattedStart}. Accessible from ${formatIST(windowStatus.earlyAccessTime, 'timeOnly')} IST.`
-        });
-      }
-
-      // Allow access throughout the exam day / 24 hours window unless exam is explicitly marked completed
-      const generousWindowEnd = windowStatus.startTime + Math.max((examData.duration || 60) * 60000 * 4, 24 * 3600000);
-      if (windowStatus.now > generousWindowEnd && examData.status !== 'published') {
-        console.log('❌ Backend: Exam access window closed. Returning 400 ERROR.');
-        return res.status(400).json({ success: false, message: 'Exam access period has ended.' });
-      }
-    } else {
-      console.log('📝 Backend: Flexible / active timing mode, allowing exam start');
+    // 2. Early Access Check: Cannot start before early access window
+    if (examData.date_time && windowStatus.isBeforeEarlyAccess) {
+      console.log('❌ Backend: Exam not accessible yet. Returning 400 ERROR.');
+      return res.status(400).json({
+        success: false,
+        message: `Exam scheduled for ${windowStatus.formattedStart}. Accessible from ${formatIST(windowStatus.earlyAccessTime, 'timeOnly')} IST.`
+      });
     }
 
     // Check for existing session for THIS student using Supabase
@@ -1532,7 +1675,7 @@ exports.startExam = async (req, res) => {
       // Resume existing session
       const { data: rawQuestions, error: questionsError } = await supabase
         .from('questions')
-        .select('id, question_text, type, options, marks, order_index, code_template, time_limit, difficulty, test_cases')
+        .select('id, question_text, type, options, marks, order_index, code_template, time_limit, memory_limit, difficulty, test_cases')
         .eq('exam_id', id)
         .order('order_index');
       const { data: answers, error: answersError } = await supabase
@@ -1548,6 +1691,25 @@ exports.startExam = async (req, res) => {
       const sessionRemainingSec = Math.max(0, Math.floor((sessionDurationMs - (nowMs - sessionStartMs)) / 1000));
       const windowRemainingSec = windowStatus?.endTime ? Math.max(0, Math.floor((windowStatus.endTime - nowMs) / 1000)) : sessionRemainingSec;
       const timeRemaining = Math.min(sessionRemainingSec, windowRemainingSec);
+
+      if (timeRemaining <= 0) {
+        console.log('❌ Backend: Resuming session but window has ended. Auto-submitting session.');
+        await supabase
+          .from('exam_sessions')
+          .update({
+            status: 'submitted',
+            is_auto_submitted: true,
+            auto_submit_reason: 'scheduled_time_expired',
+            submitted_at: new Date().toISOString()
+          })
+          .eq('id', existingSession.id);
+
+        return res.status(400).json({
+          success: false,
+          isEnded: true,
+          message: 'The scheduled examination duration has expired and your session has concluded.'
+        });
+      }
 
       return res.json({
         success: true,
@@ -1639,7 +1801,7 @@ exports.startExam = async (req, res) => {
       console.log('🗄️ Backend: Fetching questions from master table...');
       const { data: masterQuestions, error: mErr } = await supabase
         .from('questions')
-        .select('id, question_text, type, options, marks, order_index, code_template, time_limit, difficulty, test_cases')
+        .select('id, question_text, type, options, marks, order_index, code_template, time_limit, memory_limit, difficulty, test_cases')
         .eq('exam_id', id)
         .order('order_index');
       
@@ -1756,6 +1918,15 @@ exports.startExam = async (req, res) => {
     const windowRemainingSec = windowStatus?.endTime ? Math.max(0, Math.floor((windowStatus.endTime - nowMs) / 1000)) : sessionRemainingSec;
     const timeRemaining = Math.min(sessionRemainingSec, windowRemainingSec);
 
+    if (timeRemaining <= 0) {
+      console.log('❌ Backend: Calculated time remaining is 0 or negative. Blocking start.');
+      return res.status(400).json({
+        success: false,
+        isEnded: true,
+        message: 'This examination has ended. Scheduled duration has expired.'
+      });
+    }
+
     res.json({
       success: true,
       message: 'Exam started. Good luck!',
@@ -1787,6 +1958,9 @@ exports.saveAnswer = async (req, res) => {
       return res.status(400).json({ success: false, message: 'sessionId and questionId are required' });
     }
 
+    const { detectLanguageFromCode } = require('../services/codeExecutionService');
+    const resolvedLanguage = selectedLanguage || req.body.language || req.body.selected_language || (codeSubmission ? detectLanguageFromCode(codeSubmission) : null);
+
     // Use Supabase upsert with explicit onConflict constraint
     const { data: saveData, error: saveError } = await supabase
       .from('answers')
@@ -1798,7 +1972,7 @@ exports.saveAnswer = async (req, res) => {
         answer_text: answerText ?? null,
         selected_option: selectedOption ?? null,
         code_submission: codeSubmission ?? null,
-        selected_language: selectedLanguage ?? null,
+        selected_language: resolvedLanguage,
         updated_at: new Date().toISOString()
       }, { 
         onConflict: 'session_id,question_id' 
@@ -1835,20 +2009,24 @@ exports.saveAnswersBulk = async (req, res) => {
       return res.json({ success: true, count: 0, message: 'No answers to save.' });
     }
 
+    const { detectLanguageFromCode } = require('../services/codeExecutionService');
     const now = new Date().toISOString();
     const rows = answers
       .filter(a => a && a.questionId)
-      .map(a => ({
-        session_id: sessionId,
-        question_id: a.questionId,
-        student_id: studentId,
-        exam_id: id,
-        answer_text: a.answerText ?? null,
-        selected_option: a.selectedOption ?? null,
-        code_submission: a.codeSubmission ?? null,
-        selected_language: a.selectedLanguage ?? null,
-        updated_at: now
-      }));
+      .map(a => {
+        const resolvedLang = a.selectedLanguage || a.language || a.selected_language || (a.codeSubmission ? detectLanguageFromCode(a.codeSubmission) : null);
+        return {
+          session_id: sessionId,
+          question_id: a.questionId,
+          student_id: studentId,
+          exam_id: id,
+          answer_text: a.answerText ?? null,
+          selected_option: a.selectedOption ?? null,
+          code_submission: a.codeSubmission ?? null,
+          selected_language: resolvedLang,
+          updated_at: now
+        };
+      });
 
     if (rows.length === 0) {
       return res.json({ success: true, count: 0, message: 'No valid answers to save.' });
@@ -1970,20 +2148,24 @@ exports.submitExam = async (req, res) => {
     //    ensures no answer is lost due to prior network failures or silent errors.
     if (Array.isArray(submittedAnswers) && submittedAnswers.length > 0) {
       console.log(`💾 [SUBMIT-EXAM] Atomically upserting ${submittedAnswers.length} final answers from payload...`);
+      const { detectLanguageFromCode } = require('../services/codeExecutionService');
       const now = new Date().toISOString();
       const answerRows = submittedAnswers
         .filter(a => a && a.questionId)
-        .map(a => ({
-          session_id: activeSessionId,
-          question_id: a.questionId,
-          student_id: studentId,
-          exam_id: id,
-          answer_text: a.answerText ?? null,
-          selected_option: a.selectedOption ?? null,
-          code_submission: a.codeSubmission ?? null,
-          selected_language: a.selectedLanguage ?? null,
-          updated_at: now,
-        }));
+        .map(a => {
+          const resolvedLang = a.selectedLanguage || a.language || a.selected_language || (a.codeSubmission ? detectLanguageFromCode(a.codeSubmission) : null);
+          return {
+            session_id: activeSessionId,
+            question_id: a.questionId,
+            student_id: studentId,
+            exam_id: id,
+            answer_text: a.answerText ?? null,
+            selected_option: a.selectedOption ?? null,
+            code_submission: a.codeSubmission ?? null,
+            selected_language: resolvedLang,
+            updated_at: now,
+          };
+        });
 
       if (answerRows.length > 0) {
         try {
@@ -2078,22 +2260,57 @@ exports.submitExam = async (req, res) => {
         const maxQMarks = Number(question.marks) || 10;
         let earnedQMarks = 0;
 
-        if (answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
-          earnedQMarks = Number(answer.marks_obtained);
-        } else if (answer.code_submission && answer.code_submission.trim().length > 10) {
-          // Grant points for submitted code solution
-          earnedQMarks = maxQMarks;
+        if (answer.code_submission && answer.code_submission.trim().length > 0) {
+          // Extract question test cases
+          let testCases = [];
+          if (question.test_cases) {
+            testCases = typeof question.test_cases === 'string' ? JSON.parse(question.test_cases) : question.test_cases;
+          }
+          if ((!testCases || testCases.length === 0) && question.options) {
+            try {
+              const opts = typeof question.options === 'string' ? JSON.parse(question.options) : question.options;
+              testCases = opts?.testCases || opts?.test_cases || opts?.examples || [];
+            } catch (_) {}
+          }
+
+          if (Array.isArray(testCases) && testCases.length > 0) {
+            const { evaluateTestCases, detectLanguageFromCode } = require('../services/codeExecutionService');
+            const languageToRun = answer.selected_language || detectLanguageFromCode(answer.code_submission) || 'javascript';
+            try {
+              const evalRes = await evaluateTestCases(
+                answer.code_submission,
+                languageToRun,
+                testCases,
+                {
+                  timeLimitMs: question.time_limit || 2000,
+                  memoryLimitMb: question.memory_limit || 256,
+                  questionMarks: maxQMarks
+                }
+              );
+              earnedQMarks = evalRes.earnedMarks || 0;
+            } catch (evalErr) {
+              console.error('Server-side code evaluation error in submitExam:', evalErr);
+              earnedQMarks = answer.marks_obtained !== null && answer.marks_obtained !== undefined
+                ? Number(answer.marks_obtained)
+                : 0;
+            }
+          } else if (answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
+            earnedQMarks = Number(answer.marks_obtained);
+          }
         }
 
         codingMarks += earnedQMarks;
 
         try {
+          const { detectLanguageFromCode } = require('../services/codeExecutionService');
+          const finalLang = answer.selected_language || (answer.code_submission ? detectLanguageFromCode(answer.code_submission) : null);
           await supabase
             .from('answers')
             .update({
-              is_correct: earnedQMarks > 0,
+              is_correct: earnedQMarks >= maxQMarks,
               marks_obtained: earnedQMarks,
               is_evaluated: true,
+              selected_language: finalLang,
               updated_at: new Date().toISOString()
             })
             .eq('id', answer.id);
@@ -2114,7 +2331,8 @@ exports.submitExam = async (req, res) => {
       .eq('id', id)
       .maybeSingle();
 
-    const totalPossibleMarks = examData?.total_marks || (questions || []).reduce((sum, q) => sum + (Number(q.marks) || 1), 0);
+    const sumOfQuestionMarks = (questions || []).reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+    const totalPossibleMarks = sumOfQuestionMarks > 0 ? sumOfQuestionMarks : (Number(examData?.total_marks) || 100);
     const configuredPassing = Number(examData?.passing_marks);
     const passThresholdMarks = (configuredPassing && configuredPassing <= totalPossibleMarks)
       ? configuredPassing

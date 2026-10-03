@@ -299,7 +299,7 @@ export default function CollegeManagement() {
             disabled={loading}
             title="Reload directory"
           >
-            <RefreshCw size={14} className={loading ? 'sa-pulse-bullet' : ''} />
+            <RefreshCw size={14} className={loading ? 'sa-spin' : ''} />
             <span>Refresh</span>
           </button>
 
@@ -317,15 +317,15 @@ export default function CollegeManagement() {
 
       {/* ──── DIRECTORY STATS RIBBON ──── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-        <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-card)' }}>
+        <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-sm)' }}>
           <div>
             <span style={{ fontSize: '0.74rem', color: 'var(--sa-text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Total Colleges</span>
             <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--sa-text)', fontFamily: 'Space Grotesk' }}>{totalCount}</div>
           </div>
-          <Building2 size={24} style={{ color: 'var(--sa-primary)', opacity: 0.85 }} />
+          <Building2 size={24} style={{ color: 'var(--sa-blue)', opacity: 0.85 }} />
         </div>
 
-        <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-card)' }}>
+        <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-sm)' }}>
           <div>
             <span style={{ fontSize: '0.74rem', color: 'var(--sa-text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Active Licenses</span>
             <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--sa-emerald)', fontFamily: 'Space Grotesk' }}>{activeCount}</div>
@@ -333,7 +333,7 @@ export default function CollegeManagement() {
           <CheckCircle2 size={24} style={{ color: 'var(--sa-emerald)', opacity: 0.85 }} />
         </div>
 
-        <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-card)' }}>
+        <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-sm)' }}>
           <div>
             <span style={{ fontSize: '0.74rem', color: 'var(--sa-text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Suspended / Inactive</span>
             <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--sa-rose)', fontFamily: 'Space Grotesk' }}>{suspendedCount}</div>
@@ -447,7 +447,7 @@ export default function CollegeManagement() {
                                 href={c.website.startsWith('http') ? c.website : `https://${c.website}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                style={{ color: 'var(--sa-primary)', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
+                                style={{ color: 'var(--sa-blue)', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
                               >
                                 <Globe size={11} /> Visit <ExternalLink size={10} />
                               </a>
@@ -568,7 +568,7 @@ export default function CollegeManagement() {
             <div className="sa-modal-header">
               <div>
                 <h3 className="sa-modal-title">
-                  <Building2 size={20} style={{ color: 'var(--sa-primary)' }} />
+                  <Building2 size={20} style={{ color: 'var(--sa-blue)' }} />
                   Direct Institution Onboarding
                 </h3>
                 <p className="sa-modal-subtitle">
@@ -745,7 +745,7 @@ export default function CollegeManagement() {
             <div className="sa-modal-header">
               <div>
                 <h3 className="sa-modal-title">
-                  <Edit2 size={18} style={{ color: 'var(--sa-primary)' }} />
+                  <Edit2 size={18} style={{ color: 'var(--sa-blue)' }} />
                   Edit Institution Details
                 </h3>
                 <p className="sa-modal-subtitle">Modify contact and profile details for {activeCollege.name}</p>
@@ -963,7 +963,7 @@ export default function CollegeManagement() {
             <div className="sa-modal-header">
               <div>
                 <h3 className="sa-modal-title">
-                  <KeyRound size={20} style={{ color: 'var(--sa-primary)' }} />
+                  <KeyRound size={20} style={{ color: 'var(--sa-blue)' }} />
                   Reset Administrator Password
                 </h3>
                 <p className="sa-modal-subtitle">Override credentials for {activeCollege.name}</p>

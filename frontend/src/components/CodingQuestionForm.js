@@ -9,6 +9,12 @@ import {
   Terminal,
   Check,
   CheckCircle2,
+  Eye,
+  EyeOff,
+  Clock,
+  HardDrive,
+  Cpu,
+  BookOpen,
   Info,
   Sparkles,
 } from 'lucide-react';
@@ -17,14 +23,14 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
   const set = (k) => (e) => onChange(idx, { ...q, [k]: e.target.value });
 
   const setTestCase = (i, field, value) => {
-    const testCases = [...(q.testCases || [{ input: '', output: '', explanation: '' }])];
+    const testCases = [...(q.testCases || [{ input: '', output: '', explanation: '', is_hidden: false }])];
     testCases[i] = { ...testCases[i], [field]: value };
     onChange(idx, { ...q, testCases });
   };
 
-  const addTestCase = () => {
+  const addTestCase = (isHidden = false) => {
     const testCases = [...(q.testCases || [])];
-    testCases.push({ input: '', output: '', explanation: '' });
+    testCases.push({ input: '', output: '', explanation: '', is_hidden: isHidden });
     onChange(idx, { ...q, testCases });
   };
 
@@ -55,7 +61,7 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
 
   const testCases = q.testCases && q.testCases.length > 0
     ? q.testCases
-    : [{ input: '', output: '', explanation: '' }];
+    : [{ input: '', output: '', explanation: '', is_hidden: false }];
 
   const allowedLanguages = q.allowedLanguages && q.allowedLanguages.length > 0
     ? q.allowedLanguages
@@ -87,6 +93,8 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
   };
 
   const currentDiff = getDifficultyMeta(q.difficulty || 'medium');
+  const publicCount = testCases.filter(t => !t.is_hidden && !t.isHidden).length;
+  const hiddenCount = testCases.filter(t => t.is_hidden || t.isHidden).length;
 
   return (
     <div style={{
@@ -208,7 +216,7 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
       {/* ── Problem Statement & Meta Row ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 2fr) minmax(240px, 1fr)',
+        gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)',
         gap: 20,
         marginBottom: 22
       }}>
@@ -236,8 +244,8 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
           <textarea
             value={q.questionText || ''}
             onChange={set('questionText')}
-            placeholder="Describe the problem, input format, output specifications, and any algorithmic nuances..."
-            rows={6}
+            placeholder="Describe the algorithmic challenge, background context, rules, and problem goals..."
+            rows={5}
             style={{
               width: '100%',
               background: '#f8fafc',
@@ -266,11 +274,11 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
           />
         </div>
 
-        {/* Right: Difficulty & Marks */}
+        {/* Right: Difficulty, Marks & Execution Format */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 16,
+          gap: 14,
           background: '#f8fafc',
           border: '1.5px solid #e2e8f0',
           borderRadius: 12,
@@ -298,18 +306,18 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
                 background: '#ffffff',
                 border: '1.5px solid #cbd5e1',
                 borderRadius: 9,
-                padding: '9px 12px',
+                padding: '8px 12px',
                 color: '#0f172a',
-                fontSize: '0.88rem',
+                fontSize: '0.86rem',
                 fontWeight: 600,
                 cursor: 'pointer',
                 outline: 'none',
                 boxSizing: 'border-box'
               }}
             >
-              <option value="easy">🟢 Easy (Basic Logic & Control)</option>
+              <option value="easy">🟢 Easy (Basic Logic & Loops)</option>
               <option value="medium">🟡 Medium (Data Structures & Search)</option>
-              <option value="hard">🔴 Hard (DP, Graphs & Advanced Trees)</option>
+              <option value="hard">🔴 Hard (DP, Graphs & Trees)</option>
             </select>
           </div>
 
@@ -334,7 +342,6 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
               border: '1.5px solid #cbd5e1',
               borderRadius: 9,
               padding: '0 12px',
-              transition: 'border-color 0.15s ease'
             }}>
               <input
                 type="number"
@@ -347,84 +354,275 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  fontSize: '1rem',
+                  fontSize: '0.95rem',
                   fontWeight: 800,
                   color: '#0f172a',
-                  padding: '9px 0',
+                  padding: '8px 0',
                   boxSizing: 'border-box'
                 }}
               />
-              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                points
-              </span>
+              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>points</span>
             </div>
           </div>
 
-          {/* Runtime Sandbox Guarantee Pill */}
-          <div style={{
-            background: '#ffffff',
-            borderRadius: 8,
-            border: '1px solid #e2e8f0',
-            padding: '8px 10px',
-            fontSize: '0.73rem',
-            color: '#64748b',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
-          }}>
-            <Sparkles size={12} color="#0a74da" />
-            <span>Isolated Container: 2.0s limit, 256MB RAM</span>
+          {/* Execution Format */}
+          <div>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: '#1e293b',
+              marginBottom: 6
+            }}>
+              <Terminal size={14} color="#0a74da" />
+              <span>EXECUTION RUNNER</span>
+            </label>
+            <select
+              value={q.executionFormat || 'stdin_stdout'}
+              onChange={set('executionFormat')}
+              style={{
+                width: '100%',
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 9,
+                padding: '8px 12px',
+                color: '#0f172a',
+                fontSize: '0.84rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            >
+              <option value="stdin_stdout">Standard I/O (stdin &rarr; stdout)</option>
+              <option value="function">Function-based (LeetCode class Solution)</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* ── Constraints Section ── */}
-      <div style={{ marginBottom: 22 }}>
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: '0.82rem',
-          fontWeight: 700,
-          color: '#1e293b',
-          marginBottom: 8,
-          letterSpacing: '0.02em'
-        }}>
-          <Terminal size={14} color="#6366f1" />
-          <span>CONSTRAINTS &amp; COMPLEXITY EXPECTATIONS</span>
-          <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 500 }}>(Optional)</span>
-        </label>
-        <textarea
-          value={q.constraints || ''}
-          onChange={set('constraints')}
-          placeholder={"1 ≤ nums.length ≤ 10^5\n-10^9 ≤ nums[i] ≤ 10^9\nExpected Time Complexity: O(n log n)\nExpected Space Complexity: O(1)"}
-          rows={3}
-          style={{
-            width: '100%',
-            background: '#f8fafc',
-            border: '1.5px solid #cbd5e1',
-            borderRadius: 10,
-            padding: '12px 16px',
-            color: '#0f172a',
-            fontSize: '0.86rem',
-            fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-            resize: 'vertical',
-            boxSizing: 'border-box',
-            outline: 'none',
-            lineHeight: 1.5
-          }}
-          onFocus={(e) => {
-            e.target.style.background = '#ffffff';
-            e.target.style.borderColor = '#0a74da';
-          }}
-          onBlur={(e) => {
-            e.target.style.background = '#f8fafc';
-            e.target.style.borderColor = '#cbd5e1';
-          }}
-        />
+      {/* ── Input & Output Formats ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 16,
+        marginBottom: 20
+      }}>
+        <div>
+          <label style={{
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            color: '#334155',
+            marginBottom: 6,
+            display: 'block'
+          }}>
+            INPUT FORMAT SPECIFICATION
+          </label>
+          <textarea
+            value={q.inputFormat || ''}
+            onChange={set('inputFormat')}
+            placeholder="e.g. The first line contains an integer T. Each test case consists of two integers N and K..."
+            rows={2}
+            style={{
+              width: '100%',
+              background: '#f8fafc',
+              border: '1.5px solid #cbd5e1',
+              borderRadius: 8,
+              padding: '10px 12px',
+              fontSize: '0.84rem',
+              color: '#0f172a',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            color: '#334155',
+            marginBottom: 6,
+            display: 'block'
+          }}>
+            OUTPUT FORMAT SPECIFICATION
+          </label>
+          <textarea
+            value={q.outputFormat || ''}
+            onChange={set('outputFormat')}
+            placeholder="e.g. Print a single integer representing the maximum subarray sum..."
+            rows={2}
+            style={{
+              width: '100%',
+              background: '#f8fafc',
+              border: '1.5px solid #cbd5e1',
+              borderRadius: 8,
+              padding: '10px 12px',
+              fontSize: '0.84rem',
+              color: '#0f172a',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }}
+          />
+        </div>
       </div>
 
-      {/* ── Test Cases Section ── */}
+      {/* ── Constraints & Complexity & Limits Row ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 2fr) minmax(180px, 1fr) minmax(180px, 1fr)',
+        gap: 14,
+        marginBottom: 22
+      }}>
+        <div>
+          <label style={{
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            color: '#334155',
+            marginBottom: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}>
+            <Terminal size={13} color="#6366f1" />
+            <span>CONSTRAINTS</span>
+          </label>
+          <textarea
+            value={q.constraints || ''}
+            onChange={set('constraints')}
+            placeholder={"1 ≤ N ≤ 10^5\n-10^9 ≤ A[i] ≤ 10^9"}
+            rows={2}
+            style={{
+              width: '100%',
+              background: '#f8fafc',
+              border: '1.5px solid #cbd5e1',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: '0.82rem',
+              fontFamily: 'monospace',
+              color: '#0f172a',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            color: '#334155',
+            marginBottom: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}>
+            <Cpu size={13} color="#059669" />
+            <span>TIME COMPLEXITY</span>
+          </label>
+          <input
+            type="text"
+            value={q.timeComplexity || ''}
+            onChange={set('timeComplexity')}
+            placeholder="e.g. O(N log N)"
+            style={{
+              width: '100%',
+              background: '#f8fafc',
+              border: '1.5px solid #cbd5e1',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: '0.84rem',
+              fontFamily: 'monospace',
+              color: '#0f172a',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }}
+          />
+          <div style={{ marginTop: 8 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Clock size={11} /> Time Limit (ms)
+            </label>
+            <input
+              type="number"
+              value={q.timeLimit || 2000}
+              onChange={set('timeLimit')}
+              min={500}
+              max={10000}
+              step={500}
+              style={{
+                width: '100%',
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 6,
+                padding: '6px 10px',
+                fontSize: '0.82rem',
+                color: '#0f172a',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label style={{
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            color: '#334155',
+            marginBottom: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}>
+            <HardDrive size={13} color="#0284c7" />
+            <span>SPACE COMPLEXITY</span>
+          </label>
+          <input
+            type="text"
+            value={q.spaceComplexity || ''}
+            onChange={set('spaceComplexity')}
+            placeholder="e.g. O(1)"
+            style={{
+              width: '100%',
+              background: '#f8fafc',
+              border: '1.5px solid #cbd5e1',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: '0.84rem',
+              fontFamily: 'monospace',
+              color: '#0f172a',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }}
+          />
+          <div style={{ marginTop: 8 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <HardDrive size={11} /> Memory Limit (MB)
+            </label>
+            <input
+              type="number"
+              value={q.memoryLimit || 256}
+              onChange={set('memoryLimit')}
+              min={64}
+              max={1024}
+              step={64}
+              style={{
+                width: '100%',
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 6,
+                padding: '6px 10px',
+                fontSize: '0.82rem',
+                color: '#0f172a',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Test Cases Section (Public Sample + Confidential Hidden) ── */}
       <div style={{
         marginBottom: 22,
         background: '#f8fafc',
@@ -440,224 +638,281 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
           flexWrap: 'wrap',
           gap: 10
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CheckCircle2 size={16} color="#10b981" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
+                Test Cases ({testCases.length})
+              </span>
+            </div>
             <span style={{
-              fontSize: '0.85rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              letterSpacing: '0.02em',
-              textTransform: 'uppercase'
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              background: '#ecfdf5',
+              color: '#059669',
+              border: '1px solid #a7f3d0',
+              padding: '2px 8px',
+              borderRadius: 12
             }}>
-              Test Cases ({testCases.length})
+              🟢 {publicCount} Public Sample
             </span>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              Used for real-time automated candidate evaluation
+            <span style={{
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              background: '#fef2f2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              padding: '2px 8px',
+              borderRadius: 12
+            }}>
+              🔒 {hiddenCount} Hidden / Evaluation
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={addTestCase}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#f0fdf4',
-              border: '1.5px solid #86efac',
-              borderRadius: 8,
-              color: '#15803d',
-              cursor: 'pointer',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              padding: '6px 14px',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#dcfce7';
-              e.currentTarget.style.borderColor = '#4ade80';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#f0fdf4';
-              e.currentTarget.style.borderColor = '#86efac';
-            }}
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            Add Test Case
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => addTestCase(false)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: '#f0fdf4',
+                border: '1.5px solid #86efac',
+                borderRadius: 8,
+                color: '#15803d',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                padding: '6px 12px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Plus size={13} strokeWidth={2.5} />
+              + Sample Case
+            </button>
+            <button
+              type="button"
+              onClick={() => addTestCase(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: '#fef2f2',
+                border: '1.5px solid #fca5a5',
+                borderRadius: 8,
+                color: '#b91c1c',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                padding: '6px 12px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <EyeOff size={13} strokeWidth={2.5} />
+              + Hidden Case
+            </button>
+          </div>
         </div>
 
         {/* List of Test Cases */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {testCases.map((testCase, i) => (
-            <div
-              key={i}
-              style={{
-                background: '#ffffff',
-                border: '1.5px solid #cbd5e1',
-                borderRadius: 10,
-                padding: '16px 18px',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
-              }}
-            >
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 12
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    color: '#0a74da',
-                    background: '#eff6ff',
-                    padding: '3px 9px',
-                    borderRadius: 6
-                  }}>
-                    Case #{i + 1}
-                  </span>
-                  {i === 0 && (
-                    <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 600 }}>
-                      (Public Sample Case)
+          {testCases.map((testCase, i) => {
+            const isHidden = !!(testCase.is_hidden || testCase.isHidden);
+            return (
+              <div
+                key={i}
+                style={{
+                  background: '#ffffff',
+                  border: isHidden ? '1.5px solid #fecaca' : '1.5px solid #cbd5e1',
+                  borderRadius: 10,
+                  padding: '16px 18px',
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 12
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      color: isHidden ? '#b91c1c' : '#0a74da',
+                      background: isHidden ? '#fef2f2' : '#eff6ff',
+                      padding: '3px 9px',
+                      borderRadius: 6
+                    }}>
+                      Case #{i + 1}
                     </span>
+
+                    {/* Toggle Public / Hidden Button */}
+                    <button
+                      type="button"
+                      onClick={() => setTestCase(i, 'is_hidden', !isHidden)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        padding: '3px 10px',
+                        borderRadius: 14,
+                        cursor: 'pointer',
+                        background: isHidden ? '#fef2f2' : '#ecfdf5',
+                        color: isHidden ? '#dc2626' : '#059669',
+                        border: isHidden ? '1px solid #fca5a5' : '1px solid #a7f3d0'
+                      }}
+                    >
+                      {isHidden ? (
+                        <>
+                          <EyeOff size={12} /> Hidden Case (Evaluated on Server)
+                        </>
+                      ) : (
+                        <>
+                          <Eye size={12} /> Public Sample Case (Visible to Student)
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {testCases.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeTestCase(i)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#dc2626';
+                        e.currentTarget.style.background = '#fef2f2';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = '#94a3b8';
+                        e.currentTarget.style.background = 'none';
+                      }}
+                    >
+                      <Trash2 size={13} />
+                      Delete Case
+                    </button>
                   )}
                 </div>
 
-                {testCases.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeTestCase(i)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      background: 'none',
-                      border: 'none',
-                      color: '#94a3b8',
-                      cursor: 'pointer',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      padding: '4px 8px',
-                      borderRadius: 6,
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = '#dc2626';
-                      e.currentTarget.style.background = '#fef2f2';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '#94a3b8';
-                      e.currentTarget.style.background = 'none';
-                    }}
-                  >
-                    <Trash2 size={13} />
-                    Delete Case
-                  </button>
-                )}
-              </div>
-
-              {/* Input & Output Grid */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 14,
-                marginBottom: 12
-              }}>
-                <div>
-                  <label style={{
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    color: '#475569',
-                    marginBottom: 5,
-                    display: 'block'
-                  }}>
-                    INPUT (STDIN)
-                  </label>
-                  <textarea
-                    value={testCase.input}
-                    onChange={(e) => setTestCase(i, 'input', e.target.value)}
-                    placeholder="e.g. 5&#10;2 7 11 15&#10;9"
-                    rows={3}
-                    style={{
-                      width: '100%',
-                      background: '#f8fafc',
-                      border: '1.2px solid #cbd5e1',
-                      borderRadius: 8,
-                      padding: '9px 12px',
-                      color: '#0f172a',
-                      fontSize: '0.82rem',
-                      fontFamily: "'JetBrains Mono', Consolas, monospace",
-                      resize: 'vertical',
-                      boxSizing: 'border-box',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    color: '#475569',
-                    marginBottom: 5,
-                    display: 'block'
-                  }}>
-                    EXPECTED OUTPUT (STDOUT)
-                  </label>
-                  <textarea
-                    value={testCase.output}
-                    onChange={(e) => setTestCase(i, 'output', e.target.value)}
-                    placeholder="e.g. [0, 1]"
-                    rows={3}
-                    style={{
-                      width: '100%',
-                      background: '#f8fafc',
-                      border: '1.2px solid #cbd5e1',
-                      borderRadius: 8,
-                      padding: '9px 12px',
-                      color: '#0f172a',
-                      fontSize: '0.82rem',
-                      fontFamily: "'JetBrains Mono', Consolas, monospace",
-                      resize: 'vertical',
-                      boxSizing: 'border-box',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Explanation Field */}
-              <div>
-                <label style={{
-                  fontSize: '0.76rem',
-                  fontWeight: 600,
-                  color: '#64748b',
-                  marginBottom: 4,
-                  display: 'block'
+                {/* Input & Output Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 14,
+                  marginBottom: 12
                 }}>
-                  Explanation / Test Target (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={testCase.explanation}
-                  onChange={(e) => setTestCase(i, 'explanation', e.target.value)}
-                  placeholder="e.g. nums[0] + nums[1] = 2 + 7 = 9, so return [0, 1]"
-                  style={{
-                    width: '100%',
-                    background: '#f8fafc',
-                    border: '1.2px solid #cbd5e1',
-                    borderRadius: 8,
-                    padding: '8px 12px',
-                    color: '#0f172a',
-                    fontSize: '0.84rem',
-                    boxSizing: 'border-box',
-                    outline: 'none'
-                  }}
-                />
+                  <div>
+                    <label style={{
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                      marginBottom: 5,
+                      display: 'block'
+                    }}>
+                      INPUT (STDIN)
+                    </label>
+                    <textarea
+                      value={testCase.input}
+                      onChange={(e) => setTestCase(i, 'input', e.target.value)}
+                      placeholder="e.g. 5&#10;2 7 11 15&#10;9"
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        background: '#f8fafc',
+                        border: '1.2px solid #cbd5e1',
+                        borderRadius: 8,
+                        padding: '9px 12px',
+                        color: '#0f172a',
+                        fontSize: '0.82rem',
+                        fontFamily: "'JetBrains Mono', Consolas, monospace",
+                        resize: 'vertical',
+                        boxSizing: 'border-box',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                      marginBottom: 5,
+                      display: 'block'
+                    }}>
+                      EXPECTED OUTPUT (STDOUT)
+                    </label>
+                    <textarea
+                      value={testCase.output}
+                      onChange={(e) => setTestCase(i, 'output', e.target.value)}
+                      placeholder="e.g. 0 1"
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        background: '#f8fafc',
+                        border: '1.2px solid #cbd5e1',
+                        borderRadius: 8,
+                        padding: '9px 12px',
+                        color: '#0f172a',
+                        fontSize: '0.82rem',
+                        fontFamily: "'JetBrains Mono', Consolas, monospace",
+                        resize: 'vertical',
+                        boxSizing: 'border-box',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Explanation Field */}
+                <div>
+                  <label style={{
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    color: '#64748b',
+                    marginBottom: 4,
+                    display: 'block'
+                  }}>
+                    Explanation / Test Target (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={testCase.explanation || ''}
+                    onChange={(e) => setTestCase(i, 'explanation', e.target.value)}
+                    placeholder="e.g. Test case verifies handling of negative integers and duplicate elements"
+                    style={{
+                      width: '100%',
+                      background: '#f8fafc',
+                      border: '1.2px solid #cbd5e1',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      color: '#0f172a',
+                      fontSize: '0.84rem',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

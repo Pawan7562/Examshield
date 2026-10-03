@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
 import { formatDistance, formatDistanceToNow } from 'date-fns';
-import { formatIST } from '../../utils/timezone';
+import { formatIST, isExamEnded } from '../../utils/timezone';
 import toast from 'react-hot-toast';
 
 const statusColors = {
@@ -61,13 +61,17 @@ export default function ExamManagementProfessional() {
     }
   };
 
+  const getEffectiveStatus = (e) => {
+    return isExamEnded(e) ? 'completed' : (e.status || 'draft');
+  };
+
   const updateStats = (examsData) => {
     const newStats = {
       total: examsData.length,
-      draft: examsData.filter(e => e.status === 'draft').length,
-      published: examsData.filter(e => e.status === 'published').length,
-      active: examsData.filter(e => e.status === 'active').length,
-      completed: examsData.filter(e => e.status === 'completed').length,
+      draft: examsData.filter(e => getEffectiveStatus(e) === 'draft').length,
+      published: examsData.filter(e => getEffectiveStatus(e) === 'published').length,
+      active: examsData.filter(e => getEffectiveStatus(e) === 'active').length,
+      completed: examsData.filter(e => getEffectiveStatus(e) === 'completed').length,
     };
     setStats(newStats);
   };
@@ -587,14 +591,16 @@ export default function ExamManagementProfessional() {
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '16px' }}>
-          {filteredAndSortedExams.map(exam => (
+          {filteredAndSortedExams.map(exam => {
+            const effStatus = getEffectiveStatus(exam);
+            return (
             <div 
               key={exam.id} 
               style={{ 
                 background: 'rgba(255,255,255,0.05)', 
                 borderRadius: '16px', 
                 padding: '20px',
-                border: `2px solid ${statusColors[exam.status]?.border || 'rgba(255,255,255,0.1)'}`,
+                border: `2px solid ${statusColors[effStatus]?.border || 'rgba(255,255,255,0.1)'}`,
                 transition: 'all 0.3s ease',
                 position: 'relative',
                 cursor: 'pointer'
@@ -639,13 +645,13 @@ export default function ExamManagementProfessional() {
                       fontWeight: '700', 
                       padding: '4px 12px', 
                       borderRadius: '20px', 
-                      background: statusColors[exam.status]?.bg || '#6b7280',
-                      color: statusColors[exam.status]?.text || '#ffffff',
+                      background: statusColors[effStatus]?.bg || '#6b7280',
+                      color: statusColors[effStatus]?.text || '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px'
                     }}>
-                      {statusIcons[exam.status]} {exam.status?.toUpperCase()}
+                      {statusIcons[effStatus]} {effStatus?.toUpperCase()}
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', fontSize: '12px', color: '#94a3b8' }}>
@@ -827,17 +833,24 @@ export default function ExamManagementProfessional() {
                     🕐 Duration: {formatDistanceToNow(new Date(exam.date_time), { addSuffix: true })}
                   </span>
                 </div>
-                {exam.status === 'published' && (
+                {effStatus === 'published' && (
                   <div style={{ marginTop: '8px' }}>
                     <span>
                       🚀 Starts: {formatDistanceToNow(new Date(exam.date_time), { addSuffix: true })}
                     </span>
                   </div>
                 )}
-                {exam.status === 'active' && (
+                {effStatus === 'active' && (
                   <div style={{ marginTop: '8px' }}>
                     <span>
                       ⏰ Ends: {formatDistanceToNow(new Date(new Date(exam.date_time).getTime() + exam.duration * 60000), { addSuffix: true })}
+                    </span>
+                  </div>
+                )}
+                {effStatus === 'completed' && (
+                  <div style={{ marginTop: '8px', color: '#94a3b8' }}>
+                    <span>
+                      🏁 Ended: {formatDistanceToNow(new Date(new Date(exam.date_time).getTime() + exam.duration * 60000), { addSuffix: true })}
                     </span>
                   </div>
                 )}

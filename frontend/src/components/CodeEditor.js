@@ -25,8 +25,9 @@ const SUPPORTED_LANGUAGES = [
     monacoLang: 'javascript',
     icon: '🟨',
     badge: 'Node v20',
-    getDefaultCode: (fnName = 'solution') =>
-`/**
+    getDefaultCode: (format = 'stdin_stdout', fnName = 'solution') => {
+      if (format === 'function') {
+        return `/**
  * @param {any} input
  * @return {any}
  */
@@ -34,7 +35,20 @@ function ${fnName}(input) {
   // Write your solution here
   
   return input;
-}`
+}`;
+      }
+      return `const fs = require('fs');
+
+function main() {
+  const input = fs.readFileSync(0, 'utf-8').trim();
+  if (!input) return;
+
+  // Write your solution here: process input and output with console.log
+  
+}
+
+main();`;
+    }
   },
   {
     id: 'python',
@@ -42,12 +56,28 @@ function ${fnName}(input) {
     monacoLang: 'python',
     icon: '🐍',
     badge: 'Python 3.11',
-    getDefaultCode: (fnName = 'solution') =>
-`class Solution:
+    getDefaultCode: (format = 'stdin_stdout', fnName = 'solution') => {
+      if (format === 'function') {
+        return `class Solution:
     def ${fnName}(self, input):
         # Write your solution here
         
-        return input`
+        return input`;
+      }
+      return `import sys
+
+def main():
+    # Read input from standard input
+    input_data = sys.stdin.read().strip()
+    if not input_data:
+        return
+    
+    # Write your solution here: process input_data and print result
+    
+
+if __name__ == '__main__':
+    main()`;
+    }
   },
   {
     id: 'cpp',
@@ -55,8 +85,9 @@ function ${fnName}(input) {
     monacoLang: 'cpp',
     icon: '⚙️',
     badge: 'GCC 13',
-    getDefaultCode: (fnName = 'solution') =>
-`#include <iostream>
+    getDefaultCode: (format = 'stdin_stdout', fnName = 'solution') => {
+      if (format === 'function') {
+        return `#include <iostream>
 #include <vector>
 #include <string>
 
@@ -66,10 +97,28 @@ class Solution {
 public:
     int ${fnName}(int input) {
         // Write your solution here
-        
         return input;
     }
-};`
+};`;
+      }
+      return `#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+
+using namespace std;
+
+int main() {
+    // Fast I/O
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+
+    // Write your solution here: read with cin and output with cout
+    
+
+    return 0;
+}`;
+    }
   },
   {
     id: 'java',
@@ -77,16 +126,28 @@ public:
     monacoLang: 'java',
     icon: '☕',
     badge: 'OpenJDK 21',
-    getDefaultCode: (fnName = 'solution') =>
-`import java.util.*;
+    getDefaultCode: (format = 'stdin_stdout', fnName = 'solution') => {
+      if (format === 'function') {
+        return `import java.util.*;
 
 class Solution {
     public int ${fnName}(int input) {
         // Write your solution here
-        
         return input;
     }
-}`
+};`;
+      }
+      return `import java.util.*;
+import java.io.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        // Write your solution here: read from sc and print to System.out
+        
+    }
+}`;
+    }
   }
 ];
 
@@ -114,6 +175,11 @@ const CodeEditor = ({
   const editorInstanceRef = useRef(null);
   const containerRef = useRef(null);
 
+  const executionFormat = question?.executionFormat ||
+    question?.execution_format ||
+    (typeof question?.options === 'object' && question?.options?.executionFormat) ||
+    'stdin_stdout';
+
   // Extract function name from question or fallback to 'solution'
   const detectedFnName = useMemo(() => {
     if (!question) return 'solution';
@@ -132,21 +198,34 @@ const CodeEditor = ({
   const cases = useMemo(() => {
     if (Array.isArray(sampleTestCases) && sampleTestCases.length > 0) return sampleTestCases;
     if (Array.isArray(question?.examples) && question.examples.length > 0) return question.examples;
-    if (Array.isArray(question?.testCases) && question.testCases.length > 0) return question.testCases;
-    return [{ input: '[1, 2, 3]', output: '3' }];
+    if (Array.isArray(question?.sampleTestCases) && question.sampleTestCases.length > 0) return question.sampleTestCases;
+    if (Array.isArray(question?.testCases) && question.testCases.length > 0) {
+      return question.testCases.filter(tc => !tc.is_hidden && !tc.isHidden);
+    }
+    if (Array.isArray(question?.test_cases) && question.test_cases.length > 0) {
+      return question.test_cases.filter(tc => !tc.is_hidden && !tc.isHidden);
+    }
+    return [];
   }, [sampleTestCases, question]);
+
+  // Auto-switch to custom case if no sample cases exist
+  useEffect(() => {
+    if (cases.length === 0) {
+      setIsCustomCase(true);
+    }
+  }, [cases.length]);
 
   // Initial code template setup
   useEffect(() => {
     if (!answer) {
       const currentLang = SUPPORTED_LANGUAGES.find(l => l.id === language) || SUPPORTED_LANGUAGES[0];
-      const template = question?.code_template || currentLang.getDefaultCode(detectedFnName);
+      const template = question?.code_template || currentLang.getDefaultCode(executionFormat, detectedFnName);
       setCode(template);
-      onAnswer?.(template);
+      onAnswer?.(template, language);
     } else {
       setCode(answer);
     }
-  }, [language, question, detectedFnName]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [language, question, executionFormat, detectedFnName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Switch to result tab automatically when run completes
   useEffect(() => {
@@ -160,7 +239,7 @@ const CodeEditor = ({
   // Code change handler
   const handleCodeChange = (newCode) => {
     setCode(newCode || '');
-    onAnswer?.(newCode || '');
+    onAnswer?.(newCode || '', language);
   };
 
   // Language switch handler
@@ -169,18 +248,18 @@ const CodeEditor = ({
     if (!langObj) return;
 
     onLanguageChange?.(newLangId);
-    const newTemplate = langObj.getDefaultCode(detectedFnName);
+    const newTemplate = langObj.getDefaultCode(executionFormat, detectedFnName);
     setCode(newTemplate);
-    onAnswer?.(newTemplate);
+    onAnswer?.(newTemplate, newLangId);
     toast.success(`Switched to ${langObj.name}`, { icon: langObj.icon, duration: 2500 });
   };
 
   // Reset to initial boilerplate template
   const handleResetCode = () => {
     const langObj = SUPPORTED_LANGUAGES.find(l => l.id === language) || SUPPORTED_LANGUAGES[0];
-    const resetTemplate = question?.code_template || langObj.getDefaultCode(detectedFnName);
+    const resetTemplate = question?.code_template || langObj.getDefaultCode(executionFormat, detectedFnName);
     setCode(resetTemplate);
-    onAnswer?.(resetTemplate);
+    onAnswer?.(resetTemplate, language);
     toast.success('Code reset to default starter template');
   };
 

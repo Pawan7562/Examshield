@@ -10,6 +10,7 @@
     "migrate": "node config/migrate.js",
     "seed": "node config/seed.js",
     "check": "node start-backend.js",
+    "test": "node tests/coding_exam_system.test.js",
     "start:prod": "NODE_ENV=production node server.js"
   },
   "dependencies": {

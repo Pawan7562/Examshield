@@ -1,6 +1,7 @@
 // controllers/liveMonitoringController.js
 const { pool } = require('../config/database');
 const { supabase } = require('../config/postgres-client');
+const { autoCloseExpiredExams } = require('../services/examLifecycleService');
 
 /**
  * GET /api/admin/monitoring/overview
@@ -9,6 +10,7 @@ const { supabase } = require('../config/postgres-client');
 exports.getLiveOverview = async (req, res) => {
   try {
     const collegeId = req.user.id;
+    await autoCloseExpiredExams().catch(() => {});
 
     // Single consolidated high-speed query
     const result = await pool.query(`
@@ -52,8 +54,9 @@ exports.getLiveOverview = async (req, res) => {
       const start = exam.date_time ? new Date(exam.date_time) : null;
       const durationMin = Number(exam.duration) || 60;
       const end = start ? new Date(start.getTime() + durationMin * 60000) : null;
+      const isEnded = end ? now > end : (exam.status === 'completed');
       const isTimeLive = start && end && now >= start && now <= end;
-      const isLive = exam.active_students > 0 || isTimeLive || exam.status === 'active' || exam.status === 'published';
+      const isLive = !isEnded && (exam.active_students > 0 || isTimeLive);
 
       return {
         id: exam.id,
@@ -61,7 +64,7 @@ exports.getLiveOverview = async (req, res) => {
         name: exam.name,
         subject: exam.subject,
         exam_code: exam.exam_code,
-        status: exam.status,
+        status: isEnded ? 'completed' : exam.status,
         date_time: exam.date_time,
         start_time: exam.date_time,
         duration: exam.duration,

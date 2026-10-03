@@ -114,6 +114,7 @@ initRedisAdapter(io);
 
 // Socket.IO rooms for exam monitoring
 const activeExamSessions = new Map(); // sessionId -> {studentId, examId, collegeId, status}
+const latestStudentFrames = new Map(); // examId -> Map(studentId -> { studentId, sessionId, imageData, timestamp })
 
 // Automatic session memory sweeper for 50k-100k concurrent users (evicts inactive sessions > 1 hour)
 setInterval(() => {
@@ -121,6 +122,16 @@ setInterval(() => {
   for (const [id, session] of activeExamSessions.entries()) {
     if (new Date(session.lastHeartbeat || session.connectedAt).getTime() < cutoff) {
       activeExamSessions.delete(id);
+    }
+  }
+  for (const [examId, framesMap] of latestStudentFrames.entries()) {
+    for (const [studentId, frame] of framesMap.entries()) {
+      if (frame.timestamp < cutoff) {
+        framesMap.delete(studentId);
+      }
+    }
+    if (framesMap.size === 0) {
+      latestStudentFrames.delete(examId);
     }
   }
 }, 10 * 60 * 1000).unref();
@@ -207,8 +218,7 @@ io.on('connection', (socket) => {
       examId,
       timestamp: new Date().toISOString(),
     };
-    io.to(`admin-exam-${examId}`).emit('student-joined', joinPayload);
-    io.to(`exam-monitoring-${examId}`).emit('student-joined', joinPayload);
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('student-joined', joinPayload);
 
     logger.info(`Student ${studentId || 'unknown'} joined exam ${examId}`);
   });
@@ -225,6 +235,17 @@ io.on('connection', (socket) => {
       .map(([id, data]) => ({ sessionId: id, ...data }));
     
     socket.emit('active-sessions', sessions);
+
+    // Send latest cached camera frames for immediate zero-delay display
+    const examFramesMap = latestStudentFrames.get(examId);
+    if (examFramesMap && examFramesMap.size > 0) {
+      const initialFrames = {};
+      examFramesMap.forEach((val, sid) => {
+        initialFrames[sid] = val.imageData;
+      });
+      socket.emit('initial-camera-feeds', { examId, frames: initialFrames });
+    }
+
     logger.info(`Admin joined monitoring for exam ${examId}`);
   };
 
@@ -237,17 +258,29 @@ io.on('connection', (socket) => {
     socket.leave(`exam-monitoring-${examId}`);
   });
 
-  // Camera feed stream from student to proctor
+  // Camera feed stream from student to proctor (optimized deduplicated broadcast)
   socket.on('camera-feed', ({ examId, studentId, sessionId, imageData, timestamp }) => {
+    if (!examId || !studentId || !imageData) return;
+
+    // Cache latest frame for zero-latency initial load on admin reconnects
+    if (!latestStudentFrames.has(examId)) {
+      latestStudentFrames.set(examId, new Map());
+    }
+    latestStudentFrames.get(examId).set(studentId, {
+      studentId,
+      sessionId,
+      imageData,
+      timestamp: timestamp || Date.now(),
+    });
+
     const feedPayload = {
       examId,
       studentId,
       sessionId,
       imageData,
-      timestamp: timestamp || new Date().toISOString(),
+      timestamp: timestamp || Date.now(),
     };
-    io.to(`admin-exam-${examId}`).emit('camera-feed', feedPayload);
-    io.to(`exam-monitoring-${examId}`).emit('camera-feed', feedPayload);
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('camera-feed', feedPayload);
   });
 
   // Student telemetry update (question progress, face count, audio level)
@@ -261,8 +294,7 @@ io.on('connection', (socket) => {
         lastSeen: new Date().toISOString(),
       },
     };
-    io.to(`admin-exam-${examId}`).emit('student-activity', actPayload);
-    io.to(`exam-monitoring-${examId}`).emit('student-activity', actPayload);
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('student-activity', actPayload);
   });
 
   // Violation event
@@ -277,8 +309,7 @@ io.on('connection', (socket) => {
       description: description || type,
       timestamp: new Date().toISOString(),
     };
-    io.to(`admin-exam-${examId}`).emit('violation-alert', violPayload);
-    io.to(`exam-monitoring-${examId}`).emit('violation-alert', violPayload);
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('violation-alert', violPayload);
   });
 
   // Admin sends direct warning to student
@@ -293,8 +324,7 @@ io.on('connection', (socket) => {
     };
     io.to(`student-${studentId}`).emit('warning-received', warnPayload);
     io.to(`exam-${examId}`).emit('warning-received', warnPayload);
-    io.to(`admin-exam-${examId}`).emit('warning-sent', warnPayload);
-    io.to(`exam-monitoring-${examId}`).emit('warning-sent', warnPayload);
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('warning-sent', warnPayload);
   });
 
   // Admin terminates exam for student
@@ -307,8 +337,7 @@ io.on('connection', (socket) => {
     };
     io.to(`student-${studentId}`).emit('exam-terminated', termPayload);
     io.to(`exam-${examId}`).emit('exam-terminated', termPayload);
-    io.to(`admin-exam-${examId}`).emit('student-terminated', termPayload);
-    io.to(`exam-monitoring-${examId}`).emit('student-terminated', termPayload);
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('student-terminated', termPayload);
   });
 
   // Admin broadcasts announcement to entire exam
@@ -321,8 +350,7 @@ io.on('connection', (socket) => {
       timestamp: new Date().toISOString(),
     };
     io.to(`exam-${examId}`).emit('broadcast-received', broadPayload);
-    io.to(`admin-exam-${examId}`).emit('broadcast-sent', broadPayload);
-    io.to(`exam-monitoring-${examId}`).emit('broadcast-sent', broadPayload);
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('broadcast-sent', broadPayload);
   });
 
   // Heartbeat - student is still present
@@ -337,8 +365,7 @@ io.on('connection', (socket) => {
       timestamp: new Date().toISOString(),
     };
     if (examId) {
-      io.to(`admin-exam-${examId}`).emit('heartbeat', hbPayload);
-      io.to(`exam-monitoring-${examId}`).emit('heartbeat', hbPayload);
+      io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('heartbeat', hbPayload);
     }
   });
 
@@ -353,8 +380,7 @@ io.on('connection', (socket) => {
       examId,
       timestamp: new Date().toISOString(),
     };
-    io.to(`admin-exam-${examId}`).emit('student-submitted', subPayload);
-    io.to(`exam-monitoring-${examId}`).emit('student-submitted', subPayload);
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('student-submitted', subPayload);
   });
 
   // Disconnect
@@ -367,8 +393,7 @@ io.on('connection', (socket) => {
           examId: data.examId,
           timestamp: new Date().toISOString(),
         };
-        io.to(`admin-exam-${data.examId}`).emit('student-disconnected', dcPayload);
-        io.to(`exam-monitoring-${data.examId}`).emit('student-disconnected', dcPayload);
+        io.to(`admin-exam-${data.examId}`).to(`exam-monitoring-${data.examId}`).emit('student-disconnected', dcPayload);
         activeExamSessions.delete(sessionId);
         break;
       }
@@ -435,8 +460,27 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Too many login attempts for this account. Please try again in 15 minutes.' },
 });
 
+const codeExecLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // 60 code runs/submissions per candidate per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith('Bearer ')) {
+      return `code_${auth.slice(-32)}`;
+    }
+    return req.ip;
+  },
+  skip: (req) => req.method === 'OPTIONS',
+  message: { success: false, message: 'Code execution rate limit reached. Please wait a moment before running or submitting again.' },
+});
+
 app.use('/api/', limiter);
 app.use('/api/auth/', authLimiter);
+app.use('/api/student/run-code', codeExecLimiter);
+app.use('/api/student/submit-code', codeExecLimiter);
+app.use('/api/code/', codeExecLimiter);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -548,31 +592,19 @@ app.use((err, req, res, next) => {
 });
 
 // =====================================================
-// CRON JOBS (TEMPORARILY DISABLED)
 // =====================================================
+// EXAM LIFECYCLE MANAGEMENT (AUTO-CLOSE EXPIRED EXAMS)
+// =====================================================
+const { autoCloseExpiredExams } = require('./services/examLifecycleService');
 
-// Send exam reminders 1 hour before
-// cron.schedule('* * * * *', async () => {
-//   try {
-//     const { supabase } = require('./config/supabase');
-//     const { sendExamReminder } = require('./services/emailService');
-//     
-//     logger.info('Exam reminder cron job running (mock)');
-//   } catch (error) {
-//     logger.error('Exam reminder cron error:', error);
-//   }
-// });
-
-// Auto-close exams that have ended
-// cron.schedule('*/5 * * * *', async () => {
-//   try {
-//     const { supabase } = require('./config/supabase');
-//     // Simplified for development - just log the action
-//     logger.info('Auto-close exams cron job running (mock)');
-//   } catch (err) {
-//     logger.error('Auto-close exams error:', err);
-//   }
-// });
+// Run auto-close every 30 seconds to strictly enforce scheduled end times
+const autoCloseInterval = setInterval(async () => {
+  try {
+    await autoCloseExpiredExams();
+  } catch (err) {
+    logger.error('Auto-close exams interval error:', err);
+  }
+}, 30000);
 
 // =====================================================
 // START SERVER & ENTERPRISE RELIABILITY GUARDS
@@ -594,6 +626,13 @@ server.listen(PORT, () => {
     logger.info('⚡ Database connection pool pre-warmed and ready for instant logins');
   }).catch((err) => {
     logger.warn(`Initial DB warm-up ping: ${err.message}`);
+  });
+
+  // Execute initial lifecycle sweep to close any expired exams and hanging sessions
+  autoCloseExpiredExams().then((res) => {
+    logger.info(`🛡️ Initial Exam Lifecycle sweep complete. (Closed: ${res?.closedExamsCount || 0}, Sessions: ${res?.autoSubmittedSessionsCount || 0})`);
+  }).catch((err) => {
+    logger.error('Initial auto-close exams error:', err);
   });
 });
 

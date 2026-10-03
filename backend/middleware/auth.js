@@ -26,7 +26,16 @@ const authenticate = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'examshield_jwt_secret_key_change_in_production_123456');
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'examshield_jwt_secret_key_change_in_production_123456');
+    } catch (tokenErr) {
+      try {
+        decoded = jwt.verify(token, 'CollegeExam_jwt_secret_key_change_in_production_123456');
+      } catch (fallbackErr) {
+        throw tokenErr;
+      }
+    }
 
     const cacheKey = `${decoded.role}:${decoded.id}`;
     const cached = userCache.get(cacheKey);

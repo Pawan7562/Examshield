@@ -140,64 +140,93 @@ const ProfessionalProctoring = ({
   const socketRef = useRef(socket);
   const cameraOffRef = useRef(false);
   const cameraStatusRef = useRef('initializing');
+  const studentIdRef = useRef(studentId);
+  const currentQuestionRef = useRef(currentQuestion);
+  const totalQuestionsRef = useRef(totalQuestions);
+  const faceCountRef = useRef(faceCount);
+  const audioLevelRef = useRef(0);
+  const offscreenCanvasRef = useRef(null);
+  const lastAudioUiUpdateRef = useRef(0);
+  const lastAudioUiValRef = useRef(0);
 
   useEffect(() => { socketRef.current = socket; }, [socket]);
-
-  // Keep refs current
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
   useEffect(() => { examIdRef.current = examId; }, [examId]);
   useEffect(() => { onViolationRef.current = onViolation; }, [onViolation]);
   useEffect(() => { cameraStatusRef.current = cameraStatus; }, [cameraStatus]);
   useEffect(() => { cameraOffRef.current = cameraOff; }, [cameraOff]);
+  useEffect(() => { studentIdRef.current = studentId; }, [studentId]);
+  useEffect(() => { currentQuestionRef.current = currentQuestion; }, [currentQuestion]);
+  useEffect(() => { totalQuestionsRef.current = totalQuestions; }, [totalQuestions]);
+  useEffect(() => { faceCountRef.current = faceCount; }, [faceCount]);
 
-  // ─── Periodic Camera Frame & Telemetry Transmitter to Admin Cockpit ───
+  // ─── Continuous High-Performance Live Video Streaming Loop ───
   useEffect(() => {
     if (!socket) return;
     if (cameraStatus !== 'active' && cameraStatus !== 'off') return;
 
-    const transmitInterval = setInterval(() => {
+    if (!offscreenCanvasRef.current) {
+      const c = document.createElement('canvas');
+      c.width = 240;
+      c.height = 180;
+      offscreenCanvasRef.current = c;
+    }
+    const offscreen = offscreenCanvasRef.current;
+    const ctx = offscreen.getContext('2d', { alpha: false, desynchronized: true });
+
+    // Video frame streamer: 350ms (~2.8 FPS) with lightweight 0.45 JPEG compression
+    const videoStreamInterval = setInterval(() => {
       try {
-        const isActive = cameraStatus === 'active' && !cameraOffRef.current;
+        const isActive = cameraStatusRef.current === 'active' && !cameraOffRef.current;
         const video = videoRef.current;
 
-        if (isActive && video && video.readyState >= 2 && video.videoWidth) {
-          const offscreen = document.createElement('canvas');
-          offscreen.width = 240;
-          offscreen.height = 180;
-          const ctx = offscreen.getContext('2d');
+        if (isActive && video && video.readyState >= 2 && video.videoWidth > 0) {
           ctx.drawImage(video, 0, 0, 240, 180);
-          const dataUrl = offscreen.toDataURL('image/jpeg', 0.42);
+          const dataUrl = offscreen.toDataURL('image/jpeg', 0.45);
           const base64Data = dataUrl.split(',')[1];
-          if (base64Data) {
-            socket.emit('camera-feed', {
+          if (base64Data && socketRef.current && socketRef.current.connected) {
+            socketRef.current.emit('camera-feed', {
               examId: examIdRef.current,
-              studentId,
+              studentId: studentIdRef.current,
               sessionId: sessionIdRef.current,
               imageData: base64Data,
-              timestamp: new Date().toISOString(),
+              timestamp: Date.now(),
             });
           }
         }
+      } catch (e) {
+        // Continue silently without interrupting streaming loop
+      }
+    }, 350);
 
-        socket.emit('student-activity', {
-          examId: examIdRef.current,
-          studentId,
-          sessionId: sessionIdRef.current,
-          activity: {
-            currentQuestion,
-            totalQuestions,
-            cameraActive: isActive,
-            cameraOff: cameraOffRef.current,
-            audioLevel,
-            faceCount,
-            status: 'active',
-          },
-        });
+    // Telemetry transmitter: runs every 2200ms
+    const telemetryInterval = setInterval(() => {
+      try {
+        const isActive = cameraStatusRef.current === 'active' && !cameraOffRef.current;
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('student-activity', {
+            examId: examIdRef.current,
+            studentId: studentIdRef.current,
+            sessionId: sessionIdRef.current,
+            activity: {
+              currentQuestion: currentQuestionRef.current,
+              totalQuestions: totalQuestionsRef.current,
+              cameraActive: isActive,
+              cameraOff: cameraOffRef.current,
+              audioLevel: audioLevelRef.current,
+              faceCount: faceCountRef.current,
+              status: 'active',
+            },
+          });
+        }
       } catch (_) {}
-    }, 3500);
+    }, 2200);
 
-    return () => clearInterval(transmitInterval);
-  }, [socket, cameraStatus, cameraOff, studentId, currentQuestion, totalQuestions, audioLevel, faceCount]);
+    return () => {
+      clearInterval(videoStreamInterval);
+      clearInterval(telemetryInterval);
+    };
+  }, [socket, cameraStatus, cameraOff]);
 
   // ─── Throttled Violation Reporter ──────────────────────────────────────────
   const reportViolation = useCallback(async (type, description) => {
@@ -416,7 +445,15 @@ const ProfessionalProctoring = ({
                 const avg = sum / dataArray.length;
                 // Scale to 0-100%
                 const normalized = Math.min(100, Math.round((avg / 128) * 100));
-                setAudioLevel(normalized);
+                audioLevelRef.current = normalized;
+
+                // Throttle state update to at most ~5 updates/sec to prevent React frame drops
+                const nowMs = Date.now();
+                if (nowMs - lastAudioUiUpdateRef.current > 200 || Math.abs(normalized - lastAudioUiValRef.current) > 8) {
+                  lastAudioUiUpdateRef.current = nowMs;
+                  lastAudioUiValRef.current = normalized;
+                  setAudioLevel(normalized);
+                }
 
                 // Detect sustained speech/voice: volume > 58% for > 25 consecutive frames (~0.4s sustained voice)
                 if (normalized > 58) {

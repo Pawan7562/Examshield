@@ -49,6 +49,97 @@ const playAlertChime = (severity = 'high') => {
   } catch (_) {}
 };
 
+// High-performance Pub/Sub dispatcher for real-time video frames (bypasses full-tree React re-renders)
+class LiveFeedHub {
+  constructor() {
+    this.listeners = new Map(); // studentId -> Set(cb)
+    this.latestFrames = new Map(); // studentId -> imageData
+  }
+  dispatch(studentId, imageData) {
+    this.latestFrames.set(studentId, imageData);
+    const set = this.listeners.get(studentId);
+    if (set) {
+      set.forEach(cb => {
+        try { cb(imageData); } catch (_) {}
+      });
+    }
+  }
+  subscribe(studentId, cb) {
+    if (!this.listeners.has(studentId)) {
+      this.listeners.set(studentId, new Set());
+    }
+    this.listeners.get(studentId).add(cb);
+    if (this.latestFrames.has(studentId)) {
+      try { cb(this.latestFrames.get(studentId)); } catch (_) {}
+    }
+    return () => {
+      const set = this.listeners.get(studentId);
+      if (set) {
+        set.delete(cb);
+        if (set.size === 0) this.listeners.delete(studentId);
+      }
+    };
+  }
+  getFrame(studentId) {
+    return this.latestFrames.get(studentId) || null;
+  }
+  clear() {
+    this.listeners.clear();
+    this.latestFrames.clear();
+  }
+}
+
+const liveFeedHub = new LiveFeedHub();
+
+// Isolated, zero-reconciliation video renderer for high FPS multi-candidate streaming
+const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated }) => {
+  const imgRef = useRef(null);
+  const placeholderRef = useRef(null);
+
+  useEffect(() => {
+    const handleFrame = (imageData) => {
+      if (imgRef.current) {
+        imgRef.current.src = `data:image/jpeg;base64,${imageData}`;
+        imgRef.current.style.display = 'block';
+      }
+      if (placeholderRef.current) {
+        placeholderRef.current.style.display = 'none';
+      }
+    };
+
+    const unsub = liveFeedHub.subscribe(studentId, handleFrame);
+    const existing = liveFeedHub.getFrame(studentId);
+    if (existing) {
+      handleFrame(existing);
+    }
+    return unsub;
+  }, [studentId]);
+
+  return (
+    <>
+      <img
+        ref={imgRef}
+        alt={studentName || 'Candidate'}
+        className="surveillance-webcam-feed"
+        style={{ display: 'none', width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+      <div
+        ref={placeholderRef}
+        className="surveillance-radar-placeholder"
+        style={{ display: 'flex' }}
+      >
+        <div className="surveillance-avatar-circle">
+          {studentName?.charAt(0)?.toUpperCase() || 'C'}
+          <div className="surveillance-scanline" />
+        </div>
+        <span style={{ fontSize: '0.72rem', letterSpacing: '0.04em' }}>
+          {isTerminated ? 'SESSION TERMINATED' : 'PROCTOR RADAR ACTIVE'}
+        </span>
+      </div>
+    </>
+  );
+});
+
 export default function LiveMonitor() {
   const { id: paramExamId } = useParams();
   const navigate = useNavigate();
@@ -98,6 +189,8 @@ export default function LiveMonitor() {
   const [audioLevels, setAudioLevels] = useState({}); // { [studentId]: level0to100 }
 
   const socketRef = useRef(null);
+  const pendingActivitiesRef = useRef({});
+  const flushTimeoutRef = useRef(null);
 
   const applyMonitoringData = useCallback((data) => {
     if (!data) return;
@@ -191,32 +284,57 @@ export default function LiveMonitor() {
       setConnected(false);
     });
 
-    // Live frame feed from candidate
+    // Live frame feed from candidate — zero React re-render overhead via liveFeedHub
     socket.on('camera-feed', (data) => {
-      if (data.studentId && data.imageData) {
-        setCameraFrames(prev => ({ ...prev, [data.studentId]: data.imageData }));
+      if (data?.studentId && data?.imageData) {
+        liveFeedHub.dispatch(data.studentId, data.imageData);
       }
     });
 
-    // Real-time candidate telemetry
-    socket.on('student-activity', (data) => {
-      if (!data.studentId) return;
-      setCandidates(prev => prev.map(cand => {
-        if (cand.id === data.studentId || cand.sessionId === data.sessionId) {
-          return {
-            ...cand,
-            activity: {
-              ...cand.activity,
-              ...data.activity,
-              lastSeen: new Date().toISOString()
-            }
-          };
-        }
-        return cand;
-      }));
+    socket.on('initial-camera-feeds', (data) => {
+      if (data?.frames) {
+        Object.entries(data.frames).forEach(([sid, img]) => {
+          liveFeedHub.dispatch(sid, img);
+        });
+      }
+    });
 
-      if (data.activity?.audioLevel !== undefined) {
-        setAudioLevels(prev => ({ ...prev, [data.studentId]: data.activity.audioLevel }));
+    // Real-time candidate telemetry — batched at 300ms to preserve UI smoothness
+    socket.on('student-activity', (data) => {
+      if (!data?.studentId) return;
+      pendingActivitiesRef.current[data.studentId] = data;
+
+      if (!flushTimeoutRef.current) {
+        flushTimeoutRef.current = setTimeout(() => {
+          flushTimeoutRef.current = null;
+          const pending = { ...pendingActivitiesRef.current };
+          pendingActivitiesRef.current = {};
+
+          setCandidates(prev => prev.map(cand => {
+            const p = pending[cand.id] || (cand.sessionId ? pending[cand.sessionId] : null);
+            if (p) {
+              return {
+                ...cand,
+                activity: {
+                  ...cand.activity,
+                  ...p.activity,
+                  lastSeen: new Date().toISOString()
+                }
+              };
+            }
+            return cand;
+          }));
+
+          const audioBatch = {};
+          Object.entries(pending).forEach(([sid, d]) => {
+            if (d.activity?.audioLevel !== undefined) {
+              audioBatch[sid] = d.activity.audioLevel;
+            }
+          });
+          if (Object.keys(audioBatch).length > 0) {
+            setAudioLevels(prev => ({ ...prev, ...audioBatch }));
+          }
+        }, 300);
       }
     });
 
@@ -278,6 +396,7 @@ export default function LiveMonitor() {
     });
 
     return () => {
+      if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current);
       socket.emit('leave-exam-monitoring', { examId: currentExamId });
       socket.disconnect();
     };
@@ -759,25 +878,13 @@ export default function LiveMonitor() {
                     key={student.id}
                     className={`surveillance-card ${isFlagged && !isTerminated ? 'flagged' : ''} ${isTerminated ? 'terminated' : ''}`}
                   >
-                    {/* Camera Feed Viewport */}
+                    {/* Camera Feed Viewport — High-throughput real-time video feed */}
                     <div className="surveillance-frame-wrap">
-                      {liveImage ? (
-                        <img
-                          src={`data:image/jpeg;base64,${liveImage}`}
-                          alt={student.name}
-                          className="surveillance-webcam-feed"
-                        />
-                      ) : (
-                        <div className="surveillance-radar-placeholder">
-                          <div className="surveillance-avatar-circle">
-                            {student.name?.charAt(0)?.toUpperCase() || 'C'}
-                            <div className="surveillance-scanline" />
-                          </div>
-                          <span style={{ fontSize: '0.72rem', letterSpacing: '0.04em' }}>
-                            {isTerminated ? 'SESSION TERMINATED' : 'PROCTOR RADAR ACTIVE'}
-                          </span>
-                        </div>
-                      )}
+                      <CandidateWebcamFeed
+                        studentId={student.id}
+                        studentName={student.name}
+                        isTerminated={isTerminated}
+                      />
 
                       {/* Top Overlay Badges */}
                       <div className="surveillance-overlay-top">
@@ -1240,6 +1347,25 @@ export default function LiveMonitor() {
                 <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
                   Roll No: {inspectModal.student.studentId} • {inspectModal.student.email}
                 </div>
+              </div>
+            </div>
+
+            {/* High-Resolution Live Camera Stream for Inspected Candidate */}
+            <div style={{
+              width: '100%',
+              height: 220,
+              borderRadius: 10,
+              overflow: 'hidden',
+              marginBottom: 16,
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: '#030712'
+            }}>
+              <div className="surveillance-frame-wrap" style={{ width: '100%', height: '100%' }}>
+                <CandidateWebcamFeed
+                  studentId={inspectModal.student.id}
+                  studentName={inspectModal.student.name}
+                  isTerminated={inspectModal.student.status === 'terminated'}
+                />
               </div>
             </div>
 

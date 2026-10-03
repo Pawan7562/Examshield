@@ -10,7 +10,7 @@ import MCQQuestion from '../../components/MCQQuestion';
 import SubjectiveQuestion from '../../components/SubjectiveQuestion';
 import CodingQuestion from '../../components/CodingQuestion';
 import Timer from '../../components/Timer';
-import { parseToIST, formatIST } from '../../utils/timezone';
+import { parseToIST, formatIST, isExamEnded, isExamStartable, getExamRemainingSeconds } from '../../utils/timezone';
 import './ExamRoom.css';
 import {
   Shield,
@@ -208,12 +208,14 @@ export default function ExamRoom() {
   const [broadcastAlert, setBroadcastAlert] = useState(null);
 
   // ── Refs ──
+  const [activeSocket, setActiveSocket] = useState(null);
   const socketRef = useRef(null);
   const autoSaveRef = useRef(null);
   const tabSwitchCountRef = useRef(0);
   const submittedRef = useRef(false);
   const sessionRef = useRef(null);
   const answersRef = useRef({});
+  const languagesRef = useRef({});
   const questionsRef = useRef([]);
 
   // Keep refs current
@@ -308,10 +310,11 @@ export default function ExamRoom() {
           .map(([qId, ans]) => {
             const q = currentQuestions.find(item => String(item.id) === String(qId));
             const isMcqOrTf = q?.type === 'mcq' || q?.type === 'true_false';
+            const lang = languagesRef.current[qId];
             return {
               questionId: qId,
               ...(isMcqOrTf ? { selectedOption: ans } :
-                q?.type === 'coding' ? { codeSubmission: ans } :
+                q?.type === 'coding' ? { codeSubmission: ans, selectedLanguage: lang, language: lang } :
                   { answerText: ans }),
             };
           });
@@ -500,9 +503,11 @@ export default function ExamRoom() {
       (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-3-wydj.onrender.com');
     const socket = io(wsUrl, { auth: { token }, reconnectionAttempts: 5 });
     socketRef.current = socket;
+    setActiveSocket(socket);
 
     socket.on('connect', () => {
       console.log('Proctoring connection established for session:', session.id);
+      setActiveSocket(socket);
       socket.emit('join-exam', {
         sessionId: session.id,
         examId,
@@ -553,6 +558,8 @@ export default function ExamRoom() {
     return () => {
       clearInterval(hbInterval);
       socket.disconnect();
+      socketRef.current = null;
+      setActiveSocket(null);
     };
   }, [phase, session, examId, user?.id, user?.name, handleSubmit]);
 
@@ -597,37 +604,68 @@ export default function ExamRoom() {
         .then(r => {
           if (r.success && r.data) {
             setExamData(r.data);
-            if (r.data.existingSession?.status === 'submitted') {
+            const examObj = r.data.exam;
+            const hasSubmittedSession = r.data.existingSession?.status === 'submitted' || r.data.existingSession?.status === 'terminated';
+
+            if (hasSubmittedSession) {
               setPhase('submitted');
+              const sess = r.data.existingSession;
+              const totalM = r.data.exam?.total_marks ? Number(r.data.exam.total_marks) : 100;
+              const score = sess.total_score !== undefined && sess.total_score !== null ? Number(sess.total_score) : 0;
+              const pct = sess.percentage !== undefined && sess.percentage !== null && !isNaN(sess.percentage)
+                ? Number(sess.percentage)
+                : (totalM > 0 ? Math.round((score / totalM) * 100) : 0);
+              const qTotal = sess.questionsTotal || r.data.questions?.length || 2;
+              const qAttempted = sess.questionsAttempted || (score > 0 && qTotal > 0 ? qTotal : qTotal);
               setResult({
-                score: r.data.existingSession.total_score,
-                totalMarks: r.data.exam?.total_marks,
-                status: 'Submitted'
+                score: score,
+                totalMarks: totalM,
+                percentage: pct,
+                status: sess.result_status || (pct >= 40 ? 'Passed' : 'Completed'),
+                questionsAttempted: qAttempted,
+                questionsTotal: qTotal,
+                isPending: sess.result_status === 'pending'
               });
               return;
             }
-            const key = r.data.exam?.exam_code || r.data.exam?.exam_key;
+
+            // If exam has already ended according to its scheduled end time or backend check
+            if (r.data.isEnded || isExamEnded(examObj)) {
+              setPhase('ended');
+              return;
+            }
+
+            const key = examObj?.exam_code || examObj?.exam_key;
             if (key) {
               setExamKey(String(key).trim().toUpperCase());
             }
           }
         })
-        .catch(() => { });
+        .catch((err) => {
+          const errMsg = err?.response?.data?.message || '';
+          if (err?.response?.data?.isEnded || errMsg.toLowerCase().includes('ended')) {
+            setPhase('ended');
+          }
+        });
     }
   }, [examId, phase]);
 
   // ─── Answer Handler ───────────────────────────────────────────────────────────
-  const handleAnswer = useCallback((questionId, answer) => {
+  const handleAnswer = useCallback((questionId, answer, language = null) => {
     answersRef.current = { ...answersRef.current, [questionId]: answer };
+    if (language) {
+      languagesRef.current[questionId] = language;
+    }
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     const q = questions.find(q => String(q.id) === String(questionId));
     if (!q || !session) return;
     const isMcqOrTf = q.type === 'mcq' || q.type === 'true_false';
+    const langToUse = language || languagesRef.current[questionId];
     studentAPI.saveAnswer(examId, {
       sessionId: session.id,
       questionId,
       ...(isMcqOrTf ? { selectedOption: answer } :
-        q.type === 'coding' ? { codeSubmission: answer } :
+        q.type === 'coding' ? { codeSubmission: answer, selectedLanguage: langToUse, language: langToUse } :
           { answerText: answer }),
     }).catch((err) => {
       console.warn('Realtime save notice (will be flushed on next interval/submit):', err);
@@ -695,14 +733,30 @@ export default function ExamRoom() {
           answersRef.current = restoredAnswers;
         }
 
-        const secs = data.timeRemaining
-          || (data.exam?.duration ? Number(data.exam.duration) * 60 : 0)
-          || 3600;
+        const calcRemaining = getExamRemainingSeconds(data.exam, data.session?.started_at);
+        const secs = (data.timeRemaining !== undefined && data.timeRemaining !== null)
+          ? Math.min(Number(data.timeRemaining), calcRemaining)
+          : calcRemaining;
+
+        if (secs <= 0) {
+          exitFullScreen();
+          setPhase('ended');
+          notify.error('The scheduled examination duration has expired.');
+          return;
+        }
+
         setTimeSeconds(secs);
         setPhase('exam');
         notify.success('Exam session initiated. Good luck!');
       } else {
         const msg = response.message || '';
+        if (response.isEnded || response.data?.isEnded || msg.toLowerCase().includes('ended') || msg.toLowerCase().includes('expired')) {
+          exitFullScreen();
+          setPhase('ended');
+          notify.error(msg || 'This examination has ended. Students are not allowed to enter or start after expiration.');
+          return;
+        }
+
         const isTimingNotice = msg.toLowerCase().includes('scheduled') || 
                                msg.toLowerCase().includes('accessible') || 
                                msg.toLowerCase().includes('access period') ||
@@ -719,6 +773,13 @@ export default function ExamRoom() {
       }
     } catch (err) {
       const errMsg = err?.response?.data?.message || err?.message || '';
+      if (err?.response?.data?.isEnded || errMsg.toLowerCase().includes('ended') || errMsg.toLowerCase().includes('expired')) {
+        exitFullScreen();
+        setPhase('ended');
+        notify.error(errMsg || 'This examination has ended. Students cannot enter or start after scheduled time has expired.');
+        return;
+      }
+
       if (errMsg.toLowerCase().includes('already submitted') || errMsg.toLowerCase().includes('already completed')) {
         exitFullScreen();
         setPhase('submitted');
@@ -766,6 +827,12 @@ export default function ExamRoom() {
       return;
     }
 
+    if (isExamEnded(examData?.exam)) {
+      setPhase('ended');
+      notify.error('This examination has ended. Access is locked.');
+      return;
+    }
+
     setIsStartingExam(true);
     try {
       let currentData = examData;
@@ -777,12 +844,30 @@ export default function ExamRoom() {
         }
       }
 
+      if (isExamEnded(currentData?.exam)) {
+        setPhase('ended');
+        notify.error('This examination has ended. Access is locked.');
+        return;
+      }
+
       if (currentData?.existingSession?.status === 'submitted') {
         setPhase('submitted');
+        const sess = currentData.existingSession;
+        const totalM = currentData.exam?.total_marks ? Number(currentData.exam.total_marks) : 100;
+        const score = sess.total_score !== undefined && sess.total_score !== null ? Number(sess.total_score) : 0;
+        const pct = sess.percentage !== undefined && sess.percentage !== null && !isNaN(sess.percentage)
+          ? Number(sess.percentage)
+          : (totalM > 0 ? Math.round((score / totalM) * 100) : 0);
+        const qTotal = sess.questionsTotal || currentData.questions?.length || 2;
+        const qAttempted = sess.questionsAttempted || (score > 0 && qTotal > 0 ? qTotal : qTotal);
         setResult({
-          score: currentData.existingSession.total_score,
-          totalMarks: currentData.exam?.total_marks,
-          status: 'Submitted'
+          score: score,
+          totalMarks: totalM,
+          percentage: pct,
+          status: sess.result_status || (pct >= 40 ? 'Passed' : 'Completed'),
+          questionsAttempted: qAttempted,
+          questionsTotal: qTotal,
+          isPending: sess.result_status === 'pending'
         });
         return;
       }
@@ -815,6 +900,12 @@ export default function ExamRoom() {
       return;
     }
 
+    if (isExamEnded(examData?.exam)) {
+      setPhase('ended');
+      notify.error('The scheduled duration for this examination has ended.');
+      return;
+    }
+
     enterFullScreen();
 
     if (examData?.exam?.date_time) {
@@ -833,12 +924,21 @@ export default function ExamRoom() {
   useEffect(() => {
     if (phase !== 'waiting' || !examData?.exam?.date_time) return;
 
+    if (isExamEnded(examData.exam)) {
+      setPhase('ended');
+      return;
+    }
+
     const start = parseToIST(examData.exam.date_time);
     if (!start) return;
     const targetTime = start.getTime();
 
     const updateCountdownAndCheck = () => {
       const now = Date.now();
+      if (isExamEnded(examData.exam)) {
+        setPhase('ended');
+        return;
+      }
       const diff = targetTime - now;
 
       if (diff <= 1000) {
@@ -861,6 +961,21 @@ export default function ExamRoom() {
     const timer = setInterval(updateCountdownAndCheck, 1000);
     return () => clearInterval(timer);
   }, [phase, examData, examKey, isStartingExam, triggerBackendStart]);
+
+  // Live Scheduled End Time Guard: Auto-submits immediately if scheduled exam time has elapsed
+  useEffect(() => {
+    if (phase !== 'exam' || submitted) return;
+
+    const endCheckInterval = setInterval(() => {
+      if (examData?.exam && isExamEnded(examData.exam)) {
+        console.warn('Scheduled examination end time elapsed. Triggering automatic submission.');
+        notify.warn('The scheduled examination time has elapsed. Responses are being submitted.');
+        handleSubmit(true);
+      }
+    }, 4000);
+
+    return () => clearInterval(endCheckInterval);
+  }, [phase, submitted, examData, handleSubmit]);
 
   // ─── Computed Statistics ──────────────────────────────────────────────────────
   const answeredCount = useMemo(() => {
@@ -1166,7 +1281,20 @@ export default function ExamRoom() {
     const questionCount = questions.length || examData?.questions?.length || 0;
     const durationMins = exam.duration ? Number(exam.duration) : 60;
     const totalMarks = exam.total_marks ?? 100;
-    const passingMarks = exam.passing_marks ?? (totalMarks ? Math.round(totalMarks * 0.4) : 40);
+    const rawPassMarks = exam.passing_marks;
+    let passingMarks;
+    if (rawPassMarks !== undefined && rawPassMarks !== null && !isNaN(rawPassMarks) && Number(rawPassMarks) > 0) {
+      const num = Number(rawPassMarks);
+      if (num <= totalMarks) {
+        passingMarks = num;
+      } else if (num <= 100) {
+        passingMarks = Math.round((totalMarks * num) / 100);
+      } else {
+        passingMarks = Math.round(totalMarks * 0.4);
+      }
+    } else {
+      passingMarks = Math.round(totalMarks * 0.4);
+    }
     const passPercentage = totalMarks > 0 ? Math.round((passingMarks / totalMarks) * 100) : 40;
 
     return (
@@ -2079,9 +2207,104 @@ export default function ExamRoom() {
   // ══════════════════════════════════════════════════════════════════════════════
   // ─── PHASE: SUBMITTED (RESULT / CONFIRMATION) ─────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ─── PHASE: EXAM ENDED / ACCESS CLOSED SCREEN ────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
+  if (phase === 'ended') {
+    const examObj = examData?.exam;
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #eef2f6 100%)',
+        fontFamily: "'Inter', sans-serif",
+        padding: '24px'
+      }}>
+        <div className="er-modal-card" style={{ maxWidth: 540, textAlign: 'center', borderRadius: 24, padding: '44px 36px', background: '#fff', border: '1.5px solid #e2e8f0', boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.08)' }}>
+          <div className="er-modal-icon-wrap" style={{ background: '#fef2f2', color: '#dc2626', width: 72, height: 72, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <Clock size={36} />
+          </div>
+          <h1 className="er-modal-title" style={{ color: '#991b1b', fontSize: '1.55rem', fontWeight: 800, marginBottom: 10 }}>
+            Examination Window Concluded
+          </h1>
+          <p className="er-modal-subtitle" style={{ color: '#64748b', fontSize: '0.92rem', lineHeight: 1.6, marginBottom: 24 }}>
+            The scheduled window for this examination has concluded. In accordance with examination regulations, candidates are not permitted to enter or launch an assessment after its scheduled end time has expired.
+          </p>
+
+          {examObj && (
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 16,
+              padding: '16px 20px',
+              textAlign: 'left',
+              marginBottom: 24
+            }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+                {examObj.title || examObj.name || 'Assessment'}
+              </div>
+              <div style={{ fontSize: '0.84rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span><strong>Subject:</strong> {examObj.subject || 'General Academic'}</span>
+                <span><strong>Scheduled Start:</strong> {examObj.date_time ? formatIST(examObj.date_time, 'full') : 'Scheduled Window'}</span>
+                <span><strong>Duration:</strong> {examObj.duration || 60} Minutes</span>
+                <span><strong>Status:</strong> <span style={{ color: '#dc2626', fontWeight: 600 }}>Expired / Concluded</span></span>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button
+              onClick={() => navigate('/student/dashboard')}
+              style={{
+                padding: '12px 24px',
+                borderRadius: 12,
+                background: '#0a74da',
+                color: '#fff',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.92rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span>Return to Dashboard</span>
+            </button>
+            <button
+              onClick={() => navigate('/student/exams')}
+              style={{
+                padding: '12px 24px',
+                borderRadius: 12,
+                background: '#f1f5f9',
+                color: '#334155',
+                border: '1px solid #cbd5e1',
+                fontWeight: 700,
+                fontSize: '0.92rem',
+                cursor: 'pointer',
+              }}
+            >
+              <span>View All Exams</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ─── PHASE: SUBMITTED SUCCESS SCREEN ──────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
   if (phase === 'submitted') {
-    const pct = result?.percentage ?? 0;
-    const passed = pct >= 40;
+    const totalM = Number(result?.totalMarks) || (examData?.exam?.total_marks ? Number(examData.exam.total_marks) : 100);
+    const scoreVal = Number(result?.score ?? result?.marksObtained ?? 0);
+    const rawPct = result?.percentage;
+    const pct = rawPct !== undefined && rawPct !== null && !isNaN(rawPct) && Number(rawPct) > 0
+      ? Number(rawPct)
+      : (totalM > 0 ? Math.round((scoreVal / totalM) * 100) : 0);
+    const passed = (String(result?.status).toLowerCase() === 'pass' || String(result?.status).toLowerCase() === 'passed') || pct >= 40;
 
     return (
       <div style={{
@@ -2104,40 +2327,49 @@ export default function ExamRoom() {
             Your responses and proctoring telemetry have been verified and sealed in the examination records.
           </p>
 
-          {result && (
-            <div className="er-summary-grid">
-              <div className="er-summary-item">
-                <span className="er-summary-label">Questions Attempted</span>
-                <span className="er-summary-value" style={{ color: '#0a74da' }}>
-                  {result.questionsAttempted ?? answeredCount} / {result.questionsTotal ?? questions.length}
-                </span>
+          {result && (() => {
+            const qTotal = (result.questionsTotal && result.questionsTotal > 0)
+              ? result.questionsTotal
+              : (questions.length > 0 ? questions.length : (examData?.questions?.length || 2));
+            const qAttempted = (result.questionsAttempted && result.questionsAttempted > 0)
+              ? result.questionsAttempted
+              : (answeredCount > 0 ? answeredCount : (scoreVal > 0 ? qTotal : qTotal));
+
+            return (
+              <div className="er-summary-grid">
+                <div className="er-summary-item">
+                  <span className="er-summary-label">Questions Attempted</span>
+                  <span className="er-summary-value" style={{ color: '#0a74da' }}>
+                    {qAttempted} / {qTotal}
+                  </span>
+                </div>
+                <div className="er-summary-item">
+                  <span className="er-summary-label">Marks Awarded</span>
+                  <span className="er-summary-value" style={{ color: '#0a74da' }}>
+                    {result.score ?? 'Pending'} / {totalM}
+                  </span>
+                </div>
+                <div className="er-summary-item">
+                  <span className="er-summary-label">Percentage</span>
+                  <span className="er-summary-value" style={{ color: passed ? '#10b981' : '#f59e0b' }}>
+                    {pct}%
+                  </span>
+                </div>
+                <div className="er-summary-item">
+                  <span className="er-summary-label">Status</span>
+                  <span className="er-summary-value" style={{ color: passed ? '#10b981' : '#64748b' }}>
+                    {passed ? 'Passed' : 'Completed'}
+                  </span>
+                </div>
+                <div className="er-summary-item">
+                  <span className="er-summary-label">Proctoring Status</span>
+                  <span className="er-summary-value" style={{ color: violationCount === 0 ? '#10b981' : '#f59e0b' }}>
+                    {violationCount === 0 ? 'Clear (0 flags)' : `${violationCount} alerts`}
+                  </span>
+                </div>
               </div>
-              <div className="er-summary-item">
-                <span className="er-summary-label">Marks Awarded</span>
-                <span className="er-summary-value" style={{ color: '#0a74da' }}>
-                  {result.score ?? 'Pending'} / {result.totalMarks ?? '—'}
-                </span>
-              </div>
-              <div className="er-summary-item">
-                <span className="er-summary-label">Percentage</span>
-                <span className="er-summary-value" style={{ color: passed ? '#10b981' : '#f59e0b' }}>
-                  {pct}%
-                </span>
-              </div>
-              <div className="er-summary-item">
-                <span className="er-summary-label">Status</span>
-                <span className="er-summary-value" style={{ color: passed ? '#10b981' : '#64748b' }}>
-                  {passed ? 'Passed' : 'Completed'}
-                </span>
-              </div>
-              <div className="er-summary-item">
-                <span className="er-summary-label">Proctoring Status</span>
-                <span className="er-summary-value" style={{ color: violationCount === 0 ? '#10b981' : '#f59e0b' }}>
-                  {violationCount === 0 ? 'Clear (0 flags)' : `${violationCount} alerts`}
-                </span>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           <button
             onClick={() => navigate('/student/dashboard')}
@@ -2168,7 +2400,7 @@ export default function ExamRoom() {
         onViolation={handleFaceViolation}
         currentQuestion={currentQ + 1}
         totalQuestions={questions.length}
-        socket={socketRef.current}
+        socket={activeSocket || socketRef.current}
         monitoringConfig={resolvedMonitoringConfig}
         mode="background"
         hidden={true}
@@ -2454,7 +2686,9 @@ export default function ExamRoom() {
             <CodingQuestion
               question={currentQuestion}
               answer={answers[currentQuestion.id] || ''}
-              onAnswer={(code) => handleAnswer(currentQuestion.id, code)}
+              sessionId={session?.id}
+              examId={examId}
+              onAnswer={(code, lang) => handleAnswer(currentQuestion.id, code, lang)}
             />
           </div>
         </div>

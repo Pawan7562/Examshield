@@ -594,11 +594,44 @@ exports.reevaluateResult = async (req, res) => {
       } else if (q.type === 'coding') {
         const maxM = Number(q.marks) || 10;
         let earned = 0;
-        if (ans.marks_obtained !== null && ans.marks_obtained !== undefined) {
-          earned = Number(ans.marks_obtained);
-        } else if (ans.code_submission && ans.code_submission.trim().length > 10) {
-          earned = maxM;
+
+        if (ans.code_submission && ans.code_submission.trim().length > 0) {
+          let testCases = [];
+          if (q.test_cases) {
+            testCases = typeof q.test_cases === 'string' ? JSON.parse(q.test_cases) : q.test_cases;
+          }
+          if ((!testCases || testCases.length === 0) && q.options) {
+            try {
+              const opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+              testCases = opts?.testCases || opts?.test_cases || opts?.examples || [];
+            } catch (_) {}
+          }
+
+          if (Array.isArray(testCases) && testCases.length > 0) {
+            try {
+              const { evaluateTestCases } = require('../services/codeExecutionService');
+              const evalRes = await evaluateTestCases(
+                ans.code_submission,
+                ans.selected_language || 'javascript',
+                testCases,
+                {
+                  timeLimitMs: q.time_limit || 2000,
+                  memoryLimitMb: q.memory_limit || 256,
+                  questionMarks: maxM
+                }
+              );
+              earned = evalRes.earnedMarks || 0;
+            } catch (evalErr) {
+              console.error('Re-evaluation execution error:', evalErr);
+              earned = ans.marks_obtained !== null && ans.marks_obtained !== undefined
+                ? Number(ans.marks_obtained)
+                : 0;
+            }
+          } else if (ans.marks_obtained !== null && ans.marks_obtained !== undefined) {
+            earned = Number(ans.marks_obtained);
+          }
         }
+
         codingMarks += earned;
         await query(
           'UPDATE answers SET is_correct = $1, marks_obtained = $2, is_evaluated = true, updated_at = NOW() WHERE id = $3',
@@ -701,11 +734,44 @@ exports.reevaluateExam = async (req, res) => {
         } else if (q.type === 'coding') {
           const maxM = Number(q.marks) || 10;
           let earned = 0;
-          if (ans.marks_obtained !== null && ans.marks_obtained !== undefined) {
-            earned = Number(ans.marks_obtained);
-          } else if (ans.code_submission && ans.code_submission.trim().length > 10) {
-            earned = maxM;
+
+          if (ans.code_submission && ans.code_submission.trim().length > 0) {
+            let testCases = [];
+            if (q.test_cases) {
+              testCases = typeof q.test_cases === 'string' ? JSON.parse(q.test_cases) : q.test_cases;
+            }
+            if ((!testCases || testCases.length === 0) && q.options) {
+              try {
+                const opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+                testCases = opts?.testCases || opts?.test_cases || opts?.examples || [];
+              } catch (_) {}
+            }
+
+            if (Array.isArray(testCases) && testCases.length > 0) {
+              try {
+                const { evaluateTestCases } = require('../services/codeExecutionService');
+                const evalRes = await evaluateTestCases(
+                  ans.code_submission,
+                  ans.selected_language || 'javascript',
+                  testCases,
+                  {
+                    timeLimitMs: q.time_limit || 2000,
+                    memoryLimitMb: q.memory_limit || 256,
+                    questionMarks: maxM
+                  }
+                );
+                earned = evalRes.earnedMarks || 0;
+              } catch (evalErr) {
+                console.error('Batch re-evaluation execution error:', evalErr);
+                earned = ans.marks_obtained !== null && ans.marks_obtained !== undefined
+                  ? Number(ans.marks_obtained)
+                  : 0;
+              }
+            } else if (ans.marks_obtained !== null && ans.marks_obtained !== undefined) {
+              earned = Number(ans.marks_obtained);
+            }
           }
+
           codingMarks += earned;
           await query(
             'UPDATE answers SET is_correct = $1, marks_obtained = $2, is_evaluated = true, updated_at = NOW() WHERE id = $3',

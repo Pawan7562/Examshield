@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { studentAPI } from '../../services/api';
-import { formatIST, isExamStartable } from '../../utils/timezone';
+import { formatIST, isExamStartable, isExamEnded } from '../../utils/timezone';
 import toast from 'react-hot-toast';
 import { 
   Calendar, 
@@ -32,9 +32,13 @@ export default function ExamList() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Determine whether an exam is startable right now in IST
+  // Determine whether an exam is startable right now in IST (never true if expired)
   const isStartable = (exam) => {
-    return isExamStartable(exam);
+    return isExamStartable(exam) && !isExamEnded(exam);
+  };
+
+  const isCompletedExam = (exam) => {
+    return isExamEnded(exam) || exam.session_status === 'submitted' || exam.status === 'completed';
   };
 
   const copyKey = (e, key) => {
@@ -46,13 +50,14 @@ export default function ExamList() {
   // Filtered exams
   const filteredExams = useMemo(() => {
     return exams.filter(exam => {
-      const isSubmitted = exam.session_status === 'submitted' || exam.session_status === 'terminated';
+      const completed = isCompletedExam(exam);
       const startable = isStartable(exam);
+      const isUpcoming = !completed && !startable;
 
       // Category filter
       if (filter === 'live' && !startable) return false;
-      if (filter === 'upcoming' && (startable || isSubmitted || exam.status === 'completed')) return false;
-      if (filter === 'completed' && !isSubmitted && exam.status !== 'completed') return false;
+      if (filter === 'upcoming' && !isUpcoming) return false;
+      if (filter === 'completed' && !completed) return false;
 
       // Search query
       if (searchQuery.trim()) {
@@ -70,7 +75,7 @@ export default function ExamList() {
   // Counts
   const counts = useMemo(() => {
     const live = exams.filter(e => isStartable(e)).length;
-    const completed = exams.filter(e => e.session_status === 'submitted' || e.status === 'completed').length;
+    const completed = exams.filter(e => isCompletedExam(e)).length;
     return { total: exams.length, live, completed };
   }, [exams]);
 
@@ -170,7 +175,7 @@ export default function ExamList() {
         <div className="el-cards-grid">
           {filteredExams.map(exam => {
             const startable = isStartable(exam);
-            const isCompleted = exam.session_status === 'submitted' || exam.status === 'completed';
+            const isCompleted = isCompletedExam(exam);
             const examCode = exam.exam_code || exam.exam_key;
 
             return (
@@ -188,7 +193,7 @@ export default function ExamList() {
                       </span>
                     ) : isCompleted ? (
                       <span className="el-status-pill status-completed">
-                        Completed
+                        {exam.session_status === 'submitted' ? 'Completed' : 'Ended'}
                       </span>
                     ) : (
                       <span className="el-status-pill status-upcoming">
@@ -213,24 +218,44 @@ export default function ExamList() {
                     </div>
                   )}
 
-                  <div className="el-card-meta-grid">
-                    <div className="el-meta-item">
-                      <Calendar size={14} />
-                      <span>{exam.date_time ? formatIST(exam.date_time, 'full') : 'Flexible Window'}</span>
-                    </div>
-                    <div className="el-meta-item">
-                      <Clock size={14} />
-                      <span>{exam.duration || 60} Minutes</span>
-                    </div>
-                    <div className="el-meta-item">
-                      <Award size={14} />
-                      <span>{exam.total_marks || 100} Total Marks</span>
-                    </div>
-                    <div className="el-meta-item">
-                      <CheckCircle2 size={14} />
-                      <span>Pass: {exam.passing_marks || 40} Marks</span>
-                    </div>
-                  </div>
+                  {(() => {
+                    const totalMarks = exam.total_marks || 100;
+                    const rawPass = exam.passing_marks;
+                    let passMarks;
+                    if (rawPass !== undefined && rawPass !== null && !isNaN(rawPass) && Number(rawPass) > 0) {
+                      const num = Number(rawPass);
+                      if (num <= totalMarks) {
+                        passMarks = num;
+                      } else if (num <= 100) {
+                        passMarks = Math.round((totalMarks * num) / 100);
+                      } else {
+                        passMarks = Math.round(totalMarks * 0.4);
+                      }
+                    } else {
+                      passMarks = Math.round(totalMarks * 0.4);
+                    }
+
+                    return (
+                      <div className="el-card-meta-grid">
+                        <div className="el-meta-item">
+                          <Calendar size={14} />
+                          <span>{exam.date_time ? formatIST(exam.date_time, 'full') : 'Flexible Window'}</span>
+                        </div>
+                        <div className="el-meta-item">
+                          <Clock size={14} />
+                          <span>{exam.duration || 60} Minutes</span>
+                        </div>
+                        <div className="el-meta-item">
+                          <Award size={14} />
+                          <span>{totalMarks} Total Marks</span>
+                        </div>
+                        <div className="el-meta-item">
+                          <CheckCircle2 size={14} />
+                          <span>Pass: {passMarks} Marks</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="el-card-footer">
@@ -249,10 +274,10 @@ export default function ExamList() {
                     </button>
                   ) : isCompleted ? (
                     <button
-                      onClick={() => navigate('/student/results')}
+                      onClick={() => navigate(exam.session_status === 'submitted' ? '/student/results' : `/student/exams/${exam.id}`)}
                       className="el-btn-secondary"
                     >
-                      <span>View Transcript</span>
+                      <span>{exam.session_status === 'submitted' ? 'View Transcript' : 'Exam Ended'}</span>
                     </button>
                   ) : (
                     <button

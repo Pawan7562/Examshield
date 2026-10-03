@@ -53,6 +53,15 @@ const LiveMonitoring = ({ examId, examName }) => {
       updateCameraFeed(data);
     });
 
+    // Initial camera feeds on join
+    newSocket.on('initial-camera-feeds', (data) => {
+      if (data?.frames) {
+        Object.entries(data.frames).forEach(([sid, img]) => {
+          updateCameraFeed({ studentId: sid, imageData: img });
+        });
+      }
+    });
+
     // Exam status updates
     newSocket.on('exam-status-update', (data) => {
       updateExamStatus(data);
@@ -467,16 +476,16 @@ const LiveMonitoring = ({ examId, examName }) => {
                 position: 'relative',
                 overflow: 'hidden'
               }}>
-                <video
-                  ref={el => videoRefs.current[selectedStudent.id] = el}
+                <img
+                  ref={el => { if (el) videoRefs.current[selectedStudent.id] = el; }}
+                  alt={selectedStudent.name || 'Candidate Feed'}
                   style={{ 
                     width: '100%', 
                     height: '100%', 
                     objectFit: 'cover',
-                    borderRadius: 8
+                    borderRadius: 8,
+                    display: 'block'
                   }}
-                  autoPlay
-                  muted
                 />
                 {!selectedStudent.activity?.cameraActive && (
                   <div style={{ 

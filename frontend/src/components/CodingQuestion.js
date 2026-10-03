@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import './CodingQuestion.css';
 
-const CodingQuestion = ({ question, answer, onAnswer }) => {
+const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
   const [selectedLanguage, setSelectedLanguage] = useState('javascript');
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,6 +43,18 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
     meta = question.options;
   }
 
+  const safeParseArray = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (_) {}
+    }
+    return [];
+  };
+
   const title = question.title || meta.title ||
     (question.question_text ? question.question_text.split('\n')[0].replace(/^#+\s*/, '') : 'Coding Challenge');
 
@@ -58,46 +70,48 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
   const inputFormat = question.inputFormat || question.input_format || meta.inputFormat || meta.input_format || '';
   const outputFormat = question.outputFormat || question.output_format || meta.outputFormat || meta.output_format || '';
 
-  const rawConstraints = question.constraints || meta.constraints || [];
-  const constraints = Array.isArray(rawConstraints)
-    ? rawConstraints
-    : (rawConstraints ? [rawConstraints] : []);
+  const rawConstraints = safeParseArray(question.constraints)
+    .concat(safeParseArray(meta.constraints));
+  const constraints = rawConstraints.length > 0 
+    ? rawConstraints 
+    : (question.constraints && typeof question.constraints === 'string' ? [question.constraints] : []);
 
-  let rawExamples = Array.isArray(question.examples) && question.examples.length > 0
-    ? question.examples
-    : (Array.isArray(meta.examples) && meta.examples.length > 0 ? meta.examples : []);
+  const rawExamples = safeParseArray(question.examples)
+    .concat(safeParseArray(question.sampleTestCases))
+    .concat(safeParseArray(meta.examples));
 
-  let rawTestCases = Array.isArray(question.testCases) && question.testCases.length > 0
-    ? question.testCases
-    : (Array.isArray(question.test_cases) && question.test_cases.length > 0
-      ? question.test_cases
-      : (Array.isArray(meta.testCases) ? meta.testCases : (Array.isArray(meta.test_cases) ? meta.test_cases : [])));
+  const rawTestCases = safeParseArray(question.testCases)
+    .concat(safeParseArray(question.test_cases))
+    .concat(safeParseArray(meta.testCases))
+    .concat(safeParseArray(meta.test_cases));
 
-  // Parse if stringified
-  if (typeof rawExamples === 'string') {
-    try { rawExamples = JSON.parse(rawExamples); } catch (_) { rawExamples = []; }
+  // Determine public sample test cases (prefer explicit !is_hidden, then first 1-2 cases)
+  let publicCases = rawExamples.filter(tc => !tc.is_hidden && !tc.isHidden);
+  if (publicCases.length === 0) {
+    publicCases = rawTestCases.filter(tc => !tc.is_hidden && !tc.isHidden);
   }
-  if (typeof rawTestCases === 'string') {
-    try { rawTestCases = JSON.parse(rawTestCases); } catch (_) { rawTestCases = []; }
-  }
-
-  // Cross-pollinate so that neither is empty if at least one exists
-  if ((!rawExamples || rawExamples.length === 0) && Array.isArray(rawTestCases) && rawTestCases.length > 0) {
-    rawExamples = rawTestCases;
-  }
-  if ((!rawTestCases || rawTestCases.length === 0) && Array.isArray(rawExamples) && rawExamples.length > 0) {
-    rawTestCases = rawExamples;
+  if (publicCases.length === 0) {
+    const combined = rawExamples.length > 0 ? rawExamples : rawTestCases;
+    if (combined.length > 0) {
+      publicCases = combined.slice(0, 2);
+    }
   }
 
-  // Guarantee sample test cases exist from either examples or testCases
-  const sampleCases = Array.isArray(rawExamples) && rawExamples.length > 0
-    ? rawExamples
-    : (Array.isArray(rawTestCases) && rawTestCases.length > 0 ? rawTestCases.slice(0, 3) : []);
+  // Deduplicate cases by input
+  const sampleCases = [];
+  const seenInputs = new Set();
+  for (const c of publicCases) {
+    const key = String(c.input ?? '');
+    if (!seenInputs.has(key)) {
+      seenInputs.add(key);
+      sampleCases.push(c);
+    }
+  }
 
-  const totalTestCasesCount = Math.max(
-    Array.isArray(rawTestCases) ? rawTestCases.length : 0,
-    Array.isArray(rawExamples) ? rawExamples.length : 0
-  );
+  const totalTestCasesCount = question.totalTestCases ||
+    question.total_test_cases ||
+    meta.totalTestCases ||
+    Math.max(rawTestCases.length, rawExamples.length, sampleCases.length);
 
   const rawHints = question.hints || meta.hints || [];
   const hints = Array.isArray(rawHints) ? rawHints : [];
@@ -131,8 +145,10 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
         questionId: question.id,
         code,
         language,
-        testCases: rawTestCases.length > 0 ? rawTestCases : sampleCases,
-        customInput
+        testCases: sampleCases,
+        customInput,
+        sessionId,
+        examId
       });
 
       if (res?.data) {
@@ -154,18 +170,19 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
     setIsSubmitting(true);
 
     try {
-      onAnswer(code);
+      onAnswer(code, language || selectedLanguage);
 
       const res = await studentAPI.submitCode({
         questionId: question.id,
         code,
         language,
-        testCases: rawTestCases.length > 0 ? rawTestCases : sampleCases
+        sessionId,
+        examId
       });
 
       if (res?.data) {
         setTestResults(res.data);
-        toast.success('Code submitted and evaluated successfully!');
+        toast.success(`Evaluated: ${res.data.passedTestCases}/${res.data.totalTestCases} test cases passed (${res.data.earnedMarks}/${res.data.maxMarks} marks)`);
       } else if (res?.success) {
         setTestResults(res);
         toast.success('Code submitted and evaluated successfully!');
@@ -249,49 +266,73 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
         )}
 
         {/* 2. Input & Output Formats */}
-        {(activeTab === 'all' || activeTab === 'io') && (inputFormat || outputFormat) && (
+        {(activeTab === 'all' || activeTab === 'io') && (
           <div className="er-coding-section">
             <div className="er-coding-section-header">
               <Terminal size={16} color="#0a74da" />
-              <h4>Input & Output Format</h4>
+              <h4>Input & Output Specification</h4>
             </div>
 
-            {inputFormat && (
+            {inputFormat ? (
               <div className="er-coding-format-card">
                 <div className="er-coding-format-title">
                   <span>📥 Input Format</span>
                 </div>
-                <div className="er-coding-format-content">{inputFormat}</div>
+                <div className="er-coding-format-content" style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>{inputFormat}</div>
+              </div>
+            ) : (
+              <div className="er-coding-format-card">
+                <div className="er-coding-format-title">
+                  <span>📥 Input Format</span>
+                </div>
+                <div className="er-coding-format-content" style={{ color: '#475569', fontStyle: 'italic' }}>
+                  Read problem input from standard input (stdin) according to the problem statement and sample cases.
+                </div>
               </div>
             )}
 
-            {outputFormat && (
+            {outputFormat ? (
               <div className="er-coding-format-card" style={{ marginTop: '10px' }}>
                 <div className="er-coding-format-title" style={{ color: '#10b981' }}>
                   <span>📤 Output Format</span>
                 </div>
-                <div className="er-coding-format-content">{outputFormat}</div>
+                <div className="er-coding-format-content" style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>{outputFormat}</div>
+              </div>
+            ) : (
+              <div className="er-coding-format-card" style={{ marginTop: '10px' }}>
+                <div className="er-coding-format-title" style={{ color: '#10b981' }}>
+                  <span>📤 Output Format</span>
+                </div>
+                <div className="er-coding-format-content" style={{ color: '#475569', fontStyle: 'italic' }}>
+                  Print the computed result to standard output (stdout) with required formatting.
+                </div>
               </div>
             )}
           </div>
         )}
 
         {/* 3. Constraints */}
-        {(activeTab === 'all' || activeTab === 'io') && constraints.length > 0 && (
+        {(activeTab === 'all' || activeTab === 'io') && (
           <div className="er-coding-section">
             <div className="er-coding-section-header">
               <Hash size={16} color="#0a74da" />
               <h4>Constraints & Boundaries</h4>
             </div>
             <div className="er-coding-constraints-card">
-              <ul className="er-coding-constraints-list">
-                {constraints.map((c, i) => (
-                  <li key={i} className="er-coding-constraint-item">
-                    <span className="er-coding-constraint-bullet">•</span>
-                    <code>{c}</code>
-                  </li>
-                ))}
-              </ul>
+              {constraints.length > 0 ? (
+                <ul className="er-coding-constraints-list">
+                  {constraints.map((c, i) => (
+                    <li key={i} className="er-coding-constraint-item">
+                      <span className="er-coding-constraint-bullet">•</span>
+                      <code style={{ whiteSpace: 'pre-line' }}>{c}</code>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div style={{ fontSize: '0.86rem', color: '#64748b', fontStyle: 'italic', padding: '6px 0' }}>
+                  Standard execution limits apply: Time limit {timeLimit}, Memory limit {question.memory_limit || meta.memoryLimit || 256} MB.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -396,7 +437,7 @@ const CodingQuestion = ({ question, answer, onAnswer }) => {
         <CodeEditor
           question={question}
           answer={answer}
-          onAnswer={onAnswer}
+          onAnswer={(c, l) => onAnswer?.(c, l || selectedLanguage)}
           language={selectedLanguage}
           onLanguageChange={handleLanguageChange}
           onRunCode={handleRunCode}

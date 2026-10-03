@@ -240,37 +240,12 @@ router.use('/student-password', studentPasswordRoutes);
 router.use('/chatbot', chatbotRoutes);
 
 // =====================================================
-// CODE EXECUTION (Sandboxed - basic implementation)
+// CODE EXECUTION (Sandboxed Enterprise Judge & Runner)
 // =====================================================
-router.post('/execute-code', authenticate, authorize('student'), async (req, res) => {
-  const { code, language, input } = req.body;
-
-  // NOTE: In production, use Judge0 API or similar sandboxed service
-  // This is a placeholder that integrates with Judge0 API
-  try {
-    const response = await fetch('https://judge0-ce.p.rapidapi.com/submissions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-RapidAPI-Key': process.env.JUDGE0_API_KEY,
-        'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
-      },
-      body: JSON.stringify({
-        source_code: Buffer.from(code).toString('base64'),
-        language_id: getLanguageId(language),
-        stdin: input ? Buffer.from(input).toString('base64') : null,
-      }),
-    });
-
-    const submission = await response.json();
-    res.json({ success: true, data: { token: submission.token } });
-  } catch (error) {
-    res.status(503).json({
-      success: false,
-      message: 'Code execution service unavailable. Configure JUDGE0_API_KEY.',
-    });
-  }
-});
+router.post('/code/run', authenticate, codeExecutionController.runCode);
+router.post('/code/submit', authenticate, codeExecutionController.submitCode);
+router.post('/code/execute', authenticate, codeExecutionController.runCode);
+router.post('/execute-code', authenticate, codeExecutionController.runCode);
 
 const getLanguageId = (language) => {
   const map = {

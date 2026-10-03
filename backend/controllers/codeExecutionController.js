@@ -1,358 +1,66 @@
 // backend/controllers/codeExecutionController.js
-// Production-grade multi-language sandboxed execution engine for ExamShield Coding Assessments
+// Production-grade multi-language sandboxed execution controller for ExamShield Coding Assessments
 
-const vm = require('vm');
+const { pool } = require('../config/database');
+const { supabase } = require('../config/supabase-clean');
+const {
+  evaluateTestCases,
+  normalizeOutput,
+  areOutputsEqual,
+} = require('../services/codeExecutionService');
 
 /**
- * Normalizes values for comparison (strips whitespace, handles formatting)
+ * Extracts and parses test cases from question record or raw inputs
  */
-function normalizeOutput(val) {
-  if (val === undefined || val === null) return '';
-  if (typeof val === 'boolean') return val ? 'true' : 'false';
-  if (typeof val === 'number') return Number.isInteger(val) ? String(val) : String(parseFloat(val.toFixed(6)));
-  if (typeof val === 'object') {
+function extractQuestionTestCases(questionRow) {
+  if (!questionRow) return [];
+
+  let testCases = [];
+  if (questionRow.test_cases) {
+    if (Array.isArray(questionRow.test_cases)) {
+      testCases = questionRow.test_cases;
+    } else if (typeof questionRow.test_cases === 'string') {
+      try {
+        testCases = JSON.parse(questionRow.test_cases);
+      } catch (_) {}
+    }
+  }
+
+  // Fallback to options JSON if test_cases column was empty
+  if ((!testCases || testCases.length === 0) && questionRow.options) {
     try {
-      return JSON.stringify(val);
-    } catch (_) {
-      return String(val).trim();
-    }
-  }
-  const str = String(val).trim();
-  // If wrapped in quotes, unwrap
-  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
-    return str.slice(1, -1);
-  }
-  return str;
-}
-
-/**
- * Parses diverse input formats (JSON, comma-separated, key=value format like `nums = [1,2], k = 3`)
- */
-function parseSmartInput(rawInput) {
-  if (rawInput === undefined || rawInput === null) return [];
-  if (typeof rawInput !== 'string') {
-    return Array.isArray(rawInput) ? rawInput : [rawInput];
-  }
-
-  const trimmed = rawInput.trim();
-  if (!trimmed) return [];
-
-  // 1. Try parsing directly as JSON
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) return parsed;
-    return [parsed];
-  } catch (_) {}
-
-  // 2. Try parsing `varName = val, varName2 = val2` format (common in LeetCode)
-  if (trimmed.includes('=')) {
-    const parts = [];
-    // Split by comma followed by variable assignment e.g. `, target =` or `, k =`
-    const regex = /(?:^|,\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/g;
-    let match;
-    const indices = [];
-
-    while ((match = regex.exec(trimmed)) !== null) {
-      indices.push({ index: match.index, end: regex.lastIndex, varName: match[1] });
-    }
-
-    if (indices.length > 0) {
-      for (let i = 0; i < indices.length; i++) {
-        const start = indices[i].end;
-        const end = (i + 1 < indices.length) ? indices[i + 1].index : trimmed.length;
-        const valStr = trimmed.slice(start, end).replace(/,\s*$/, '').trim();
-        try {
-          parts.push(JSON.parse(valStr));
-        } catch (_) {
-          // If not valid JSON, check if number or boolean or fallback to string
-          if (!isNaN(valStr) && valStr !== '') {
-            parts.push(Number(valStr));
-          } else if (valStr.toLowerCase() === 'true') {
-            parts.push(true);
-          } else if (valStr.toLowerCase() === 'false') {
-            parts.push(false);
-          } else {
-            parts.push(valStr);
-          }
-        }
+      const opts = typeof questionRow.options === 'string'
+        ? JSON.parse(questionRow.options)
+        : questionRow.options;
+      if (opts && Array.isArray(opts.testCases)) {
+        testCases = opts.testCases;
+      } else if (opts && Array.isArray(opts.test_cases)) {
+        testCases = opts.test_cases;
+      } else if (opts && Array.isArray(opts.examples)) {
+        testCases = opts.examples;
       }
-      if (parts.length > 0) return parts;
-    }
+    } catch (_) {}
   }
 
-  // 3. Try splitting by comma for simple primitives
-  if (trimmed.includes(',') && !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
-    const splitParts = trimmed.split(',').map(s => {
-      const p = s.trim();
-      try { return JSON.parse(p); } catch (_) { return p; }
-    });
-    return splitParts;
-  }
-
-  // 4. Default: single raw value
-  return [trimmed];
-}
-
-/**
- * Deep equality comparison for programming outputs (arrays, objects, primitives)
- */
-function areOutputsEqual(actual, expected) {
-  const normActual = normalizeOutput(actual);
-  const normExpected = normalizeOutput(expected);
-
-  if (normActual === normExpected) return true;
-
-  // Numerical comparison tolerance (float rounding)
-  const numActual = Number(normActual);
-  const numExpected = Number(normExpected);
-  if (!isNaN(numActual) && !isNaN(numExpected) && normActual !== '' && normExpected !== '') {
-    return Math.abs(numActual - numExpected) < 1e-6;
-  }
-
-  // Array comparison (ignoring slight whitespace differences)
-  try {
-    const arrA = JSON.parse(normActual);
-    const arrB = JSON.parse(normExpected);
-    return JSON.stringify(arrA) === JSON.stringify(arrB);
-  } catch (_) {}
-
-  return false;
-}
-
-/**
- * Runs JavaScript code in an isolated Node.js VM context
- */
-function executeJavaScript(code, testCases = []) {
-  const results = [];
-  let totalTime = 0;
-
-  // Security guard against prototype escape, process execution, and host tampering
-  const DANGEROUS_PATTERNS = [
-    /process\s*\./i,
-    /child_process/i,
-    /require\s*\(/i,
-    /import\s*\(/i,
-    /mainModule/i,
-    /constructor\s*\[\s*['"`]constructor['"`]\s*\]/i,
-    /\.constructor\s*\.\s*constructor/i,
-    /__proto__/i,
-    /\bexecSync\b/i,
-    /\bspawnSync\b/i,
-    /\bprocess\b/i
-  ];
-
-  for (const pat of DANGEROUS_PATTERNS) {
-    if (pat.test(code)) {
-      return {
-        status: 'Security Violation',
-        totalTestCases: testCases.length,
-        passedTestCases: 0,
-        failedTestCases: testCases.length,
-        executionTimeMs: 0,
-        memoryKb: 0,
-        testCases: testCases.map((tc, idx) => ({
-          testCaseIndex: idx + 1,
-          input: tc.input || '',
-          expectedOutput: tc.output || '',
-          actualOutput: 'Security Violation: Restricted token or prototype manipulation detected.',
-          stdout: '',
-          passed: false,
-          error: 'Security Violation: Restricted keyword detected.',
-        })),
-      };
-    }
-  }
-
-  const builtInGlobals = new Set([
-    'console', 'Math', 'JSON', 'parseInt', 'parseFloat', 'Array', 'Object',
-    'String', 'Number', 'Boolean', 'Date', 'Map', 'Set', 'BigInt', 'Infinity',
-    'NaN', 'input', 'undefined', 'null', 'isFinite', 'isNaN'
-  ]);
-
-  for (let i = 0; i < testCases.length; i++) {
-    const tc = testCases[i];
-    const rawInput = tc.input !== undefined ? tc.input : '';
-    const rawExpected = tc.output !== undefined ? tc.output : (tc.expectedOutput !== undefined ? tc.expectedOutput : tc.expected_output);
-    const args = parseSmartInput(rawInput);
-
-    let logs = [];
-    const sandbox = {
-      console: {
-        log: (...a) => logs.push(a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ')),
-        info: (...a) => logs.push(a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ')),
-        warn: (...a) => logs.push(a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ')),
-        error: (...a) => logs.push(a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ')),
-      },
-      Math,
-      JSON,
-      parseInt,
-      parseFloat,
-      Array,
-      Object,
-      String,
-      Number,
-      Boolean,
-      Date,
-      Map,
-      Set,
-      BigInt,
-      Infinity,
-      NaN,
-      input: rawInput,
-    };
-
-    const context = vm.createContext(sandbox);
-    const startTime = process.hrtime.bigint();
-    let actualOutput = null;
-    let executionError = null;
-
-    try {
-      // Dynamic invocation harness: executes candidate code and invokes target function
-      const wrappedCode = `
-        ${code}
-        ;(() => {
-          // 1. Check known candidate function names
-          let target = null;
-          const candidates = ['solution', 'solve', 'longestSubarray', 'twoSum', 'maxSubArray', 'isValid', 'search'];
-          for (const name of candidates) {
-            if (typeof this[name] === 'function') {
-              target = this[name];
-              break;
-            }
-          }
-
-          // 2. Check any user-defined function in context
-          if (!target) {
-            const keys = Object.getOwnPropertyNames(this);
-            for (const k of keys) {
-              if (typeof this[k] === 'function' && !${JSON.stringify(Array.from(builtInGlobals))}.includes(k)) {
-                target = this[k];
-                break;
-              }
-            }
-          }
-
-          if (typeof target === 'function') {
-            const argsList = ${JSON.stringify(args)};
-            return target(...argsList);
-          }
-
-          return undefined;
-        })();
-      `;
-
-      const script = new vm.Script(wrappedCode);
-      const retVal = script.runInContext(context, { timeout: 2500 });
-
-      if (retVal !== undefined) {
-        actualOutput = retVal;
-      } else if (logs.length > 0) {
-        actualOutput = logs[logs.length - 1];
-      } else {
-        actualOutput = '';
-      }
-    } catch (err) {
-      executionError = err.message || 'Execution error';
-    }
-
-    const endTime = process.hrtime.bigint();
-    const elapsedMs = Number(endTime - startTime) / 1e6;
-    totalTime += elapsedMs;
-
-    const hasExpected = rawExpected !== undefined && rawExpected !== null && String(rawExpected).trim() !== '';
-    const passed = !executionError && (hasExpected ? areOutputsEqual(actualOutput, rawExpected) : true);
-
-    results.push({
-      testCaseIndex: i + 1,
-      input: rawInput,
-      expectedOutput: rawExpected,
-      actualOutput: executionError ? `Runtime Error: ${executionError}` : actualOutput,
-      stdout: logs.join('\n'),
-      passed,
-      executionTimeMs: Math.max(1, Math.round(elapsedMs)),
-      error: executionError,
-    });
-  }
-
-  const passedCount = results.filter(r => r.passed).length;
-  const isAllPassed = passedCount === results.length;
-  const hasTimeout = results.some(r => r.error && r.error.toLowerCase().includes('timed out'));
-  const hasRuntimeErr = results.some(r => r.error && !r.error.toLowerCase().includes('timed out'));
-  const allNoExpected = results.length > 0 && results.every(r => r.expectedOutput === '' || r.expectedOutput === undefined || r.expectedOutput === null);
-
-  const status = hasTimeout
-    ? 'Time Limit Exceeded'
-    : hasRuntimeErr
-    ? 'Runtime Error'
-    : allNoExpected
-    ? 'Finished'
-    : isAllPassed
-    ? 'Accepted'
-    : 'Wrong Answer';
-
-  return {
-    status,
-    totalTestCases: results.length,
-    passedTestCases: passedCount,
-    failedTestCases: results.length - passedCount,
-    executionTimeMs: Math.max(1, Math.round(totalTime)),
-    memoryKb: Math.round(16400 + Math.random() * 3200),
-    testCases: results,
-  };
-}
-
-/**
- * Fallback / Simulated runner for Python, Java, C++
- */
-function executeSimulated(code, language, testCases = []) {
-  const results = [];
-  let totalTime = 0;
-
-  for (let i = 0; i < testCases.length; i++) {
-    const tc = testCases[i];
-    const rawInput = tc.input !== undefined ? tc.input : '';
-    const rawExpected = tc.output !== undefined ? tc.output : (tc.expectedOutput !== undefined ? tc.expectedOutput : tc.expected_output);
-    const elapsed = Math.floor(Math.random() * 25) + 12;
-    totalTime += elapsed;
-
-    // Verify basic syntax validity
-    const hasLogic = code.length > 20 && (code.includes('return') || code.includes('print') || code.includes('cout'));
-    const passed = hasLogic;
-
-    results.push({
-      testCaseIndex: i + 1,
-      input: rawInput,
-      expectedOutput: rawExpected,
-      actualOutput: passed ? rawExpected : 'Wrong Answer or Empty Return',
-      stdout: `[${language.toUpperCase()} Sandbox output stream initialized]`,
-      passed,
-      executionTimeMs: elapsed,
-      error: null,
-    });
-  }
-
-  const passedCount = results.filter(r => r.passed).length;
-  const isAllPassed = passedCount === results.length;
-  const allNoExpected = results.length > 0 && results.every(r => r.expectedOutput === '' || r.expectedOutput === undefined || r.expectedOutput === null);
-
-  return {
-    status: allNoExpected ? 'Finished' : (isAllPassed ? 'Accepted' : 'Wrong Answer'),
-    totalTestCases: results.length,
-    passedTestCases: passedCount,
-    failedTestCases: results.length - passedCount,
-    executionTimeMs: totalTime,
-    memoryKb: 21500,
-    testCases: results,
-  };
+  return Array.isArray(testCases) ? testCases : [];
 }
 
 /**
  * POST /api/student/run-code
- * Runs code against sample test cases (or custom student testcase)
+ * Runs code against sample test cases or custom student input
  */
 exports.runCode = async (req, res) => {
   try {
-    const { code, language = 'javascript', testCases = [], customInput = null } = req.body;
+    const {
+      questionId,
+      code,
+      language = 'javascript',
+      testCases = [],
+      sessionId,
+    } = req.body;
+    const customInput = req.body.customInput !== undefined ? req.body.customInput : (req.body.input !== undefined ? req.body.input : null);
+
+    const studentId = req.user?.id;
 
     if (!code || typeof code !== 'string') {
       return res.status(400).json({
@@ -362,25 +70,47 @@ exports.runCode = async (req, res) => {
     }
 
     let casesToRun = [];
+    let timeLimitMs = 2000;
+    let memoryLimitMb = 256;
 
-    // If student provided a custom testcase input
+    // If custom test case input is provided
     if (customInput !== null && customInput !== undefined && String(customInput).trim() !== '') {
-      casesToRun = [{ input: String(customInput).trim(), output: '' }];
+      casesToRun = [{ input: String(customInput).trim(), output: '', is_hidden: false }];
     } else if (Array.isArray(testCases) && testCases.length > 0) {
-      // Run up to 4 sample test cases
-      casesToRun = testCases.slice(0, 4);
-    } else {
-      casesToRun = [{ input: '', output: '' }];
+      // Only run public sample cases (never run hidden cases in run-code)
+      casesToRun = testCases.filter(tc => !tc.is_hidden && !tc.isHidden).slice(0, 4);
+      if (casesToRun.length === 0) {
+        casesToRun = testCases.slice(0, 2).map(tc => ({ ...tc, is_hidden: false }));
+      }
+    } else if (questionId) {
+      // Fetch public sample test cases from database
+      const qRes = await pool.query(
+        'SELECT id, test_cases, options, time_limit, memory_limit FROM questions WHERE id = $1',
+        [questionId]
+      );
+      if (qRes.rows.length > 0) {
+        const qRow = qRes.rows[0];
+        timeLimitMs = qRow.time_limit || 2000;
+        memoryLimitMb = qRow.memory_limit || 256;
+        const allCases = extractQuestionTestCases(qRow);
+        casesToRun = allCases.filter(tc => !tc.is_hidden && !tc.isHidden).slice(0, 4);
+        if (casesToRun.length === 0 && allCases.length > 0) {
+          // If none explicitly marked, treat first 2 as sample
+          casesToRun = allCases.slice(0, 2).map(tc => ({ ...tc, is_hidden: false }));
+        }
+      }
     }
 
-    const lang = (language || 'javascript').toLowerCase();
-    let result;
-
-    if (lang === 'javascript' || lang === 'js' || lang === 'node') {
-      result = executeJavaScript(code, casesToRun);
-    } else {
-      result = executeSimulated(code, language, casesToRun);
+    if (casesToRun.length === 0) {
+      casesToRun = [{ input: '', output: '', is_hidden: false }];
     }
+
+    const result = await evaluateTestCases(code, language, casesToRun, {
+      timeLimitMs,
+      memoryLimitMb,
+      isSampleOnly: true,
+      questionMarks: 10,
+    });
 
     return res.json({
       success: true,
@@ -397,11 +127,18 @@ exports.runCode = async (req, res) => {
 
 /**
  * POST /api/student/submit-code
- * Runs code against all test cases, produces score, and validates completeness
+ * Evaluates candidate code against ALL authoritative test cases (sample + hidden) on server
+ * Persists answer and score immediately. Returns sanitized result without leaking hidden inputs.
  */
 exports.submitCode = async (req, res) => {
   try {
-    const { questionId, code, language = 'javascript', testCases = [] } = req.body;
+    const questionId = req.body.questionId || req.body.question_id;
+    const examId = req.body.examId || req.body.exam_id;
+    const sessionId = req.body.sessionId || req.body.session_id;
+    const code = req.body.code;
+    const language = req.body.language || 'javascript';
+
+    const studentId = req.user?.id;
 
     if (!code || typeof code !== 'string') {
       return res.status(400).json({
@@ -410,29 +147,108 @@ exports.submitCode = async (req, res) => {
       });
     }
 
-    const casesToRun = Array.isArray(testCases) && testCases.length > 0
-      ? testCases
-      : [{ input: '', output: '' }];
-
-    const lang = (language || 'javascript').toLowerCase();
-    let result;
-
-    if (lang === 'javascript' || lang === 'js' || lang === 'node') {
-      result = executeJavaScript(code, casesToRun);
-    } else {
-      result = executeSimulated(code, language, casesToRun);
+    if (!questionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Question ID is required for submission.',
+      });
     }
 
-    const scorePercentage = result.totalTestCases > 0
-      ? Math.round((result.passedTestCases / result.totalTestCases) * 100)
-      : 0;
+    // 1. Fetch Question from database with test cases and configured marks
+    const qRes = await pool.query(
+      'SELECT id, exam_id, marks, time_limit, memory_limit, test_cases, options FROM questions WHERE id = $1',
+      [questionId]
+    );
+
+    if (qRes.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Question not found.',
+      });
+    }
+
+    const question = qRes.rows[0];
+    const targetExamId = examId || question.exam_id;
+    const questionMarks = Number(question.marks) || 10;
+    const timeLimitMs = question.time_limit || 2000;
+    const memoryLimitMb = question.memory_limit || 256;
+
+    // 2. Authorization check: verify student has access to this exam
+    if (studentId && targetExamId) {
+      const accessCheck = await pool.query(
+        `SELECT e.id FROM exams e
+         WHERE e.id = $1 AND (
+           e.college_id = $2 OR
+           EXISTS (SELECT 1 FROM exam_assignments ea WHERE ea.exam_id = $1 AND ea.student_id = $3) OR
+           EXISTS (SELECT 1 FROM exam_sessions es WHERE es.exam_id = $1 AND es.student_id = $3)
+         )`,
+        [targetExamId, req.user?.college_id, studentId]
+      );
+
+      if (accessCheck.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized for this examination question.',
+        });
+      }
+    }
+
+    // 3. Extract authoritative test cases (public + hidden)
+    const testCases = extractQuestionTestCases(question);
+    const casesToRun = testCases.length > 0 ? testCases : [{ input: '', output: '', is_hidden: false }];
+
+    // 4. Run server-side evaluation across all test cases
+    const evaluation = await evaluateTestCases(code, language, casesToRun, {
+      timeLimitMs,
+      memoryLimitMb,
+      isSampleOnly: false,
+      questionMarks,
+    });
+
+    // 5. Persist submission in answers table (atomic upsert)
+    // Find active session if sessionId not provided
+    let activeSessionId = sessionId;
+    if (!activeSessionId && studentId && targetExamId) {
+      const sRes = await pool.query(
+        'SELECT id FROM exam_sessions WHERE exam_id = $1 AND student_id = $2 ORDER BY started_at DESC LIMIT 1',
+        [targetExamId, studentId]
+      );
+      if (sRes.rows.length > 0) {
+        activeSessionId = sRes.rows[0].id;
+      }
+    }
+
+    if (activeSessionId && studentId) {
+      const isCorrect = evaluation.status === 'Accepted';
+      await pool.query(
+        `INSERT INTO answers (session_id, question_id, student_id, exam_id, code_submission, selected_language, marks_obtained, is_correct, is_evaluated, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW())
+         ON CONFLICT (session_id, question_id)
+         DO UPDATE SET
+           code_submission = EXCLUDED.code_submission,
+           selected_language = EXCLUDED.selected_language,
+           marks_obtained = EXCLUDED.marks_obtained,
+           is_correct = EXCLUDED.is_correct,
+           is_evaluated = true,
+           updated_at = NOW()`,
+        [
+          activeSessionId,
+          questionId,
+          studentId,
+          targetExamId,
+          code,
+          language,
+          evaluation.earnedMarks,
+          isCorrect,
+        ]
+      );
+    }
 
     return res.json({
       success: true,
       data: {
-        ...result,
+        ...evaluation,
         questionId,
-        scorePercentage,
         submittedAt: new Date().toISOString(),
       },
     });
@@ -440,7 +256,7 @@ exports.submitCode = async (req, res) => {
     console.error('Submit code error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Submission error: ' + error.message,
+      message: 'Submission evaluation error: ' + error.message,
     });
   }
 };

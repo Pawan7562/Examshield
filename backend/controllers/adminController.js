@@ -1,6 +1,7 @@
 const { pool } = require('../config/database');
 const { supabase } = require('../config/supabase');
 const { toISTISOString } = require('../utils/timezone');
+const { autoCloseExpiredExams } = require('../services/examLifecycleService');
 
 // Ultra-fast in-memory cache for college dashboard (15-second TTL)
 const dashboardCache = new Map();
@@ -20,6 +21,9 @@ exports.getDashboard = async (req, res) => {
       });
     }
 
+    // Auto-close any expired exams before aggregating metrics
+    await autoCloseExpiredExams().catch(() => {});
+
     // 2. High-speed single consolidated query to Neon
     const statsPromise = pool.query(`
       SELECT 
@@ -32,10 +36,10 @@ exports.getDashboard = async (req, res) => {
       SELECT * FROM exams 
       WHERE college_id = $1 
         AND status IN ('published', 'active') 
-        AND date_time > $2 
+        AND (date_time + (COALESCE(duration, 60) * INTERVAL '1 minute')) > NOW()
       ORDER BY date_time ASC 
-      LIMIT 5
-    `, [collegeId, toISTISOString(new Date())]);
+      LIMIT 10
+    `, [collegeId]);
 
     const [statsRes, upcomingRes] = await Promise.all([statsPromise, upcomingPromise]);
     const statsRow = statsRes.rows[0] || {};
@@ -132,6 +136,9 @@ exports.getExams = async (req, res) => {
     const collegeId = req.user.id;
     const { limit = 50, offset = 0, status, search } = req.query;
     
+    // Auto-close any exams that have ended before returning list
+    await autoCloseExpiredExams().catch(() => {});
+
     const parsedLimit = Math.min(Math.max(1, parseInt(limit) || 50), 100);
     const parsedOffset = Math.max(0, parseInt(offset) || 0);
 

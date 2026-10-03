@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
-import { formatIST, parseToIST, isExamStartable } from '../../utils/timezone';
+import { formatIST, parseToIST, isExamStartable, isExamEnded } from '../../utils/timezone';
 import toast from 'react-hot-toast';
 import { 
   Users, 
@@ -45,11 +45,9 @@ const StatCard = ({ icon: Icon, label, value, sub, color = '#0a74da', trend }) =
 );
 
 const ExamRow = ({ exam, onClick }) => {
-  const isLive = isExamStartable(exam);
-  const now = Date.now();
-  const start = parseToIST(exam.date_time).getTime();
-  const duration = (exam.duration || 60) * 60000;
-  const isCompleted = now > (start + duration);
+  const isEnded = isExamEnded(exam);
+  const isLive = isExamStartable(exam) && !isEnded;
+  const isCompleted = isEnded || exam.status === 'completed';
 
   return (
     <div onClick={onClick} className="admin-exam-row">
@@ -139,7 +137,7 @@ export default function Dashboard() {
   }, [collegeId]);
 
   const { stats, upcomingExams } = data || {};
-  const liveExam = upcomingExams?.find(exam => isExamStartable(exam));
+  const liveExam = upcomingExams?.find(exam => isExamStartable(exam) && !isExamEnded(exam));
 
   return (
     <div>

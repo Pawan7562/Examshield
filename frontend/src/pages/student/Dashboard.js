@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { studentAPI } from '../../services/api';
 import { formatDistanceToNow } from 'date-fns';
-import { formatIST, isExamStartable } from '../../utils/timezone';
+import { formatIST, isExamStartable, isExamEnded } from '../../utils/timezone';
 import toast from 'react-hot-toast';
 import {
   BookOpen,
@@ -65,17 +65,17 @@ export default function StudentDashboard() {
     return () => { isMounted = false; };
   }, []);
 
-  // Filter exams
+  // Filter exams that are active or scheduled in the future (exclude completed and time-expired)
   const upcomingExams = useMemo(() => {
     return exams.filter(e => {
-      const isDone = e.session_status === 'submitted' || e.session_status === 'terminated';
+      const isDone = isExamEnded(e) || e.session_status === 'submitted' || e.session_status === 'terminated' || e.status === 'completed';
       return !isDone && (e.status === 'published' || e.status === 'active');
     });
   }, [exams]);
 
   // Check for any currently live / immediately startable exam
   const liveExam = useMemo(() => {
-    return upcomingExams.find(exam => isExamStartable(exam));
+    return upcomingExams.find(exam => isExamStartable(exam) && !isExamEnded(exam));
   }, [upcomingExams]);
 
   // Statistics calculation
@@ -115,6 +115,11 @@ export default function StudentDashboard() {
     );
 
     if (matched) {
+      if (isExamEnded(matched)) {
+        toast.error(`The scheduled time for "${matched.title || matched.name}" has expired. Entry is closed.`);
+        setJoiningKey(false);
+        return;
+      }
       toast.success(`Exam identified: "${matched.title || matched.name}"`);
       navigate(`/student/exams/${matched.id}`);
     } else {

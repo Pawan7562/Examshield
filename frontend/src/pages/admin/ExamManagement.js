@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
-import { formatIST } from '../../utils/timezone';
+import { formatIST, isExamEnded } from '../../utils/timezone';
 import toast from 'react-hot-toast';
 import { 
   Plus, 
@@ -58,8 +58,9 @@ const Button = ({ children, variant = 'primary', size = 'md', icon: Icon, loadin
   );
 };
 
-const StatusBadge = ({ status }) => {
-  const normalized = (status || 'draft').toLowerCase();
+const StatusBadge = ({ exam, status }) => {
+  const currentStatus = (exam && isExamEnded(exam)) ? 'completed' : (status || exam?.status || 'draft');
+  const normalized = String(currentStatus).toLowerCase();
   const config = statusConfig[normalized] || statusConfig.draft;
   return (
     <span className="admin-exam-status-badge" style={{ 
@@ -412,7 +413,7 @@ export default function ExamManagement() {
                   <div className="admin-exam-header">
                     <div className="admin-exam-title-section">
                       <h3 className="admin-exam-title">{examTitle}</h3>
-                      <StatusBadge status={exam.status} />
+                      <StatusBadge exam={exam} status={exam.status} />
                     </div>
                     <div className="admin-exam-actions">
                       <Button 

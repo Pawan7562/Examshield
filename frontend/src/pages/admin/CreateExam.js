@@ -319,8 +319,27 @@ export default function CreateExam() {
   };
 
   const addQuestion = (type) => {
-    const base = { type, questionText: '', marks: type === 'mcq' ? 1 : 5, difficulty: 'medium' };
-    if (type === 'mcq') base.options = [{id:'a',text:''},{id:'b',text:''},{id:'c',text:''},{id:'d',text:''}];
+    const base = {
+      type,
+      questionText: '',
+      marks: type === 'mcq' ? 1 : (type === 'coding' ? 10 : 5),
+      difficulty: 'medium'
+    };
+    if (type === 'mcq') {
+      base.options = [{id:'a',text:''},{id:'b',text:''},{id:'c',text:''},{id:'d',text:''}];
+    } else if (type === 'coding') {
+      base.testCases = [
+        { input: '', output: '', explanation: '', is_hidden: false },
+        { input: '', output: '', explanation: '', is_hidden: true }
+      ];
+      base.allowedLanguages = ['javascript', 'python', 'java', 'cpp'];
+      base.timeLimit = 2000;
+      base.memoryLimit = 256;
+      base.executionFormat = 'stdin_stdout';
+      base.inputFormat = '';
+      base.outputFormat = '';
+      base.constraints = '';
+    }
     setQuestions(q => [...q, base]);
   };
 
