@@ -174,18 +174,24 @@ const ProfessionalProctoring = ({
     const offscreen = offscreenCanvasRef.current;
     const ctx = offscreen.getContext('2d', { alpha: false, desynchronized: true });
 
-    // Video frame streamer: 350ms (~2.8 FPS) with lightweight 0.45 JPEG compression
+    let isBusyEncoding = false;
+
+    // High-responsiveness video frame streamer: 125ms (~8 FPS) with volatile non-blocking emit
     const videoStreamInterval = setInterval(() => {
       try {
+        if (isBusyEncoding) return; // Drop frame if previous is still processing (zero buffer bloat)
         const isActive = cameraStatusRef.current === 'active' && !cameraOffRef.current;
         const video = videoRef.current;
 
         if (isActive && video && video.readyState >= 2 && video.videoWidth > 0) {
+          isBusyEncoding = true;
           ctx.drawImage(video, 0, 0, 240, 180);
-          const dataUrl = offscreen.toDataURL('image/jpeg', 0.45);
+          const dataUrl = offscreen.toDataURL('image/jpeg', 0.40);
           const base64Data = dataUrl.split(',')[1];
           if (base64Data && socketRef.current && socketRef.current.connected) {
-            socketRef.current.emit('camera-feed', {
+            // Volatile emit drops stale frames on congested networks rather than queueing lag
+            const sock = socketRef.current.volatile || socketRef.current;
+            sock.emit('camera-feed', {
               examId: examIdRef.current,
               studentId: studentIdRef.current,
               sessionId: sessionIdRef.current,
@@ -193,11 +199,12 @@ const ProfessionalProctoring = ({
               timestamp: Date.now(),
             });
           }
+          isBusyEncoding = false;
         }
       } catch (e) {
-        // Continue silently without interrupting streaming loop
+        isBusyEncoding = false;
       }
-    }, 350);
+    }, 125);
 
     // Telemetry transmitter: runs every 2200ms
     const telemetryInterval = setInterval(() => {
@@ -227,6 +234,99 @@ const ProfessionalProctoring = ({
       clearInterval(telemetryInterval);
     };
   }, [socket, cameraStatus, cameraOff]);
+
+  // ─── WebRTC P2P Direct Video Stream Server ──────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const peerConnections = new Map(); // adminSocketId -> RTCPeerConnection
+
+    const iceServers = [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+    ];
+
+    const handleRequestFeed = async ({ adminSocketId }) => {
+      try {
+        const stream = streamRef.current;
+        if (!stream) return;
+
+        if (peerConnections.has(adminSocketId)) {
+          try { peerConnections.get(adminSocketId).close(); } catch (_) {}
+        }
+
+        const pc = new RTCPeerConnection({ iceServers });
+        peerConnections.set(adminSocketId, pc);
+
+        stream.getVideoTracks().forEach(track => {
+          pc.addTrack(track, stream);
+        });
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate && socketRef.current?.connected) {
+            socketRef.current.emit('webrtc-ice-candidate', {
+              targetSocketId: adminSocketId,
+              studentId: studentIdRef.current,
+              candidate: event.candidate,
+            });
+          }
+        };
+
+        const offer = await pc.createOffer({
+          offerToReceiveVideo: false,
+          offerToReceiveAudio: false,
+        });
+        await pc.setLocalDescription(offer);
+
+        if (socketRef.current?.connected) {
+          socketRef.current.emit('webrtc-offer', {
+            targetSocketId: adminSocketId,
+            targetStudentId: studentIdRef.current,
+            examId: examIdRef.current,
+            offer,
+          });
+        }
+      } catch (err) {
+        console.warn('[WebRTC] Student P2P offer error, fallback to Canvas stream:', err);
+      }
+    };
+
+    const handleAnswer = async ({ fromSocketId, answer }) => {
+      const pc = peerConnections.get(fromSocketId);
+      if (pc && answer) {
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        } catch (e) {
+          console.warn('[WebRTC] Set remote description failed:', e);
+        }
+      }
+    };
+
+    const handleCandidate = async ({ fromSocketId, candidate }) => {
+      const pc = peerConnections.get(fromSocketId);
+      if (pc && candidate) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.warn('[WebRTC] Add ICE candidate failed:', e);
+        }
+      }
+    };
+
+    socket.on('webrtc-request-feed', handleRequestFeed);
+    socket.on('webrtc-answer', handleAnswer);
+    socket.on('webrtc-ice-candidate', handleCandidate);
+
+    return () => {
+      socket.off('webrtc-request-feed', handleRequestFeed);
+      socket.off('webrtc-answer', handleAnswer);
+      socket.off('webrtc-ice-candidate', handleCandidate);
+      peerConnections.forEach(pc => {
+        try { pc.close(); } catch (_) {}
+      });
+      peerConnections.clear();
+    };
+  }, [socket]);
 
   // ─── Throttled Violation Reporter ──────────────────────────────────────────
   const reportViolation = useCallback(async (type, description) => {

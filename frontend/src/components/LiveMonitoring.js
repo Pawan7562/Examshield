@@ -120,12 +120,14 @@ const LiveMonitoring = ({ examId, examName }) => {
   };
 
   const updateCameraFeed = (data) => {
-    // Update video feed for student
-    if (videoRefs.current[data.studentId]) {
-      const videoElement = videoRefs.current[data.studentId];
-      if (data.imageData) {
-        videoElement.src = `data:image/jpeg;base64,${data.imageData}`;
-      }
+    // Update video feed for student with smooth pre-decode
+    if (videoRefs.current[data.studentId] && data.imageData) {
+      const imgEl = videoRefs.current[data.studentId];
+      const preloader = new Image();
+      preloader.onload = () => {
+        imgEl.src = preloader.src;
+      };
+      preloader.src = `data:image/jpeg;base64,${data.imageData}`;
     }
   };
 

@@ -91,20 +91,35 @@ class LiveFeedHub {
 
 const liveFeedHub = new LiveFeedHub();
 
-// Isolated, zero-reconciliation video renderer for high FPS multi-candidate streaming
-const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated }) => {
-  const imgRef = useRef(null);
+// Ultra-smooth hybrid video renderer (Native WebRTC 30 FPS + Double-Buffered Hardware Canvas)
+const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated, socket, examId }) => {
+  const canvasRef = useRef(null);
+  const videoRef = useRef(null);
   const placeholderRef = useRef(null);
+  const activeStreamRef = useRef(false);
 
+  // 1. Double-Buffered Canvas WebSocket Stream (Instant, zero-tear, flicker-free)
   useEffect(() => {
+    let active = true;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+
     const handleFrame = (imageData) => {
-      if (imgRef.current) {
-        imgRef.current.src = `data:image/jpeg;base64,${imageData}`;
-        imgRef.current.style.display = 'block';
-      }
-      if (placeholderRef.current) {
-        placeholderRef.current.style.display = 'none';
-      }
+      if (!active || activeStreamRef.current) return;
+      const img = new Image();
+      img.onload = () => {
+        if (!active || activeStreamRef.current) return;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        if (canvas.style.display !== 'block') {
+          canvas.style.display = 'block';
+        }
+        if (placeholderRef.current) {
+          placeholderRef.current.style.display = 'none';
+        }
+      };
+      img.src = 'data:image/jpeg;base64,' + imageData;
     };
 
     const unsub = liveFeedHub.subscribe(studentId, handleFrame);
@@ -112,14 +127,114 @@ const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated }
     if (existing) {
       handleFrame(existing);
     }
-    return unsub;
+    return () => {
+      active = false;
+      unsub();
+    };
   }, [studentId]);
+
+  // 2. Direct WebRTC P2P MediaStream (30 FPS hardware accelerated video)
+  useEffect(() => {
+    if (!socket || !studentId) return;
+    let pc = null;
+    let isMounted = true;
+
+    const iceServers = [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+    ];
+
+    const initWebRTC = () => {
+      try {
+        pc = new RTCPeerConnection({ iceServers });
+
+        pc.ontrack = (event) => {
+          if (videoRef.current && event.streams && event.streams[0] && isMounted) {
+            activeStreamRef.current = true;
+            videoRef.current.srcObject = event.streams[0];
+            videoRef.current.style.display = 'block';
+            if (canvasRef.current) canvasRef.current.style.display = 'none';
+            if (placeholderRef.current) placeholderRef.current.style.display = 'none';
+          }
+        };
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate && socket.connected) {
+            socket.emit('webrtc-ice-candidate', {
+              targetSocketId: null,
+              studentId,
+              candidate: event.candidate,
+            });
+          }
+        };
+
+        const onOffer = async (data) => {
+          if (data.studentId === studentId && data.offer && pc && isMounted) {
+            try {
+              await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              socket.emit('webrtc-answer', {
+                targetSocketId: data.fromSocketId,
+                studentId,
+                answer,
+              });
+            } catch (e) {
+              console.warn('[WebRTC Admin] Answer creation notice:', e);
+            }
+          }
+        };
+
+        const onCandidate = async (data) => {
+          if (data.studentId === studentId && data.candidate && pc && isMounted) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } catch (_) {}
+          }
+        };
+
+        socket.on('webrtc-offer', onOffer);
+        socket.on('webrtc-ice-candidate', onCandidate);
+
+        // Send request to student to initiate WebRTC stream
+        socket.emit('webrtc-request-feed', { studentId, examId });
+
+        return () => {
+          socket.off('webrtc-offer', onOffer);
+          socket.off('webrtc-ice-candidate', onCandidate);
+        };
+      } catch (err) {
+        console.warn('[WebRTC Admin] Setup notice:', err);
+      }
+    };
+
+    const cleanup = initWebRTC();
+
+    return () => {
+      isMounted = false;
+      activeStreamRef.current = false;
+      if (cleanup) cleanup();
+      if (pc) {
+        try { pc.close(); } catch (_) {}
+      }
+    };
+  }, [socket, studentId, examId]);
 
   return (
     <>
-      <img
-        ref={imgRef}
-        alt={studentName || 'Candidate'}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="surveillance-webcam-feed"
+        style={{ display: 'none', width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+      <canvas
+        ref={canvasRef}
+        width={240}
+        height={180}
         className="surveillance-webcam-feed"
         style={{ display: 'none', width: '100%', height: '100%', objectFit: 'cover' }}
       />
@@ -884,6 +999,8 @@ export default function LiveMonitor() {
                         studentId={student.id}
                         studentName={student.name}
                         isTerminated={isTerminated}
+                        socket={socketRef.current}
+                        examId={currentExamId}
                       />
 
                       {/* Top Overlay Badges */}
@@ -1365,6 +1482,8 @@ export default function LiveMonitor() {
                   studentId={inspectModal.student.id}
                   studentName={inspectModal.student.name}
                   isTerminated={inspectModal.student.status === 'terminated'}
+                  socket={socketRef.current}
+                  examId={currentExamId}
                 />
               </div>
             </div>
