@@ -96,39 +96,92 @@ class LiveFeedHub {
 
 const liveFeedHub = new LiveFeedHub();
 
-// Ultra-smooth robust video renderer (Double-Buffered Hardware Canvas via High-Speed WebSocket)
+// URI normalizer to ensure images and canvas frames always have valid data URL formatting
+const normalizeImageUri = (data) => {
+  if (!data) return '';
+  if (typeof data !== 'string') return '';
+  if (data.startsWith('data:image')) return data;
+  return `data:image/jpeg;base64,${data}`;
+};
+
+// Dynamic WebSocket URL resolver (preserves localhost, local network IP, and production reverse proxy)
+const resolveWsUrl = () => {
+  if (process.env.REACT_APP_WS_URL) return process.env.REACT_APP_WS_URL;
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname, port } = window.location;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:5000';
+    }
+    // Behind reverse proxy (Nginx / ALB / Domain):
+    const wsProto = protocol === 'https:' ? 'https:' : 'http:';
+    return `${wsProto}//${hostname}${port ? ':' + port : ''}`;
+  }
+  return 'http://localhost:5000';
+};
+
+// Ultra-smooth robust video renderer (Double-Buffered Hardware Canvas + Fallback Image via High-Speed WebSocket)
 const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated, streamState = 'connecting', onFrameReceived = null }) => {
   const canvasRef = useRef(null);
+  const imgFallbackRef = useRef(null);
   const placeholderRef = useRef(null);
   const lastFrameTimeRef = useRef(0);
   const staleTimerRef = useRef(null);
+  const [fps, setFps] = useState(0);
+  const frameCountRef = useRef(0);
+  const lastFpsCalcRef = useRef(Date.now());
   const onFrameReceivedRef = useRef(onFrameReceived);
   useEffect(() => { onFrameReceivedRef.current = onFrameReceived; }, [onFrameReceived]);
 
   useEffect(() => {
     let active = true;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const imgFallback = imgFallbackRef.current;
+    if (!canvas && !imgFallback) return;
 
-    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
-    let currentImage = new Image();
+    const ctx = canvas ? canvas.getContext('2d', { alpha: false, desynchronized: true }) : null;
 
     const handleFrame = (imageData) => {
       if (!active || !imageData) return;
-      lastFrameTimeRef.current = Date.now();
+      const now = Date.now();
+      lastFrameTimeRef.current = now;
+      frameCountRef.current++;
+
+      if (now - lastFpsCalcRef.current >= 1000) {
+        const measured = Math.round((frameCountRef.current * 1000) / (now - lastFpsCalcRef.current));
+        setFps(measured > 0 ? measured : 8);
+        frameCountRef.current = 0;
+        lastFpsCalcRef.current = now;
+      }
+
       onFrameReceivedRef.current?.();
 
-      currentImage.onload = () => {
+      const cleanUri = normalizeImageUri(imageData);
+
+      // Fast image decode
+      const img = new Image();
+      img.onload = () => {
         if (!active) return;
-        ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-        if (canvas.style.display !== 'block') {
-          canvas.style.display = 'block';
+        if (ctx && canvas) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          if (canvas.style.display !== 'block') canvas.style.display = 'block';
+        }
+        if (imgFallback && imgFallback.style.display !== 'none') {
+          imgFallback.style.display = 'none';
         }
         if (placeholderRef.current && placeholderRef.current.style.display !== 'none') {
           placeholderRef.current.style.display = 'none';
         }
       };
-      currentImage.src = 'data:image/jpeg;base64,' + imageData;
+      img.onerror = () => {
+        // Fallback to direct img tag if canvas draw fails
+        if (imgFallback) {
+          imgFallback.src = cleanUri;
+          imgFallback.style.display = 'block';
+          if (canvas) canvas.style.display = 'none';
+          if (placeholderRef.current) placeholderRef.current.style.display = 'none';
+        }
+      };
+      img.src = cleanUri;
     };
 
     const unsub = liveFeedHub.subscribe(studentId, handleFrame);
@@ -137,12 +190,14 @@ const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated, 
       handleFrame(existing);
     }
 
-    // Health watchdog: If no frame arrives for 6 seconds, display state placeholder
+    // Health watchdog: If no frame arrives for 7 seconds, display state placeholder
     staleTimerRef.current = setInterval(() => {
       if (!active) return;
-      if (lastFrameTimeRef.current > 0 && Date.now() - lastFrameTimeRef.current > 6000) {
+      if (lastFrameTimeRef.current > 0 && Date.now() - lastFrameTimeRef.current > 7000) {
         if (placeholderRef.current) placeholderRef.current.style.display = 'flex';
         if (canvas) canvas.style.display = 'none';
+        if (imgFallback) imgFallback.style.display = 'none';
+        setFps(0);
       }
     }, 2000);
 
@@ -150,7 +205,6 @@ const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated, 
       active = false;
       unsub();
       if (staleTimerRef.current) clearInterval(staleTimerRef.current);
-      currentImage.onload = null;
     };
   }, [studentId]);
 
@@ -158,8 +212,14 @@ const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated, 
     <>
       <canvas
         ref={canvasRef}
-        width={240}
-        height={180}
+        width={320}
+        height={240}
+        className="surveillance-webcam-feed"
+        style={{ display: 'none', width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+      <img
+        ref={imgFallbackRef}
+        alt={`${studentName || 'Candidate'} live feed`}
         className="surveillance-webcam-feed"
         style={{ display: 'none', width: '100%', height: '100%', objectFit: 'cover' }}
       />
@@ -186,6 +246,13 @@ const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated, 
             : 'PROCTOR RADAR ACTIVE'}
         </span>
       </div>
+      {/* Live Video Indicator Badge */}
+      {fps > 0 && (
+        <div className="surveillance-live-fps-badge">
+          <span className="live-dot-pulse" />
+          <span>LIVE • {fps} FPS</span>
+        </div>
+      )}
     </>
   );
 });
@@ -328,8 +395,7 @@ export default function LiveMonitor() {
     if (!currentExamId) return;
 
     const token = localStorage.getItem('accessToken');
-    const wsUrl = process.env.REACT_APP_WS_URL ||
-      (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-3-wydj.onrender.com');
+    const wsUrl = resolveWsUrl();
 
     const socket = io(wsUrl, {
       auth: { token, role: 'admin' },
@@ -505,10 +571,34 @@ export default function LiveMonitor() {
       });
     });
 
-    // Student joined
+    // Student joined — auto-populate stream if tile is open
     socket.on('student-joined', (data) => {
-      toast.success(`Candidate joined exam session`, { duration: 2500 });
+      toast.success(`Candidate ${data?.studentName || ''} joined session`, { duration: 2500 });
       loadExamMonitoringData(currentExamId);
+
+      if (data?.studentId) {
+        setActiveSlots(prev => {
+          if (prev.some(s => s.studentId === data.studentId)) return prev;
+          const emptyIdx = prev.findIndex(s => !s.studentId);
+          if (emptyIdx !== -1 && emptyIdx < maxStreams) {
+            socket.emit('subscribe-student-stream', {
+              examId: currentExamId,
+              studentId: data.studentId,
+              tileIndex: emptyIdx,
+            });
+            const next = [...prev];
+            next[emptyIdx] = {
+              slotIndex: emptyIdx,
+              studentId: data.studentId,
+              studentName: data.studentName || 'Candidate',
+              status: 'connecting',
+              student: { id: data.studentId, name: data.studentName, status: 'active' },
+            };
+            return next;
+          }
+          return prev;
+        });
+      }
     });
 
     // Student submitted
@@ -531,6 +621,7 @@ export default function LiveMonitor() {
       if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current);
       socket.emit('leave-exam-monitoring', { examId: currentExamId });
       socket.disconnect();
+      liveFeedHub.clear();
     };
   }, [currentExamId, soundEnabled]);
 
@@ -620,6 +711,44 @@ export default function LiveMonitor() {
       return next;
     });
   }, []);
+
+  // ─── Auto-Subscribe Open Slots to Active Candidates (Instant Live Streaming) ───
+  useEffect(() => {
+    if (!currentExamId || !socketRef.current?.connected || candidates.length === 0) return;
+
+    setActiveSlots(prev => {
+      const activeCandidates = candidates.filter(c => c.status === 'active' && c.id);
+      if (activeCandidates.length === 0) return prev;
+
+      let hasChanges = false;
+      const next = [...prev];
+
+      activeCandidates.forEach(cand => {
+        // Skip if candidate is already in an active tile
+        if (next.some(s => s.studentId === cand.id)) return;
+
+        // Find next empty tile
+        const emptyIdx = next.findIndex(s => !s.studentId);
+        if (emptyIdx !== -1 && emptyIdx < maxStreams) {
+          hasChanges = true;
+          socketRef.current.emit('subscribe-student-stream', {
+            examId: currentExamId,
+            studentId: cand.id,
+            tileIndex: emptyIdx,
+          });
+          next[emptyIdx] = {
+            slotIndex: emptyIdx,
+            studentId: cand.id,
+            studentName: cand.name,
+            status: 'connecting',
+            student: cand,
+          };
+        }
+      });
+
+      return hasChanges ? next : prev;
+    });
+  }, [currentExamId, candidates, maxStreams]);
 
   // ─── 5. Warning Interventions ─────────────────────────────────────────────────
   const openWarningModal = (student, presetMsg = '', strike = 1) => {
@@ -1237,7 +1366,7 @@ export default function LiveMonitor() {
                       <div className="surveillance-frame-wrap">
                         {thumbnail?.imageData ? (
                           <img
-                            src={`data:image/jpeg;base64,${thumbnail.imageData}`}
+                            src={normalizeImageUri(thumbnail.imageData)}
                             alt={student.name}
                             className="surveillance-webcam-feed"
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}

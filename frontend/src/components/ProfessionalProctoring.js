@@ -268,8 +268,8 @@ const ProfessionalProctoring = ({
       }
     }, 125);
 
-    // Periodic background surveillance snapshot (low frequency: every 12s when NOT live streaming)
-    // Feeds candidate roster thumbnails with minimal network consumption (~0.25 KB/s vs 48 KB/s)
+    // Periodic background surveillance snapshot (optimized for 50,000 candidates: 25s when idle)
+    // Instant incident-triggered snapshots are dispatched immediately on violation detection!
     const snapshotInterval = setInterval(() => {
       try {
         if (isStreamingRequestedRef.current) return; // Skip if high-speed stream is already active
@@ -294,7 +294,7 @@ const ProfessionalProctoring = ({
           });
         }
       } catch (_) {}
-    }, 12000);
+    }, 25000);
 
     // Adaptive Telemetry Transmitter: Instant dispatch on state change, 7s idle heartbeat
     let lastActivityState = null;

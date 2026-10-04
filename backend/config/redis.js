@@ -16,11 +16,22 @@ let isRedisConnected = false;
  * Initialize Redis adapter on Socket.IO for horizontal load balancing
  */
 const initRedisAdapter = async (io) => {
-  const redisUrl = process.env.REDIS_URL;
+  let redisUrl = process.env.REDIS_URL;
+
+  // Fallback: derive TCP/TLS URL from Upstash REST variables if REDIS_URL is not set
+  if (!redisUrl && process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const host = process.env.UPSTASH_REDIS_REST_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    redisUrl = `rediss://default:${process.env.UPSTASH_REDIS_REST_TOKEN}@${host}:6379`;
+  }
 
   if (!redisUrl) {
     logger.info('ℹ️ REDIS_URL not configured. Running Socket.IO in standalone in-memory mode.');
     return false;
+  }
+
+  // Normalize URL for TLS if connecting to Upstash or if protocol requires TLS
+  if ((redisUrl.includes('upstash.io') || process.env.REDIS_TLS === 'true') && redisUrl.startsWith('redis://')) {
+    redisUrl = redisUrl.replace(/^redis:\/\//, 'rediss://');
   }
 
   try {
@@ -90,4 +101,44 @@ const getRedisClient = () => {
   return isRedisConnected ? redisClient : null;
 };
 
-module.exports = { initRedisAdapter, getRedisClient, isRedisConnected: () => isRedisConnected };
+/**
+ * Cluster-wide Stream Subscriber Coordination
+ */
+const addStreamSubscriber = async (studentId, socketId) => {
+  if (isRedisConnected && redisClient) {
+    try {
+      await redisClient.sAdd(`stream_subs:${studentId}`, socketId);
+      await redisClient.expire(`stream_subs:${studentId}`, 7200);
+      return await redisClient.sCard(`stream_subs:${studentId}`);
+    } catch (_) {}
+  }
+  return null;
+};
+
+const removeStreamSubscriber = async (studentId, socketId) => {
+  if (isRedisConnected && redisClient) {
+    try {
+      await redisClient.sRem(`stream_subs:${studentId}`, socketId);
+      return await redisClient.sCard(`stream_subs:${studentId}`);
+    } catch (_) {}
+  }
+  return null;
+};
+
+const getStreamSubscriberCount = async (studentId) => {
+  if (isRedisConnected && redisClient) {
+    try {
+      return await redisClient.sCard(`stream_subs:${studentId}`);
+    } catch (_) {}
+  }
+  return null;
+};
+
+module.exports = {
+  initRedisAdapter,
+  getRedisClient,
+  isRedisConnected: () => isRedisConnected,
+  addStreamSubscriber,
+  removeStreamSubscriber,
+  getStreamSubscriberCount,
+};

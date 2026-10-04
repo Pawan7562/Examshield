@@ -8,7 +8,7 @@ const { pool } = require('../config/database');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'examshield_jwt_secret_key_change_in_production_123456';
 const BASE_URL = process.env.LOAD_TEST_URL || 'http://localhost:5000';
-const NUM_CANDIDATES = parseInt(process.env.CANDIDATES || process.argv[2] || '100', 10);
+const NUM_CANDIDATES = parseInt(process.env.CANDIDATES || '100', 10);
 
 async function runCandidateLoadBenchmark() {
   console.log('\n======================================================================');
@@ -52,41 +52,22 @@ async function runCandidateLoadBenchmark() {
     console.log(`✓ Fixtures created: Exam ${examId}, Questions: [${q1Id}, ${q2Id}]`);
     console.log(`✓ Simulating ${NUM_CANDIDATES} concurrent authenticated student lifecycles...\n`);
 
-    const allLatencies = [];
-    const startLatencies = [];
-    const saveAnswerLatencies = [];
-    const bulkSaveLatencies = [];
-    const submitLatencies = [];
-    const poolStatsSamples = [];
-
+    const latencies = [];
     let successfulWorkflows = 0;
     let failedRequests = 0;
     const initialMemory = process.memoryUsage();
     const benchmarkStart = Date.now();
 
-    // Helper for timing HTTP calls with per-endpoint categorization
-    const timedFetch = async (url, options, category) => {
+    // Helper for timing HTTP calls
+    const timedFetch = async (url, options) => {
       const start = Date.now();
       try {
         const res = await fetch(url, options);
-        const lat = Date.now() - start;
-        allLatencies.push(lat);
-        if (category === 'start') startLatencies.push(lat);
-        else if (category === 'save-answer') saveAnswerLatencies.push(lat);
-        else if (category === 'save-bulk') bulkSaveLatencies.push(lat);
-        else if (category === 'submit') submitLatencies.push(lat);
-
-        poolStatsSamples.push({
-          total: pool.totalCount,
-          idle: pool.idleCount,
-          waiting: pool.waitingCount
-        });
-
+        latencies.push(Date.now() - start);
         if (!res.ok) failedRequests++;
         return res;
       } catch (err) {
-        const lat = Date.now() - start;
-        allLatencies.push(lat);
+        latencies.push(Date.now() - start);
         failedRequests++;
         throw err;
       }
@@ -106,7 +87,7 @@ async function runCandidateLoadBenchmark() {
           const stuRes = await pool.query(
             `INSERT INTO students (college_id, student_id, name, email, password, roll_no, is_active)
              VALUES ($1, $2, $3, $4, 'hash_placeholder', $5, true) RETURNING id`,
-            [collegeId, `L-${idx}-${Date.now().toString().slice(-4)}`, `Candidate ${idx}`, `${fakeStudentId}@load.test`, `ROLL-${idx}`]
+            [collegeId, `L-${idx}-${Date.now().toString().slice(-4)}`, `Candidate ${idx}`, `${fakeStudentId}@load.test`, `ROLL-${Date.now().toString().slice(-5)}-${idx}`]
           );
           const studentDbId = stuRes.rows[0].id;
           createdStudentIds.push(studentDbId);
@@ -122,7 +103,7 @@ async function runCandidateLoadBenchmark() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${studentToken}` },
             body: JSON.stringify({ examKey: examCode })
-          }, 'start');
+          });
           const startData = await startRes.json();
           const sessionId = startData.data?.session?.id || startData.session?.id;
           if (!sessionId) throw new Error(`Start failed: ${JSON.stringify(startData)}`);
@@ -132,7 +113,7 @@ async function runCandidateLoadBenchmark() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${studentToken}` },
             body: JSON.stringify({ sessionId, questionId: q1Id, selectedOption: 'O(1)' })
-          }, 'save-answer');
+          });
 
           // Step 3: Jittered Bulk Flush
           await timedFetch(`${BASE_URL}/api/student/exams/${examId}/save-answers-bulk`, {
@@ -145,7 +126,7 @@ async function runCandidateLoadBenchmark() {
                 { questionId: q2Id, selectedOption: 'O(n)' }
               ]
             })
-          }, 'save-bulk');
+          });
 
           // Step 4: Final Submission
           const submitRes = await timedFetch(`${BASE_URL}/api/student/exams/${examId}/submit`, {
@@ -159,7 +140,7 @@ async function runCandidateLoadBenchmark() {
                 { questionId: q2Id, selectedOption: 'O(n)' }
               ]
             })
-          }, 'submit');
+          });
           const submitData = await submitRes.json();
           if (submitData.success) {
             successfulWorkflows++;
@@ -174,29 +155,14 @@ async function runCandidateLoadBenchmark() {
 
     const durationSec = (Date.now() - benchmarkStart) / 1000;
     const finalMemory = process.memoryUsage();
+    latencies.sort((a, b) => a - b);
 
-    const calcPercentiles = (arr) => {
-      if (!arr || arr.length === 0) return { p50: 0, p95: 0, p99: 0 };
-      const sorted = [...arr].sort((a, b) => a - b);
-      return {
-        p50: sorted[Math.floor(sorted.length * 0.50)] || 0,
-        p95: sorted[Math.floor(sorted.length * 0.95)] || 0,
-        p99: sorted[Math.floor(sorted.length * 0.99)] || 0,
-      };
-    };
-
-    const overallPct = calcPercentiles(allLatencies);
-    const startPct = calcPercentiles(startLatencies);
-    const saveAnswerPct = calcPercentiles(saveAnswerLatencies);
-    const bulkSavePct = calcPercentiles(bulkSaveLatencies);
-    const submitPct = calcPercentiles(submitLatencies);
-
-    const totalRequests = allLatencies.length;
+    const p50 = latencies[Math.floor(latencies.length * 0.50)] || 0;
+    const p95 = latencies[Math.floor(latencies.length * 0.95)] || 0;
+    const p99 = latencies[Math.floor(latencies.length * 0.99)] || 0;
+    const totalRequests = latencies.length;
     const throughput = (totalRequests / durationSec).toFixed(1);
-    const errorRate = totalRequests > 0 ? ((failedRequests / totalRequests) * 100).toFixed(2) : '0.00';
-
-    const maxWaitingInPool = poolStatsSamples.reduce((max, s) => Math.max(max, s.waiting || 0), 0);
-    const maxActiveClients = poolStatsSamples.reduce((max, s) => Math.max(max, (s.total || 0) - (s.idle || 0)), 0);
+    const errorRate = ((failedRequests / totalRequests) * 100).toFixed(2);
 
     // Database Persistence Audit: check that all completed workflows persisted both answers in DB
     const { rows: persistedCount } = await pool.query(
@@ -206,25 +172,19 @@ async function runCandidateLoadBenchmark() {
     const expectedPersistedAnswers = successfulWorkflows * 2;
 
     console.log('──────────────────────────────────────────────────────────────────────');
-    console.log('📊 OVERALL WORKFLOW METRICS:');
+    console.log('📊 BENCHMARK METRICS SUMMARY:');
     console.log(`   Simulated Candidates:    ${NUM_CANDIDATES}`);
     console.log(`   Completed Workflows:     ${successfulWorkflows} / ${NUM_CANDIDATES} (${((successfulWorkflows / NUM_CANDIDATES) * 100).toFixed(1)}%)`);
     console.log(`   Total HTTP Requests:     ${totalRequests}`);
     console.log(`   Total Duration:          ${durationSec.toFixed(2)}s`);
     console.log(`   Throughput:              ${throughput} req/sec`);
     console.log(`   Error Rate:              ${errorRate}% (${failedRequests} failed calls)`);
+    console.log(`   Latency p50:             ${p50} ms`);
+    console.log(`   Latency p95:             ${p95} ms`);
+    console.log(`   Latency p99:             ${p99} ms`);
     console.log(`   Process RSS Memory:      ${(finalMemory.rss / 1024 / 1024).toFixed(1)} MB (Δ ${((finalMemory.rss - initialMemory.rss) / 1024 / 1024).toFixed(1)} MB)`);
     console.log(`   Process Heap Used:       ${(finalMemory.heapUsed / 1024 / 1024).toFixed(1)} MB`);
-    console.log(`   DB Pool Max Active:      ${maxActiveClients} / ${pool.options.max} clients`);
-    console.log(`   DB Pool Max Waiting:     ${maxWaitingInPool} requests in queue`);
     console.log(`   DB Persisted Answers:    ${persistedCount[0].count} / ${expectedPersistedAnswers} (${persistedCount[0].count === String(expectedPersistedAnswers) ? '100% Persisted' : 'Discrepancy'})`);
-    console.log('──────────────────────────────────────────────────────────────────────');
-    console.log('⏱️ LATENCY BREAKDOWN BY ENDPOINT (p50 / p95 / p99):');
-    console.log(`   1. Start Exam (/start):           p50: ${startPct.p50} ms | p95: ${startPct.p95} ms | p99: ${startPct.p99} ms (Total: ${startLatencies.length})`);
-    console.log(`   2. Single Save (/save-answer):    p50: ${saveAnswerPct.p50} ms | p95: ${saveAnswerPct.p95} ms | p99: ${saveAnswerPct.p99} ms (Total: ${saveAnswerLatencies.length})`);
-    console.log(`   3. Bulk Flush (/save-answers-bulk):p50: ${bulkSavePct.p50} ms | p95: ${bulkSavePct.p95} ms | p99: ${bulkSavePct.p99} ms (Total: ${bulkSaveLatencies.length})`);
-    console.log(`   4. Final Submit (/submit):        p50: ${submitPct.p50} ms | p95: ${submitPct.p95} ms | p99: ${submitPct.p99} ms (Total: ${submitLatencies.length})`);
-    console.log(`   → OVERALL HTTP REQUESTS:          p50: ${overallPct.p50} ms | p95: ${overallPct.p95} ms | p99: ${overallPct.p99} ms`);
     console.log('──────────────────────────────────────────────────────────────────────\n');
 
   } catch (err) {
