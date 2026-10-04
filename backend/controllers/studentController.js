@@ -2,7 +2,9 @@
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const csv = require('csv-parser');
+const xlsx = require('xlsx');
 const fs = require('fs');
+const path = require('path');
 const { supabase } = require('../config/supabase');
 const { pool } = require('../config/database');
 const { sendStudentCredentials } = require('../services/emailService');
@@ -679,127 +681,287 @@ exports.changePassword = async (req, res) => {
 
 /**
  * POST /api/admin/students/bulk
- * Bulk upload students from CSV
+ * Bulk upload students from CSV and Excel (.xlsx, .xls) files.
+ * Dispatches credentials email to each registered student.
  */
 exports.bulkUploadStudents = async (req, res) => {
+  let uploadedFilePath = null;
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'No CSV file uploaded'
+        message: 'No file uploaded. Please upload a CSV (.csv) or Excel (.xlsx, .xls) file.'
       });
     }
 
+    uploadedFilePath = req.file.path;
     const collegeId = req.user.id;
-    const students = [];
-    const errors = [];
 
-    // Parse CSV
-    fs.createReadStream(req.file.path)
-      .pipe(csv())
-      .on('data', (data) => {
-        try {
-          students.push({
-            name: data.name?.trim(),
-            email: data.email?.trim(),
-            roll_no: data.roll_no?.trim(),
-            department: data.department?.trim(),
-            batch: data.batch?.trim()
-          });
-        } catch (err) {
-          errors.push(`Invalid data: ${JSON.stringify(data)}`);
-        }
-      })
-      .on('end', async () => {
-        try {
-          // Process students
-          const results = [];
-          
-          for (const studentData of students) {
-            try {
-              if (!studentData.email || !studentData.roll_no || !studentData.name) {
-                errors.push(`Skipped row: Name, email, and roll number are required.`);
-                continue;
-              }
-              const cleanEmail = studentData.email.trim().toLowerCase();
-              const cleanRoll = studentData.roll_no.trim();
-
-              // Check if student already exists in THIS college
-              const existingCheck = await pool.query(
-                'SELECT id FROM students WHERE (LOWER(email) = $1 OR roll_no = $2) AND college_id = $3 LIMIT 1',
-                [cleanEmail, cleanRoll, collegeId]
-              );
-
-              if (existingCheck.rows.length > 0) {
-                errors.push(`Student ${cleanEmail} (${cleanRoll}) is already registered in your college`);
-                continue;
-              }
-
-              // Generate unique student ID and password
-              const studentId = await generateStudentId(collegeId);
-              const password = generatePassword();
-              const hashedPassword = await bcrypt.hash(password, 12);
-              const newUuid = uuidv4();
-
-              // Insert student strictly associated with this college
-              const insertRes = await pool.query(
-                `INSERT INTO students (id, student_id, name, email, roll_no, department, batch, password, college_id, is_active, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, NOW(), NOW())
-                 RETURNING *`,
-                [newUuid, studentId, studentData.name.trim(), cleanEmail, cleanRoll, studentData.department?.trim() || null, studentData.batch?.trim() || null, hashedPassword, collegeId]
-              );
-
-              const createdStudent = insertRes.rows[0];
-              results.push({
-                ...createdStudent,
-                password
-              });
-
-              // Send credentials email
-              sendStudentCredentials({
-                name: studentData.name,
-                email: cleanEmail,
-                studentId,
-                password,
-                collegeName: req.user.name || 'Your Institution',
-                loginUrl: process.env.STUDENT_LOGIN_URL || 'https://exam.nexifyforge.in/student/login'
-              }).catch(emailError => {
-                console.error(`❌ Bulk Upload Email Error for ${cleanEmail}:`, emailError.message);
-              });
-            } catch (err) {
-              errors.push(`Failed to process ${studentData.email}: ${err.message}`);
-            }
-          }
-
-          // Clean up uploaded file
-          fs.unlinkSync(req.file.path);
-
-          res.json({
-            success: true,
-            message: `Bulk upload completed. ${results.length} students added, ${errors.length} errors.`,
-            data: {
-              uploaded: results,
-              errors: errors
-            }
-          });
-
-        } catch (error) {
-          console.error('Bulk upload error:', error);
-          res.status(500).json({
-            success: false,
-            message: 'Bulk upload failed',
-            error: error.message
-          });
-        }
+    // 1. Universal Spreadsheet parsing with SheetJS (supports .csv, .xlsx, .xls)
+    let rawRows = [];
+    try {
+      const workbook = xlsx.readFile(uploadedFilePath, { cellDates: true, raw: false });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) {
+        throw new Error('Spreadsheet does not contain any sheets.');
+      }
+      const worksheet = workbook.Sheets[sheetName];
+      rawRows = xlsx.utils.sheet_to_json(worksheet, { defval: '', blankrows: false });
+    } catch (parseErr) {
+      return res.status(400).json({
+        success: false,
+        message: `Failed to read spreadsheet: ${parseErr.message}. Please upload a valid CSV or Excel file.`
       });
+    }
+
+    if (!Array.isArray(rawRows) || rawRows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'The uploaded file contains no data rows.'
+      });
+    }
+
+    // 2. Normalization helper to map flexible column headers
+    const normalizeRow = (rawRow) => {
+      const map = {};
+      for (const [key, val] of Object.entries(rawRow)) {
+        if (!key) continue;
+        const cleanKey = String(key).trim().toLowerCase().replace(/[\s\-_.]+/g, '');
+        map[cleanKey] = typeof val === 'string' ? val.trim() : String(val ?? '').trim();
+      }
+
+      const name = map['name'] || map['studentname'] || map['fullname'] || map['candidatename'] || map['student'] || '';
+      const email = map['email'] || map['studentemail'] || map['emailid'] || map['emailaddress'] || map['mail'] || '';
+      const roll_no = map['rollno'] || map['rollnumber'] || map['registrationno'] || map['regno'] || map['registerno'] || map['enrollmentno'] || map['enrollmentnumber'] || map['studentid'] || '';
+      const department = map['department'] || map['dept'] || map['branch'] || map['stream'] || map['course'] || '';
+      const batch = map['batch'] || map['year'] || map['academicbatch'] || map['session'] || map['class'] || '';
+      const semester = map['semester'] || map['sem'] || '';
+
+      return { name, email, roll_no, department, batch, semester };
+    };
+
+    // 3. Resolve active or specified exam for this college
+    const { examId } = req.body || {};
+    let targetExam = null;
+    let effectiveExamKey = null;
+
+    try {
+      if (examId) {
+        const { data: specifiedExam } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('id', examId)
+          .eq('college_id', collegeId)
+          .single();
+        targetExam = specifiedExam;
+      }
+
+      if (!targetExam) {
+        const { data: latestExams } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('college_id', collegeId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (latestExams && latestExams.length > 0) {
+          targetExam = latestExams[0];
+        }
+      }
+
+      if (targetExam) {
+        effectiveExamKey = targetExam.exam_key || targetExam.exam_code;
+        if (!effectiveExamKey) {
+          effectiveExamKey = `EXAM-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+          await supabase
+            .from('exams')
+            .update({ exam_key: effectiveExamKey, exam_code: effectiveExamKey })
+            .eq('id', targetExam.id);
+        }
+      }
+    } catch (examErr) {
+      console.warn('⚠️ Could not resolve target exam for bulk upload:', examErr.message);
+    }
+
+    // 4. Validate rows, insert students into database
+    const createdStudents = [];
+    const errors = [];
+    const seenEmails = new Set();
+    const seenRolls = new Set();
+
+    for (let i = 0; i < rawRows.length; i++) {
+      const rowNum = i + 2; // spreadsheet 1-indexed row accounting for header
+      const norm = normalizeRow(rawRows[i]);
+
+      // Skip completely empty rows
+      if (!norm.name && !norm.email && !norm.roll_no) {
+        continue;
+      }
+
+      if (!norm.name) {
+        errors.push(`Row ${rowNum}: Student Name is missing.`);
+        continue;
+      }
+      if (!norm.email) {
+        errors.push(`Row ${rowNum} (${norm.name}): Email address is missing.`);
+        continue;
+      }
+      if (!norm.email.includes('@') || !norm.email.includes('.')) {
+        errors.push(`Row ${rowNum} (${norm.name}): Invalid email address "${norm.email}".`);
+        continue;
+      }
+      if (!norm.roll_no) {
+        errors.push(`Row ${rowNum} (${norm.name}): Roll Number is missing.`);
+        continue;
+      }
+
+      const cleanEmail = norm.email.toLowerCase();
+      const cleanRoll = norm.roll_no;
+
+      if (seenEmails.has(cleanEmail)) {
+        errors.push(`Row ${rowNum}: Duplicate email "${cleanEmail}" in uploaded file.`);
+        continue;
+      }
+      if (seenRolls.has(cleanRoll)) {
+        errors.push(`Row ${rowNum}: Duplicate roll number "${cleanRoll}" in uploaded file.`);
+        continue;
+      }
+
+      // Check if student already exists in this college
+      const existingCheck = await pool.query(
+        'SELECT id, email, roll_no FROM students WHERE (LOWER(email) = $1 OR roll_no = $2) AND college_id = $3 LIMIT 1',
+        [cleanEmail, cleanRoll, collegeId]
+      );
+
+      if (existingCheck.rows.length > 0) {
+        const match = existingCheck.rows[0];
+        const matchReason = match.email?.toLowerCase() === cleanEmail ? `Email ${cleanEmail}` : `Roll number ${cleanRoll}`;
+        errors.push(`Row ${rowNum} (${norm.name}): ${matchReason} is already registered in your institution.`);
+        continue;
+      }
+
+      seenEmails.add(cleanEmail);
+      seenRolls.add(cleanRoll);
+
+      try {
+        const studentId = await generateStudentId(collegeId);
+        const password = generatePassword();
+        const hashedPassword = await bcrypt.hash(password, 12);
+        const newUuid = uuidv4();
+
+        // If semester is provided and batch is provided, preserve both
+        const batchValue = norm.batch ? norm.batch : (norm.semester ? `Sem ${norm.semester}` : null);
+
+        const insertRes = await pool.query(
+          `INSERT INTO students (id, student_id, name, email, roll_no, department, batch, password, college_id, is_active, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, NOW(), NOW())
+           RETURNING *`,
+          [newUuid, studentId, norm.name, cleanEmail, cleanRoll, norm.department || null, batchValue, hashedPassword, collegeId]
+        );
+
+        const createdStudent = insertRes.rows[0];
+
+        // Assign to target exam if present
+        if (targetExam) {
+          try {
+            await supabase
+              .from('exam_assignments')
+              .insert([{
+                exam_id: targetExam.id,
+                student_id: createdStudent.id,
+                status: 'assigned',
+                created_at: new Date().toISOString()
+              }]);
+          } catch (assignErr) {
+            console.warn(`[bulkUpload] Exam assignment error for ${cleanEmail}:`, assignErr.message);
+          }
+        }
+
+        createdStudents.push({
+          id: createdStudent.id,
+          student_id: studentId,
+          name: norm.name,
+          email: cleanEmail,
+          roll_no: cleanRoll,
+          department: norm.department,
+          batch: batchValue,
+          password
+        });
+      } catch (insertErr) {
+        errors.push(`Row ${rowNum} (${norm.name}): Database insert failed - ${insertErr.message}`);
+      }
+    }
+
+    // 5. Send credentials email to EACH created student in parallel batches
+    let emailsSent = 0;
+    let emailsFailed = 0;
+    const collegeName = req.user?.name || req.user?.college_name || 'Your Institution';
+    const loginUrl = process.env.STUDENT_LOGIN_URL || 'https://exam.nexifyforge.in/student/login';
+
+    if (createdStudents.length > 0) {
+      console.log(`\n📧 [bulkUpload] Dispatched emails for ${createdStudents.length} students to ${collegeName}...`);
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < createdStudents.length; i += BATCH_SIZE) {
+        const batch = createdStudents.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(student =>
+            sendStudentCredentials({
+              name: student.name,
+              email: student.email,
+              studentId: student.student_id,
+              password: student.password,
+              collegeName: collegeName,
+              loginUrl: loginUrl,
+              examName: targetExam?.title || targetExam?.name || 'Scheduled Examination',
+              examKey: effectiveExamKey,
+              examDate: targetExam?.date_time,
+              examDuration: targetExam?.duration,
+              subject: targetExam?.subject,
+              isReset: false
+            })
+          )
+        );
+
+        results.forEach((outcome, idx) => {
+          if (outcome.status === 'fulfilled') {
+            emailsSent++;
+            console.log(`   ✅ [bulkUpload] Email delivered to: ${batch[idx].email}`);
+          } else {
+            emailsFailed++;
+            console.error(`   ❌ [bulkUpload] Email failed for ${batch[idx].email}:`, outcome.reason?.message);
+          }
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Bulk upload completed. ${createdStudents.length} student(s) added, ${emailsSent} email(s) sent.${errors.length > 0 ? ` ${errors.length} row(s) skipped.` : ''}`,
+      data: {
+        created: createdStudents.length,
+        emailsSent,
+        emailsFailed,
+        failed: errors.length,
+        uploaded: createdStudents,
+        errors
+      }
+    });
 
   } catch (error) {
     console.error('Bulk upload error:', error);
     res.status(500).json({
       success: false,
-      message: 'Bulk upload failed',
+      message: 'Bulk upload failed: ' + error.message,
       error: error.message
     });
+  } finally {
+    // 6. Guarantee cleanup of temporary uploaded spreadsheet file
+    if (uploadedFilePath && fs.existsSync(uploadedFilePath)) {
+      try {
+        fs.unlinkSync(uploadedFilePath);
+      } catch (unlinkErr) {
+        console.warn('⚠️ Could not remove temp upload file:', unlinkErr.message);
+      }
+    }
   }
 };
 

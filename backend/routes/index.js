@@ -22,22 +22,56 @@ const supportController = require('../controllers/supportController');
 const studentPasswordRoutes = require('./studentPasswordRoutes');
 const chatbotRoutes = require('./chatbotRoutes');
 
-// Multer config for CSV uploads
+const fs = require('fs');
+
+// Multer config for CSV and Excel (.xlsx, .xls) uploads
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, './uploads/'),
+  destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
 });
+
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv' || path.extname(file.originalname) === '.csv') {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    const validMimes = [
+      'text/csv',
+      'text/plain',
+      'application/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/octet-stream',
+    ];
+
+    if (validExtensions.includes(ext) || validMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV files are allowed'));
+      cb(new Error('Invalid file format. Only CSV (.csv) and Excel (.xlsx, .xls) spreadsheets are supported.'));
     }
   },
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
+
+// Middleware wrapper to return clean 400 JSON on Multer errors
+const handleRosterUpload = (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ success: false, message: 'File is too large. Maximum allowed size is 10MB.' });
+      }
+      return res.status(400).json({ success: false, message: `Upload error: ${err.message}` });
+    } else if (err) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next();
+  });
+};
 
 // =====================================================
 // AUTH ROUTES
@@ -62,7 +96,7 @@ admin.use(authenticate, authorize('college_admin'));
 // Student management & Password Governance
 admin.get('/students', adminController.getStudents);
 admin.post('/students', checkSubscription, studentController.addStudent);
-admin.post('/students/bulk', checkSubscription, upload.single('file'), studentController.bulkUploadStudents);
+admin.post('/students/bulk', checkSubscription, handleRosterUpload, studentController.bulkUploadStudents);
 admin.put('/students/:id', studentController.updateStudent);
 admin.patch('/students/:id/toggle-status', studentController.toggleStudentStatus);
 admin.delete('/students/:id', studentController.deleteStudent);

@@ -21,14 +21,18 @@ import {
   Building,
   Calendar,
   CheckCircle,
+  CheckCircle2,
   XCircle,
   AlertCircle,
   Key,
   RefreshCw,
   Copy,
   Clock,
-  Send
+  Send,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import '../../components/admin/AdminSidebar.css';
 
 const Modal = ({ open, onClose, title, children }) => {
@@ -134,6 +138,7 @@ export default function StudentManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
+  const [bulkExamId, setBulkExamId] = useState('');
   const fileRef = useRef();
 
   // Tab & Password Requests state
@@ -437,19 +442,108 @@ export default function StudentManagement() {
     }
   };
 
+  const openBulkUpload = () => {
+    setCsvFile(null);
+    setBulkExamId('');
+    adminAPI.getExams({ page: 1, limit: 50 })
+      .then(res => setExams(res.data?.exams || []))
+      .catch(() => {});
+    setBulkModal(true);
+  };
+
+  const downloadExcelTemplate = () => {
+    try {
+      const templateData = [
+        {
+          'Student Name': 'Aarav Sharma',
+          'Email Address': 'aarav.sharma@example.com',
+          'Roll Number': 'CS2026-001',
+          'Department': 'Computer Science',
+          'Batch': '2022-26',
+          'Semester': '6th'
+        },
+        {
+          'Student Name': 'Diya Patel',
+          'Email Address': 'diya.patel@example.com',
+          'Roll Number': 'CS2026-002',
+          'Department': 'Information Technology',
+          'Batch': '2022-26',
+          'Semester': '6th'
+        }
+      ];
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      ws['!cols'] = [
+        { wch: 22 },
+        { wch: 30 },
+        { wch: 18 },
+        { wch: 26 },
+        { wch: 14 },
+        { wch: 12 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Students_Roster');
+      XLSX.writeFile(wb, 'examshield_students_template.xlsx');
+      toast.success('Excel template downloaded');
+    } catch (err) {
+      toast.error('Failed to create Excel template: ' + err.message);
+    }
+  };
+
+  const downloadCsvTemplate = () => {
+    const csvContent = 'Student Name,Email Address,Roll Number,Department,Batch,Semester\n' +
+      'Aarav Sharma,aarav.sharma@example.com,CS2026-001,Computer Science,2022-26,6th\n' +
+      'Diya Patel,diya.patel@example.com,CS2026-002,Information Technology,2022-26,6th';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'examshield_students_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('CSV template downloaded');
+  };
+
   const handleBulkUpload = async () => {
-    if (!csvFile) return toast.error('Select a CSV file first');
+    if (!csvFile) return toast.error('Please select a CSV or Excel file first');
     const fd = new FormData();
     fd.append('file', csvFile);
+    if (bulkExamId) {
+      fd.append('examId', bulkExamId);
+    }
     setSubmitting(true);
     try {
       const res = await adminAPI.bulkUpload(fd);
-      toast.success(`${res.data.created} students created, ${res.data.failed} failed`);
+      const payload = res.data?.data || res.data || {};
+      const createdCount = payload.created ?? payload.uploaded?.length ?? 0;
+      const emailsCount = payload.emailsSent ?? createdCount;
+      const failedCount = payload.failed ?? payload.errors?.length ?? 0;
+
+      if (createdCount > 0) {
+        toast.success(`🎉 ${createdCount} student(s) added! ${emailsCount} credentials email(s) sent.`);
+      } else {
+        toast.error(res.data?.message || 'No new students were added.');
+      }
+
+      if (failedCount > 0 && Array.isArray(payload.errors) && payload.errors.length > 0) {
+        const sampleErrors = payload.errors.slice(0, 3).join('\n');
+        toast((t) => (
+          <div style={{ maxWidth: '420px' }}>
+            <strong>{failedCount} row(s) skipped:</strong>
+            <pre style={{ fontSize: '11px', marginTop: '6px', whiteSpace: 'pre-wrap', maxHeight: '120px', overflowY: 'auto' }}>
+              {sampleErrors}
+            </pre>
+          </div>
+        ), { duration: 7000 });
+      }
+
       setBulkModal(false);
       setCsvFile(null);
-      fetchStudents(1);
+      setBulkExamId('');
+      fetchStudents(1, true);
     } catch (err) {
-      toast.error(err.message || 'Bulk upload failed');
+      toast.error(err.response?.data?.message || err.message || 'Bulk upload failed');
     } finally {
       setSubmitting(false);
     }
@@ -466,7 +560,7 @@ export default function StudentManagement() {
           </p>
         </div>
         <div className="admin-header-actions">
-          <Button variant="secondary" icon={Upload} onClick={() => setBulkModal(true)}>
+          <Button variant="secondary" icon={Upload} onClick={openBulkUpload}>
             Bulk Upload
           </Button>
           <Button icon={UserPlus} onClick={openAdd}>
@@ -986,55 +1080,180 @@ export default function StudentManagement() {
         </div>
       </Modal>
 
-      {/* Bulk Upload Modal */}
-      <Modal open={bulkModal} onClose={() => setBulkModal(false)} title="Bulk Upload Students">
-        <div className="admin-bulk-upload">
-          <div className="admin-bulk-info">
-            <p>Upload a CSV file with the following columns:</p>
-            <div className="admin-csv-format">
-              name,email,roll_no,department,semester,batch
+      {/* Bulk Upload Modal (CSV & Excel) */}
+      <Modal open={bulkModal} onClose={() => setBulkModal(false)} title="Bulk Upload Students (CSV &amp; Excel)">
+        <div className="admin-bulk-upload" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          
+          {/* Information banner */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f2744', fontWeight: 700, fontSize: '0.95rem', marginBottom: '6px' }}>
+              <Users size={18} color="#2563eb" />
+              <span>Automated Candidate Provisioning &amp; Email Delivery</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: '#475569', lineHeight: 1.55 }}>
+              Upload your candidate roster using a <strong>CSV</strong> or <strong>Excel (.xlsx, .xls)</strong> file. Every newly registered student will automatically receive an official <strong>Nexify Forge / ExamShield</strong> email with their temporary credentials and portal login link.
+            </p>
+
+            <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Supported Columns:</span>
+              {['Name', 'Email', 'Roll Number', 'Department', 'Batch', 'Semester'].map((col) => (
+                <span key={col} style={{ background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', borderRadius: '4px', fontSize: '0.74rem', padding: '2px 8px', fontWeight: 600 }}>
+                  {col}
+                </span>
+              ))}
             </div>
           </div>
 
+          {/* Optional: Link to an upcoming exam */}
+          {exams && exams.length > 0 && (
+            <div>
+              <label className="admin-form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
+                <Key size={14} color="#0a74da" />
+                Assign to Scheduled Exam (Optional)
+              </label>
+              <select
+                className="admin-form-input"
+                value={bulkExamId}
+                onChange={(e) => setBulkExamId(e.target.value)}
+                style={{ fontSize: '0.86rem', padding: '8px 12px' }}
+              >
+                <option value="">-- No specific exam (General Account Invitation) --</option>
+                {exams.map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.title || ex.name} ({ex.exam_key || ex.exam_code || 'Auto-Key'})
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                If selected, candidates will be registered and their access key will be included in the email.
+              </span>
+            </div>
+          )}
+
+          {/* Interactive File Dropzone */}
           <div 
             className={`admin-file-upload ${csvFile ? 'has-file' : ''}`}
             onClick={() => fileRef.current.click()}
+            style={{
+              border: csvFile ? '2px solid #2563eb' : '2px dashed #cbd5e1',
+              borderRadius: '12px',
+              padding: '24px 16px',
+              textAlign: 'center',
+              backgroundColor: csvFile ? '#f0f7ff' : '#f8fafc',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
           >
-            <Upload size={32} />
-            <p>
-              {csvFile ? csvFile.name : 'Click to select CSV file'}
-            </p>
-            <span className="admin-file-hint">
-              Supported format: .csv (Max 5MB)
-            </span>
+            {csvFile ? (
+              <>
+                {csvFile.name.endsWith('.xlsx') || csvFile.name.endsWith('.xls') ? (
+                  <FileSpreadsheet size={40} color="#107c41" />
+                ) : (
+                  <FileText size={40} color="#2563eb" />
+                )}
+                <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f2744', wordBreak: 'break-all' }}>
+                  {csvFile.name}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  {(csvFile.size / 1024).toFixed(1)} KB • Click to choose a different file
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#16a34a', fontSize: '0.8rem', fontWeight: 600, marginTop: '2px' }}>
+                  <CheckCircle2 size={14} /> Ready for upload &amp; email dispatch
+                </div>
+              </>
+            ) : (
+              <>
+                <Upload size={36} color="#64748b" />
+                <p style={{ margin: 0, fontWeight: 700, fontSize: '0.92rem', color: '#1e293b' }}>
+                  Click to select CSV or Excel file
+                </p>
+                <span className="admin-file-hint" style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  Supported formats: <strong>.xlsx</strong>, <strong>.xls</strong>, <strong>.csv</strong> (Max 10MB)
+                </span>
+              </>
+            )}
             <input 
               ref={fileRef} 
               type="file" 
-              accept=".csv" 
+              accept=".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv" 
               style={{ display: 'none' }} 
-              onChange={e => setCsvFile(e.target.files[0])} 
+              onChange={e => {
+                if (e.target.files && e.target.files[0]) {
+                  setCsvFile(e.target.files[0]);
+                }
+              }} 
             />
           </div>
 
-          <a 
-            href="data:text/csv;charset=utf-8,name,email,roll_no,department,semester,batch%0AJohn Doe,john@email.com,CS001,Computer Science,5th,2022-26"
-            download="students_template.csv"
-            className="admin-download-template"
-          >
-            <Download size={16} />
-            Download CSV Template
-          </a>
+          {/* Download Sample Templates */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Download Starter Templates:</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={downloadExcelTemplate}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  color: '#15803d',
+                  borderRadius: '8px',
+                  padding: '9px 12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s ease'
+                }}
+              >
+                <FileSpreadsheet size={16} />
+                Excel Template (.xlsx)
+              </button>
 
-          <div className="admin-form-actions">
-            <Button variant="secondary" onClick={() => setBulkModal(false)}>
+              <button
+                type="button"
+                onClick={downloadCsvTemplate}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  color: '#334155',
+                  borderRadius: '8px',
+                  padding: '9px 12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s ease'
+                }}
+              >
+                <Download size={16} />
+                CSV Template (.csv)
+              </button>
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="admin-form-actions" style={{ marginTop: '8px' }}>
+            <Button variant="secondary" onClick={() => setBulkModal(false)} disabled={submitting}>
               Cancel
             </Button>
             <Button 
               onClick={handleBulkUpload} 
               disabled={!csvFile || submitting}
               loading={submitting}
+              icon={Send}
             >
-              {submitting ? 'Uploading...' : 'Upload Students'}
+              {submitting ? 'Uploading & Emailing...' : 'Upload & Send Emails'}
             </Button>
           </div>
         </div>
