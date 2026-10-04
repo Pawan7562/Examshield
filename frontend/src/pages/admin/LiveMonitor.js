@@ -22,7 +22,12 @@ import {
   Sparkles,
   Camera,
   Activity,
-  UserX
+  UserX,
+  Plus,
+  Maximize2,
+  ChevronLeft,
+  ChevronRight,
+  Grid
 } from 'lucide-react';
 import './LiveMonitoringCockpit.css';
 
@@ -92,11 +97,13 @@ class LiveFeedHub {
 const liveFeedHub = new LiveFeedHub();
 
 // Ultra-smooth robust video renderer (Double-Buffered Hardware Canvas via High-Speed WebSocket)
-const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated }) => {
+const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated, streamState = 'connecting', onFrameReceived = null }) => {
   const canvasRef = useRef(null);
   const placeholderRef = useRef(null);
   const lastFrameTimeRef = useRef(0);
   const staleTimerRef = useRef(null);
+  const onFrameReceivedRef = useRef(onFrameReceived);
+  useEffect(() => { onFrameReceivedRef.current = onFrameReceived; }, [onFrameReceived]);
 
   useEffect(() => {
     let active = true;
@@ -109,6 +116,7 @@ const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated }
     const handleFrame = (imageData) => {
       if (!active || !imageData) return;
       lastFrameTimeRef.current = Date.now();
+      onFrameReceivedRef.current?.();
 
       currentImage.onload = () => {
         if (!active) return;
@@ -129,14 +137,14 @@ const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated }
       handleFrame(existing);
     }
 
-    // Health watchdog: If no frame arrives for 7 seconds, display the proctor placeholder
+    // Health watchdog: If no frame arrives for 6 seconds, display state placeholder
     staleTimerRef.current = setInterval(() => {
       if (!active) return;
-      if (lastFrameTimeRef.current > 0 && Date.now() - lastFrameTimeRef.current > 7000) {
+      if (lastFrameTimeRef.current > 0 && Date.now() - lastFrameTimeRef.current > 6000) {
         if (placeholderRef.current) placeholderRef.current.style.display = 'flex';
         if (canvas) canvas.style.display = 'none';
       }
-    }, 2500);
+    }, 2000);
 
     return () => {
       active = false;
@@ -165,7 +173,17 @@ const CandidateWebcamFeed = React.memo(({ studentId, studentName, isTerminated }
           <div className="surveillance-scanline" />
         </div>
         <span style={{ fontSize: '0.72rem', letterSpacing: '0.04em' }}>
-          {isTerminated ? 'SESSION TERMINATED' : 'PROCTOR RADAR ACTIVE'}
+          {isTerminated
+            ? 'SESSION TERMINATED'
+            : streamState === 'camera_unavailable'
+            ? 'CAMERA UNAVAILABLE / DISABLED'
+            : streamState === 'disconnected'
+            ? 'CANDIDATE DISCONNECTED'
+            : streamState === 'reconnecting'
+            ? 'RECONNECTING FEED...'
+            : streamState === 'connecting'
+            ? 'CONNECTING SECURE STREAM...'
+            : 'PROCTOR RADAR ACTIVE'}
         </span>
       </div>
     </>
@@ -215,6 +233,20 @@ export default function LiveMonitor() {
   const [terminateModal, setTerminateModal] = useState({ open: false, student: null, reason: '' });
   const [broadcastModal, setBroadcastModal] = useState({ open: false, message: '', urgency: 'normal' });
   const [inspectModal, setInspectModal] = useState({ open: false, student: null, activityData: null });
+
+  // ─── On-Demand 4-Tile Live Video Slots (Default max 4 active streams per proctor) ───
+  const [maxStreams, setMaxStreams] = useState(4);
+  const [activeSlots, setActiveSlots] = useState([
+    { slotIndex: 0, studentId: null, studentName: null, status: 'idle', student: null },
+    { slotIndex: 1, studentId: null, studentName: null, status: 'idle', student: null },
+    { slotIndex: 2, studentId: null, studentName: null, status: 'idle', student: null },
+    { slotIndex: 3, studentId: null, studentName: null, status: 'idle', student: null },
+  ]);
+  const [candidateThumbnails, setCandidateThumbnails] = useState({}); // studentId -> { imageData, faceCount, audioLevel, timestamp, isIncident }
+  const [enlargedSlot, setEnlargedSlot] = useState(null); // slotIndex | null
+  const [assignModal, setAssignModal] = useState({ open: false, targetSlotIndex: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   // ─── Live Camera Frames & Audio Cache ──────────────────────────────────────────
   const [cameraFrames, setCameraFrames] = useState({}); // { [studentId]: base64Data }
@@ -316,17 +348,85 @@ export default function LiveMonitor() {
       setConnected(false);
     });
 
+    socket.on('proctor-config', (cfg) => {
+      if (cfg?.maxStreams) {
+        setMaxStreams(cfg.maxStreams);
+      }
+    });
+
+    socket.on('initial-candidate-thumbnails', ({ thumbnails }) => {
+      if (thumbnails) {
+        setCandidateThumbnails(prev => ({ ...prev, ...thumbnails }));
+      }
+    });
+
+    socket.on('candidate-snapshot', (snap) => {
+      if (snap?.studentId) {
+        setCandidateThumbnails(prev => ({
+          ...prev,
+          [snap.studentId]: {
+            imageData: snap.imageData,
+            faceCount: snap.faceCount,
+            audioLevel: snap.audioLevel,
+            timestamp: snap.timestamp,
+            isIncident: snap.isIncident,
+          }
+        }));
+      }
+    });
+
+    socket.on('stream-subscribed', ({ studentId, tileIndex, status }) => {
+      setActiveSlots(prev => prev.map((s, idx) => {
+        if (idx === tileIndex || s.studentId === studentId) {
+          return { ...s, status: status || 'connecting' };
+        }
+        return s;
+      }));
+    });
+
+    socket.on('stream-subscription-error', ({ studentId, tileIndex, message }) => {
+      toast.error(message || 'Unable to subscribe to live video feed');
+      setActiveSlots(prev => {
+        const next = [...prev];
+        if (next[tileIndex]) {
+          next[tileIndex] = {
+            slotIndex: tileIndex,
+            studentId: null,
+            studentName: null,
+            status: 'idle',
+            student: null,
+          };
+        }
+        return next;
+      });
+    });
+
+    socket.on('student-stream-state', ({ studentId, state, message }) => {
+      setActiveSlots(prev => prev.map(s => {
+        if (s.studentId === studentId) {
+          return { ...s, status: state };
+        }
+        return s;
+      }));
+      if (state === 'camera_unavailable') {
+        toast.error(`Candidate camera unavailable (${message || 'camera off'})`, { duration: 3000 });
+      }
+    });
+
     // Live frame feed from candidate — zero React re-render overhead via liveFeedHub
     socket.on('camera-feed', (data) => {
       if (data?.studentId && data?.imageData) {
         liveFeedHub.dispatch(data.studentId, data.imageData);
-      }
-    });
-
-    socket.on('initial-camera-feeds', (data) => {
-      if (data?.frames) {
-        Object.entries(data.frames).forEach(([sid, img]) => {
-          liveFeedHub.dispatch(sid, img);
+        setActiveSlots(prev => {
+          let updated = false;
+          const next = prev.map(s => {
+            if (s.studentId === data.studentId && s.status !== 'live') {
+              updated = true;
+              return { ...s, status: 'live' };
+            }
+            return s;
+          });
+          return updated ? next : prev;
         });
       }
     });
@@ -449,6 +549,77 @@ export default function LiveMonitor() {
     navigate(`/admin/exams/${newExamId}/monitor`, { replace: true });
     loadExamMonitoringData(newExamId);
   };
+
+  // ─── On-Demand Stream Slot Management (Max 4 streams enforced) ───
+  const assignStudentToSlot = useCallback((student, preferredSlot = null) => {
+    if (!student) return;
+
+    setActiveSlots(prev => {
+      // Check if student is already active in a slot
+      const existingIdx = prev.findIndex(s => s.studentId === student.id);
+      if (existingIdx !== -1) {
+        toast.info(`${student.name} is already active in Tile ${existingIdx + 1}`);
+        return prev;
+      }
+
+      // Determine destination slot
+      let targetIndex = (preferredSlot !== null && preferredSlot >= 0 && preferredSlot < maxStreams)
+        ? preferredSlot
+        : prev.findIndex(s => !s.studentId);
+
+      if (targetIndex === -1) {
+        targetIndex = 0; // Replace slot 0 if all 4 are occupied
+      }
+
+      const oldStudentId = prev[targetIndex]?.studentId;
+      if (oldStudentId && socketRef.current?.connected) {
+        socketRef.current.emit('unsubscribe-student-stream', {
+          studentId: oldStudentId,
+          tileIndex: targetIndex,
+        });
+      }
+
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('subscribe-student-stream', {
+          examId: currentExamId,
+          studentId: student.id,
+          tileIndex: targetIndex,
+        });
+      }
+
+      const next = [...prev];
+      next[targetIndex] = {
+        slotIndex: targetIndex,
+        studentId: student.id,
+        studentName: student.name,
+        status: 'connecting',
+        student,
+      };
+      toast.success(`Connected Tile ${targetIndex + 1} to ${student.name}`);
+      return next;
+    });
+  }, [currentExamId, maxStreams]);
+
+  const releaseSlot = useCallback((slotIndex) => {
+    setActiveSlots(prev => {
+      const slot = prev[slotIndex];
+      if (slot?.studentId && socketRef.current?.connected) {
+        socketRef.current.emit('unsubscribe-student-stream', {
+          studentId: slot.studentId,
+          tileIndex: slotIndex,
+        });
+      }
+      const next = [...prev];
+      next[slotIndex] = {
+        slotIndex,
+        studentId: null,
+        studentName: null,
+        status: 'idle',
+        student: null,
+      };
+      return next;
+    });
+  }, []);
 
   // ─── 5. Warning Interventions ─────────────────────────────────────────────────
   const openWarningModal = (student, presetMsg = '', strike = 1) => {
@@ -660,6 +831,17 @@ export default function LiveMonitor() {
       return true;
     });
   }, [candidates, activeFilter, searchQuery]);
+
+  const totalPages = Math.ceil(filteredCandidates.length / itemsPerPage) || 1;
+  const paginatedCandidates = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredCandidates.slice(start, start + itemsPerPage);
+  }, [filteredCandidates, currentPage, itemsPerPage]);
+
+  // Reset pagination to page 1 on filter or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, searchQuery]);
 
   if (loading && examsList.length === 0) {
     return (
@@ -877,6 +1059,144 @@ export default function LiveMonitor() {
       <div className="cockpit-viewport">
         {/* Left Column: Candidates Surveillance Grid */}
         <div className="cockpit-grid-container">
+          {/* ─── ON-DEMAND LIVE VIDEO PROCTORING QUAD-GRID (MAX 4 TILES) ─── */}
+          <section className="proctor-quad-section">
+            <div className="proctor-quad-header">
+              <div className="proctor-quad-title-wrap">
+                <h3 className="proctor-quad-title">
+                  <Radio size={18} color="#38bdf8" />
+                  <span>On-Demand Live Video Feeds</span>
+                </h3>
+                <span className="proctor-stream-limit-pill">
+                  {activeSlots.filter(s => s.studentId).length} / {maxStreams} Live Feeds Active
+                </span>
+              </div>
+              <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+                Server-enforced quota: Select any candidate below to view their live webcam feed on-demand.
+              </div>
+            </div>
+
+            <div className="proctor-quad-grid">
+              {activeSlots.map((slot, idx) => {
+                if (!slot.studentId) {
+                  return (
+                    <div
+                      key={`slot-${idx}`}
+                      className="proctor-tile empty-slot"
+                      onClick={() => setAssignModal({ open: true, targetSlotIndex: idx })}
+                      title="Click to assign a candidate live video feed"
+                    >
+                      <div className="empty-slot-content">
+                        <div className="empty-slot-icon-wrap">
+                          <Plus size={22} />
+                        </div>
+                        <div className="empty-slot-label">Tile {idx + 1} Available</div>
+                        <div className="empty-slot-hint">Click to select candidate stream or click "Watch Live" below</div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const isTerminated = slot.student?.status === 'terminated';
+                const decibel = audioLevels[slot.studentId] || 0;
+
+                return (
+                  <div key={`slot-${idx}-${slot.studentId}`} className="proctor-tile active-stream">
+                    <div className="proctor-tile-header">
+                      <span className="proctor-tile-num">Tile {idx + 1}</span>
+                      <div className={`proctor-tile-state-badge state-badge-${
+                        slot.status === 'live' ? 'live'
+                        : slot.status === 'camera_unavailable' ? 'unavailable'
+                        : slot.status === 'disconnected' ? 'disconnected'
+                        : slot.status === 'reconnecting' ? 'reconnecting'
+                        : 'connecting'
+                      }`}>
+                        <span className={`status-dot-${slot.status === 'live' ? 'active' : slot.status === 'camera_unavailable' ? 'warning' : 'danger'}`} />
+                        <span style={{ textTransform: 'capitalize' }}>
+                          {slot.status === 'camera_unavailable' ? 'Cam Unavailable' : slot.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="proctor-tile-view">
+                      <CandidateWebcamFeed
+                        studentId={slot.studentId}
+                        studentName={slot.studentName}
+                        isTerminated={isTerminated}
+                        streamState={slot.status}
+                      />
+                      {/* Audio Decibel Meter Bar */}
+                      <div className="surveillance-audio-meter-bar">
+                        <div
+                          className={`surveillance-audio-fill ${decibel > 40 ? 'spiking' : ''}`}
+                          style={{ width: `${Math.min(100, decibel)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="proctor-tile-footer">
+                      <div className="proctor-tile-student-info">
+                        <div>
+                          <h4 className="proctor-tile-name" title={slot.studentName}>{slot.studentName}</h4>
+                          <div className="proctor-tile-roll">ID: {slot.student?.studentId || slot.studentId?.slice(0, 8)}</div>
+                        </div>
+                        {slot.student?.violation_count > 0 && (
+                          <span style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>
+                            {slot.student.violation_count} flags
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="proctor-tile-actions">
+                        <button
+                          className="proctor-tile-btn"
+                          onClick={() => setEnlargedSlot(slot)}
+                          title="Enlarge video feed"
+                        >
+                          <Maximize2 size={12} />
+                          <span>Enlarge</span>
+                        </button>
+                        <button
+                          className="proctor-tile-btn"
+                          onClick={() => openWarningModal(slot.student || { id: slot.studentId, name: slot.studentName })}
+                          disabled={isTerminated}
+                          title="Issue proctor warning"
+                        >
+                          <AlertTriangle size={12} />
+                          <span>Warn</span>
+                        </button>
+                        <button
+                          className="proctor-tile-btn btn-stop"
+                          onClick={() => releaseSlot(idx)}
+                          title="Stop live stream and release quota"
+                        >
+                          <X size={12} />
+                          <span>Stop</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* ─── CANDIDATE ROSTER & BACKGROUND SURVEILLANCE ─── */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Users size={16} color="#38bdf8" />
+                <span>Candidate Surveillance Roster ({filteredCandidates.length})</span>
+              </h3>
+              <p style={{ margin: '3px 0 0', fontSize: '0.76rem', color: '#94a3b8' }}>
+                All candidates maintain local AI monitoring. Click "Watch Live" to initiate streaming in an open tile.
+              </p>
+            </div>
+            <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
+              Page {currentPage} of {totalPages}
+            </span>
+          </div>
+
           {filteredCandidates.length === 0 ? (
             <div className="cockpit-empty-banner">
               <Camera size={44} color="#64748b" />
@@ -898,148 +1218,225 @@ export default function LiveMonitor() {
               )}
             </div>
           ) : (
-            <div className="cockpit-candidates-grid">
-              {filteredCandidates.map((student) => {
-                const liveImage = cameraFrames[student.id];
-                const decibelLevel = audioLevels[student.id] || 0;
-                const isFlagged = student.violation_count > 0;
-                const isTerminated = student.status === 'terminated';
+            <>
+              <div className="cockpit-candidates-grid">
+                {paginatedCandidates.map((student) => {
+                  const isCurrentlyStreaming = activeSlots.some(s => s.studentId === student.id);
+                  const activeSlotNum = activeSlots.findIndex(s => s.studentId === student.id) + 1;
+                  const thumbnail = candidateThumbnails[student.id];
+                  const isFlagged = student.violation_count > 0;
+                  const isTerminated = student.status === 'terminated';
+                  const decibelLevel = audioLevels[student.id] || thumbnail?.audioLevel || 0;
 
-                return (
-                  <div
-                    key={student.id}
-                    className={`surveillance-card ${isFlagged && !isTerminated ? 'flagged' : ''} ${isTerminated ? 'terminated' : ''}`}
-                  >
-                    {/* Camera Feed Viewport — High-throughput real-time video feed */}
-                    <div className="surveillance-frame-wrap">
-                      <CandidateWebcamFeed
-                        studentId={student.id}
-                        studentName={student.name}
-                        isTerminated={isTerminated}
-                      />
-
-                      {/* Top Overlay Badges */}
-                      <div className="surveillance-overlay-top">
-                        <div className="surveillance-status-badge">
-                          <span
-                            className={
-                              isTerminated
-                                ? 'status-dot-danger'
-                                : isFlagged
-                                ? 'status-dot-warning'
-                                : 'status-dot-active'
-                            }
+                  return (
+                    <div
+                      key={student.id}
+                      className={`surveillance-card ${isFlagged && !isTerminated ? 'flagged' : ''} ${isTerminated ? 'terminated' : ''} ${isCurrentlyStreaming ? 'streaming' : ''}`}
+                    >
+                      {/* Candidate Surveillance Preview (Background Thumbnail or Radar) */}
+                      <div className="surveillance-frame-wrap">
+                        {thumbnail?.imageData ? (
+                          <img
+                            src={`data:image/jpeg;base64,${thumbnail.imageData}`}
+                            alt={student.name}
+                            className="surveillance-webcam-feed"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           />
-                          <span>
-                            {isTerminated
-                              ? 'Terminated'
-                              : isFlagged
-                              ? `Flagged (${student.violation_count})`
-                              : 'Live • Good'}
-                          </span>
-                        </div>
-
-                        {student.warning_count > 0 && (
-                          <div
-                            style={{
-                              background: 'rgba(239, 68, 68, 0.85)',
-                              color: '#fff',
-                              fontSize: '0.66rem',
-                              fontWeight: 800,
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
-                            Strike {student.warning_count}/3
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Audio Decibel Meter Bar */}
-                      <div className="surveillance-audio-meter-bar">
-                        <div
-                          className={`surveillance-audio-fill ${decibelLevel > 40 ? 'spiking' : ''}`}
-                          style={{ width: `${Math.min(100, decibelLevel)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Candidate Body Meta */}
-                    <div className="surveillance-card-body">
-                      <div className="surveillance-candidate-header">
-                        <div>
-                          <h4 className="surveillance-name" title={student.name}>
-                            {student.name}
-                          </h4>
-                          <div className="surveillance-id-pill">
-                            {student.studentId} • {student.email}
-                          </div>
-                        </div>
-
-                        {student.violation_count > 0 ? (
-                          <div className="surveillance-violations-badge">
-                            <AlertTriangle size={12} />
-                            <span>{student.violation_count} flags</span>
-                          </div>
                         ) : (
-                          <div className="surveillance-clean-badge">Clean</div>
+                          <div className="surveillance-radar-placeholder" style={{ display: 'flex' }}>
+                            <div className="surveillance-avatar-circle">
+                              {student.name?.charAt(0)?.toUpperCase() || 'C'}
+                              <div className="surveillance-scanline" />
+                            </div>
+                            <span style={{ fontSize: '0.72rem', letterSpacing: '0.04em' }}>
+                              {isTerminated ? 'SESSION TERMINATED' : 'BACKGROUND SURVEILLANCE'}
+                            </span>
+                          </div>
                         )}
+
+                        {/* Top Overlay Badges */}
+                        <div className="surveillance-overlay-top">
+                          <div className="surveillance-status-badge">
+                            <span
+                              className={
+                                isTerminated
+                                  ? 'status-dot-danger'
+                                  : isFlagged
+                                  ? 'status-dot-warning'
+                                  : 'status-dot-active'
+                              }
+                            />
+                            <span>
+                              {isTerminated
+                                ? 'Terminated'
+                                : isFlagged
+                                ? `Flagged (${student.violation_count})`
+                                : 'Active'}
+                            </span>
+                          </div>
+
+                          {isCurrentlyStreaming ? (
+                            <span className="roster-live-badge">
+                              <Radio size={11} /> Tile {activeSlotNum}
+                            </span>
+                          ) : student.warning_count > 0 ? (
+                            <div
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.85)',
+                                color: '#fff',
+                                fontSize: '0.66rem',
+                                fontWeight: 800,
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                              }}
+                            >
+                              Strike {student.warning_count}/3
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {/* Audio Decibel Meter Bar */}
+                        <div className="surveillance-audio-meter-bar">
+                          <div
+                            className={`surveillance-audio-fill ${decibelLevel > 40 ? 'spiking' : ''}`}
+                            style={{ width: `${Math.min(100, decibelLevel)}%` }}
+                          />
+                        </div>
                       </div>
 
-                      {/* Question Progress & Time Spent */}
-                      <div className="surveillance-telemetry-row">
-                        <div className="telemetry-item">
-                          <Activity size={13} color="#38bdf8" />
-                          <span>
-                            Q {student.activity?.currentQuestion || 1}/
-                            {student.activity?.totalQuestions || examData?.total_questions || 30}
-                          </span>
+                      {/* Candidate Body Meta */}
+                      <div className="surveillance-card-body">
+                        <div className="surveillance-candidate-header">
+                          <div>
+                            <h4 className="surveillance-name" title={student.name}>
+                              {student.name}
+                            </h4>
+                            <div className="surveillance-id-pill">
+                              {student.studentId} • {student.email}
+                            </div>
+                          </div>
+
+                          {student.violation_count > 0 ? (
+                            <div className="surveillance-violations-badge">
+                              <AlertTriangle size={12} />
+                              <span>{student.violation_count} flags</span>
+                            </div>
+                          ) : (
+                            <div className="surveillance-clean-badge">Clean</div>
+                          )}
                         </div>
-                        <div className="telemetry-item">
-                          <Clock size={13} color="#94a3b8" />
-                          <span>
-                            {student.activity?.timeSpent
-                              ? `${Math.floor(student.activity.timeSpent / 60)}m elapsed`
-                              : 'Session active'}
-                          </span>
+
+                        {/* Question Progress & Time Spent */}
+                        <div className="surveillance-telemetry-row">
+                          <div className="telemetry-item">
+                            <Activity size={13} color="#38bdf8" />
+                            <span>
+                              Q {student.activity?.currentQuestion || 1}/
+                              {student.activity?.totalQuestions || examData?.total_questions || 30}
+                            </span>
+                          </div>
+                          <div className="telemetry-item">
+                            <Clock size={13} color="#94a3b8" />
+                            <span>
+                              {student.activity?.timeSpent
+                                ? `${Math.floor(student.activity.timeSpent / 60)}m elapsed`
+                                : 'Session active'}
+                            </span>
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Proctor Intervention Buttons */}
-                      <div className="surveillance-actions-row">
-                        <button
-                          className="surveillance-action-btn btn-warn"
-                          onClick={() => openWarningModal(student)}
-                          disabled={isTerminated}
-                          title="Issue official proctoring warning strike"
-                        >
-                          <AlertTriangle size={13} />
-                          <span>Warn ({student.warning_count || 0})</span>
-                        </button>
+                        {/* Proctor Action Buttons */}
+                        <div className="surveillance-actions-row">
+                          {isCurrentlyStreaming ? (
+                            <button
+                              className="surveillance-action-btn"
+                              style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                              onClick={() => {
+                                const slotIdx = activeSlots.findIndex(s => s.studentId === student.id);
+                                if (slotIdx !== -1) releaseSlot(slotIdx);
+                              }}
+                              title="Stop streaming this student"
+                            >
+                              <X size={13} />
+                              <span>Stop Tile {activeSlotNum}</span>
+                            </button>
+                          ) : (
+                            <button
+                              className="surveillance-action-btn"
+                              style={{ background: 'rgba(56, 189, 248, 0.18)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' }}
+                              onClick={() => assignStudentToSlot(student)}
+                              disabled={isTerminated}
+                              title="Stream live camera feed into next available tile"
+                            >
+                              <Radio size={13} />
+                              <span>Watch Live</span>
+                            </button>
+                          )}
 
-                        <button
-                          className="surveillance-action-btn btn-terminate"
-                          onClick={() => openTerminationModal(student)}
-                          disabled={isTerminated}
-                          title="Immediately disqualify and terminate exam session"
-                        >
-                          <UserX size={13} />
-                          <span>Terminate</span>
-                        </button>
+                          <button
+                            className="surveillance-action-btn btn-warn"
+                            onClick={() => openWarningModal(student)}
+                            disabled={isTerminated}
+                            title="Issue official proctoring warning strike"
+                          >
+                            <AlertTriangle size={13} />
+                            <span>Warn</span>
+                          </button>
 
-                        <button
-                          className="surveillance-action-btn btn-inspect"
-                          onClick={() => handleInspectStudent(student)}
-                          title="Inspect deep telemetry and violation audit log"
-                        >
-                          <Eye size={14} />
-                        </button>
+                          <button
+                            className="surveillance-action-btn btn-terminate"
+                            onClick={() => openTerminationModal(student)}
+                            disabled={isTerminated}
+                            title="Immediately disqualify and terminate exam session"
+                          >
+                            <UserX size={13} />
+                            <span>Terminate</span>
+                          </button>
+
+                          <button
+                            className="surveillance-action-btn btn-inspect"
+                            onClick={() => handleInspectStudent(student)}
+                            title="Inspect deep telemetry and violation audit log"
+                          >
+                            <Eye size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+
+              {/* Roster Pagination Controls */}
+              {filteredCandidates.length > itemsPerPage && (
+                <div className="roster-pagination-bar">
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                    Showing {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredCandidates.length)} of {filteredCandidates.length} Candidates
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      className="cockpit-btn cockpit-btn-outline"
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                    >
+                      <ChevronLeft size={14} /> Prev
+                    </button>
+                    <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 700, padding: '0 8px' }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      className="cockpit-btn cockpit-btn-outline"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                    >
+                      Next <ChevronRight size={14} />
+                    </button>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 

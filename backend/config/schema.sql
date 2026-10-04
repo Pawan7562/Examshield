@@ -328,7 +328,11 @@ CREATE INDEX IF NOT EXISTS idx_exam_assignments_exam_student ON exam_assignments
 CREATE INDEX IF NOT EXISTS idx_exam_questions_exam_order ON exam_questions(exam_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_student_question_sets_exam_student ON student_question_sets(exam_id, student_id);
 CREATE INDEX IF NOT EXISTS idx_answers_session_id ON answers(session_id);
+CREATE INDEX IF NOT EXISTS idx_answers_exam_student ON answers(exam_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_answers_session_question ON answers(session_id, question_id);
+CREATE INDEX IF NOT EXISTS idx_exam_sessions_exam_status ON exam_sessions(exam_id, status);
 CREATE INDEX IF NOT EXISTS idx_violations_session_id ON violations(session_id);
+CREATE INDEX IF NOT EXISTS idx_violations_exam_student ON violations(exam_id, student_id);
 CREATE INDEX IF NOT EXISTS idx_violations_exam_created_at ON violations(exam_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_results_exam_id ON results(exam_id);
 CREATE INDEX IF NOT EXISTS idx_results_student_id ON results(student_id);

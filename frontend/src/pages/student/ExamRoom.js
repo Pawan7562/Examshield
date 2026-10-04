@@ -332,6 +332,8 @@ export default function ExamRoom() {
   const answersRef = useRef({});
   const languagesRef = useRef({});
   const questionsRef = useRef([]);
+  const debounceTimersRef = useRef({});
+  const isFlushingRef = useRef(false);
 
   // Keep refs current
   useEffect(() => { sessionRef.current = session; }, [session]);
@@ -745,7 +747,15 @@ export default function ExamRoom() {
     submittedRef.current = true;
     setSubmitted(true);
     setShowSubmitModal(false);
-    if (autoSaveRef.current) clearInterval(autoSaveRef.current);
+    if (autoSaveRef.current) {
+      clearTimeout(autoSaveRef.current);
+      autoSaveRef.current = null;
+    }
+    // Cancel all pending per-question debounce timers to avoid post-submit race conditions
+    if (debounceTimersRef.current) {
+      Object.values(debounceTimersRef.current).forEach(t => clearTimeout(t));
+      debounceTimersRef.current = {};
+    }
 
     try {
       // 1. Build answersList from current in-memory state, then flush via bulk save
@@ -795,6 +805,7 @@ export default function ExamRoom() {
       });
 
       if (response.success) {
+        try { localStorage.removeItem(`examshield_backup_${examId}_${user?.id || 'candidate'}`); } catch (_) {}
         notify.success('Exam submitted successfully!');
         const rawResult = response.data?.result || response.data || {};
         const normalizedResult = {
@@ -816,6 +827,7 @@ export default function ExamRoom() {
       console.error('Submission error:', err);
       const errMsg = err?.response?.data?.message || err?.message || '';
       if (errMsg.toLowerCase().includes('already submitted') || errMsg.toLowerCase().includes('already completed')) {
+        try { localStorage.removeItem(`examshield_backup_${examId}_${user?.id || 'candidate'}`); } catch (_) {}
         notify.success('Your examination responses are safely recorded.');
         setPhase('submitted');
         setTimeout(exitFullScreen, 1200);
@@ -1015,39 +1027,75 @@ export default function ExamRoom() {
     };
   }, [phase, session, examId, user?.id, user?.name, handleSubmit]);
 
-  // ─── Periodic Auto-save (Bulk Batching) ────────────────────────────────────
+  // ─── Periodic Auto-save with Randomized Scheduling Jitter ───────────────────
   useEffect(() => {
     if (phase !== 'exam' || !session || submitted) return;
-    autoSaveRef.current = setInterval(() => {
-      const currentAnswers = { ...(answersRef.current || {}), ...(answers || {}) };
-      const currentQuestions = (questionsRef.current && questionsRef.current.length > 0)
-        ? questionsRef.current
-        : (questions || []);
 
-      const answersList = Object.entries(currentAnswers)
-        .filter(([, ans]) => ans !== null && ans !== undefined && String(ans).trim() !== '')
-        .map(([qId, ans]) => {
-          const q = currentQuestions.find(item => String(item.id) === String(qId));
-          const isMcqOrTf = q?.type === 'mcq' || q?.type === 'true_false';
-          return {
-            questionId: qId,
-            ...(isMcqOrTf ? { selectedOption: ans } :
-              q?.type === 'coding' ? { codeSubmission: ans } :
-                { answerText: ans }),
-          };
-        });
+    let isMounted = true;
 
-      if (answersList.length > 0 && session?.id) {
-        studentAPI.saveAnswersBulk(examId, {
-          sessionId: session.id,
-          answers: answersList,
-        }).catch((err) => {
-          console.warn('Periodic bulk autosave background notice:', err);
-        });
+    const scheduleNextBulkFlush = () => {
+      // Randomized scheduling jitter: 28s to 42s (smoothes concurrent load across candidates)
+      const jitteredIntervalMs = 28000 + Math.floor(Math.random() * 14000);
+
+      autoSaveRef.current = setTimeout(async () => {
+        if (!isMounted || phase !== 'exam' || submittedRef.current) return;
+
+        // Prevent overlapping concurrent flushes
+        if (isFlushingRef.current) {
+          scheduleNextBulkFlush();
+          return;
+        }
+
+        const currentAnswers = { ...(answersRef.current || {}) };
+        const currentQuestions = (questionsRef.current && questionsRef.current.length > 0)
+          ? questionsRef.current
+          : [];
+        const currentSessionId = sessionRef.current?.id || session?.id;
+
+        const answersList = Object.entries(currentAnswers)
+          .filter(([, ans]) => ans !== null && ans !== undefined && String(ans).trim() !== '')
+          .map(([qId, ans]) => {
+            const q = currentQuestions.find(item => String(item.id) === String(qId));
+            const isMcqOrTf = q?.type === 'mcq' || q?.type === 'true_false';
+            const lang = languagesRef.current?.[qId];
+            return {
+              questionId: qId,
+              ...(isMcqOrTf ? { selectedOption: ans } :
+                q?.type === 'coding' ? { codeSubmission: ans, selectedLanguage: lang, language: lang } :
+                  { answerText: ans }),
+            };
+          });
+
+        if (answersList.length > 0 && currentSessionId) {
+          isFlushingRef.current = true;
+          try {
+            await studentAPI.saveAnswersBulk(examId, {
+              sessionId: currentSessionId,
+              answers: answersList,
+            });
+          } catch (err) {
+            console.warn('Periodic bulk autosave background notice:', err);
+          } finally {
+            isFlushingRef.current = false;
+          }
+        }
+
+        if (isMounted && !submittedRef.current) {
+          scheduleNextBulkFlush();
+        }
+      }, jitteredIntervalMs);
+    };
+
+    scheduleNextBulkFlush();
+
+    return () => {
+      isMounted = false;
+      if (autoSaveRef.current) {
+        clearTimeout(autoSaveRef.current);
+        autoSaveRef.current = null;
       }
-    }, 25000);
-    return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
-  }, [phase, session, submitted, examId, answers]);
+    };
+  }, [phase, session?.id, submitted, examId]);
 
   // ─── Fetch Exam Details ───────────────────────────────────────────────────────
   // ─── Fetch Exam Details & Auto-Fill Access Key ──────────────────────────────
@@ -1116,36 +1164,91 @@ export default function ExamRoom() {
     }
   }, [examId]);
 
-  // ─── Answer Handler ───────────────────────────────────────────────────────────
+  // ─── Answer Handler & Offline Local Backup ──────────────────────────────────
+  // ─── Answer Handler & Offline Local Backup ──────────────────────────────────
+  const persistAnswersToLocalStorage = useCallback((updatedAnswers, updatedLanguages = {}) => {
+    try {
+      const storageKey = `examshield_backup_${examId}_${user?.id || 'candidate'}`;
+      let existingBackup = {};
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) existingBackup = JSON.parse(raw);
+      } catch (_) {}
+
+      const previousEntries = (existingBackup && existingBackup.entries) ? existingBackup.entries : {};
+      const now = Date.now();
+
+      const newEntries = {};
+      Object.entries(updatedAnswers || {}).forEach(([qId, val]) => {
+        const prev = previousEntries[qId];
+        const hasChanged = !prev || prev.value !== val;
+        newEntries[qId] = {
+          value: val,
+          updatedAt: hasChanged ? now : (prev.updatedAt || now),
+          language: updatedLanguages[qId] || languagesRef.current?.[qId] || prev?.language || null
+        };
+      });
+
+      const backupEnvelope = {
+        version: 2,
+        savedAt: now,
+        answers: updatedAnswers,
+        entries: newEntries
+      };
+
+      localStorage.setItem(storageKey, JSON.stringify(backupEnvelope));
+    } catch (_) {}
+  }, [examId, user]);
+
   const handleAnswer = useCallback((questionId, answer, language = null) => {
     answersRef.current = { ...answersRef.current, [questionId]: answer };
     if (language) {
       languagesRef.current[questionId] = language;
     }
-    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+    setAnswers(prev => {
+      const next = { ...prev, [questionId]: answer };
+      persistAnswersToLocalStorage(next, language ? { [questionId]: language } : {});
+      return next;
+    });
+
     const q = questions.find(q => String(q.id) === String(questionId));
     if (!q || !session) return;
     const isMcqOrTf = q.type === 'mcq' || q.type === 'true_false';
     const langToUse = language || languagesRef.current[questionId];
-    studentAPI.saveAnswer(examId, {
-      sessionId: session.id,
-      questionId,
-      ...(isMcqOrTf ? { selectedOption: answer } :
-        q.type === 'coding' ? { codeSubmission: answer, selectedLanguage: langToUse, language: langToUse } :
-          { answerText: answer }),
-    }).catch((err) => {
-      console.warn('Realtime save notice (will be flushed on next interval/submit):', err);
-    });
-  }, [questions, session, examId]);
+
+    // Clear any previous debounce timer for this question
+    if (debounceTimersRef.current[questionId]) {
+      clearTimeout(debounceTimersRef.current[questionId]);
+    }
+
+    // Debounce remote network saves by 1200ms to eliminate high-concurrency request spikes
+    debounceTimersRef.current[questionId] = setTimeout(() => {
+      delete debounceTimersRef.current[questionId];
+      studentAPI.saveAnswer(examId, {
+        sessionId: session.id,
+        questionId,
+        ...(isMcqOrTf ? { selectedOption: answer } :
+          q.type === 'coding' ? { codeSubmission: answer, selectedLanguage: langToUse, language: langToUse } :
+            { answerText: answer }),
+      }).catch((err) => {
+        console.warn('Realtime save notice (will be flushed on next interval/submit):', err);
+      });
+    }, 1200);
+  }, [questions, session, examId, persistAnswersToLocalStorage]);
 
   // ─── Clear Answer ─────────────────────────────────────────────────────────────
   const handleClearAnswer = (questionId) => {
+    if (debounceTimersRef.current[questionId]) {
+      clearTimeout(debounceTimersRef.current[questionId]);
+      delete debounceTimersRef.current[questionId];
+    }
     if (answersRef.current) {
       delete answersRef.current[questionId];
     }
     setAnswers(prev => {
       const next = { ...prev };
       delete next[questionId];
+      persistAnswersToLocalStorage(next);
       return next;
     });
     notify.info('Choice cleared');
@@ -1197,18 +1300,71 @@ export default function ExamRoom() {
         setSession(data.session);
         setQuestions(data.questions || []);
 
-        // Restore saved answers if student is resuming session
+        // ── Intelligent Answer Reconciliation (Question-by-Question Timestamp Merge) ──
+        const serverMap = {};
         if (Array.isArray(data.savedAnswers) && data.savedAnswers.length > 0) {
-          const restoredAnswers = {};
           data.savedAnswers.forEach(a => {
             const val = a.selected_option ?? a.code_submission ?? a.answer_text;
             if (val !== undefined && val !== null) {
-              restoredAnswers[a.question_id] = val;
+              const serverTime = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+              serverMap[String(a.question_id)] = {
+                value: val,
+                updatedAt: serverTime,
+                language: a.selected_language || null
+              };
             }
           });
-          setAnswers(restoredAnswers);
-          answersRef.current = restoredAnswers;
         }
+
+        let localEntries = {};
+        try {
+          const cached = localStorage.getItem(`examshield_backup_${examId}_${user?.id || 'candidate'}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.version === 2 && parsed.entries) {
+              localEntries = parsed.entries;
+            } else if (parsed && typeof parsed === 'object') {
+              const flat = parsed.answers || parsed;
+              Object.entries(flat).forEach(([k, v]) => {
+                localEntries[k] = { value: v, updatedAt: 0 };
+              });
+            }
+          }
+        } catch (_) {}
+
+        const allQuestionIds = new Set([
+          ...Object.keys(serverMap),
+          ...Object.keys(localEntries)
+        ]);
+
+        const mergedAnswers = {};
+        const mergedLanguages = { ...(languagesRef.current || {}) };
+
+        allQuestionIds.forEach(qId => {
+          const s = serverMap[qId];
+          const l = localEntries[qId];
+
+          if (s && l) {
+            // If local answer has a newer timestamp than server, prioritize fresher local answer
+            if (l.updatedAt && l.updatedAt > s.updatedAt) {
+              mergedAnswers[qId] = l.value;
+              if (l.language) mergedLanguages[qId] = l.language;
+            } else {
+              mergedAnswers[qId] = s.value;
+              if (s.language) mergedLanguages[qId] = s.language;
+            }
+          } else if (s) {
+            mergedAnswers[qId] = s.value;
+            if (s.language) mergedLanguages[qId] = s.language;
+          } else if (l) {
+            mergedAnswers[qId] = l.value;
+            if (l.language) mergedLanguages[qId] = l.language;
+          }
+        });
+
+        setAnswers(mergedAnswers);
+        answersRef.current = mergedAnswers;
+        languagesRef.current = mergedLanguages;
 
         const calcRemaining = getExamRemainingSeconds(data.exam, data.session?.started_at);
         const secs = (data.timeRemaining !== undefined && data.timeRemaining !== null)

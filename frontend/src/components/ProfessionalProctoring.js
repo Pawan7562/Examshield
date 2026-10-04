@@ -151,6 +151,9 @@ const ProfessionalProctoring = ({
   const lastAudioUiUpdateRef = useRef(0);
   const lastAudioUiValRef = useRef(0);
 
+  const [isStreamingRequested, setIsStreamingRequested] = useState(false);
+  const isStreamingRequestedRef = useRef(false);
+
   useEffect(() => { socketRef.current = socket; }, [socket]);
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
   useEffect(() => { examIdRef.current = examId; }, [examId]);
@@ -161,6 +164,24 @@ const ProfessionalProctoring = ({
   useEffect(() => { currentQuestionRef.current = currentQuestion; }, [currentQuestion]);
   useEffect(() => { totalQuestionsRef.current = totalQuestions; }, [totalQuestions]);
   useEffect(() => { faceCountRef.current = faceCount; }, [faceCount]);
+  useEffect(() => { isStreamingRequestedRef.current = isStreamingRequested; }, [isStreamingRequested]);
+
+  // On-Demand Stream Signaling: Start/Stop high-speed video only when an authorized proctor is actively watching!
+  useEffect(() => {
+    if (!socket) return;
+    const handleStreamRequested = ({ studentId: targetSid, active }) => {
+      if (!targetSid || targetSid === studentIdRef.current) {
+        const nextActive = Boolean(active);
+        isStreamingRequestedRef.current = nextActive;
+        setIsStreamingRequested(nextActive);
+        console.log(`[Proctoring] Live video transmission ${nextActive ? 'ACTIVATED (Proctor viewing)' : 'IDLE (Background monitoring active)'}`);
+      }
+    };
+    socket.on('stream-requested', handleStreamRequested);
+    return () => {
+      socket.off('stream-requested', handleStreamRequested);
+    };
+  }, [socket]);
 
   // Notify parent component on device status changes (e.g. camera or mic denied, revoked, or disconnected)
   useEffect(() => {
@@ -173,9 +194,18 @@ const ProfessionalProctoring = ({
       isBlocked: isCameraBlocked || isMicBlocked,
       blockedReason: isCameraBlocked ? 'camera' : isMicBlocked ? 'microphone' : null,
     });
+
+    if (socketRef.current?.connected && studentIdRef.current) {
+      socketRef.current.emit('camera-status-update', {
+        examId: examIdRef.current,
+        studentId: studentIdRef.current,
+        status: cameraOff ? 'off' : cameraStatus,
+        message: isCameraBlocked ? 'Camera is unavailable or disabled' : 'Camera active',
+      });
+    }
   }, [cameraStatus, micStatus, cameraOff, onCameraStatusChange]);
 
-  // ─── Continuous High-Performance Live Video Streaming Loop ───
+  // ─── On-Demand Live Video Streaming Loop & Periodic Background Snapshot ───
   useEffect(() => {
     if (!socket) return;
     if (cameraStatus !== 'active' && cameraStatus !== 'off') return;
@@ -192,15 +222,18 @@ const ProfessionalProctoring = ({
     let isBusyEncoding = false;
     let lastEncodingTime = 0;
 
-    // High-responsiveness video frame streamer: 125ms (~8 FPS) with volatile non-blocking emit
+    // High-responsiveness video frame streamer: 125ms (~8 FPS)
+    // ONLY transmits frames upstream when a proctor has actively subscribed!
     const videoStreamInterval = setInterval(() => {
       try {
+        if (!isStreamingRequestedRef.current) return; // IDLE: Zero upstream video bytes when no proctor is viewing!
+
         const now = Date.now();
         // Force unlock if previous encode cycle somehow got hung for > 400ms
         if (isBusyEncoding && now - lastEncodingTime > 400) {
           isBusyEncoding = false;
         }
-        if (isBusyEncoding) return; // Drop frame if previous is still processing (zero buffer bloat)
+        if (isBusyEncoding) return; // Drop frame if previous is still processing
 
         const video = videoRef.current;
         if (!video) return;
@@ -219,7 +252,6 @@ const ProfessionalProctoring = ({
           const dataUrl = offscreen.toDataURL('image/jpeg', 0.42);
           const base64Data = dataUrl.split(',')[1];
           if (base64Data && socketRef.current && socketRef.current.connected) {
-            // Volatile emit drops stale frames on congested networks rather than queueing lag
             const sock = socketRef.current.volatile || socketRef.current;
             sock.emit('camera-feed', {
               examId: examIdRef.current,
@@ -236,31 +268,75 @@ const ProfessionalProctoring = ({
       }
     }, 125);
 
-    // Telemetry transmitter: runs every 2200ms
-    const telemetryInterval = setInterval(() => {
+    // Periodic background surveillance snapshot (low frequency: every 12s when NOT live streaming)
+    // Feeds candidate roster thumbnails with minimal network consumption (~0.25 KB/s vs 48 KB/s)
+    const snapshotInterval = setInterval(() => {
       try {
+        if (isStreamingRequestedRef.current) return; // Skip if high-speed stream is already active
+        const video = videoRef.current;
+        if (!video || video.readyState < 2 || video.videoWidth === 0) return;
         const isActive = cameraStatusRef.current === 'active' && !cameraOffRef.current;
-        if (socketRef.current && socketRef.current.connected) {
+        if (!isActive || !socketRef.current || !socketRef.current.connected) return;
+
+        ctx.drawImage(video, 0, 0, 240, 180);
+        const dataUrl = offscreen.toDataURL('image/jpeg', 0.32);
+        const base64Data = dataUrl.split(',')[1];
+        if (base64Data) {
+          socketRef.current.emit('monitoring-snapshot', {
+            examId: examIdRef.current,
+            studentId: studentIdRef.current,
+            sessionId: sessionIdRef.current,
+            imageData: base64Data,
+            faceCount: faceCountRef.current,
+            audioLevel: audioLevelRef.current,
+            timestamp: Date.now(),
+            isIncident: false,
+          });
+        }
+      } catch (_) {}
+    }, 12000);
+
+    // Adaptive Telemetry Transmitter: Instant dispatch on state change, 7s idle heartbeat
+    let lastActivityState = null;
+    let lastActivityTime = 0;
+
+    const emitTelemetry = (force = false) => {
+      try {
+        const now = Date.now();
+        const isActive = cameraStatusRef.current === 'active' && !cameraOffRef.current;
+        const currentPayload = {
+          currentQuestion: currentQuestionRef.current,
+          totalQuestions: totalQuestionsRef.current,
+          cameraActive: isActive,
+          cameraOff: cameraOffRef.current,
+          audioLevel: audioLevelRef.current,
+          faceCount: faceCountRef.current,
+          isStreaming: isStreamingRequestedRef.current,
+          status: 'active',
+        };
+
+        const stateKey = `${currentPayload.currentQuestion}_${currentPayload.faceCount}_${currentPayload.cameraActive}_${currentPayload.isStreaming}`;
+        const hasStateChanged = lastActivityState !== stateKey;
+        const isHeartbeatDue = now - lastActivityTime >= 7000;
+
+        if ((force || hasStateChanged || isHeartbeatDue) && socketRef.current && socketRef.current.connected) {
+          lastActivityState = stateKey;
+          lastActivityTime = now;
           socketRef.current.emit('student-activity', {
             examId: examIdRef.current,
             studentId: studentIdRef.current,
             sessionId: sessionIdRef.current,
-            activity: {
-              currentQuestion: currentQuestionRef.current,
-              totalQuestions: totalQuestionsRef.current,
-              cameraActive: isActive,
-              cameraOff: cameraOffRef.current,
-              audioLevel: audioLevelRef.current,
-              faceCount: faceCountRef.current,
-              status: 'active',
-            },
+            activity: currentPayload,
           });
         }
       } catch (_) {}
-    }, 2200);
+    };
+
+    const telemetryInterval = setInterval(() => emitTelemetry(false), 2000);
 
     return () => {
       clearInterval(videoStreamInterval);
+      clearInterval(snapshotInterval);
       clearInterval(telemetryInterval);
     };
   }, [socket, cameraStatus, cameraOff]);
@@ -311,6 +387,29 @@ const ProfessionalProctoring = ({
         severity: type === 'multiple_faces' || type === 'camera_off' ? 'high' : 'medium',
         description,
       });
+
+      // Immediate incident snapshot for forensic proctor review
+      try {
+        const video = videoRef.current;
+        if (video && video.readyState >= 2 && offscreenCanvasRef.current && socketRef.current.connected) {
+          const offCtx = offscreenCanvasRef.current.getContext('2d', { alpha: false });
+          offCtx.drawImage(video, 0, 0, 240, 180);
+          const snapData = offscreenCanvasRef.current.toDataURL('image/jpeg', 0.42).split(',')[1];
+          if (snapData) {
+            socketRef.current.emit('monitoring-snapshot', {
+              examId: examIdRef.current,
+              studentId: studentIdRef.current,
+              sessionId: sessionIdRef.current,
+              imageData: snapData,
+              faceCount: faceCountRef.current,
+              audioLevel: audioLevelRef.current,
+              timestamp: now,
+              isIncident: true,
+              incidentType: type,
+            });
+          }
+        }
+      } catch (_) {}
     }
 
     // Toast with unique IDs to prevent stacking duplicates
