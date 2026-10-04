@@ -155,18 +155,30 @@ const Login = ({ role }) => {
     }
   }, [role]);
 
-  // Load saved credentials on mount or role switch
+  // Load saved credentials on mount, role switch, or email link query params
   useEffect(() => {
-    const saved = localStorage.getItem(`${REMEMBER_KEY}_${activeRole}`);
-    if (saved) {
-      setIdentifier(saved);
+    const searchParams = new URLSearchParams(location.search);
+    const emailParam = searchParams.get('email') || searchParams.get('identifier') || searchParams.get('studentId');
+    const examKeyParam = searchParams.get('examKey') || searchParams.get('key');
+    if (examKeyParam) {
+      sessionStorage.setItem('pendingExamKey', examKeyParam);
+    }
+
+    if (emailParam) {
+      setIdentifier(emailParam.trim());
       setRememberMe(true);
     } else {
-      setIdentifier('');
-      setRememberMe(false);
+      const saved = localStorage.getItem(`${REMEMBER_KEY}_${activeRole}`);
+      if (saved) {
+        setIdentifier(saved);
+        setRememberMe(true);
+      } else {
+        setIdentifier('');
+        setRememberMe(false);
+      }
     }
     setErrorMessage('');
-  }, [activeRole]);
+  }, [activeRole, location.search]);
 
   // Switch role handler
   const handleRoleChange = (newRole) => {

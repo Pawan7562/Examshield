@@ -227,7 +227,7 @@ exports.addStudent = async (req, res) => {
         studentId,
         password,
         collegeName: req.user?.name || req.user?.college_name || 'Your Institution',
-        loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login',
+        loginUrl: process.env.STUDENT_LOGIN_URL || 'https://exam.nexifyforge.in/student/login',
         examName: targetExam?.title || targetExam?.name || 'Scheduled Examination',
         examKey: effectiveExamKey,
         examDate: targetExam?.date_time,
@@ -762,7 +762,7 @@ exports.bulkUploadStudents = async (req, res) => {
                 studentId,
                 password,
                 collegeName: req.user.name || 'Your Institution',
-                loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login'
+                loginUrl: process.env.STUDENT_LOGIN_URL || 'https://exam.nexifyforge.in/student/login'
               }).catch(emailError => {
                 console.error(`❌ Bulk Upload Email Error for ${cleanEmail}:`, emailError.message);
               });
@@ -866,7 +866,7 @@ exports.resetStudentPassword = async (req, res) => {
           studentId: student.student_id,
           password: passwordToSet,
           collegeName: req.user?.name || req.user?.college_name || 'Your Institution',
-          loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login',
+          loginUrl: process.env.STUDENT_LOGIN_URL || 'https://exam.nexifyforge.in/student/login',
           isReset: true
         });
         emailSent = true;
@@ -890,7 +890,7 @@ exports.resetStudentPassword = async (req, res) => {
         temporaryPassword: passwordToSet,
         newPassword: passwordToSet,
         emailSent,
-        loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login'
+        loginUrl: process.env.STUDENT_LOGIN_URL || 'https://exam.nexifyforge.in/student/login'
       }
     });
 
@@ -1020,7 +1020,7 @@ exports.resolvePasswordRequest = async (req, res) => {
           studentId: reqData.student_id,
           password: passwordToSet,
           collegeName: req.user?.name || req.user?.college_name || 'Your Institution',
-          loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login',
+          loginUrl: process.env.STUDENT_LOGIN_URL || 'https://exam.nexifyforge.in/student/login',
           isReset: true
         });
         emailSent = true;
@@ -1105,7 +1105,7 @@ exports.resendStudentCredentials = async (req, res) => {
         studentId: student.student_id,
         password: newPassword,
         collegeName: req.user?.name || req.user?.college_name || 'Your Institution',
-        loginUrl: process.env.STUDENT_LOGIN_URL || 'https://www.exam.nexifyforge.in/student/login',
+        loginUrl: process.env.STUDENT_LOGIN_URL || 'https://exam.nexifyforge.in/student/login',
         examName: targetExam?.title || targetExam?.name || 'Scheduled Examination',
         examKey: effectiveExamKey,
         examDate: targetExam?.date_time,

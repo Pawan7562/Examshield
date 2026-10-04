@@ -333,12 +333,24 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
           // Get exam details for email
           const { data: examData } = await supabase
             .from('exams')
-            .select('title, subject, date_time, duration, exam_code')
+            .select('title, subject, date_time, duration, exam_code, college_id')
             .eq('id', examId)
             .maybeSingle();
 
+          let resolvedCollegeName = 'Your Institution';
+          if (examData?.college_id) {
+            const { data: collegeRec } = await supabase
+              .from('colleges')
+              .select('name')
+              .eq('id', examData.college_id)
+              .maybeSingle();
+            if (collegeRec?.name) {
+              resolvedCollegeName = collegeRec.name;
+            }
+          }
+
           const loginUrl = process.env.STUDENT_LOGIN_URL || 
-            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://www.exam.nexifyforge.in/student/login');
+            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://exam.nexifyforge.in/student/login');
 
           // Send email to each assigned student
           for (const student of students) {
@@ -353,6 +365,7 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
                 examKey: examData?.exam_code || 'TBD',
                 subject: examData?.subject || 'General',
                 type: 'exam',
+                collegeName: resolvedCollegeName,
                 loginUrl: loginUrl
               });
             } catch (emailError) {
@@ -950,10 +963,21 @@ exports.publishExam = async (req, res) => {
         if (assignedStudents && assignedStudents.length > 0) {
           const { sendExamNotification } = require('../services/emailService');
           const loginUrl = process.env.STUDENT_LOGIN_URL || 
-            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://www.exam.nexifyforge.in/student/login');
+            (process.env.NODE_ENV === 'development' ? 'http://localhost:3002/student/login' : 'https://exam.nexifyforge.in/student/login');
+
+          let resolvedCollegeName = req.user?.name || req.user?.college_name;
+          if (!resolvedCollegeName && completeExamData?.college_id) {
+            const { data: col } = await supabase
+              .from('colleges')
+              .select('name')
+              .eq('id', completeExamData.college_id)
+              .maybeSingle();
+            if (col?.name) resolvedCollegeName = col.name;
+          }
 
           console.log('📧 Backend: Sending exam notifications to students:', {
             totalStudents: assignedStudents.length,
+            collegeName: resolvedCollegeName || 'Your Institution',
             examCode: completeExamData?.exam_code,
             examTitle: completeExamData?.title
           });
@@ -969,6 +993,7 @@ exports.publishExam = async (req, res) => {
               examKey: completeExamData?.exam_code || 'N/A',
               subject: completeExamData?.subject || 'Exam',
               type: completeExamData?.type || 'exam',
+              collegeName: resolvedCollegeName || 'Your Institution',
               loginUrl: loginUrl
             });
           }
