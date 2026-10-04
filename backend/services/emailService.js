@@ -220,10 +220,12 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 4000) =
     (process.env.EMAIL_PASS && process.env.EMAIL_PASS.startsWith('xkeysib-') ? process.env.EMAIL_PASS : null) ||
     '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';
 
+  let brevoApiError = null;
   if (brevoApiKey) {
     try {
       return await sendViaBrevoApi(brevoApiKey, opts);
     } catch (brevoErr) {
+      brevoApiError = brevoErr;
       console.error(`❌ [Brevo API] Failed: ${brevoErr.message}`);
       console.log('🔄 Brevo API failed, falling back to SMTP...');
     }
@@ -285,7 +287,10 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 4000) =
         console.error(`❌ [SMTP] Attempt ${attempt} failed: ${err.message} (code: ${err.code})`);
         if (transporter) transporter.close();
         
-        // If authentication failed on Brevo, do not loop needlessly; engage verified fallback immediately
+        if (err.code === 'ETIMEDOUT' && isCloudOrProd) {
+          logger.warn('Direct SMTP timed out (outbound port 587 is blocked by cloud provider). Aborting SMTP retries.');
+          break;
+        }
         if (err.code === 'EAUTH' || (err.message && err.message.includes('Authentication failed'))) {
           logger.warn('Primary SMTP auth failed — engaging resilient fallback provider');
           break;
@@ -323,7 +328,12 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 4000) =
       }
     }
 
-    if (lastError) throw lastError;
+    if (lastError) {
+      if (brevoApiError) {
+        throw new Error(`${brevoApiError.message}. Cloud SMTP blocked: ${lastError.message}`);
+      }
+      throw lastError;
+    }
     return;
   }
 
