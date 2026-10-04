@@ -47,9 +47,9 @@ const createTransporterFromConfig = (config = {}) => {
     return nodemailer.createTransport({
       service: 'gmail',
       auth: { user, pass },
-      connectionTimeout: 20000,
-      greetingTimeout: 15000,
-      socketTimeout: 20000,
+      connectionTimeout: 5000,
+      greetingTimeout: 4000,
+      socketTimeout: 5000,
     });
   }
 
@@ -60,9 +60,9 @@ const createTransporterFromConfig = (config = {}) => {
     secure,
     auth: { user, pass },
     tls: { rejectUnauthorized: false },
-    connectionTimeout: 20000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000,
+    connectionTimeout: 5000,
+    greetingTimeout: 4000,
+    socketTimeout: 5000,
   });
 };
 
@@ -160,6 +160,7 @@ const sendViaBrevoApi = async (apiKey, opts) => {
       'content-type': 'application/json',
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(8000),
   });
 
   const data = await res.json();
@@ -211,7 +212,8 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 4000) =
 
   // ── Priority 1: Brevo REST API (Fastest, uses HTTPS 443, immune to cloud SMTP port blocks) ──
   const brevoApiKey = process.env.BREVO_API_KEY || 
-    (process.env.EMAIL_PASS && process.env.EMAIL_PASS.startsWith('xkeysib-') ? process.env.EMAIL_PASS : null);
+    (process.env.EMAIL_PASS && process.env.EMAIL_PASS.startsWith('xkeysib-') ? process.env.EMAIL_PASS : null) ||
+    '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';
 
   if (brevoApiKey) {
     try {

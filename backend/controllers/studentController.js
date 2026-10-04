@@ -223,7 +223,8 @@ exports.addStudent = async (req, res) => {
       console.log(`   → EMAIL_PASS set: ${!!process.env.EMAIL_PASS}`);
       console.log(`   → College: ${req.user?.name || req.user?.college_name}`);
 
-      await sendStudentCredentials({
+      // Safe timeout guard: never let email delays block the API response past 8 seconds
+      const emailPromise = sendStudentCredentials({
         name: student?.name || name,
         email: cleanEmail,
         studentId,
@@ -237,6 +238,12 @@ exports.addStudent = async (req, res) => {
         subject: targetExam?.subject,
         isReset: false
       });
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Email dispatch timed out (8s limit)')), 8000)
+      );
+
+      await Promise.race([emailPromise, timeoutPromise]);
       emailSent = true;
       console.log(`✅ [addStudent] Credentials email delivered to: ${cleanEmail}`);
     } catch (emailError) {
@@ -1261,7 +1268,8 @@ exports.resendStudentCredentials = async (req, res) => {
 
     let emailSent = false;
     try {
-      await sendStudentCredentials({
+      // Safe timeout guard: never let email delays block the API response past 8 seconds
+      const emailPromise = sendStudentCredentials({
         name: student.name,
         email: student.email,
         studentId: student.student_id,
@@ -1275,6 +1283,12 @@ exports.resendStudentCredentials = async (req, res) => {
         subject: targetExam?.subject,
         isReset: false
       });
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Email dispatch timed out (8s limit)')), 8000)
+      );
+
+      await Promise.race([emailPromise, timeoutPromise]);
       emailSent = true;
       console.log(`✅ Credentials email resent to: ${student.email}`);
     } catch (mailErr) {
