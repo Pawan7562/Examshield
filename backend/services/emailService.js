@@ -201,11 +201,16 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 4000) =
 
   const mailAttachments = [
     ...(mailOptions.attachments || []),
-    ...(fs.existsSync(logoPath) ? [{
+    ...(logoBase64 ? [{
+      filename: 'nexifyforge-logo.jpg',
+      content: logoBase64,
+      encoding: 'base64',
+      cid: 'nexifyforge-logo.jpg'
+    }] : (fs.existsSync(logoPath) ? [{
       filename: 'nexifyforge-logo.jpg',
       path: logoPath,
       cid: 'nexifyforge-logo.jpg'
-    }] : [])
+    }] : []))
   ];
 
   const opts = { ...mailOptions, from, replyTo, headers, attachments: mailAttachments };
