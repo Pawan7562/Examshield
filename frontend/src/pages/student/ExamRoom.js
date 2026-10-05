@@ -287,6 +287,7 @@ export default function ExamRoom() {
   const [screenShareInterrupted, setScreenShareInterrupted] = useState(false);
   const [reinitCameraKey, setReinitCameraKey] = useState(0);
   const [activeMediaStream, setActiveMediaStream] = useState(null);
+  const wakeLockRef = useRef(null);
 
   const previewStreamRef = useRef(null);
   const previewVideoRef = useRef(null);
@@ -704,6 +705,34 @@ export default function ExamRoom() {
     };
   }, [examData]);
 
+  // ─── Screen Wake Lock (Prevents screen from sleeping during assessment) ──────
+  const enableWakeLock = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+      try {
+        const wl = await navigator.wakeLock.request('screen');
+        wakeLockRef.current = wl;
+        wl.addEventListener('release', () => {
+          wakeLockRef.current = null;
+        });
+      } catch (_) {}
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(() => {
+    if (wakeLockRef.current) {
+      try {
+        wakeLockRef.current.release();
+      } catch (_) {}
+      wakeLockRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      releaseWakeLock();
+    };
+  }, [releaseWakeLock]);
+
   // ─── Fullscreen Handlers ──────────────────────────────────────────────────────
   const enterFullScreen = useCallback(() => {
     try {
@@ -743,6 +772,7 @@ export default function ExamRoom() {
   // ─── Exam Submit ──────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(async (autoSubmit = false) => {
     if (submittedRef.current) return;
+    releaseWakeLock();
 
     submittedRef.current = true;
     setSubmitted(true);
@@ -856,17 +886,17 @@ export default function ExamRoom() {
     setTimeout(() => setFaceAlert(null), 5000);
   }, [handleSubmit, resolvedMonitoringConfig.face_detection]);
 
-  // ─── Tab Switch Detection ───────────────────────────────────────────────────
+  // ─── Tab Switch & Window Focus Detection ───────────────────────────────────
   useEffect(() => {
     if (phase !== 'exam') return;
     if (resolvedMonitoringConfig.tab_switch === false) return; // Feature disabled by admin
 
-    let isBlurred = false;
     let effectStartTime = Date.now();
+    let isSwitchedAway = false;
 
-    const recordViolation = () => {
-      // Grace period: ignore blur during the first 3 seconds of entering the exam room (fullscreen transition)
-      if (Date.now() - effectStartTime < 3000) return;
+    const recordViolation = (details = `Tab/Window switch #${tabSwitchCountRef.current + 1}`) => {
+      // Grace period: ignore blur during the first 4 seconds of entering the exam room (fullscreen transition)
+      if (Date.now() - effectStartTime < 4000) return;
 
       tabSwitchCountRef.current += 1;
       setTabSwitchCount(tabSwitchCountRef.current);
@@ -875,29 +905,29 @@ export default function ExamRoom() {
         socketRef.current.emit('violation', {
           sessionId: sessionRef.current.id,
           type: 'tab_switch',
-          details: `Tab/Window switch #${tabSwitchCountRef.current}`,
+          details,
           timestamp: new Date().toISOString(),
         });
+      }
+
+      const n = tabSwitchCountRef.current;
+      if (n > 0 && n < 3) {
+        setShowTabWarning(true);
+      } else if (n >= 3 && !submittedRef.current) {
+        notify.error('Maximum tab switch limit (3) exceeded. Auto-submitting exam.');
+        handleSubmit(true);
       }
     };
 
     const handleHide = () => {
-      if (!isBlurred) {
-        isBlurred = true;
-        recordViolation();
+      if (!isSwitchedAway) {
+        isSwitchedAway = true;
+        recordViolation(`Candidate switched away from exam tab or minimized window (#${tabSwitchCountRef.current + 1})`);
       }
     };
 
     const handleShow = () => {
-      if (isBlurred) {
-        isBlurred = false;
-        const n = tabSwitchCountRef.current;
-        if (n > 0 && n < 3) {
-          setShowTabWarning(true);
-        } else if (n >= 3 && !submittedRef.current) {
-          handleSubmit(true);
-        }
-      }
+      isSwitchedAway = false;
     };
 
     const handleVisibility = () => {
@@ -1381,6 +1411,7 @@ export default function ExamRoom() {
         }
 
         setTimeSeconds(secs);
+        enableWakeLock();
         setPhase('exam');
         notify.success('Exam session initiated. Good luck!');
       } else {
@@ -1566,7 +1597,7 @@ export default function ExamRoom() {
 
     const key = (examKey || examData?.exam?.exam_code || examData?.exam?.exam_key || '').trim();
     triggerBackendStart(key);
-  }, [isDeviceCheckPassed, agreedToTerms, examData, examKey, enterFullScreen, triggerBackendStart, cameraPerm, micPerm, screenPerm, syncCombinedMediaStream]);
+  }, [isDeviceCheckPassed, agreedToTerms, examData, examKey, enterFullScreen, triggerBackendStart, cameraPerm, micPerm, screenPerm, syncCombinedMediaStream, enableWakeLock]);
 
   // Live Countdown & Resilient Auto-Start Effect for Waiting Room (Strictly anchored to IST)
   useEffect(() => {

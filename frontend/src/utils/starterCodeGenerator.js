@@ -46,7 +46,7 @@ export function parseTemplateSignature(templateStr) {
   }
 
   // 2. Python signature: def functionName(self, arg1: type, ...):
-  const pyRegex = /def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)(?:\s*->\s*([a-zA-Z0-9_\[\], ]+))?/;
+  const pyRegex = /def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)(?:\s*->\s*([a-zA-Z0-9_[\\], ]+))?/;
   const matchPy = templateStr.match(pyRegex);
   if (matchPy) {
     const fnName = matchPy[1].trim();
