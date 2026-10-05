@@ -283,7 +283,9 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
             time_limit: timeLimit,
             memory_limit: q.memoryLimit || q.memory_limit || (type === 'coding' ? 256 : null),
             difficulty: difficulty,
-            test_cases: testCasesJson
+            test_cases: testCasesJson,
+            section_id: q.sectionId || null,
+            section_name: q.sectionName || null
           };
         });
 
@@ -614,7 +616,8 @@ exports.createExam = async (req, res) => {
       title, name, description, type, subject, dateTime, duration, totalMarks,
       passingMarks, instructions, isProctored, maxViolations, studentIds, questions,
       studentQuestionSets, questionRandomization, aiGenerated,
-      monitoringConfig, monitoring_config
+      monitoringConfig, monitoring_config,
+      sections
     } = req.body;
     const collegeId = req.user?.id;
 
@@ -725,6 +728,24 @@ exports.createExam = async (req, res) => {
       }
     } catch (checkError) {
       console.log('Could not check for new columns, using fallback');
+    }
+
+    // Store sections data if provided
+    if (sections && Array.isArray(sections) && sections.length > 0) {
+      try {
+        const { error: secCheckError } = await supabase
+          .from('exams')
+          .select('sections')
+          .limit(1);
+        if (!secCheckError) {
+          examData.sections = JSON.stringify(sections);
+          console.log('Sections column exists, storing', sections.length, 'sections');
+        } else {
+          console.log('Sections column does not exist, skipping');
+        }
+      } catch (secCheckError) {
+        console.log('Could not check for sections column, skipping');
+      }
     }
 
     console.log('Final exam data to insert:', examData);

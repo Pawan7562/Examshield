@@ -27,7 +27,10 @@ import {
   Mic,
   Maximize,
   Camera,
-  Layers
+  Layers,
+  Plus,
+  Minus,
+  LayoutGrid
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 import './CreateExam.css';
@@ -252,6 +255,51 @@ export default function CreateExam() {
     }
   });
 
+  // ── Multi-Section State ──
+  const [sectionsEnabled, setSectionsEnabled] = useState(false);
+  const [sections, setSections] = useState([
+    { id: 'sec-1', name: 'Section A', marks: 30, timeLimit: 20 },
+    { id: 'sec-2', name: 'Section B', marks: 20, timeLimit: 15 },
+  ]);
+
+  const addSection = () => {
+    const nextLetter = String.fromCharCode(65 + sections.length); // A=65
+    setSections(s => [...s, {
+      id: `sec-${Date.now()}`,
+      name: `Section ${nextLetter}`,
+      marks: 10,
+      timeLimit: 10
+    }]);
+  };
+
+  const removeSection = (idx) => {
+    if (sections.length <= 1) return toast.error('At least one section is required');
+    const removedId = sections[idx].id;
+    setSections(s => s.filter((_, i) => i !== idx));
+    // Unassign questions from this section
+    setQuestions(qs => qs.map(q => q.sectionId === removedId ? { ...q, sectionId: null, sectionName: null } : q));
+  };
+
+  const updateSection = (idx, field, value) => {
+    setSections(s => s.map((sec, i) => {
+      if (i !== idx) return sec;
+      const updated = { ...sec, [field]: field === 'name' ? value : (parseInt(value) || 0) };
+      // If section name changed, update questions assigned to it
+      if (field === 'name') {
+        setQuestions(qs => qs.map(q => q.sectionId === sec.id ? { ...q, sectionName: value } : q));
+      }
+      return updated;
+    }));
+  };
+
+  const getQuestionsForSection = (sectionId) => {
+    return questions.filter(q => q.sectionId === sectionId);
+  };
+
+  const getUnassignedQuestions = () => {
+    return questions.filter(q => !q.sectionId);
+  };
+
   const toggleMonitoringOption = (key) => {
     setDetails(prev => ({
       ...prev,
@@ -318,12 +366,15 @@ export default function CreateExam() {
     toast.success('Exam schedule updated');
   };
 
-  const addQuestion = (type) => {
+  const addQuestion = (type, sectionId = null) => {
+    const section = sectionId ? sections.find(s => s.id === sectionId) : null;
     const base = {
       type,
       questionText: '',
       marks: type === 'mcq' ? 1 : (type === 'coding' ? 10 : 5),
-      difficulty: 'medium'
+      difficulty: 'medium',
+      sectionId: sectionId || null,
+      sectionName: section?.name || null
     };
     if (type === 'mcq') {
       base.options = [{id:'a',text:''},{id:'b',text:''},{id:'c',text:''},{id:'d',text:''}];
@@ -375,6 +426,22 @@ export default function CreateExam() {
 
     setLoading(true);
     try {
+      // Build sections payload if enabled
+      const sectionsPayload = sectionsEnabled ? sections.map(s => ({
+        id: s.id,
+        name: s.name,
+        marks: s.marks,
+        timeLimit: s.timeLimit,
+        questionCount: getQuestionsForSection(s.id).length
+      })) : null;
+
+      // Attach section info to each question
+      const enrichedQuestions = questions.map(q => ({
+        ...q,
+        sectionId: sectionsEnabled ? (q.sectionId || null) : null,
+        sectionName: sectionsEnabled ? (q.sectionName || null) : null
+      }));
+
       await adminAPI.createExam({
         ...details,
         dateTime: toISTISOString(details.dateTime),
@@ -382,7 +449,8 @@ export default function CreateExam() {
         totalMarks: totalCalc || parseInt(details.totalMarks),
         passingMarks: parseInt(details.passingMarks),
         duration: parseInt(details.duration),
-        questions,
+        questions: enrichedQuestions,
+        sections: sectionsPayload,
         studentIds: selectedStudents,
         monitoringConfig: details.monitoringConfig,
         monitoring_config: details.monitoringConfig,
@@ -696,6 +764,111 @@ export default function CreateExam() {
                     ℹ️ AI Proctoring is disabled for this exam. Candidates will not be monitored via webcam, microphone, or tab-switch detection.
                   </div>
                 )}
+
+                {/* ── Multi-Section Builder ── */}
+                <div className="admin-sections-toggle">
+                  <div className="admin-checkbox-group" style={{ marginBottom: 0 }}>
+                    <input
+                      type="checkbox"
+                      id="sections-enabled"
+                      checked={sectionsEnabled}
+                      onChange={() => setSectionsEnabled(v => !v)}
+                      className="admin-checkbox"
+                    />
+                    <label htmlFor="sections-enabled" className="admin-checkbox-label" style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                      <LayoutGrid size={18} color="#7c3aed" />
+                      Enable Multi-Section Exam
+                    </label>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 32 }}>
+                    Organize your exam into sections, each with its own time limit and marks allocation.
+                  </span>
+                </div>
+
+                {sectionsEnabled && (
+                  <div className="admin-sections-builder">
+                    <div className="admin-sections-builder-header">
+                      <div>
+                        <div className="admin-sections-builder-title">
+                          <LayoutGrid size={18} color="#7c3aed" />
+                          <span>Exam Sections</span>
+                        </div>
+                        <div className="admin-sections-builder-subtitle">
+                          Define your sections below. Questions will be assigned to these sections in the next step.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="admin-section-add-btn"
+                        onClick={addSection}
+                      >
+                        <Plus size={15} /> Add Section
+                      </button>
+                    </div>
+
+                    <div className="admin-sections-list">
+                      {sections.map((sec, idx) => (
+                        <div key={sec.id} className="admin-section-card">
+                          <div className="admin-section-card-header">
+                            <span className="admin-section-badge">{String.fromCharCode(65 + idx)}</span>
+                            <input
+                              type="text"
+                              value={sec.name}
+                              onChange={e => updateSection(idx, 'name', e.target.value)}
+                              className="admin-section-name-input"
+                              placeholder="Section Name"
+                            />
+                            {sections.length > 1 && (
+                              <button
+                                type="button"
+                                className="admin-section-remove-btn"
+                                onClick={() => removeSection(idx)}
+                                title="Remove section"
+                              >
+                                <Minus size={14} />
+                              </button>
+                            )}
+                          </div>
+                          <div className="admin-section-card-fields">
+                            <div className="admin-section-field">
+                              <label><Award size={13} /> Marks</label>
+                              <input
+                                type="number"
+                                value={sec.marks}
+                                onChange={e => updateSection(idx, 'marks', e.target.value)}
+                                min={1}
+                                className="admin-section-field-input"
+                              />
+                            </div>
+                            <div className="admin-section-field">
+                              <label><Clock size={13} /> Time (mins)</label>
+                              <input
+                                type="number"
+                                value={sec.timeLimit}
+                                onChange={e => updateSection(idx, 'timeLimit', e.target.value)}
+                                min={1}
+                                className="admin-section-field-input"
+                              />
+                            </div>
+                            <div className="admin-section-field">
+                              <label><FileText size={13} /> Questions</label>
+                              <span className="admin-section-q-count">{getQuestionsForSection(sec.id).length}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="admin-sections-summary">
+                      <span>Total: <strong>{sections.reduce((s, sec) => s + sec.marks, 0)} Marks</strong></span>
+                      <span style={{ margin: '0 12px', color: '#cbd5e1' }}>·</span>
+                      <span><strong>{sections.reduce((s, sec) => s + sec.timeLimit, 0)} Mins</strong> combined</span>
+                      <span style={{ margin: '0 12px', color: '#cbd5e1' }}>·</span>
+                      <span><strong>{sections.length}</strong> Sections</span>
+                    </div>
+                  </div>
+                )}
+
               </div>
             </div>
           )}
@@ -708,45 +881,162 @@ export default function CreateExam() {
                   <h2 className="admin-step-title">Questions</h2>
                   <p className="admin-questions-count">
                     {questions.length} Questions · {totalCalc} Marks
+                    {sectionsEnabled && (
+                      <span style={{ color: '#7c3aed', fontWeight: 700, marginLeft: 8 }}>
+                        ({sections.length} Sections)
+                      </span>
+                    )}
                   </p>
                 </div>
-                <div className="admin-questions-actions">
-                  {(details.type === 'mcq' || details.type === 'mixed') && (
-                    <Button variant="secondary" icon={HelpCircle} onClick={() => addQuestion('mcq')}>
-                      + MCQ
-                    </Button>
-                  )}
-                  {(details.type === 'subjective' || details.type === 'mixed') && (
-                    <Button variant="secondary" icon={Edit3} onClick={() => addQuestion('subjective')}>
-                      + Subjective
-                    </Button>
-                  )}
-                  {(details.type === 'coding' || details.type === 'mixed') && (
-                    <Button variant="secondary" icon={Code} onClick={() => addQuestion('coding')}>
-                      + Coding
-                    </Button>
-                  )}
-                </div>
+                {!sectionsEnabled && (
+                  <div className="admin-questions-actions">
+                    {(details.type === 'mcq' || details.type === 'mixed') && (
+                      <Button variant="secondary" icon={HelpCircle} onClick={() => addQuestion('mcq')}>
+                        + MCQ
+                      </Button>
+                    )}
+                    {(details.type === 'subjective' || details.type === 'mixed') && (
+                      <Button variant="secondary" icon={Edit3} onClick={() => addQuestion('subjective')}>
+                        + Subjective
+                      </Button>
+                    )}
+                    {(details.type === 'coding' || details.type === 'mixed') && (
+                      <Button variant="secondary" icon={Code} onClick={() => addQuestion('coding')}>
+                        + Coding
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {questions.length === 0 ? (
-                <div className="admin-empty-questions">
-                  <FileText size={48} />
-                  <h3>No questions yet</h3>
-                  <p>Add questions using the buttons above to get started.</p>
-                </div>
-              ) : (
-                <div className="admin-questions-list">
-                  {questions.map((q, i) =>
-                    q.type === 'mcq' ? (
-                      <MCQQuestionForm key={i} q={q} idx={i} onChange={updateQ} onRemove={removeQ} />
-                    ) : q.type === 'coding' ? (
-                      <CodingQuestionForm key={i} q={q} idx={i} onChange={updateQ} onRemove={removeQ} />
-                    ) : (
-                      <SubjectiveForm key={i} q={q} idx={i} onChange={updateQ} onRemove={removeQ} />
-                    )
+              {/* ── Section-Aware Question Builder ── */}
+              {sectionsEnabled ? (
+                <div className="admin-sections-questions">
+                  {sections.map((sec, secIdx) => {
+                    const secQuestions = getQuestionsForSection(sec.id);
+                    return (
+                      <div key={sec.id} className="admin-section-question-group">
+                        <div className="admin-section-question-group-header">
+                          <div className="admin-section-question-group-info">
+                            <span className="admin-section-badge-sm">{String.fromCharCode(65 + secIdx)}</span>
+                            <span className="admin-section-question-group-name">{sec.name}</span>
+                            <span className="admin-section-question-group-meta">
+                              {secQuestions.length} Qs · {sec.marks} Marks · {sec.timeLimit} min
+                            </span>
+                          </div>
+                          <div className="admin-questions-actions">
+                            {(details.type === 'mcq' || details.type === 'mixed') && (
+                              <button type="button" className="admin-section-add-q-btn" onClick={() => addQuestion('mcq', sec.id)}>
+                                <HelpCircle size={13} /> + MCQ
+                              </button>
+                            )}
+                            {(details.type === 'subjective' || details.type === 'mixed') && (
+                              <button type="button" className="admin-section-add-q-btn" onClick={() => addQuestion('subjective', sec.id)}>
+                                <Edit3 size={13} /> + Subjective
+                              </button>
+                            )}
+                            {(details.type === 'coding' || details.type === 'mixed') && (
+                              <button type="button" className="admin-section-add-q-btn" onClick={() => addQuestion('coding', sec.id)}>
+                                <Code size={13} /> + Coding
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {secQuestions.length === 0 ? (
+                          <div className="admin-section-empty-qs">
+                            <FileText size={28} color="#cbd5e1" />
+                            <span>No questions in this section yet. Use the buttons above to add.</span>
+                          </div>
+                        ) : (
+                          <div className="admin-questions-list">
+                            {secQuestions.map((q) => {
+                              const globalIdx = questions.findIndex(gq => gq === q);
+                              return q.type === 'mcq' ? (
+                                <MCQQuestionForm key={globalIdx} q={q} idx={globalIdx} onChange={updateQ} onRemove={removeQ} />
+                              ) : q.type === 'coding' ? (
+                                <CodingQuestionForm key={globalIdx} q={q} idx={globalIdx} onChange={updateQ} onRemove={removeQ} />
+                              ) : (
+                                <SubjectiveForm key={globalIdx} q={q} idx={globalIdx} onChange={updateQ} onRemove={removeQ} />
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Unassigned questions */}
+                  {getUnassignedQuestions().length > 0 && (
+                    <div className="admin-section-question-group unassigned">
+                      <div className="admin-section-question-group-header">
+                        <div className="admin-section-question-group-info">
+                          <span className="admin-section-badge-sm" style={{ background: '#fbbf24', color: '#78350f' }}>!</span>
+                          <span className="admin-section-question-group-name">Unassigned Questions</span>
+                          <span className="admin-section-question-group-meta">
+                            {getUnassignedQuestions().length} Qs — assign these to a section
+                          </span>
+                        </div>
+                      </div>
+                      <div className="admin-questions-list">
+                        {getUnassignedQuestions().map((q) => {
+                          const globalIdx = questions.findIndex(gq => gq === q);
+                          return (
+                            <div key={globalIdx} className="admin-unassigned-q-wrap">
+                              <div className="admin-unassigned-q-assign">
+                                <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Move to:</label>
+                                <select
+                                  value=""
+                                  onChange={e => {
+                                    const targetSec = sections.find(s => s.id === e.target.value);
+                                    if (targetSec) {
+                                      updateQ(globalIdx, { ...q, sectionId: targetSec.id, sectionName: targetSec.name });
+                                    }
+                                  }}
+                                  className="admin-section-field-input"
+                                  style={{ width: 140, fontSize: '0.78rem' }}
+                                >
+                                  <option value="">Select section</option>
+                                  {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                              </div>
+                              {q.type === 'mcq' ? (
+                                <MCQQuestionForm q={q} idx={globalIdx} onChange={updateQ} onRemove={removeQ} />
+                              ) : q.type === 'coding' ? (
+                                <CodingQuestionForm q={q} idx={globalIdx} onChange={updateQ} onRemove={removeQ} />
+                              ) : (
+                                <SubjectiveForm q={q} idx={globalIdx} onChange={updateQ} onRemove={removeQ} />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
+              ) : (
+                /* Non-sectioned question list (original) */
+                <>
+                  {questions.length === 0 ? (
+                    <div className="admin-empty-questions">
+                      <FileText size={48} />
+                      <h3>No questions yet</h3>
+                      <p>Add questions using the buttons above to get started.</p>
+                    </div>
+                  ) : (
+                    <div className="admin-questions-list">
+                      {questions.map((q, i) =>
+                        q.type === 'mcq' ? (
+                          <MCQQuestionForm key={i} q={q} idx={i} onChange={updateQ} onRemove={removeQ} />
+                        ) : q.type === 'coding' ? (
+                          <CodingQuestionForm key={i} q={q} idx={i} onChange={updateQ} onRemove={removeQ} />
+                        ) : (
+                          <SubjectiveForm key={i} q={q} idx={i} onChange={updateQ} onRemove={removeQ} />
+                        )
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -912,6 +1202,37 @@ export default function CreateExam() {
                   </div>
                 )}
               </div>
+
+              {/* Section Breakdown in Review */}
+              {sectionsEnabled && sections.length > 0 && (
+                <div className="admin-review-sections-card">
+                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <LayoutGrid size={16} color="#7c3aed" />
+                    <span>Exam Section Breakdown</span>
+                  </div>
+                  <div className="admin-review-sections-grid">
+                    {sections.map((sec, idx) => {
+                      const secQs = getQuestionsForSection(sec.id);
+                      return (
+                        <div key={sec.id} className="admin-review-section-item">
+                          <div className="admin-review-section-badge">{String.fromCharCode(65 + idx)}</div>
+                          <div className="admin-review-section-details">
+                            <div className="admin-review-section-name">{sec.name}</div>
+                            <div className="admin-review-section-stats">
+                              <span>{secQs.length} Questions</span>
+                              <span>{sec.marks} Marks</span>
+                              <span>{sec.timeLimit} Min</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: 10, fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                    Combined: {sections.reduce((s, sec) => s + sec.marks, 0)} Marks · {sections.reduce((s, sec) => s + sec.timeLimit, 0)} Minutes · {questions.length} Total Questions
+                  </div>
+                </div>
+              )}
 
               {details.instructions && (
                 <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px 20px' }}>
