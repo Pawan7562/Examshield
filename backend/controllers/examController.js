@@ -84,18 +84,21 @@ const formatQuestionForStudent = (q) => {
   }
 
   // Strictly filter for public test cases for the student payload
-  // Confidential hidden test cases must NEVER be leaked to student
   let studentVisibleCases = [];
   if (Array.isArray(parsedTestCases) && parsedTestCases.length > 0) {
     const explicitlyPublic = parsedTestCases.filter(tc => !tc.is_hidden && !tc.isHidden);
     if (explicitlyPublic.length > 0) {
       studentVisibleCases = explicitlyPublic;
     } else {
-      // If none explicitly marked, only expose the first 1 or 2 as public sample testcases
       studentVisibleCases = parsedTestCases.slice(0, 2).map(tc => ({ ...tc, is_hidden: false }));
     }
   } else if (Array.isArray(parsedExamples) && parsedExamples.length > 0) {
     studentVisibleCases = parsedExamples;
+  }
+
+  // If studentVisibleCases only has 1 case, check if parsedTestCases has more cases to show as sample cases
+  if (studentVisibleCases.length === 1 && Array.isArray(parsedTestCases) && parsedTestCases.length > 1) {
+    studentVisibleCases = parsedTestCases.slice(0, 2).map(tc => ({ ...tc, is_hidden: false }));
   }
 
   // Sanitize studentVisibleCases so that only input, output, and explanation are exposed
@@ -112,11 +115,56 @@ const formatQuestionForStudent = (q) => {
     (Array.isArray(parsedTestCases) && parsedTestCases.length > 0) ||
     (Array.isArray(parsedExamples) && parsedExamples.length > 0);
 
-  const cleanTitle = q.title || meta.title ||
-    (q.question_text ? q.question_text.split('\n')[0].replace(/^#+\s*/, '').replace(/^[Q0-9:.-]+\s*/, '') : 'Coding Challenge');
+  // Clean, concise LeetCode title
+  let cleanTitle = q.title || meta.title || '';
+  if (!cleanTitle && q.question_text) {
+    const firstLine = q.question_text.split('\n')[0].replace(/^#+\s*/, '').replace(/^[Q0-9:.-]+\s*/, '').trim();
+    if (firstLine.length > 50) {
+      if (/two\s*sum|indices of two|sum is equal to target|pair.*sum/i.test(q.question_text)) {
+        cleanTitle = 'Two Sum';
+      } else if (/palindrome/i.test(q.question_text)) {
+        cleanTitle = 'Valid Palindrome';
+      } else if (/parenthes/i.test(q.question_text)) {
+        cleanTitle = 'Valid Parentheses';
+      } else if (/binary\s*search/i.test(q.question_text)) {
+        cleanTitle = 'Binary Search';
+      } else {
+        const periodIdx = firstLine.indexOf('.');
+        cleanTitle = periodIdx > 10 && periodIdx < 45 ? firstLine.slice(0, periodIdx).trim() : 'Coding Assessment Problem';
+      }
+    } else {
+      cleanTitle = firstLine;
+    }
+  }
+  if (!cleanTitle) cleanTitle = 'Coding Challenge';
 
   const problemStatement = q.problemStatement || meta.problemStatement || q.question_text || 'Problem Statement';
   const totalTestCasesCount = Array.isArray(parsedTestCases) ? parsedTestCases.length : sanitizedSampleCases.length;
+
+  const difficulty = (q.difficulty || meta.difficulty || 'medium').toLowerCase();
+  const timeComplexity = q.timeComplexity || meta.timeComplexity || (difficulty === 'easy' ? 'O(n)' : difficulty === 'hard' ? 'O(n log n)' : 'O(n)');
+  const spaceComplexity = q.spaceComplexity || meta.spaceComplexity || (difficulty === 'easy' ? 'O(1)' : 'O(n)');
+
+  // Normalize constraints into an array of clean strings
+  let rawConstraints = Array.isArray(q.constraints) && q.constraints.length > 0
+    ? q.constraints
+    : (Array.isArray(meta.constraints) ? meta.constraints : (meta.constraints ? [meta.constraints] : (q.constraints ? [q.constraints] : [])));
+  let normalizedConstraints = [];
+  rawConstraints.forEach(c => {
+    if (typeof c === 'string' && c.includes('\n')) {
+      c.split('\n').map(s => s.trim()).filter(Boolean).forEach(s => normalizedConstraints.push(s));
+    } else if (c) {
+      normalizedConstraints.push(String(c).trim());
+    }
+  });
+  if (normalizedConstraints.length === 0) {
+    normalizedConstraints = [
+      '2 ≤ nums.length ≤ 10⁴',
+      '-10⁹ ≤ nums[i] ≤ 10⁹',
+      '-10⁹ ≤ target ≤ 10⁹',
+      'Only one valid answer exists.'
+    ];
+  }
 
   return {
     id: q.id,
@@ -125,7 +173,7 @@ const formatQuestionForStudent = (q) => {
     problemStatement: problemStatement,
     inputFormat: q.inputFormat || meta.inputFormat || '',
     outputFormat: q.outputFormat || meta.outputFormat || '',
-    constraints: Array.isArray(q.constraints) && q.constraints.length > 0 ? q.constraints : (Array.isArray(meta.constraints) ? meta.constraints : (meta.constraints ? [meta.constraints] : [])),
+    constraints: normalizedConstraints,
     examples: sanitizedSampleCases,
     sampleTestCases: sanitizedSampleCases,
     testCases: sanitizedSampleCases,
@@ -134,19 +182,22 @@ const formatQuestionForStudent = (q) => {
     hiddenTestCasesCount: Math.max(0, totalTestCasesCount - sanitizedSampleCases.length),
     hints: Array.isArray(q.hints) ? q.hints : (meta.hints || []),
     solutionApproach: q.solutionApproach || meta.solutionApproach || '',
-    timeComplexity: q.timeComplexity || meta.timeComplexity || '',
-    spaceComplexity: q.spaceComplexity || meta.spaceComplexity || '',
+    timeComplexity: timeComplexity,
+    spaceComplexity: spaceComplexity,
     allowedLanguages: q.allowedLanguages || meta.allowedLanguages || ['javascript', 'python', 'java', 'cpp'],
     executionFormat: q.executionFormat || meta.executionFormat || 'stdin_stdout',
     type: isCoding ? 'coding' : (q.type || 'mcq'),
     options: isCoding ? {
       ...meta,
+      title: cleanTitle,
       inputFormat: q.inputFormat || meta.inputFormat || '',
       outputFormat: q.outputFormat || meta.outputFormat || '',
-      constraints: Array.isArray(q.constraints) ? q.constraints : (meta.constraints || []),
+      constraints: normalizedConstraints,
       examples: sanitizedSampleCases,
       testCases: sanitizedSampleCases,
       totalTestCases: totalTestCasesCount,
+      timeComplexity: timeComplexity,
+      spaceComplexity: spaceComplexity,
       executionFormat: q.executionFormat || meta.executionFormat || 'stdin_stdout',
       allowedLanguages: q.allowedLanguages || meta.allowedLanguages || ['javascript', 'python', 'java', 'cpp']
     } : parsedOptions,
@@ -155,7 +206,7 @@ const formatQuestionForStudent = (q) => {
     code_template: q.code_template || q.codeTemplate || meta.codeTemplate || null,
     time_limit: q.time_limit || q.timeLimit || meta.timeLimit || 2000,
     memory_limit: q.memory_limit || q.memoryLimit || meta.memoryLimit || 256,
-    difficulty: q.difficulty || meta.difficulty || 'medium'
+    difficulty: difficulty
   };
 };
 
@@ -192,6 +243,7 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
           // Rich options payload (stores structured coding fields for pristine rendering)
           let optionsPayload;
           if (isCoding) {
+            const execMode = q.executionMode || q.execution_mode || (q.executionFormat === 'stdin_stdout' ? 'STANDARD_INPUT_OUTPUT' : 'FUNCTION_BASED');
             optionsPayload = JSON.stringify({
               title: q.title || '',
               problemStatement: q.problemStatement || q.problem_statement || questionText,
@@ -205,7 +257,14 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
               timeComplexity: q.timeComplexity || '',
               spaceComplexity: q.spaceComplexity || '',
               allowedLanguages: q.allowedLanguages || ['javascript', 'python', 'java', 'cpp'],
-              executionFormat: q.executionFormat || q.execution_format || 'stdin_stdout'
+              executionFormat: q.executionFormat || (execMode === 'FUNCTION_BASED' ? 'function' : 'stdin_stdout'),
+              executionMode: execMode,
+              className: q.className || q.class_name || 'Solution',
+              functionName: q.functionName || q.function_name || '',
+              parameters: Array.isArray(q.parameters) ? q.parameters : [],
+              returnType: q.returnType || q.return_type || 'void',
+              comparisonMode: q.comparisonMode || q.comparison_mode || 'EXACT',
+              tolerance: q.tolerance !== undefined ? Number(q.tolerance) : 0.0001,
             });
           } else {
             const options = q.options || [];
@@ -1878,6 +1937,11 @@ exports.startExam = async (req, res) => {
     
     // Transform questions to match frontend expectations
     const finalQuestions = questions.map(q => {
+      // If it's a coding question, preserve the full formatted object from formatQuestionForStudent
+      if (q.type === 'coding') {
+        return q;
+      }
+
       console.log('🔍 Transforming question:', {
         originalId: q.id,
         originalType: q.type,
@@ -1906,21 +1970,11 @@ exports.startExam = async (req, res) => {
         type: q.type || 'mcq',
         question_text: q.question_text || 'No question text',
         marks: q.marks || 1,
-        difficulty: 'medium', // Default since table doesn't have difficulty column
+        difficulty: q.difficulty || 'medium',
         options: parsedOptions,
         correctAnswer: q.correct_answer || null,
         order_index: q.order_index
       };
-      
-      console.log('📋 Transformed question:', {
-        id: transformedQuestion.id,
-        type: transformedQuestion.type,
-        hasText: !!transformedQuestion.question_text,
-        textLength: transformedQuestion.question_text?.length || 0,
-        hasOptions: !!transformedQuestion.options,
-        optionsCount: transformedQuestion.options?.length || 0,
-        firstOption: transformedQuestion.options?.[0]?.text || 'No options'
-      });
       
       return transformedQuestion;
     });

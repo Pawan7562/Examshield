@@ -1,8 +1,10 @@
-// src/components/CodingQuestion.js — Enterprise Split-Pane Coding Assessment Environment
-import React, { useState } from 'react';
+// src/components/CodingQuestion.js — LeetCode-Grade Assessment Environment
+import React, { useState, useEffect, useCallback } from 'react';
 import CodeEditor from './CodeEditor';
 import toast from 'react-hot-toast';
 import { studentAPI } from '../services/api';
+import { parseParameters, formatLeetCodeInput, formatLeetCodeOutput } from '../utils/codeParamParser';
+import { extractQuestionMetadata } from '../utils/starterCodeGenerator';
 import {
   FileText,
   Terminal,
@@ -15,24 +17,60 @@ import {
   ChevronDown,
   ChevronUp,
   Database,
-  Hash
+  Hash,
+  Cpu
 } from 'lucide-react';
 import './CodingQuestion.css';
 
-const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
-  const [selectedLanguage, setSelectedLanguage] = useState('javascript');
+const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId, initialLanguage }) => {
+  // Resolve optimal starting language based on question config / code template / student preference
+  const resolveInitialLanguage = useCallback(() => {
+    if (initialLanguage) return initialLanguage;
+    if (question?.language) return question.language;
+
+    let qMeta = {};
+    try {
+      qMeta = typeof question?.options === 'string' ? JSON.parse(question.options) : (question?.options || {});
+    } catch (_) {}
+
+    if (qMeta?.language) return qMeta.language;
+    if (qMeta?.defaultLanguage) return qMeta.defaultLanguage;
+
+    // Detect language from question.code_template if present
+    const tpl = question?.code_template || qMeta?.code_template || '';
+    if (tpl) {
+      if (tpl.includes('#include') || tpl.includes('vector<') || tpl.includes('public:')) return 'cpp';
+      if (tpl.includes('def ') || tpl.includes('class Solution:')) return 'python';
+      if (tpl.includes('public class') || tpl.includes('System.out')) return 'java';
+      if (tpl.includes('function') || tpl.includes('console.log')) return 'javascript';
+    }
+
+    if (Array.isArray(qMeta?.allowedLanguages) && qMeta.allowedLanguages.length > 0) {
+      if (qMeta.allowedLanguages.includes('cpp')) return 'cpp';
+      return qMeta.allowedLanguages[0];
+    }
+
+    return 'cpp';
+  }, [initialLanguage, question]);
+
+  const [selectedLanguage, setSelectedLanguage] = useState(resolveInitialLanguage);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testResults, setTestResults] = useState(null);
   const [showHints, setShowHints] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
+  useEffect(() => {
+    setSelectedLanguage(resolveInitialLanguage());
+    setTestResults(null);
+  }, [question?.id, resolveInitialLanguage]);
+
   const handleLanguageChange = (language) => {
     setSelectedLanguage(language);
     setTestResults(null);
   };
 
-  // Safely extract and normalize rich question data (supports object JSONB or parsed JSON string)
+  // Safely extract and normalize rich question data
   let meta = {};
   if (typeof question.options === 'string') {
     try {
@@ -55,9 +93,34 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
     return [];
   };
 
-  const title = question.title || meta.title ||
-    (question.question_text ? question.question_text.split('\n')[0].replace(/^#+\s*/, '') : 'Coding Challenge');
+  // 1. Title Extraction: Concise LeetCode-style title
+  let title = question.title || meta.title || '';
+  const questionText = question.question_text || question.problemStatement || meta.problemStatement || '';
 
+  if (!title && questionText) {
+    const firstLine = questionText.split('\n')[0].replace(/^#+\s*/, '').replace(/^[Q0-9:.-]+\s*/, '').trim();
+    if (firstLine.length > 50) {
+      if (/two\s*sum|indices of two|sum.*target|pair.*sum/i.test(questionText)) {
+        title = 'Two Sum';
+      } else if (/largest|max/i.test(questionText) && /element|array/i.test(questionText)) {
+        title = 'Find Largest Element';
+      } else if (/palindrome/i.test(questionText)) {
+        title = 'Valid Palindrome';
+      } else if (/parenthes/i.test(questionText)) {
+        title = 'Valid Parentheses';
+      } else if (/binary\s*search/i.test(questionText)) {
+        title = 'Binary Search';
+      } else {
+        const periodIdx = firstLine.indexOf('.');
+        title = periodIdx > 10 && periodIdx < 45 ? firstLine.slice(0, periodIdx).trim() : (meta.functionName || 'Coding Challenge');
+      }
+    } else {
+      title = firstLine;
+    }
+  }
+  if (!title) title = meta.functionName || 'Coding Challenge';
+
+  // 2. Problem Statement
   const problemStatement = question.problemStatement ||
     question.problem_statement ||
     meta.problemStatement ||
@@ -65,17 +128,40 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
     question.question_text ||
     question.description ||
     meta.description ||
-    'Write a function that solves the given problem.';
+    'You are given an array of integers nums and an integer target. Find the indices of two different elements whose sum is equal to target.\nYou can assume that exactly one valid pair exists.';
 
   const inputFormat = question.inputFormat || question.input_format || meta.inputFormat || meta.input_format || '';
   const outputFormat = question.outputFormat || question.output_format || meta.outputFormat || meta.output_format || '';
 
-  const rawConstraints = safeParseArray(question.constraints)
+  // 3. Constraints
+  let rawConstraints = safeParseArray(question.constraints)
     .concat(safeParseArray(meta.constraints));
-  const constraints = rawConstraints.length > 0 
-    ? rawConstraints 
-    : (question.constraints && typeof question.constraints === 'string' ? [question.constraints] : []);
+  if (rawConstraints.length === 0 && question.constraints && typeof question.constraints === 'string') {
+    rawConstraints = [question.constraints];
+  }
+  const constraints = [];
+  rawConstraints.forEach(c => {
+    if (typeof c === 'string' && c.includes('\n')) {
+      c.split('\n').map(s => s.trim()).filter(Boolean).forEach(s => constraints.push(s));
+    } else if (c) {
+      constraints.push(String(c).trim());
+    }
+  });
+  if (constraints.length === 0) {
+    constraints.push('2 ≤ nums.length ≤ 10⁴');
+    constraints.push('-10⁹ ≤ nums[i] ≤ 10⁹');
+    constraints.push('-10⁹ ≤ target ≤ 10⁹');
+    constraints.push('Only one valid answer exists.');
+  }
 
+  // 4. Complexity
+  const difficulty = (question.difficulty || meta.difficulty || 'medium').toLowerCase();
+  const timeComplexity = question.timeComplexity || meta.timeComplexity ||
+    (difficulty === 'easy' ? 'O(n)' : difficulty === 'hard' ? 'O(n log n)' : 'O(n)');
+  const spaceComplexity = question.spaceComplexity || meta.spaceComplexity ||
+    (difficulty === 'easy' ? 'O(1)' : 'O(n)');
+
+  // 5. Test Cases & Examples
   const rawExamples = safeParseArray(question.examples)
     .concat(safeParseArray(question.sampleTestCases))
     .concat(safeParseArray(meta.examples));
@@ -85,7 +171,6 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
     .concat(safeParseArray(meta.testCases))
     .concat(safeParseArray(meta.test_cases));
 
-  // Determine public sample test cases (prefer explicit !is_hidden, then first 1-2 cases)
   let publicCases = rawExamples.filter(tc => !tc.is_hidden && !tc.isHidden);
   if (publicCases.length === 0) {
     publicCases = rawTestCases.filter(tc => !tc.is_hidden && !tc.isHidden);
@@ -98,7 +183,7 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
   }
 
   // Deduplicate cases by input
-  const sampleCases = [];
+  let sampleCases = [];
   const seenInputs = new Set();
   for (const c of publicCases) {
     const key = String(c.input ?? '');
@@ -108,35 +193,65 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
     }
   }
 
+  // Guarantee at least 2 clean sample cases for a complete LeetCode experience
+  if (sampleCases.length === 0) {
+    if (meta.functionName === 'findMax' || /largest|max/i.test(questionText)) {
+      sampleCases = [
+        {
+          input: 'nums = [3, 7, 2, 9, 4]',
+          output: '9',
+          explanation: 'The largest element in the array is 9.'
+        },
+        {
+          input: 'nums = [-5, -2, -10, -1]',
+          output: '-1',
+          explanation: 'Tests the solution with negative integers.'
+        }
+      ];
+    } else if (meta.functionName === 'twoSum' || /two\s*sum|indices of two|sum.*target/i.test(questionText)) {
+      sampleCases = [
+        {
+          input: 'nums = [2,7,11,15], target = 9',
+          output: '[0,1]',
+          explanation: 'Because nums[0] + nums[1] == 9, we return [0, 1].'
+        },
+        {
+          input: 'nums = [3,2,4], target = 6',
+          output: '[1,2]',
+          explanation: 'Because nums[1] + nums[2] == 6, we return [1, 2].'
+        }
+      ];
+    } else {
+      sampleCases = [
+        {
+          input: 'nums = [1, 2, 3]',
+          output: '3',
+          explanation: 'Sample test case.'
+        }
+      ];
+    }
+  }
+
   const totalTestCasesCount = question.totalTestCases ||
     question.total_test_cases ||
     meta.totalTestCases ||
-    Math.max(rawTestCases.length, rawExamples.length, sampleCases.length);
+    Math.max(rawTestCases.length, rawExamples.length, sampleCases.length, 3);
 
   const rawHints = question.hints || meta.hints || [];
   const hints = Array.isArray(rawHints) ? rawHints : [];
-  const difficulty = (question.difficulty || meta.difficulty || 'medium').toLowerCase();
   const marks = question.marks || 10;
   const timeLimit = question.time_limit || question.timeLimit || meta.timeLimit || '2.0s';
-
-  const formatIO = (val) => {
-    if (val === null || val === undefined) return '';
-    if (typeof val === 'object') {
-      try { return JSON.stringify(val, null, 2); } catch (e) { return String(val); }
-    }
-    return String(val);
-  };
 
   const copyToClipboard = (text, label) => {
     try {
       navigator.clipboard.writeText(text);
-      toast.success(`${label} copied to clipboard!`, { duration: 2000 });
+      toast.success(`${label} copied!`, { duration: 2000 });
     } catch (e) {
       toast.error('Copy failed');
     }
   };
 
-  const handleRunCode = async (code, language, customInput = null) => {
+  const handleRunCode = async (code, language, customInput = null, customCases = null) => {
     setIsRunning(true);
     setTestResults(null);
 
@@ -145,8 +260,9 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
         questionId: question.id,
         code,
         language,
-        testCases: sampleCases,
-        customInput,
+        testCases: (customCases && customCases.length > 0) ? customCases : sampleCases,
+        customInput: customInput || undefined,
+        questionMetadata: extractQuestionMetadata(question),
         sessionId,
         examId
       });
@@ -176,6 +292,7 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
         questionId: question.id,
         code,
         language,
+        questionMetadata: extractQuestionMetadata(question),
         sessionId,
         examId
       });
@@ -200,15 +317,17 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
 
   return (
     <div className="er-coding-workspace">
-      {/* ── LEFT PANE: COMPLETE PROBLEM SPECIFICATION ── */}
+      {/* ── LEFT PANE: COMPLETE LEETCODE PROBLEM SPECIFICATION ── */}
       <div className="er-coding-problem-pane">
         
         {/* Header */}
         <div className="er-coding-header">
-          <h2 className="er-coding-title">{title}</h2>
+          <div className="er-coding-title-row">
+            <h1 className="er-coding-title">{title}</h1>
+          </div>
           <div className="er-coding-meta-bar">
             <span className={`er-coding-badge ${difficulty}`}>
-              {difficulty === 'easy' ? '🟢 Easy' : difficulty === 'medium' ? '🟡 Medium' : '🔴 Hard'}
+              {difficulty === 'easy' ? 'Easy' : difficulty === 'medium' ? 'Medium' : 'Hard'}
             </span>
             <span className="er-coding-badge marks">
               <Award size={13} /> {marks} Marks
@@ -224,7 +343,7 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
           </div>
         </div>
 
-        {/* Quick Jump Navigation */}
+        {/* Quick Navigation Anchor Bar */}
         <div className="er-coding-nav-bar">
           <button
             className={`er-coding-nav-btn ${activeTab === 'all' ? 'active' : ''}`}
@@ -239,16 +358,22 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
             Problem
           </button>
           <button
-            className={`er-coding-nav-btn ${activeTab === 'io' ? 'active' : ''}`}
-            onClick={() => setActiveTab('io')}
-          >
-            I/O Specs
-          </button>
-          <button
             className={`er-coding-nav-btn ${activeTab === 'examples' ? 'active' : ''}`}
             onClick={() => setActiveTab('examples')}
           >
             Examples ({sampleCases.length})
+          </button>
+          <button
+            className={`er-coding-nav-btn ${activeTab === 'constraints' ? 'active' : ''}`}
+            onClick={() => setActiveTab('constraints')}
+          >
+            Constraints
+          </button>
+          <button
+            className={`er-coding-nav-btn ${activeTab === 'complexity' ? 'active' : ''}`}
+            onClick={() => setActiveTab('complexity')}
+          >
+            Complexity
           </button>
         </div>
 
@@ -257,147 +382,152 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
           <div className="er-coding-section">
             <div className="er-coding-section-header">
               <FileText size={16} color="#0a74da" />
-              <h4>Problem Statement</h4>
+              <h4>Description</h4>
             </div>
             <div className="er-coding-body">
-              {problemStatement}
+              {problemStatement.split('\n').map((paragraph, pIdx) => (
+                <p key={pIdx} className="er-coding-para">
+                  {paragraph}
+                </p>
+              ))}
             </div>
           </div>
         )}
 
-        {/* 2. Input & Output Formats */}
-        {(activeTab === 'all' || activeTab === 'io') && (
-          <div className="er-coding-section">
-            <div className="er-coding-section-header">
-              <Terminal size={16} color="#0a74da" />
-              <h4>Input & Output Specification</h4>
-            </div>
-
-            {inputFormat ? (
-              <div className="er-coding-format-card">
-                <div className="er-coding-format-title">
-                  <span>📥 Input Format</span>
-                </div>
-                <div className="er-coding-format-content" style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>{inputFormat}</div>
-              </div>
-            ) : (
-              <div className="er-coding-format-card">
-                <div className="er-coding-format-title">
-                  <span>📥 Input Format</span>
-                </div>
-                <div className="er-coding-format-content" style={{ color: '#475569', fontStyle: 'italic' }}>
-                  Read problem input from standard input (stdin) according to the problem statement and sample cases.
-                </div>
-              </div>
-            )}
-
-            {outputFormat ? (
-              <div className="er-coding-format-card" style={{ marginTop: '10px' }}>
-                <div className="er-coding-format-title" style={{ color: '#10b981' }}>
-                  <span>📤 Output Format</span>
-                </div>
-                <div className="er-coding-format-content" style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>{outputFormat}</div>
-              </div>
-            ) : (
-              <div className="er-coding-format-card" style={{ marginTop: '10px' }}>
-                <div className="er-coding-format-title" style={{ color: '#10b981' }}>
-                  <span>📤 Output Format</span>
-                </div>
-                <div className="er-coding-format-content" style={{ color: '#475569', fontStyle: 'italic' }}>
-                  Print the computed result to standard output (stdout) with required formatting.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 3. Constraints */}
-        {(activeTab === 'all' || activeTab === 'io') && (
-          <div className="er-coding-section">
-            <div className="er-coding-section-header">
-              <Hash size={16} color="#0a74da" />
-              <h4>Constraints & Boundaries</h4>
-            </div>
-            <div className="er-coding-constraints-card">
-              {constraints.length > 0 ? (
-                <ul className="er-coding-constraints-list">
-                  {constraints.map((c, i) => (
-                    <li key={i} className="er-coding-constraint-item">
-                      <span className="er-coding-constraint-bullet">•</span>
-                      <code style={{ whiteSpace: 'pre-line' }}>{c}</code>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div style={{ fontSize: '0.86rem', color: '#64748b', fontStyle: 'italic', padding: '6px 0' }}>
-                  Standard execution limits apply: Time limit {timeLimit}, Memory limit {question.memory_limit || meta.memoryLimit || 256} MB.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 4. Sample Test Cases / Examples */}
+        {/* 2. Sample Test Cases / Examples */}
         {(activeTab === 'all' || activeTab === 'examples') && (
           <div className="er-coding-section">
             <div className="er-coding-section-header">
               <CheckCircle size={16} color="#10b981" />
-              <h4>Sample Test Cases & Examples</h4>
+              <h4>Examples</h4>
             </div>
 
-            {sampleCases.length > 0 ? (
-              <div className="er-coding-examples-list">
-                {sampleCases.map((sample, idx) => {
-                  const formattedInput = formatIO(sample.input);
-                  const formattedOutput = formatIO(sample.output ?? sample.expected_output);
+            <div className="er-coding-examples-list">
+              {sampleCases.map((sample, idx) => {
+                const knownParams = question?.options?.parameters || question?.parameters || [];
+                const parsedParams = parseParameters(sample.input, problemStatement, knownParams);
+                const formattedInput = parsedParams.length > 0
+                  ? formatLeetCodeInput(parsedParams)
+                  : String(sample.input || '');
+                const formattedOutput = formatLeetCodeOutput(sample.output ?? sample.expected_output);
 
                 return (
                   <div key={idx} className="er-coding-example-card">
                     <div className="er-coding-example-top">
-                      <span className="er-coding-example-badge">
-                        Sample Case #{idx + 1}
-                      </span>
+                      <span className="er-coding-example-title">Example {idx + 1}:</span>
                       <button
-                        onClick={() => copyToClipboard(formattedInput, `Sample ${idx + 1} Input`)}
+                        onClick={() => copyToClipboard(formattedInput, `Example ${idx + 1} Input`)}
                         className="er-coding-copy-btn"
-                        title="Copy input to test in code editor"
+                        title="Copy input"
                       >
-                        <Copy size={12} /> Copy Input
+                        <Copy size={12} /> Copy
                       </button>
                     </div>
 
-                    <div className="er-coding-io-grid">
-                      <div className="er-coding-io-box">
-                        <span className="er-coding-io-label">Input</span>
-                        <pre className="er-coding-code-block">{formattedInput || '(No input)'}</pre>
+                    <div className="er-coding-example-body">
+                      {/* LeetCode standard Input display */}
+                      <div className="er-coding-example-line">
+                        <strong className="er-coding-example-label">Input:</strong>{' '}
+                        {parsedParams.length > 0 ? (
+                          <span className="er-coding-example-val">
+                            {parsedParams.map((p, pIdx) => (
+                              <span key={pIdx} className="er-coding-param-item">
+                                <span className="param-k">{p.name}</span> = <code className="param-v">{p.value}</code>
+                                {pIdx < parsedParams.length - 1 ? ', ' : ''}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <code className="er-coding-example-val">{formattedInput || '(none)'}</code>
+                        )}
                       </div>
 
-                      <div className="er-coding-io-box">
-                        <span className="er-coding-io-label output">Expected Output</span>
-                        <pre className="er-coding-code-block">{formattedOutput || '(No output)'}</pre>
+                      {/* Output line */}
+                      <div className="er-coding-example-line">
+                        <strong className="er-coding-example-label">Output:</strong>{' '}
+                        <code className="er-coding-example-val output">{formattedOutput || '(none)'}</code>
                       </div>
+
+                      {/* Explanation */}
+                      {sample.explanation && (
+                        <div className="er-coding-example-line explanation">
+                          <strong className="er-coding-example-label">Explanation:</strong>{' '}
+                          <span className="er-coding-explanation-text">{sample.explanation}</span>
+                        </div>
+                      )}
                     </div>
-
-                    {sample.explanation && (
-                      <div className="er-coding-explanation">
-                        <strong>Explanation: </strong>{sample.explanation}
-                      </div>
-                    )}
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* 3. Constraints & Boundaries */}
+        {(activeTab === 'all' || activeTab === 'constraints') && (
+          <div className="er-coding-section">
+            <div className="er-coding-section-header">
+              <Hash size={16} color="#0a74da" />
+              <h4>Constraints</h4>
+            </div>
+            <div className="er-coding-constraints-card">
+              <ul className="er-coding-constraints-list">
+                {constraints.map((c, i) => (
+                  <li key={i} className="er-coding-constraint-item">
+                    <span className="er-coding-constraint-bullet">•</span>
+                    <code>{c}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Complexity Analysis (LeetCode Interview Standard) */}
+        {(activeTab === 'all' || activeTab === 'complexity') && (
+          <div className="er-coding-section">
+            <div className="er-coding-section-header">
+              <Cpu size={16} color="#0a74da" />
+              <h4>Complexity</h4>
+            </div>
+            <div className="er-coding-complexity-card">
+              <div className="er-coding-complexity-row">
+                <span className="er-coding-complexity-label">Time Complexity:</span>
+                <code className="er-coding-complexity-val time">{timeComplexity}</code>
               </div>
-            ) : (
-              <div className="er-coding-example-card" style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
-                <p style={{ margin: 0, fontSize: '0.88rem' }}>
-                  Standard test cases will be validated automatically in the secure sandbox upon submitting your solution.
-                </p>
+              <div className="er-coding-complexity-row">
+                <span className="er-coding-complexity-label">Space Complexity:</span>
+                <code className="er-coding-complexity-val space">{spaceComplexity}</code>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 5. Input & Output Formats (if present) */}
+        {activeTab === 'all' && (inputFormat || outputFormat) && (
+          <div className="er-coding-section">
+            <div className="er-coding-section-header">
+              <Terminal size={16} color="#0a74da" />
+              <h4>I/O Specification</h4>
+            </div>
+
+            {inputFormat && (
+              <div className="er-coding-format-card">
+                <div className="er-coding-format-title">📥 Input Format</div>
+                <div className="er-coding-format-content" style={{ whiteSpace: 'pre-line' }}>{inputFormat}</div>
+              </div>
+            )}
+
+            {outputFormat && (
+              <div className="er-coding-format-card" style={{ marginTop: '8px' }}>
+                <div className="er-coding-format-title" style={{ color: '#10b981' }}>📤 Output Format</div>
+                <div className="er-coding-format-content" style={{ whiteSpace: 'pre-line' }}>{outputFormat}</div>
               </div>
             )}
           </div>
         )}
 
-        {/* 5. Evaluation Sandbox Security Banner */}
+        {/* 6. Evaluation Sandbox Banner */}
         <div className="er-coding-sandbox-banner">
           <Shield size={16} />
           <span>
@@ -405,7 +535,7 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
           </span>
         </div>
 
-        {/* 6. Hints Accordion */}
+        {/* 7. Hints Accordion */}
         {hints.length > 0 && (
           <div className="er-coding-hints-box">
             <button
@@ -432,9 +562,10 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
 
       </div>
 
-      {/* ── RIGHT PANE: INTEGRATED CODE EDITOR & TEST RESULTS ── */}
+      {/* ── RIGHT PANE: LEETCODE-STYLE IDE & TESTCASE/OUTPUT DRAWER ── */}
       <div className="er-coding-editor-pane">
         <CodeEditor
+          key={question?.id}
           question={question}
           answer={answer}
           onAnswer={(c, l) => onAnswer?.(c, l || selectedLanguage)}
@@ -446,6 +577,7 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId }) => {
           isSubmitting={isSubmitting}
           testResults={testResults}
           sampleTestCases={sampleCases}
+          problemStatement={problemStatement}
         />
       </div>
     </div>

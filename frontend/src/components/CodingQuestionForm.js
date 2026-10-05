@@ -17,10 +17,73 @@ import {
   BookOpen,
   Info,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 
 const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
   const set = (k) => (e) => onChange(idx, { ...q, [k]: e.target.value });
+
+  const executionMode = q.executionMode || (q.executionFormat === 'stdin_stdout' ? 'STANDARD_INPUT_OUTPUT' : 'FUNCTION_BASED');
+
+  const setExecutionMode = (mode) => {
+    onChange(idx, {
+      ...q,
+      executionMode: mode,
+      executionFormat: mode === 'FUNCTION_BASED' ? 'function' : 'stdin_stdout',
+      className: q.className || 'Solution',
+      functionName: q.functionName || 'twoSum',
+      returnType: q.returnType || 'vector<int>',
+      parameters: q.parameters && q.parameters.length > 0 ? q.parameters : [
+        { name: 'nums', type: 'vector<int>' },
+        { name: 'target', type: 'int' }
+      ],
+      comparisonMode: q.comparisonMode || 'ARRAY',
+    });
+  };
+
+  const parameters = Array.isArray(q.parameters) ? q.parameters : (
+    executionMode === 'FUNCTION_BASED' ? [
+      { name: 'nums', type: 'vector<int>' },
+      { name: 'target', type: 'int' }
+    ] : []
+  );
+
+  const setParameter = (paramIdx, field, val) => {
+    const params = [...parameters];
+    params[paramIdx] = { ...params[paramIdx], [field]: val };
+    onChange(idx, { ...q, parameters: params });
+  };
+
+  const addParameter = () => {
+    const params = [...parameters];
+    params.push({ name: `param${params.length + 1}`, type: 'int' });
+    onChange(idx, { ...q, parameters: params });
+  };
+
+  const removeParameter = (paramIdx) => {
+    const params = [...parameters];
+    params.splice(paramIdx, 1);
+    onChange(idx, { ...q, parameters: params });
+  };
+
+  const generateStarterCode = () => {
+    const className = q.className || 'Solution';
+    const funcName = q.functionName || 'twoSum';
+    const retType = q.returnType || 'vector<int>';
+    const params = parameters.length > 0 ? parameters : [{ name: 'nums', type: 'vector<int>' }, { name: 'target', type: 'int' }];
+
+    const cppParams = params.map(p => {
+      const t = p.type || 'int';
+      return (t.includes('vector') || t.includes('string')) ? `${t}& ${p.name}` : `${t} ${p.name}`;
+    }).join(', ');
+
+    const starter = `class ${className} {\npublic:\n    ${retType} ${funcName}(${cppParams}) {\n        // Write your code here\n        \n    }\n};`;
+
+    onChange(idx, {
+      ...q,
+      codeTemplate: starter,
+    });
+  };
 
   const setTestCase = (i, field, value) => {
     const testCases = [...(q.testCases || [{ input: '', output: '', explanation: '', is_hidden: false }])];
@@ -365,7 +428,7 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
             </div>
           </div>
 
-          {/* Execution Format */}
+          {/* Execution Mode */}
           <div>
             <label style={{
               display: 'flex',
@@ -377,11 +440,11 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
               marginBottom: 6
             }}>
               <Terminal size={14} color="#0a74da" />
-              <span>EXECUTION RUNNER</span>
+              <span>EXECUTION MODE</span>
             </label>
             <select
-              value={q.executionFormat || 'stdin_stdout'}
-              onChange={set('executionFormat')}
+              value={executionMode}
+              onChange={(e) => setExecutionMode(e.target.value)}
               style={{
                 width: '100%',
                 background: '#ffffff',
@@ -396,12 +459,286 @@ const CodingQuestionForm = ({ q, idx, onChange, onRemove }) => {
                 boxSizing: 'border-box'
               }}
             >
-              <option value="stdin_stdout">Standard I/O (stdin &rarr; stdout)</option>
-              <option value="function">Function-based (LeetCode class Solution)</option>
+              <option value="FUNCTION_BASED">⚡ Function-based (LeetCode class Solution — Default)</option>
+              <option value="STANDARD_INPUT_OUTPUT">⌨️ Standard I/O (stdin → stdout with main())</option>
             </select>
           </div>
         </div>
       </div>
+
+      {/* ── Function-based Structured Metadata & Starter Code Panel ── */}
+      {executionMode === 'FUNCTION_BASED' && (
+        <div style={{
+          marginBottom: 20,
+          background: '#f8fafc',
+          border: '1.5px solid #cbd5e1',
+          borderRadius: 12,
+          padding: '16px 18px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 14,
+            flexWrap: 'wrap',
+            gap: 8
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                background: '#eff6ff',
+                color: '#2563eb',
+                padding: '4px 8px',
+                borderRadius: 6,
+                fontWeight: 800,
+                fontSize: '0.78rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5
+              }}>
+                <Zap size={13} /> FUNCTION SPECIFICATION
+              </div>
+              <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                Platform automatically wraps and executes test cases without requiring student main()
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={generateStarterCode}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: '#eff6ff',
+                border: '1.5px solid #93c5fd',
+                borderRadius: 8,
+                color: '#1d4ed8',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                padding: '6px 12px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Zap size={13} />
+              Auto-Generate Starter Code
+            </button>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: 12,
+            marginBottom: 14
+          }}>
+            <div>
+              <label style={{ fontSize: '0.76rem', fontWeight: 700, color: '#475569', marginBottom: 4, display: 'block' }}>
+                CLASS NAME
+              </label>
+              <input
+                type="text"
+                value={q.className || 'Solution'}
+                onChange={set('className')}
+                placeholder="Solution"
+                style={{
+                  width: '100%',
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: 8,
+                  padding: '7px 10px',
+                  fontSize: '0.82rem',
+                  fontFamily: 'monospace',
+                  color: '#0f172a',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.76rem', fontWeight: 700, color: '#475569', marginBottom: 4, display: 'block' }}>
+                FUNCTION NAME
+              </label>
+              <input
+                type="text"
+                value={q.functionName || 'twoSum'}
+                onChange={set('functionName')}
+                placeholder="twoSum"
+                style={{
+                  width: '100%',
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: 8,
+                  padding: '7px 10px',
+                  fontSize: '0.82rem',
+                  fontFamily: 'monospace',
+                  color: '#0f172a',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.76rem', fontWeight: 700, color: '#475569', marginBottom: 4, display: 'block' }}>
+                RETURN TYPE
+              </label>
+              <input
+                type="text"
+                value={q.returnType || 'vector<int>'}
+                onChange={set('returnType')}
+                placeholder="vector<int>, int, string, bool"
+                style={{
+                  width: '100%',
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: 8,
+                  padding: '7px 10px',
+                  fontSize: '0.82rem',
+                  fontFamily: 'monospace',
+                  color: '#0f172a',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.76rem', fontWeight: 700, color: '#475569', marginBottom: 4, display: 'block' }}>
+                OUTPUT COMPARATOR
+              </label>
+              <select
+                value={q.comparisonMode || 'ARRAY'}
+                onChange={set('comparisonMode')}
+                style={{
+                  width: '100%',
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: 8,
+                  padding: '7px 10px',
+                  fontSize: '0.82rem',
+                  color: '#0f172a',
+                  boxSizing: 'border-box'
+                }}
+              >
+                <option value="ARRAY">ARRAY (e.g. [0, 1])</option>
+                <option value="EXACT">EXACT (Strict stdout match)</option>
+                <option value="UNORDERED_ARRAY">UNORDERED_ARRAY (Order agnostic)</option>
+                <option value="INTEGER">INTEGER (Numeric equality)</option>
+                <option value="FLOAT_WITH_TOLERANCE">FLOAT_WITH_TOLERANCE (Epsilon)</option>
+                <option value="STRING">STRING (Trimmed text)</option>
+                <option value="BOOLEAN">BOOLEAN (true / false)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Parameters Section */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label style={{ fontSize: '0.76rem', fontWeight: 700, color: '#475569' }}>
+                PARAMETERS ({parameters.length})
+              </label>
+              <button
+                type="button"
+                onClick={addParameter}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#0a74da',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+              >
+                <Plus size={12} /> Add Parameter
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {parameters.map((p, pIdx) => (
+                <div key={pIdx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={p.name}
+                    onChange={(e) => setParameter(pIdx, 'name', e.target.value)}
+                    placeholder="Parameter name (e.g. nums)"
+                    style={{
+                      flex: 1,
+                      background: '#ffffff',
+                      border: '1.2px solid #cbd5e1',
+                      borderRadius: 6,
+                      padding: '6px 10px',
+                      fontSize: '0.8rem',
+                      fontFamily: 'monospace',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={p.type}
+                    onChange={(e) => setParameter(pIdx, 'type', e.target.value)}
+                    placeholder="Type (e.g. vector<int>)"
+                    style={{
+                      flex: 1,
+                      background: '#ffffff',
+                      border: '1.2px solid #cbd5e1',
+                      borderRadius: 6,
+                      padding: '6px 10px',
+                      fontSize: '0.8rem',
+                      fontFamily: 'monospace',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  {parameters.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeParameter(pIdx)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: 4
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#dc2626'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Starter Code Editor */}
+          <div>
+            <label style={{ fontSize: '0.76rem', fontWeight: 700, color: '#475569', marginBottom: 4, display: 'block' }}>
+              STARTER CODE / TEMPLATE (Given to candidates in editor)
+            </label>
+            <textarea
+              value={q.codeTemplate || ''}
+              onChange={set('codeTemplate')}
+              placeholder={`class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        \n    }\n};`}
+              rows={4}
+              style={{
+                width: '100%',
+                background: '#ffffff',
+                border: '1.2px solid #cbd5e1',
+                borderRadius: 8,
+                padding: '8px 12px',
+                fontSize: '0.82rem',
+                fontFamily: "'JetBrains Mono', Consolas, monospace",
+                color: '#0f172a',
+                boxSizing: 'border-box',
+                outline: 'none',
+                resize: 'vertical'
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Input & Output Formats ── */}
       <div style={{

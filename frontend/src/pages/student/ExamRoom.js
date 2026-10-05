@@ -5168,10 +5168,12 @@ export default function ExamRoom() {
           </div>
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', height: 'calc(100vh - 130px)', position: 'relative' }}>
             <SafeCodingQuestion
+              key={currentQuestion.id}
               question={currentQuestion}
               answer={answers[currentQuestion.id] || ''}
               sessionId={session?.id}
               examId={examId}
+              initialLanguage={languagesRef.current?.[currentQuestion.id] || currentQuestion.language || 'cpp'}
               onAnswer={(code, lang) => handleAnswer(currentQuestion.id, code, lang)}
             />
           </div>

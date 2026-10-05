@@ -239,7 +239,7 @@ export default function StudentDashboard() {
             <span className="sd-stat-label">Assigned Exams</span>
             <span className="sd-stat-value">{totalExams}</span>
             <span className="sd-stat-subtext">
-              <BookOpen size={13} color="#2563eb" /> Registered modules
+              <BookOpen size={13} color="#0a74da" /> Registered modules
             </span>
           </div>
           <div className="sd-stat-icon-wrap icon-blue">
@@ -302,7 +302,7 @@ export default function StudentDashboard() {
           <div className="sd-card">
             <div className="sd-card-header">
               <h2 className="sd-card-title">
-                <Calendar size={20} color="#2563eb" />
+                <Calendar size={20} color="#0a74da" />
                 <span>Scheduled Assessments</span>
               </h2>
               <button
@@ -511,7 +511,7 @@ export default function StudentDashboard() {
           <div className="sd-readiness-box">
             <div className="sd-readiness-header">
               <div className="sd-readiness-title">
-                <ShieldCheck size={18} color="#2563eb" />
+                <ShieldCheck size={18} color="#0a74da" />
                 <span>Pre-Flight Readiness</span>
               </div>
               <span className="sd-readiness-tag">
@@ -522,7 +522,7 @@ export default function StudentDashboard() {
             <div className="sd-check-list">
               <div className="sd-check-item">
                 <div className="sd-check-left">
-                  <Camera size={16} color="#2563eb" />
+                  <Camera size={16} color="#0a74da" />
                   <span>WebCam & AI Vision</span>
                 </div>
                 <span className="sd-check-status">Verified</span>
@@ -530,7 +530,7 @@ export default function StudentDashboard() {
 
               <div className="sd-check-item">
                 <div className="sd-check-left">
-                  <Mic size={16} color="#2563eb" />
+                  <Mic size={16} color="#0a74da" />
                   <span>Audio & Microphone</span>
                 </div>
                 <span className="sd-check-status">Calibrated</span>
@@ -538,7 +538,7 @@ export default function StudentDashboard() {
 
               <div className="sd-check-item">
                 <div className="sd-check-left">
-                  <Monitor size={16} color="#2563eb" />
+                  <Monitor size={16} color="#0a74da" />
                   <span>Fullscreen Security</span>
                 </div>
                 <span className="sd-check-status">Supported</span>
@@ -546,7 +546,7 @@ export default function StudentDashboard() {
 
               <div className="sd-check-item">
                 <div className="sd-check-left">
-                  <Wifi size={16} color="#2563eb" />
+                  <Wifi size={16} color="#0a74da" />
                   <span>Network Latency</span>
                 </div>
                 <span className="sd-check-status">Optimal (&lt;40ms)</span>
@@ -557,7 +557,7 @@ export default function StudentDashboard() {
           {/* Examination Protocol Guidelines */}
           <div className="sd-rules-box">
             <div className="sd-rules-title">
-              <AlertCircle size={16} color="#2563eb" />
+              <AlertCircle size={16} color="#0a74da" />
               <span>Assessment Protocol</span>
             </div>
             <div className="sd-rules-item">

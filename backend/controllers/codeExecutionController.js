@@ -46,6 +46,30 @@ function extractQuestionTestCases(questionRow) {
 }
 
 /**
+ * Extracts structured metadata (executionMode, className, functionName, parameters, etc.)
+ */
+function extractQuestionMetadata(questionRow, reqBodyMetadata = {}) {
+  let opts = {};
+  if (questionRow && questionRow.options) {
+    try {
+      opts = typeof questionRow.options === 'string'
+        ? JSON.parse(questionRow.options)
+        : (questionRow.options || {});
+    } catch (_) {}
+  }
+  const bodyMeta = (reqBodyMetadata && typeof reqBodyMetadata === 'object') ? reqBodyMetadata : {};
+  return {
+    executionMode: bodyMeta.executionMode || bodyMeta.execution_mode || bodyMeta.executionFormat || opts.executionMode || opts.execution_mode || opts.executionFormat,
+    className: bodyMeta.className || bodyMeta.class_name || opts.className || opts.class_name,
+    functionName: bodyMeta.functionName || bodyMeta.function_name || opts.functionName || opts.function_name,
+    parameters: (Array.isArray(bodyMeta.parameters) && bodyMeta.parameters.length > 0) ? bodyMeta.parameters : opts.parameters,
+    returnType: bodyMeta.returnType || bodyMeta.return_type || opts.returnType || opts.return_type,
+    comparisonMode: bodyMeta.comparisonMode || bodyMeta.comparison_mode || opts.comparisonMode || opts.comparison_mode,
+    tolerance: bodyMeta.tolerance ?? opts.tolerance ?? 0.0001,
+  };
+}
+
+/**
  * POST /api/student/run-code
  * Runs code against sample test cases or custom student input
  */
@@ -72,6 +96,25 @@ exports.runCode = async (req, res) => {
     let casesToRun = [];
     let timeLimitMs = 2000;
     let memoryLimitMb = 256;
+    let qRow = null;
+
+    if (questionId) {
+      try {
+        const qRes = await pool.query(
+          'SELECT id, test_cases, options, time_limit, memory_limit FROM questions WHERE id = $1',
+          [questionId]
+        );
+        if (qRes.rows.length > 0) {
+          qRow = qRes.rows[0];
+          timeLimitMs = qRow.time_limit || 2000;
+          memoryLimitMb = qRow.memory_limit || 256;
+        }
+      } catch (err) {
+        console.warn('Failed to query question in runCode:', err.message);
+      }
+    }
+
+    const questionMetadata = extractQuestionMetadata(qRow, req.body.questionMetadata || req.body.options || req.body.metadata);
 
     // If custom test case input is provided
     if (customInput !== null && customInput !== undefined && String(customInput).trim() !== '') {
@@ -82,22 +125,13 @@ exports.runCode = async (req, res) => {
       if (casesToRun.length === 0) {
         casesToRun = testCases.slice(0, 2).map(tc => ({ ...tc, is_hidden: false }));
       }
-    } else if (questionId) {
+    } else if (qRow) {
       // Fetch public sample test cases from database
-      const qRes = await pool.query(
-        'SELECT id, test_cases, options, time_limit, memory_limit FROM questions WHERE id = $1',
-        [questionId]
-      );
-      if (qRes.rows.length > 0) {
-        const qRow = qRes.rows[0];
-        timeLimitMs = qRow.time_limit || 2000;
-        memoryLimitMb = qRow.memory_limit || 256;
-        const allCases = extractQuestionTestCases(qRow);
-        casesToRun = allCases.filter(tc => !tc.is_hidden && !tc.isHidden).slice(0, 4);
-        if (casesToRun.length === 0 && allCases.length > 0) {
-          // If none explicitly marked, treat first 2 as sample
-          casesToRun = allCases.slice(0, 2).map(tc => ({ ...tc, is_hidden: false }));
-        }
+      const allCases = extractQuestionTestCases(qRow);
+      casesToRun = allCases.filter(tc => !tc.is_hidden && !tc.isHidden).slice(0, 4);
+      if (casesToRun.length === 0 && allCases.length > 0) {
+        // If none explicitly marked, treat first 2 as sample
+        casesToRun = allCases.slice(0, 2).map(tc => ({ ...tc, is_hidden: false }));
       }
     }
 
@@ -110,6 +144,7 @@ exports.runCode = async (req, res) => {
       memoryLimitMb,
       isSampleOnly: true,
       questionMarks: 10,
+      questionMetadata,
     });
 
     return res.json({
@@ -196,6 +231,7 @@ exports.submitCode = async (req, res) => {
     // 3. Extract authoritative test cases (public + hidden)
     const testCases = extractQuestionTestCases(question);
     const casesToRun = testCases.length > 0 ? testCases : [{ input: '', output: '', is_hidden: false }];
+    const questionMetadata = extractQuestionMetadata(question, req.body.questionMetadata || req.body.metadata);
 
     // 4. Run server-side evaluation across all test cases
     const evaluation = await evaluateTestCases(code, language, casesToRun, {
@@ -203,6 +239,7 @@ exports.submitCode = async (req, res) => {
       memoryLimitMb,
       isSampleOnly: false,
       questionMarks,
+      questionMetadata,
     });
 
     // 5. Persist submission in answers table (atomic upsert)
