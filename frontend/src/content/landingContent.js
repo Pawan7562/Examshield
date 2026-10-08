@@ -1,18 +1,18 @@
 /**
- * ExamShield — Centralized Landing Page Content & Statistics Source of Truth
+ * Nexify Examina — Centralized Landing Page Content & Statistics Source of Truth
  * All copy, metrics, links, and claims are consolidated here.
  * Any conflicting numbers are documented for administrative review.
  */
 
 export const BRAND_INFO = {
-  name: 'ExamShield',
-  legalName: 'ExamShield Inc.',
+  name: 'Nexify Examina',
+  legalName: 'Nexify Examina Inc.',
   tagline: 'Enterprise AI Exam Proctoring & Live Invigilation',
   foundedDate: 'Feb 2025',
   founder: 'Pawan Kumar Yadav',
   hqLocation: 'Mohali, Punjab, India',
   phone: '+91 9934290491',
-  email: 'support@examshield.com',
+  email: 'support@nexifyforge.in',
   website: 'https://exam.nexifyforge.in/',
   version: 'Enterprise v4.2',
   statusUptime: '99.98% Operational',
@@ -270,7 +270,7 @@ export const PROCTORING_ENGINES = [
     subtitle: '1:50 Multi-Feed Supervision',
     description: 'Proctors monitor dozens of active sessions concurrently on a responsive grid with automated AI risk prioritization that highlights suspicious candidates first.',
     badge: 'Live Operations',
-    tags: ['Multi-Stream Grid', 'Risk Priority Roster', 'Audio Whisper', 'Instant Session Freeze'],
+    tags: ['Multi-Stream Grid', 'Risk Priority Sorter', 'Audio Whisper', 'Instant Session Freeze'],
     iconName: 'Monitor',
     span: 'lg:col-span-2',
     accent: 'lime',
@@ -446,7 +446,7 @@ export const SECURITY_PILLARS = [
   {
     id: 'sandbox',
     title: 'Non-Invasive Browser Sandbox',
-    description: 'Zero kernel drivers, root access, or background daemons. ExamShield operates cleanly in standard browsers, ensuring personal devices are never compromised.',
+    description: 'Zero kernel drivers, root access, or background daemons. Nexify Examina operates cleanly in standard browsers, ensuring personal devices are never compromised.',
     iconName: 'Laptop',
     badge: 'Zero Kernel Drivers',
   },
@@ -469,7 +469,7 @@ export const INSTITUTIONAL_TESTIMONIALS = [
     role: 'Dean of Academic Examinations',
     institution: 'Apex Institute of Technology',
     stats: '12,000+ Finals Secured · 0 Disputes',
-    quote: 'ExamShield delivered seamless proctoring for our engineering finals with zero candidate lockouts. The synchronized video audit dossiers eliminated all grade dispute ambiguities before the academic senate.',
+    quote: 'Nexify Examina delivered seamless proctoring for our engineering finals with zero candidate lockouts. The synchronized video audit dossiers eliminated all grade dispute ambiguities before the academic senate.',
     tags: ['ABET Accredited', 'Canvas LTI 1.3', 'Engineering Cohort'],
   },
   {
@@ -480,7 +480,7 @@ export const INSTITUTIONAL_TESTIMONIALS = [
     role: 'Director of Assessment & Distance Learning',
     institution: 'State Medical & Health Sciences Board',
     stats: '86% Reduction in Proctor Overhead',
-    quote: 'Switching from intrusive software downloads to ExamShield’s zero-install browser kiosk cut our pre-exam support tickets by 86%. Our proctors love the AI-prioritized risk cockpit that flags looking-away incidents instantly.',
+    quote: 'Switching from intrusive software downloads to Nexify Examina’s zero-install browser kiosk cut our pre-exam support tickets by 86%. Our proctors love the AI-prioritized risk cockpit that flags looking-away incidents instantly.',
     tags: ['Clinical Pathology', 'HIPAA Aligned', 'Zero Kernel Driver'],
   },
   {
@@ -491,7 +491,7 @@ export const INSTITUTIONAL_TESTIMONIALS = [
     role: 'Head of Global Certifications',
     institution: 'Horizon Cyber Academy',
     stats: '99.98% Anomaly Precision',
-    quote: 'For high-stakes cloud security certifications, credential integrity is non-negotiable. ExamShield provided enterprise compliance, real-time whisper intercom, and bulletproof exam defensibility across our candidate base.',
+    quote: 'For high-stakes cloud security certifications, credential integrity is non-negotiable. Nexify Examina provided enterprise compliance, real-time whisper intercom, and bulletproof exam defensibility across our candidate base.',
     tags: ['Global InfoSec', 'AES-256 Cloud', '1:50 Proctoring'],
   },
   {
@@ -502,7 +502,7 @@ export const INSTITUTIONAL_TESTIMONIALS = [
     role: 'Controller of Examinations',
     institution: 'Metro State University System',
     stats: '18 Campus Halls Live on Single Radar',
-    quote: 'Managing 18 examination halls used to require dozens of invigilators on campus. With ExamShield’s centralized College Admin radar, a calibrated proctor team maintained higher vigilance than ever before.',
+    quote: 'Managing 18 examination halls used to require dozens of invigilators on campus. With Nexify Examina’s centralized College Admin radar, a calibrated proctor team maintained higher vigilance than ever before.',
     tags: ['18 Exam Halls', 'Banner ERP Sync', 'Multi-Dept Radar'],
   },
   {
@@ -524,7 +524,7 @@ export const INSTITUTIONAL_TESTIMONIALS = [
     role: 'Testing Committee Chair',
     institution: 'Chartered Legal & Financial Standards Institute',
     stats: 'Zero Student Privacy Complaints',
-    quote: 'Our candidates refused to install invasive kernel-level spyware. ExamShield’s browser kiosk lockdown and transparent warning alerts satisfied student privacy while completely stopping Alt+Tab cheating.',
+    quote: 'Our candidates refused to install invasive kernel-level spyware. Nexify Examina’s browser kiosk lockdown and transparent warning alerts satisfied student privacy while completely stopping Alt+Tab cheating.',
     tags: ['Browser Kiosk', 'FERPA Aligned', '3-Strike Alerts'],
   },
 ];
@@ -532,28 +532,28 @@ export const INSTITUTIONAL_TESTIMONIALS = [
 // Institutional FAQs
 export const INSTITUTIONAL_FAQS = [
   {
-    q: 'Does ExamShield require students to install extensions or invasive desktop apps?',
-    a: 'No. ExamShield is 100% web-based. It runs natively in Google Chrome, Microsoft Edge, Mozilla Firefox, and Apple Safari using HTML5 WebRTC, Canvas API, and Web Audio. Candidates do not need administrator privileges or invasive root-level software.',
+    q: 'Does Nexify Examina require students to install extensions or invasive desktop apps?',
+    a: 'No. Nexify Examina is 100% web-based. It runs natively in Google Chrome, Microsoft Edge, Mozilla Firefox, and Apple Safari using HTML5 WebRTC, Canvas API, and Web Audio. Candidates do not need administrator privileges or invasive root-level software.',
   },
   {
-    q: 'How does ExamShield handle unexpected internet drops during an active exam?',
-    a: 'ExamShield features an offline-resilient caching architecture. If a student’s connection temporarily drops, test progress and encrypted biometric timestamps continue locally in protected browser memory and automatically sync the moment connection is restored.',
+    q: 'How does Nexify Examina handle unexpected internet drops during an active exam?',
+    a: 'Nexify Examina features an offline-resilient caching architecture. If a student’s connection temporarily drops, test progress and encrypted biometric timestamps continue locally in protected browser memory and automatically sync the moment connection is restored.',
   },
   {
     q: 'How is candidate biometric data and exam video protected under privacy laws?',
-    a: 'ExamShield adheres strictly to FERPA, GDPR, and ISO 27001 data protection standards. All video feeds, audio recordings, and audit logs are encrypted using AES-256 at rest and TLS 1.3 in transit. Recordings are automatically deleted upon expiration of your institution’s retention window.',
+    a: 'Nexify Examina adheres strictly to FERPA, GDPR, and ISO 27001 data protection standards. All video feeds, audio recordings, and audit logs are encrypted using AES-256 at rest and TLS 1.3 in transit. Recordings are automatically deleted upon expiration of your institution’s retention window.',
   },
   {
     q: 'Can human invigilators intervene or whisper to candidates in real time?',
     a: 'Yes. The Invigilator Cockpit provides a discreet 1-on-1 private audio whisper feature and instant text alert broadcast. Invigilators can clarify instructions, issue calibrated warnings, or pause an exam session immediately without disrupting other candidates.',
   },
   {
-    q: 'Can ExamShield detect dual monitors, HDMI splitters, and screen-sharing tools?',
+    q: 'Can Nexify Examina detect dual monitors, HDMI splitters, and screen-sharing tools?',
     a: 'Yes. Our browser kiosk queries the display environment, flags multiple active display profiles, intercepts keyboard shortcuts (Alt+Tab, Windows key, Ctrl+C/V), prevents virtual machine access, and blocks desktop capture tools.',
   },
   {
     q: 'How does integration work with LMS platforms like Canvas, Moodle, and Blackboard?',
-    a: 'ExamShield natively supports LTI 1.3 standards. Instructors can attach ExamShield proctoring to existing assignments with a single toggle. Student rosters populate automatically and validated grades return directly to your LMS gradebook.',
+    a: 'Nexify Examina natively supports LTI 1.3 standards. Instructors can attach Nexify Examina proctoring to existing assignments with a single toggle. Student rosters populate automatically and validated grades return directly to your LMS gradebook.',
   },
 ];
 

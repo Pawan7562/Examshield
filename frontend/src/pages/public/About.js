@@ -11,7 +11,7 @@ import './About.css';
 
 /* ─── Data ─── */
 const milestones = [
-  { year: 'Feb 2025', title: 'Company Founded in Mohali', desc: 'ExamShield founded in Mohali, Punjab by Founder & CEO Pawan Kumar Yadav and core founding team (Prince, Suraj, Shruti, Sachin, Vishal) to engineer next-generation AI exam proctoring.' },
+  { year: 'Feb 2025', title: 'Company Founded in Mohali', desc: 'Nexify Examina founded in Mohali, Punjab by Founder & CEO Pawan Kumar Yadav and core founding team (Prince, Suraj, Shruti, Sachin, Vishal) to engineer next-generation AI exam proctoring.' },
   { year: 'Mar 2025', title: 'First Institutional Rollout', desc: 'Deployed real-time proctoring for campus entrance assessments and semester exams with zero candidate installation.' },
   { year: 'Jul 2025', title: 'Browser Kiosk Sandbox v1.0', desc: 'Released deep anti-tampering lockdown engine with automatic tab-switch detection, shortcut blocking, and second-monitor detection.' },
   { year: 'Oct 2025', title: '10+ Registered Institutions', desc: 'Crossed 10+ partner universities, polytechnic institutions, and engineering colleges across India with thousands of exams invigilated.' },
@@ -62,7 +62,7 @@ const leadership = [
   {
     name: 'Pawan Kumar Yadav',
     role: 'Founder & Chief Executive Officer (CEO)',
-    bio: 'Founder & CEO of ExamShield. Headquartered in Mohali, Punjab, Pawan steers company vision, institutional partnerships, and platform architecture to modernize college examinations.',
+    bio: 'Founder & CEO of Nexify Examina. Headquartered in Mohali, Punjab, Pawan steers company vision, institutional partnerships, and platform architecture to modernize college examinations.',
     initials: 'PK',
     color: 'green',
     linkedin: '#!',
@@ -102,7 +102,7 @@ const leadership = [
   {
     name: 'Vishal',
     role: 'Head of Infrastructure & Security',
-    bio: 'Architects ExamShield\'s zero-trust proctoring environment, anti-tampering browser kiosk guards, end-to-end data encryption, and cloud resilience.',
+    bio: 'Architects Nexify Examina\'s zero-trust proctoring environment, anti-tampering browser kiosk guards, end-to-end data encryption, and cloud resilience.',
     initials: 'VI',
     color: 'blue',
     linkedin: '#!',
@@ -138,7 +138,7 @@ export default function AboutPage() {
           Built to defend <span>every credential</span> earned honestly
         </h1>
         <p className="features-hero-sub">
-          ExamShield was founded in February 2025 in Mohali, Punjab by Founder & CEO Pawan Kumar Yadav alongside a passionate founding team. Today, we secure high-stakes examinations across 10+ registered partner institutions with AI-driven academic integrity.
+          Nexify Examina was founded in February 2025 in Mohali, Punjab by Founder & CEO Pawan Kumar Yadav alongside a passionate founding team. Today, we secure high-stakes examinations across 10+ registered partner institutions with AI-driven academic integrity.
         </p>
         <div className="features-hero-actions">
           <Link to="/admin/register" className="feat-cta-primary">
@@ -178,10 +178,10 @@ export default function AboutPage() {
               Academic credentials are the foundation of meritocracy. When credential fraud goes unchecked, it devalues the degrees of honest graduates, undermines employer trust, and corrodes the social contract that education is built on.
             </p>
             <p>
-              ExamShield exists to close that trust gap — not by creating an adversarial surveillance environment, but by building a fair, transparent, and privacy-respecting monitoring system that gives honest candidates confidence that their integrity is protected.
+              Nexify Examina exists to close that trust gap — not by creating an adversarial surveillance environment, but by building a fair, transparent, and privacy-respecting monitoring system that gives honest candidates confidence that their integrity is protected.
             </p>
             <Link to="/how-it-works" className="feat-cta-secondary" style={{ marginTop: 8, display: 'inline-flex' }}>
-              See How ExamShield Works
+              See How Nexify Examina Works
               <ChevronRight size={16} />
             </Link>
           </div>
@@ -194,7 +194,7 @@ export default function AboutPage() {
                 <div className="about-quote-avatar feat-icon-green" aria-hidden="true">PK</div>
                 <div>
                   <strong>Pawan Kumar Yadav</strong>
-                  <span>Founder & CEO, ExamShield</span>
+                  <span>Founder & CEO, Nexify Examina</span>
                 </div>
               </div>
             </div>
@@ -285,7 +285,7 @@ export default function AboutPage() {
             <p className="feat-kicker">COMPLIANCE</p>
             <h2 id="certs-heading">Certified for the strictest institutional requirements</h2>
             <p>
-              ExamShield has earned certifications across the most demanding data protection, security, and academic privacy standards globally. Our legal team maintains ongoing compliance documentation available to institutional partners.
+              Nexify Examina has earned certifications across the most demanding data protection, security, and academic privacy standards globally. Our legal team maintains ongoing compliance documentation available to institutional partners.
             </p>
             <Link to="/contact" className="feat-cta-primary" style={{ marginTop: 8, display: 'inline-flex' }}>
               Request Compliance Docs

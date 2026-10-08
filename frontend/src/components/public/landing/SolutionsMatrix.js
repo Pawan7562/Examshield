@@ -45,7 +45,7 @@ export default function SolutionsMatrix() {
             Tailored solutions for every stakeholder
           </h2>
           <p className="es-section-desc">
-            Whether managing university finals, high-stakes licensing, live invigilation, or taking an assessment, ExamShield is tuned to your workflow.
+            Whether managing university finals, high-stakes licensing, live invigilation, or taking an assessment, Nexify Examina is tuned to your workflow.
           </p>
         </div>
 

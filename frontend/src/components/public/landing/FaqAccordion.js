@@ -19,7 +19,7 @@ export default function FaqAccordion() {
             <span>FREQUENTLY ASKED QUESTIONS</span>
           </div>
           <h2 id="faq-heading" className="es-section-title">
-            Everything you need to know about ExamShield
+            Everything you need to know about Nexify Examina
           </h2>
           <p className="es-section-desc">
             Common questions from academic deans, IT administrators, and testing coordinators.

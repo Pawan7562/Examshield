@@ -79,7 +79,7 @@ exports.getStudents = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized college session' });
     }
 
-    const { limit = 50, search = '', page = 1 } = req.query;
+    const { limit = 50, search = '', page = 1, department } = req.query;
     const actualLimit = Math.min(Math.max(1, parseInt(limit) || 15), 500);
     const actualPage = Math.max(1, parseInt(page) || 1);
     const actualOffset = (actualPage - 1) * actualLimit;
@@ -92,6 +92,20 @@ exports.getStudents = async (req, res) => {
       whereClause += ` AND (name ILIKE $${params.length} OR email ILIKE $${params.length} OR student_id ILIKE $${params.length} OR roll_no ILIKE $${params.length})`;
     }
 
+    if (department && department.trim() && department.toLowerCase() !== 'all') {
+      if (department.toLowerCase() === 'unassigned') {
+        whereClause += ` AND (department IS NULL OR TRIM(department) = '')`;
+      } else {
+        const cleanDept = department.trim();
+        if (/^ai[\/&]?ml$/i.test(cleanDept.replace(/\s+/g, ''))) {
+          whereClause += ` AND (department ILIKE '%aiml%' OR department ILIKE '%ai&ml%' OR department ILIKE '%ai/ml%' OR department ILIKE '%aimml%')`;
+        } else {
+          params.push(`%${cleanDept}%`);
+          whereClause += ` AND department ILIKE $${params.length}`;
+        }
+      }
+    }
+
     const countPromise = pool.query(`SELECT COUNT(*)::int AS count FROM students ${whereClause}`, params);
     const queryParams = [...params, actualLimit, actualOffset];
     const studentsPromise = pool.query(`
@@ -102,9 +116,17 @@ exports.getStudents = async (req, res) => {
       LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}
     `, queryParams);
 
-    const [countResult, studentsResult] = await Promise.all([countPromise, studentsPromise]);
+    const deptsPromise = pool.query(`
+      SELECT DISTINCT department 
+      FROM students 
+      WHERE college_id = $1 AND department IS NOT NULL AND TRIM(department) != ''
+      ORDER BY department ASC
+    `, [collegeId]);
+
+    const [countResult, studentsResult, deptsResult] = await Promise.all([countPromise, studentsPromise, deptsPromise]);
     const total = countResult.rows[0]?.count || 0;
     const students = studentsResult.rows || [];
+    const departments = (deptsResult.rows || []).map(r => r.department);
     const totalPages = Math.ceil(total / actualLimit);
 
     res.json({
@@ -112,6 +134,7 @@ exports.getStudents = async (req, res) => {
       data: {
         students,
         total,
+        departments,
         pagination: {
           page: actualPage,
           limit: actualLimit,

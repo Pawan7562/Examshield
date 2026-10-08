@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import logoImg from '../../assets/logo.png';
+import logoImg from '../../assets/logo-mark.png';
 import '../../pages/super-admin/SuperAdmin.css';
 
 export default function SuperAdminLayout() {
@@ -81,10 +81,10 @@ export default function SuperAdminLayout() {
       <aside className={`sa-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
         {/* Brand Header */}
         <Link to="/super-admin/dashboard" className="sa-sidebar-brand" onClick={() => setMobileOpen(false)}>
-          <img src={logoImg} alt="ExamShield Logo" className="sa-brand-logo" />
+          <img src={logoImg} alt="Nexify Examina Logo" className="sa-brand-logo" />
           <div className="sa-brand-text-stack">
             <span className="sa-brand-title">
-              Exam<span>Shield</span>
+              Nexify<span>Examina</span>
             </span>
             <span className="sa-brand-badge">
               <span className="sa-pulse-bullet" />

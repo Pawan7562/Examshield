@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import ThemeToggle from '../../ui/ThemeToggle';
-import logoImg from '../../../assets/logo.png';
+import logoImg from '../../../assets/logo-mark.png';
 import { PORTAL_LINKS } from '../../../content/landingContent';
 
 const dashboardPathFor = (role) => {
@@ -82,7 +82,7 @@ export default function Navbar() {
     { label: 'How It Works', to: '/how-it-works' },
     { label: 'Institutions', href: isHome ? '#command-suite' : '/#command-suite' },
     { label: 'Security & Compliance', href: isHome ? '#security' : '/#security' },
-    { label: 'About ExamShield', to: '/about' },
+    { label: 'About Nexify Examina', to: '/about' },
     { label: 'Contact & Support', to: '/contact' },
   ];
 
@@ -101,10 +101,10 @@ export default function Navbar() {
 
         <div className="es-container es-navbar-container">
           {/* Brand Logo (Clean & Elegant) */}
-          <Link to="/" className="es-navbar-brand" aria-label="ExamShield home page">
-            <img src={logoImg} alt="ExamShield Logo" className="es-brand-logo-img" />
+          <Link to="/" className="es-navbar-brand" aria-label="Nexify Examina home page">
+            <img src={logoImg} alt="Nexify Examina Logo" className="es-brand-logo-img" />
             <span className="es-brand-name">
-              Exam<span className="es-brand-accent">Shield</span>
+              Nexify <span className="es-brand-accent">Examina</span>
             </span>
           </Link>
 
@@ -245,9 +245,9 @@ export default function Navbar() {
           <div className="es-mobile-drawer">
             <div className="es-mobile-drawer-header">
               <Link to="/" className="es-navbar-brand" onClick={() => setMobileMenuOpen(false)}>
-                <img src={logoImg} alt="ExamShield Logo" className="es-brand-logo-img" />
+                <img src={logoImg} alt="Nexify Examina Logo" className="es-brand-logo-img" />
                 <span className="es-brand-name">
-                  Exam<span className="es-brand-accent">Shield</span>
+                  Nexify <span className="es-brand-accent">Examina</span>
                 </span>
               </Link>
               <div className="es-drawer-header-actions">

@@ -314,11 +314,14 @@ body {
 }
 
 .brand-header-logo {
-  height: 32px;
-  width: auto;
-  border-radius: 4px;
+  height: 38px;
+  width: 38px;
+  border-radius: 9px;
   object-fit: contain;
-  mix-blend-mode: multiply;
+  background: #ffffff;
+  padding: 2.5px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
 }
 
 .brand-text-stack {
@@ -1076,9 +1079,14 @@ body {
 }
 
 .footer-brand-logo {
-  height: 36px;
-  width: auto;
-  border-radius: 6px;
+  height: 44px;
+  width: 44px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(16, 185, 129, 0.25);
 }
 
 .footer-brand-name {
@@ -1287,6 +1295,14 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-right: 140px; /* Ample clearance so floating AI button never obscures social links */
+}
+
+@media (max-width: 768px) {
+  .footer-social-links {
+    margin-right: 0;
+    margin-bottom: 60px;
+  }
 }
 
 .footer-social-icon {

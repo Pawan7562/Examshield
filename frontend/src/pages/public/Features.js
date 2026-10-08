@@ -478,9 +478,9 @@ export default function FeaturesPage() {
       <section className="public-shell feat-vs-section" aria-labelledby="vs-heading">
         <div className="feat-section-header">
           <p className="feat-kicker">PLATFORM COMPARISON</p>
-          <h2 id="vs-heading">ExamShield vs. the alternatives</h2>
+          <h2 id="vs-heading">Nexify Examina vs. the alternatives</h2>
           <p className="feat-section-sub">
-            See why leading institutions choose ExamShield over generic remote proctoring tools and paper-based methods.
+            See why leading institutions choose Nexify Examina over generic remote proctoring tools and paper-based methods.
           </p>
         </div>
         <div className="feat-vs-table-wrapper" role="region" aria-label="Feature comparison table">
@@ -491,7 +491,7 @@ export default function FeaturesPage() {
                 <th scope="col" className="feat-vs-col-es">
                   <div className="feat-vs-header-es">
                     <ShieldCheck size={16} aria-hidden="true" />
-                    ExamShield
+                    Nexify Examina
                   </div>
                 </th>
                 <th scope="col">Generic Proctoring</th>
@@ -591,7 +591,7 @@ export default function FeaturesPage() {
         <p className="integrations-kicker">NATIVE INTEGRATIONS</p>
         <h2 id="integrations-heading">Connects directly into your institutional ecosystem</h2>
         <p className="integrations-sub">
-          ExamShield plugs into your LMS, SIS, ERP, and identity systems via certified standards — no middleware, no bespoke IT project.
+          Nexify Examina plugs into your LMS, SIS, ERP, and identity systems via certified standards — no middleware, no bespoke IT project.
         </p>
         <div className="integrations-filter-tabs" role="tablist">
           {integrationGroups.map(g => (

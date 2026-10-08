@@ -20,6 +20,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import chatBotService from '../../services/chatBotService';
+import logoImg from '../../assets/logo-mark.png';
 import './ChatBot.css';
 
 // Audio feedback using Web Audio API
@@ -141,7 +142,7 @@ const renderInline = (str) => {
 const INITIAL_MESSAGE = {
   id: 'welcome',
   type: 'bot',
-  content: `Hello! 👋 Welcome to **ExamShield**. I am your dedicated AI Academic & Technical Assistant.\n\nI can assist you with:\n* **AI Proctoring & Anti-Cheat Controls** (Face mesh, audio analytics, kiosk lockdown)\n* **Student Exam Room & Login Assistance** (Camera check, timers, question navigation)\n* **College Admin Console** (Scheduling exams, student management, live cockpit)\n* **Online Coding Assessments** (Languages, test cases, sandboxed execution)\n* **Campus Governance & Security Architecture**\n\nHow can I help you today?`,
+  content: `Hello! 👋 Welcome to **Nexify Examina**. I am your dedicated AI Academic & Technical Assistant.\n\nI can assist you with:\n* **AI Proctoring & Anti-Cheat Controls** (Face mesh, audio analytics, kiosk lockdown)\n* **Student Exam Room & Login Assistance** (Camera check, timers, question navigation)\n* **College Admin Console** (Scheduling exams, student management, live cockpit)\n* **Online Coding Assessments** (Languages, test cases, sandboxed execution)\n* **Campus Governance & Security Architecture**\n\nHow can I help you today?`,
   timestamp: new Date(),
   suggestions: [
     'How does AI proctoring work?',
@@ -288,12 +289,14 @@ export default function ChatBot() {
             setIsMinimized(false);
             setHasUnread(false);
           }}
-          aria-label="Open ExamShield Support Chat"
+          aria-label="Open Nexify Examina Support Chat"
+          title="Ask Nexify Examina AI"
         >
           <div className="cb-launcher-icon">
-            <Bot size={24} />
+            <img src={logoImg} alt="Nexify Examina" className="cb-launcher-logo-img" />
           </div>
-          <span className="cb-launcher-text">Ask ExamShield AI</span>
+          <span className="cb-launcher-text">Ask AI</span>
+          <Sparkles size={13} className="cb-launcher-sparkle" aria-hidden="true" />
           <span className="cb-launcher-pulse" />
           {hasUnread && <span className="cb-launcher-badge">1</span>}
         </button>
@@ -306,17 +309,18 @@ export default function ChatBot() {
           <div className="cb-header">
             <div className="cb-header-brand">
               <div className="cb-header-avatar">
-                <Bot size={20} />
+                <img src={logoImg} alt="Nexify Examina" className="cb-avatar-logo-img" />
                 <span className="cb-status-beacon" />
               </div>
               <div className="cb-header-titles">
                 <div className="cb-header-title-row">
-                  <h3 className="cb-title">ExamShield AI Assistant</h3>
-                  <span className="cb-pro-badge">PRO v2.4</span>
+                  <h3 className="cb-title">Nexify Examina AI</h3>
+                  <span className="cb-pro-badge">PRO</span>
                 </div>
-                <p className="cb-subtitle">
-                  <span className="cb-live-dot" /> Instant Academic &amp; Proctoring Help
-                </p>
+                <div className="cb-subtitle">
+                  <span className="cb-live-dot" />
+                  <span>Academic &amp; Proctoring AI</span>
+                </div>
               </div>
             </div>
 
@@ -327,7 +331,7 @@ export default function ChatBot() {
                 title={soundEnabled ? 'Mute Chime' : 'Enable Chime'}
                 aria-label="Toggle Audio Feedback"
               >
-                {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
               </button>
 
               <button
@@ -336,7 +340,7 @@ export default function ChatBot() {
                 title="Download Chat Transcript"
                 aria-label="Export conversation"
               >
-                <Download size={15} />
+                <Download size={13} />
               </button>
 
               <button
@@ -345,7 +349,7 @@ export default function ChatBot() {
                 title="Reset Conversation"
                 aria-label="Clear chat"
               >
-                <RefreshCw size={14} />
+                <RefreshCw size={13} />
               </button>
 
               <button
@@ -354,7 +358,7 @@ export default function ChatBot() {
                 title={isMinimized ? 'Expand' : 'Minimize'}
                 aria-label="Minimize or Expand Chat"
               >
-                {isMinimized ? <Maximize2 size={15} /> : <Minimize2 size={15} />}
+                {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
               </button>
 
               <button
@@ -363,7 +367,7 @@ export default function ChatBot() {
                 title="Close Chat"
                 aria-label="Close Chat Window"
               >
-                <X size={16} />
+                <X size={14} />
               </button>
             </div>
           </div>
@@ -375,7 +379,7 @@ export default function ChatBot() {
                 {messages.map((msg) => (
                   <div key={msg.id} className={`cb-msg-row ${msg.type}`}>
                     <div className="cb-msg-avatar">
-                      {msg.type === 'bot' ? <Bot size={16} /> : <User size={16} />}
+                      {msg.type === 'bot' ? <img src={logoImg} alt="Nexify Examina AI" className="cb-msg-avatar-img" /> : <User size={14} />}
                     </div>
 
                     <div className="cb-msg-bubble-wrap">
@@ -457,7 +461,7 @@ export default function ChatBot() {
                           <span />
                           <span />
                         </div>
-                        <span className="cb-typing-status">ExamShield AI is writing...</span>
+                        <span className="cb-typing-status">Nexify Examina AI is writing...</span>
                       </div>
                     </div>
                   </div>
@@ -495,7 +499,7 @@ export default function ChatBot() {
                 </form>
 
                 <div className="cb-footer-hint">
-                  <span>Powered by ExamShield Neural AI</span>
+                  <span>Nexify Examina Neural AI</span>
                   <span className="cb-footer-dot">•</span>
                   <span>Press Enter ↵ to send</span>
                 </div>

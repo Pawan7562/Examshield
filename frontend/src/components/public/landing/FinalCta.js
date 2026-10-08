@@ -34,7 +34,7 @@ export default function FinalCta() {
           </h2>
 
           <p className="es-final-cta-desc">
-            Deploy ExamShield's autonomous AI cheating prevention, kiosk browser lockdown, and live invigilation command center. Pilot onboarding in under 48 hours.
+            Deploy Nexify Examina's autonomous AI cheating prevention, kiosk browser lockdown, and live invigilation command center. Pilot onboarding in under 48 hours.
           </p>
 
           <div className="es-final-cta-actions">

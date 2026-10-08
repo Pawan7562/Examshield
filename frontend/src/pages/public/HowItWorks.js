@@ -93,7 +93,7 @@ const lifecycle = [
 
 const faqs = [
   {
-    q: 'What does a student need to start an exam on ExamShield?',
+    q: 'What does a student need to start an exam on Nexify Examina?',
     a: 'Only a standard web browser (Chrome, Edge, Firefox, or Safari), a working webcam, a microphone, and a stable internet connection of at least 500 kbps. No plugins, no software downloads, no administrator permissions required.',
   },
   {
@@ -105,8 +105,8 @@ const faqs = [
     a: 'Yes. The Invigilator Cockpit displays a live grid of up to 50 candidate video tiles simultaneously, AI-sorted by risk score so the highest-priority sessions appear first. Proctors can also switch to a single-candidate focused view at any time.',
   },
   {
-    q: 'How does ExamShield handle unstable internet connections?',
-    a: 'ExamShield uses an offline-resilient caching architecture. If a student\'s connection drops temporarily, test progress and biometric timestamps are cached locally in encrypted browser storage and sync automatically when connection is restored.',
+    q: 'How does Nexify Examina handle unstable internet connections?',
+    a: 'Nexify Examina uses an offline-resilient caching architecture. If a student\'s connection drops temporarily, test progress and biometric timestamps are cached locally in encrypted browser storage and sync automatically when connection is restored.',
   },
   {
     q: 'What happens after a violation is detected?',
@@ -157,7 +157,7 @@ export default function HowItWorksPage() {
       <section className="public-shell hiw-lifecycle-section" aria-labelledby="lifecycle-heading">
         <div className="hiw-section-header">
           <p className="hiw-kicker">5-PHASE EXAMINATION LIFECYCLE</p>
-          <h2 id="lifecycle-heading">How every exam runs on ExamShield</h2>
+          <h2 id="lifecycle-heading">How every exam runs on Nexify Examina</h2>
           <p>Click any phase to explore what happens at each stage of the examination journey.</p>
         </div>
 
@@ -269,13 +269,13 @@ export default function HowItWorksPage() {
         <div className="hiw-section-header">
           <p className="hiw-kicker">PRIVACY & DATA GOVERNANCE</p>
           <h2 id="security-arch-heading">Security at every layer of the exam lifecycle</h2>
-          <p>ExamShield is architected so that AI-driven surveillance never compromises student privacy or institutional compliance obligations.</p>
+          <p>Nexify Examina is architected so that AI-driven surveillance never compromises student privacy or institutional compliance obligations.</p>
         </div>
         <div className="hiw-security-grid">
           {[
             { icon: LockKeyhole, title: 'AES-256 + TLS 1.3', desc: 'All video streams, audio recordings, and event logs encrypted at rest and in transit. Strictly isolated per-tenant storage.' },
             { icon: ShieldCheck, title: 'FERPA & GDPR Aligned', desc: 'Configurable data retention windows with automated deletion on expiry. No biometric data shared cross-institution.' },
-            { icon: Monitor, title: 'Non-Invasive Browser Only', desc: 'Zero kernel drivers, no background daemons, no root permissions. ExamShield runs cleanly inside the candidate\'s browser.' },
+            { icon: Monitor, title: 'Non-Invasive Browser Only', desc: 'Zero kernel drivers, no background daemons, no root permissions. Nexify Examina runs cleanly inside the candidate\'s browser.' },
             { icon: Users, title: 'Human Decision Gateway', desc: 'AI flags and sorts — humans decide. No candidate is disqualified based on an algorithm without invigilator review.' },
             { icon: Activity, title: 'Live Incident Audit Log', desc: 'Every proctor action, AI flag, and system event is immutably logged with ISO 8601 timestamps for governance review.' },
             { icon: AlertTriangle, title: 'No Proxy Test-Taking', desc: 'Continuous biometric verification every 500ms prevents substitution fraud even after initial check-in is completed.' },
@@ -330,7 +330,7 @@ export default function HowItWorksPage() {
           <div className="features-cta-left">
             <p className="features-cta-kicker">START IN 15 MINUTES</p>
             <h2 id="hiw-cta-heading">Ready to run your first<br />monitored exam?</h2>
-            <p>ExamShield handles every phase — from roster import to certified dossier — so your team can focus on education, not exam logistics.</p>
+            <p>Nexify Examina handles every phase — from roster import to certified dossier — so your team can focus on education, not exam logistics.</p>
           </div>
           <div className="features-cta-right">
             <div className="features-cta-card">

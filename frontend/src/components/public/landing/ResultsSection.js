@@ -37,7 +37,7 @@ export default function ResultsSection() {
             Validated by examination leaders across universities
           </h2>
           <p className="es-section-desc">
-            Read how academic deans, exam controllers, and certification boards deploy ExamShield to eliminate academic dishonesty and protect degree credibility.
+            Read how academic deans, exam controllers, and certification boards deploy Nexify Examina to eliminate academic dishonesty and protect degree credibility.
           </p>
         </div>
 

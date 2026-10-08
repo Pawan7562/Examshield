@@ -37,7 +37,7 @@ export default function SecurityCompliance() {
             Enterprise data privacy without compromise
           </h2>
           <p className="es-section-desc">
-            Institutions trust ExamShield because academic integrity must never come at the expense of student safety, privacy rights, or system security.
+            Institutions trust Nexify Examina because academic integrity must never come at the expense of student safety, privacy rights, or system security.
           </p>
         </div>
 

@@ -19,8 +19,8 @@ const teamCards = [
   {
     icon: Building2,
     name: 'Institutional Sales',
-    description: 'For university registrars, exam controllers, and academic IT teams exploring ExamShield for their campus.',
-    contact: 'sales@examshield.io',
+    description: 'For university registrars, exam controllers, and academic IT teams exploring Nexify Examina for their campus.',
+    contact: 'sales@nexifyforge.in',
     response: 'Within 4 business hours',
     color: 'green',
   },
@@ -28,7 +28,7 @@ const teamCards = [
     icon: Users,
     name: 'Technical Support',
     description: 'For existing institutional admins, faculty invigilators, or IT teams with integration or platform questions.',
-    contact: 'support@examshield.io',
+    contact: 'support@nexifyforge.in',
     response: '24/7 · Within 2 hours',
     color: 'blue',
   },
@@ -36,7 +36,7 @@ const teamCards = [
     icon: ShieldCheck,
     name: 'Enterprise & Compliance',
     description: 'For data protection officers, legal teams, and enterprise buyers requiring FERPA, GDPR, and ISO compliance documentation.',
-    contact: 'enterprise@examshield.io',
+    contact: 'enterprise@nexifyforge.in',
     response: 'Within 1 business day',
     color: 'orange',
   },
@@ -84,7 +84,7 @@ export default function Contact() {
           <span>Enterprise Sales & Support</span>
         </div>
         <h1 id="contact-hero-h1">
-          Talk to the ExamShield<br /><span>institutional team</span>
+          Talk to the Nexify Examina<br /><span>institutional team</span>
         </h1>
         <p className="contact-hero-sub">
           Whether you're a university registrar exploring our platform, an IT administrator setting up LMS integration, or a compliance officer reviewing our data governance posture — the right team is waiting.
@@ -142,7 +142,7 @@ export default function Contact() {
             <p>Our institutional team will route your message to the right specialist and respond within one business day.</p>
 
             <div className="contact-methods-list">
-              <a href="tel:+919934290491" className="contact-method-row" aria-label="Call ExamShield direct helpline">
+              <a href="tel:+919934290491" className="contact-method-row" aria-label="Call Nexify Examina direct helpline">
                 <div className="contact-method-icon-wrap green" aria-hidden="true">
                   <Phone size={18} />
                 </div>
@@ -153,13 +153,13 @@ export default function Contact() {
                 </div>
                 <ChevronRight size={16} className="contact-method-arrow" aria-hidden="true" />
               </a>
-              <a href="mailto:hello@examshield.io" className="contact-method-row" aria-label="Email ExamShield">
+              <a href="mailto:support@nexifyforge.in" className="contact-method-row" aria-label="Email Nexify Examina">
                 <div className="contact-method-icon-wrap blue" aria-hidden="true">
                   <Mail size={18} />
                 </div>
                 <div>
-                  <strong>Email Sales</strong>
-                  <span>hello@examshield.io</span>
+                  <strong>Email Sales & Support</strong>
+                  <span>support@nexifyforge.in</span>
                   <small>Response within 4 hours</small>
                 </div>
                 <ChevronRight size={16} className="contact-method-arrow" aria-hidden="true" />
@@ -284,7 +284,7 @@ export default function Contact() {
                   <label htmlFor="c-message">Message <span className="required-star">*</span></label>
                   <textarea
                     id="c-message" name="message" rows={5}
-                    placeholder="Tell us about your institution's exam setup, scale, current challenges, and what you'd like to achieve with ExamShield..."
+                    placeholder="Tell us about your institution's exam setup, scale, current challenges, and what you'd like to achieve with Nexify Examina..."
                     value={formState.message} onChange={handleChange} required
                   />
                 </div>

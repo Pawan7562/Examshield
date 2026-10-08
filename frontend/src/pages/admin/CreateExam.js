@@ -30,7 +30,11 @@ import {
   Layers,
   Plus,
   Minus,
-  LayoutGrid
+  LayoutGrid,
+  Building,
+  Target,
+  X,
+  Filter
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 import './CreateExam.css';
@@ -239,6 +243,7 @@ export default function CreateExam() {
     name: '', 
     type: 'mcq', 
     subject: '', 
+    targetDepartment: 'all',
     dateTime: toDateTimeLocalValue(new Date(Date.now() + 10 * 60000)), 
     duration: 60,
     totalMarks: 100, 
@@ -313,13 +318,20 @@ export default function CreateExam() {
   const [allStudents, setAllStudents] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [serverDepartments, setServerDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     adminAPI.getStudents({ limit: 500 })
-      .then(res => setAllStudents(res.data?.students || res.data?.data?.students || (Array.isArray(res.data) ? res.data : [])))
+      .then(res => {
+        const list = res.data?.students || res.data?.data?.students || (Array.isArray(res.data) ? res.data : []);
+        setAllStudents(list);
+        const depts = res.data?.departments || res.data?.data?.departments || [];
+        setServerDepartments(depts);
+      })
       .catch(() => {});
     
     // Handle questions passed from AI Generator (sessionStorage or location.state)
@@ -397,17 +409,105 @@ export default function CreateExam() {
   const updateQ = (idx, q) => setQuestions(qs => qs.map((old, i) => i === idx ? q : old));
   const removeQ = (idx) => setQuestions(qs => qs.filter((_, i) => i !== idx));
 
-  const toggleStudent = (id) => setSelectedStudents(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
-  const toggleAll = () => setSelectedStudents(s => s.length === allStudents.length ? [] : allStudents.map(s => s.id));
+  // Canonical department mapping and grouping
+  const canonicalDept = (dept) => {
+    if (!dept || !dept.trim()) return '';
+    const clean = dept.trim();
+    const upper = clean.toUpperCase().replace(/\s+/g, '');
+    if (upper === 'AIML' || upper === 'AI&ML' || upper === 'AIMML' || upper === 'AI/ML') return 'AIML';
+    if (upper === 'CSE' || upper === 'COMPUTERSCIENCE') return 'CSE';
+    if (upper === 'IT' || upper === 'INFORMATIONTECHNOLOGY') return 'IT';
+    if (upper === 'ECE' || upper === 'ELECTRONICS') return 'ECE';
+    if (upper === 'MECH' || upper === 'MECHANICAL') return 'Mechanical';
+    if (upper === 'CIVIL') return 'Civil';
+    return clean;
+  };
 
+  // Group counts per department
+  const departmentCounts = React.useMemo(() => {
+    const counts = {};
+    allStudents.forEach(s => {
+      const d = canonicalDept(s.department);
+      if (d) {
+        counts[d] = (counts[d] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [allStudents]);
+
+  const unassignedCount = React.useMemo(() => {
+    return allStudents.filter(s => !canonicalDept(s.department)).length;
+  }, [allStudents]);
+
+  const availableDepartments = React.useMemo(() => {
+    const set = new Set();
+    Object.keys(departmentCounts).forEach(d => set.add(d));
+    serverDepartments.forEach(d => {
+      const c = canonicalDept(d);
+      if (c) set.add(c);
+    });
+    return Array.from(set).sort();
+  }, [departmentCounts, serverDepartments]);
+
+  // Filter students based on selected department and search query
   const filteredStudents = allStudents.filter(s => {
+    const studentDept = canonicalDept(s.department);
+
+    // 1. Department filter
+    if (selectedDepartment !== 'all') {
+      if (selectedDepartment === 'Unassigned') {
+        if (studentDept !== '') return false;
+      } else {
+        if (studentDept.toLowerCase() !== selectedDepartment.toLowerCase() && 
+            (s.department || '').toLowerCase() !== selectedDepartment.toLowerCase()) {
+          return false;
+        }
+      }
+    }
+
+    // 2. Search query filter
     if (!studentSearch.trim()) return true;
     const q = studentSearch.toLowerCase();
     return (s.name || '').toLowerCase().includes(q) ||
       (s.email || '').toLowerCase().includes(q) ||
       (s.roll_no || '').toLowerCase().includes(q) ||
-      (s.student_id || '').toLowerCase().includes(q);
+      (s.student_id || '').toLowerCase().includes(q) ||
+      (s.department || '').toLowerCase().includes(q);
   });
+
+  const toggleStudent = (id) => setSelectedStudents(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+
+  // Filter-aware selection helpers
+  const areAllFilteredSelected = filteredStudents.length > 0 && 
+    filteredStudents.every(s => selectedStudents.includes(s.id));
+
+  const selectAllFiltered = () => {
+    const filteredIds = filteredStudents.map(s => s.id);
+    setSelectedStudents(prev => {
+      const set = new Set([...prev, ...filteredIds]);
+      return Array.from(set);
+    });
+  };
+
+  const deselectAllFiltered = () => {
+    const filteredIdSet = new Set(filteredStudents.map(s => s.id));
+    setSelectedStudents(prev => prev.filter(id => !filteredIdSet.has(id)));
+  };
+
+  const toggleFilteredAll = () => {
+    if (areAllFilteredSelected) {
+      deselectAllFiltered();
+    } else {
+      selectAllFiltered();
+    }
+  };
+
+  // Specific department targeting helper: sets selection to ONLY students of this department
+  const selectOnlyCurrentDepartment = () => {
+    const filteredIds = filteredStudents.map(s => s.id);
+    setSelectedStudents(filteredIds);
+    toast.success(`Selected ${filteredIds.length} candidate(s) specifically for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
+  };
 
   const totalCalc = questions.reduce((sum, q) => sum + (parseInt(q.marks) || 0), 0);
 
@@ -444,6 +544,10 @@ export default function CreateExam() {
 
       await adminAPI.createExam({
         ...details,
+        targetDepartment: details.targetDepartment || selectedDepartment,
+        department: (details.targetDepartment && details.targetDepartment !== 'all')
+          ? details.targetDepartment
+          : (selectedDepartment !== 'all' ? selectedDepartment : null),
         dateTime: toISTISOString(details.dateTime),
         status: 'published',
         totalMarks: totalCalc || parseInt(details.totalMarks),
@@ -518,6 +622,25 @@ export default function CreateExam() {
                     onChange={setD('subject')} 
                     placeholder="Computer Science" 
                   />
+                  <Input 
+                    label="Target Department" 
+                    as="select" 
+                    icon={Building}
+                    value={details.targetDepartment || 'all'} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDetails(d => ({ ...d, targetDepartment: val }));
+                      setSelectedDepartment(val);
+                    }} 
+                  >
+                    <option value="all">Campus-Wide (All Departments)</option>
+                    {availableDepartments.map(dept => (
+                      <option key={dept} value={dept}>{dept} Department</option>
+                    ))}
+                    {unassignedCount > 0 && (
+                      <option value="Unassigned">Unassigned Department</option>
+                    )}
+                  </Input>
                 </div>
                 <div className="admin-form-row">
                   <div style={{ flex: 1, minWidth: 260 }}>
@@ -1051,6 +1174,11 @@ export default function CreateExam() {
                   </h2>
                   <p className="admin-students-count">
                     <span>{selectedStudents.length} of {allStudents.length} Students Selected</span>
+                    {selectedDepartment !== 'all' && (
+                      <span className="admin-students-dept-filter-badge">
+                        · Dept: <strong>{selectedDepartment}</strong> ({filteredStudents.filter(s => selectedStudents.includes(s.id)).length}/{filteredStudents.length} selected)
+                      </span>
+                    )}
                     {selectedStudents.length > 0 && (
                       <span style={{ color: '#10b981', fontWeight: 700 }}>
                         ({Math.round((selectedStudents.length / (allStudents.length || 1)) * 100)}% enrolled)
@@ -1058,38 +1186,177 @@ export default function CreateExam() {
                     )}
                   </p>
                 </div>
-                <Button 
-                  variant="secondary" 
-                  onClick={toggleAll}
-                  className="admin-select-all-btn"
-                >
-                  {selectedStudents.length === allStudents.length ? 'Deselect All' : 'Select All'}
-                </Button>
+
+                <div className="admin-students-header-actions">
+                  {selectedDepartment !== 'all' && filteredStudents.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      onClick={selectOnlyCurrentDepartment}
+                      className="admin-select-dept-only-btn"
+                      title={`Assign ONLY ${selectedDepartment} students to this test`}
+                      icon={Target}
+                    >
+                      Only {selectedDepartment} ({filteredStudents.length})
+                    </Button>
+                  )}
+                  <Button 
+                    variant="secondary" 
+                    onClick={toggleFilteredAll}
+                    className="admin-select-all-btn"
+                  >
+                    {areAllFilteredSelected 
+                      ? (selectedDepartment === 'all' ? 'Deselect All' : `Deselect ${selectedDepartment}`) 
+                      : (selectedDepartment === 'all' ? 'Select All' : `Select All in ${selectedDepartment}`)}
+                  </Button>
+                </div>
               </div>
 
-              {/* Candidate Search Bar */}
+              {/* Department Quick Filter Tabs / Pills */}
+              <div className="admin-dept-filter-bar">
+                <div className="admin-dept-filter-heading">
+                  <Building size={15} />
+                  <span>Filter by Department:</span>
+                </div>
+                <div className="admin-dept-pills-row">
+                  <button
+                    type="button"
+                    className={`admin-dept-filter-pill ${selectedDepartment === 'all' ? 'active' : ''}`}
+                    onClick={() => setSelectedDepartment('all')}
+                  >
+                    <span>All Departments</span>
+                    <span className="admin-dept-pill-count">{allStudents.length}</span>
+                  </button>
+
+                  {availableDepartments.map(dept => {
+                    const count = departmentCounts[dept] || 0;
+                    const selectedCountInDept = allStudents.filter(s => canonicalDept(s.department) === dept && selectedStudents.includes(s.id)).length;
+                    return (
+                      <button
+                        key={dept}
+                        type="button"
+                        className={`admin-dept-filter-pill ${selectedDepartment === dept ? 'active' : ''}`}
+                        onClick={() => setSelectedDepartment(dept)}
+                      >
+                        <span>{dept}</span>
+                        <span className="admin-dept-pill-count">{count}</span>
+                        {selectedCountInDept > 0 && (
+                          <span className="admin-dept-pill-checked-dot" title={`${selectedCountInDept} selected`} />
+                        )}
+                      </button>
+                    );
+                  })}
+
+                  {unassignedCount > 0 && (
+                    <button
+                      type="button"
+                      className={`admin-dept-filter-pill ${selectedDepartment === 'Unassigned' ? 'active' : ''}`}
+                      onClick={() => setSelectedDepartment('Unassigned')}
+                    >
+                      <span>Unassigned</span>
+                      <span className="admin-dept-pill-count">{unassignedCount}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Candidate Search Bar & Quick Dropdown */}
               <div className="admin-students-toolbar">
+                <div className="admin-dept-select-wrap">
+                  <Building size={16} className="admin-dept-select-icon" />
+                  <select 
+                    value={selectedDepartment}
+                    onChange={(e) => setSelectedDepartment(e.target.value)}
+                    className="admin-dept-select-dropdown"
+                    aria-label="Department Filter"
+                  >
+                    <option value="all">All Departments ({allStudents.length})</option>
+                    {availableDepartments.map(dept => (
+                      <option key={dept} value={dept}>
+                        {dept} ({departmentCounts[dept] || 0})
+                      </option>
+                    ))}
+                    {unassignedCount > 0 && (
+                      <option value="Unassigned">Unassigned ({unassignedCount})</option>
+                    )}
+                  </select>
+                </div>
+
                 <div className="admin-student-search-box">
                   <Search size={16} className="admin-student-search-icon" />
                   <input 
                     type="text"
-                    placeholder="Search candidate name, roll number, student ID, or email..."
+                    placeholder={`Search candidate in ${selectedDepartment === 'all' ? 'all departments' : selectedDepartment}...`}
                     value={studentSearch}
                     onChange={(e) => setStudentSearch(e.target.value)}
                     className="admin-student-search-input"
                   />
+                  {studentSearch && (
+                    <button 
+                      type="button" 
+                      onClick={() => setStudentSearch('')} 
+                      className="admin-search-clear-btn"
+                      title="Clear search"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Department Active Filter Banner */}
+              {selectedDepartment !== 'all' && (
+                <div className="admin-dept-active-banner">
+                  <div className="admin-dept-active-text">
+                    <Building size={16} color="#0284c7" />
+                    <span>
+                      Filtering for <strong>{selectedDepartment} Department</strong> ({filteredStudents.length} candidate{filteredStudents.length !== 1 ? 's' : ''})
+                    </span>
+                  </div>
+                  <div className="admin-dept-active-actions">
+                    <button 
+                      type="button" 
+                      className="admin-dept-banner-btn"
+                      onClick={selectOnlyCurrentDepartment}
+                    >
+                      🎯 Conduct Test for {selectedDepartment} Only
+                    </button>
+                    <button 
+                      type="button" 
+                      className="admin-dept-banner-link"
+                      onClick={() => setSelectedDepartment('all')}
+                    >
+                      Show All Departments
+                    </button>
+                  </div>
+                </div>
+              )}
               
               <div className="admin-students-list">
                 {filteredStudents.length === 0 ? (
-                  <div style={{ gridColumn: '1 / -1', padding: '36px', textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: '12px' }}>
-                    No students match "{studentSearch}". Try a different search term.
+                  <div className="admin-students-empty-state">
+                    <div className="admin-empty-icon"><Building size={36} color="#94a3b8" /></div>
+                    <p className="admin-empty-title">
+                      No candidates found {selectedDepartment !== 'all' ? `in "${selectedDepartment}" department` : ''}
+                      {studentSearch ? ` matching "${studentSearch}"` : ''}
+                    </p>
+                    <div className="admin-empty-actions">
+                      {studentSearch && (
+                        <button type="button" onClick={() => setStudentSearch('')} className="admin-empty-action-btn">
+                          Clear Search
+                        </button>
+                      )}
+                      {selectedDepartment !== 'all' && (
+                        <button type="button" onClick={() => setSelectedDepartment('all')} className="admin-empty-action-btn primary">
+                          View All Departments
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   filteredStudents.map(s => {
                     const isSelected = selectedStudents.includes(s.id);
                     const initials = (s.name || 'ST').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+                    const dept = canonicalDept(s.department) || 'Unassigned';
                     return (
                       <label key={s.id} className={`admin-student-item ${isSelected ? 'selected' : ''}`}>
                         <input 
@@ -1102,7 +1369,13 @@ export default function CreateExam() {
                           {initials}
                         </div>
                         <div className="admin-student-info">
-                          <div className="admin-student-name" title={s.name}>{s.name}</div>
+                          <div className="admin-student-name-row">
+                            <span className="admin-student-name" title={s.name}>{s.name}</span>
+                            <span className={`admin-student-dept-tag ${dept === 'Unassigned' ? 'unassigned' : ''}`}>
+                              <Building size={10} />
+                              {dept}
+                            </span>
+                          </div>
                           <div className="admin-student-meta">
                             {s.student_id || s.roll_no ? `${s.student_id || ''}${s.student_id && s.roll_no ? ' · ' : ''}${s.roll_no || ''}` : s.email}
                           </div>
@@ -1122,11 +1395,18 @@ export default function CreateExam() {
                 <div className="admin-review-hero-info">
                   <div className="admin-review-hero-title">{details.name || 'Untitled Assessment'}</div>
                   <div className="admin-review-hero-sub">
-                    {details.subject ? `Subject: ${details.subject}` : 'Enterprise Assessment'} · Verified Configuration
+                    {details.subject ? `Subject: ${details.subject}` : 'Enterprise Assessment'} · 
+                    {selectedDepartment !== 'all' ? ` Target: ${selectedDepartment} Department` : ' Campus-Wide Examination'}
                   </div>
                 </div>
                 <div className="admin-review-hero-badges">
                   <span className="admin-review-pill type">{details.type} MODE</span>
+                  {selectedDepartment !== 'all' && (
+                    <span className="admin-review-pill dept">
+                      <Building size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                      {selectedDepartment} DEPT
+                    </span>
+                  )}
                   <span className="admin-review-pill proctor">
                     <Shield size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
                     {details.isProctored ? 'AI PROCTORING ACTIVE' : 'UNPROCTORED'}
@@ -1139,12 +1419,13 @@ export default function CreateExam() {
                   ['Exam Name', details.name || 'Untitled Exam', FileText],
                   ['Assessment Type', details.type.toUpperCase(), Settings],
                   ['Subject', details.subject || '—', BookOpen],
+                  ['Target Department', selectedDepartment !== 'all' ? `${selectedDepartment} Department` : (details.targetDepartment && details.targetDepartment !== 'all' ? `${details.targetDepartment} Department` : 'Campus-Wide (All Departments)'), Building],
                   ['Date & Time (IST)', details.dateTime ? formatIST(details.dateTime, 'full') : 'Not set', Calendar],
                   ['Duration', `${details.duration} Minutes`, Clock],
                   ['Total Marks', `${totalCalc || details.totalMarks} Marks`, Award],
                   ['Passing Score', `${details.passingMarks} Marks`, CheckCircle],
                   ['Questions Configured', `${questions.length} Questions`, HelpCircle],
-                  ['Candidates Enrolled', `${selectedStudents.length} Students`, Users],
+                  ['Candidates Enrolled', `${selectedStudents.length} Students ${selectedDepartment !== 'all' ? `(${selectedDepartment})` : ''}`, Users],
                   ['Proctoring Security', details.isProctored ? 'Webcam + Speech + Tab' : 'Disabled', Shield],
                 ].map(([key, value, Icon]) => (
                   <div key={key} className="admin-review-item">

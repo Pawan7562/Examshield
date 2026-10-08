@@ -211,6 +211,13 @@ export default function CommandCenter() {
 
                       {/* Synthetic Video Viewport */}
                       <div className="es-tile-feed">
+                        {/* Live video scan animation */}
+                        <div className="es-tile-scan-line" aria-hidden="true" />
+                        <span className="es-tile-cam-pill">
+                          <span className="es-ping-dot-xs" aria-hidden="true" />
+                          LIVE
+                        </span>
+
                         <div className={`es-tile-avatar ${cand.feedStatus === 'warning' ? 'looking-away' : 'focused'}`}>
                           <div className="es-avatar-face" />
                           <div className="es-avatar-body" />

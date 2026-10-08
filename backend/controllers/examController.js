@@ -708,6 +708,7 @@ exports.createExam = async (req, res) => {
       max_violations: examMaxViolations,
       monitoring_config: resolvedMonitoringConfig,
       college_id: collegeId,
+      department: req.body.department || req.body.targetDepartment || null,
       status: req.body.status || (questions && questions.length > 0 ? 'published' : 'draft')
     };
 

@@ -11,8 +11,6 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { PROCTORING_ENGINES, PORTAL_LINKS } from '../../../content/landingContent';
-import kioskImg from '../../../assets/kiosk-security-3d.jpg';
-import dossierImg from '../../../assets/forensic-dossier-3d.jpg';
 
 const getEngineIcon = (iconName) => {
   switch (iconName) {
@@ -79,29 +77,6 @@ export default function IntegrityFeatures() {
                   }}
                   aria-hidden="true"
                 />
-
-                {/* 3D Visual Media Preview */}
-                {(engine.id === 'kiosk-lockdown' || engine.id === 'browser-kiosk') && (
-                  <div className="es-bento-media-preview">
-                    <img
-                      src={kioskImg}
-                      alt="3D Kiosk Browser & System Lockdown sandbox architecture"
-                      loading="lazy"
-                    />
-                    <div className="es-media-preview-glow" aria-hidden="true" />
-                  </div>
-                )}
-
-                {(engine.id === 'forensic-dossier' || engine.id === 'dossier') && (
-                  <div className="es-bento-media-preview">
-                    <img
-                      src={dossierImg}
-                      alt="3D Cryptographic examination incident forensic dossier"
-                      loading="lazy"
-                    />
-                    <div className="es-media-preview-glow" aria-hidden="true" />
-                  </div>
-                )}
 
                 <div className="es-bento-top">
                   <div className="es-bento-icon-wrapper">

@@ -66,9 +66,18 @@ export default function DepartmentRadar() {
           {/* Cockpit Top Bar with Department Switcher Tabs */}
           <div className="es-cockpit-top-bar">
             <div className="es-cockpit-title-group">
-              <Building2 size={20} className="es-cockpit-icon" aria-hidden="true" />
+              <div className="es-radar-live-icon-wrap" aria-hidden="true">
+                <span className="es-radar-sweep-beam" />
+                <Building2 size={20} className="es-cockpit-icon" />
+              </div>
               <div>
-                <h3 className="es-cockpit-h3">University Examination Command Radar</h3>
+                <div className="es-cockpit-h3-wrap">
+                  <h3 className="es-cockpit-h3">University Examination Command Radar</h3>
+                  <span className="es-cockpit-live-pill">
+                    <span className="es-ping-dot" aria-hidden="true" />
+                    LIVE RADAR
+                  </span>
+                </div>
                 <span className="es-cockpit-sub">Real-Time Multi-Department Semester Session Monitoring</span>
               </div>
             </div>
@@ -211,7 +220,7 @@ export default function DepartmentRadar() {
           <div className="es-dept-cta-content">
             <h3 className="es-dept-cta-title">Ready to modernize your campus examination system?</h3>
             <p className="es-dept-cta-desc">
-              Empower your faculty, eliminate question leakage, and establish unassailable academic credentials with ExamShield.
+              Empower your faculty, eliminate question leakage, and establish unassailable academic credentials with Nexify Examina.
             </p>
           </div>
           <div className="es-dept-cta-actions">

@@ -120,6 +120,8 @@ export default function StudentManagement() {
   const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState('all');
+  const [departmentsList, setDepartmentsList] = useState([]);
   const [addModal, setAddModal] = useState(false);
   const [exams, setExams] = useState([]);
   const [credentialFallback, setCredentialFallback] = useState(null);
@@ -254,13 +256,21 @@ export default function StudentManagement() {
   const fetchStudents = async (page = 1, isBackground = false) => {
     if (!isBackground) setLoading(true);
     try {
-      const res = await adminAPI.getStudents({ page, limit: 15, search: search || undefined });
+      const res = await adminAPI.getStudents({ 
+        page, 
+        limit: 15, 
+        search: search || undefined,
+        department: selectedDeptFilter !== 'all' ? selectedDeptFilter : undefined
+      });
       const payload = res?.data || res;
       let list = payload?.students || payload?.data?.students || (Array.isArray(payload) ? payload : []);
       if (collegeId) {
         list = list.filter(s => !s.college_id || s.college_id === collegeId);
       }
       setStudents(list);
+      if (payload?.departments && Array.isArray(payload.departments)) {
+        setDepartmentsList(payload.departments);
+      }
       if (storageKey) {
         try { sessionStorage.setItem(storageKey, JSON.stringify(list)); } catch (_) {}
       }
@@ -301,6 +311,11 @@ export default function StudentManagement() {
     const t = setTimeout(() => fetchStudents(1, false), 250);
     return () => clearTimeout(t);
   }, [search]);
+
+  // Refetch when department filter changes
+  useEffect(() => {
+    fetchStudents(1, false);
+  }, [selectedDeptFilter]);
 
   const setFormField = (field) => (e) => {
     setForm(f => ({ ...f, [field]: e.target.value }));
@@ -621,9 +636,31 @@ export default function StudentManagement() {
                   placeholder="Search by name, email, roll number, or student ID..."
                 />
               </div>
-              <Button variant="secondary" icon={Filter}>
-                Filters
-              </Button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '200px' }}>
+                <Building size={16} color="#64748b" />
+                <select
+                  value={selectedDeptFilter}
+                  onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                  aria-label="Filter students by department"
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    width: '100%'
+                  }}
+                >
+                  <option value="all">All Departments</option>
+                  {departmentsList.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                  <option value="unassigned">Unassigned</option>
+                </select>
+              </div>
             </div>
           </div>
 
