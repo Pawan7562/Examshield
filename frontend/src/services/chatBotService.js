@@ -19,10 +19,10 @@ class ChatBotService {
 
   getOrInitSessionId() {
     try {
-      let stored = sessionStorage.getItem('examshield_chat_session_id');
+      let stored = sessionStorage.getItem('nexify_examina_chat_session_id');
       if (!stored) {
         stored = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        sessionStorage.setItem('examshield_chat_session_id', stored);
+        sessionStorage.setItem('nexify_examina_chat_session_id', stored);
       }
       return stored;
     } catch (e) {

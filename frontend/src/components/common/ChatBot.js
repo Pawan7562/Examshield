@@ -3,8 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Send,
-  Minimize2,
-  Maximize2,
   X,
   Bot,
   User,
@@ -12,9 +10,6 @@ import {
   Check,
   Sparkles,
   RefreshCw,
-  Download,
-  Volume2,
-  VolumeX,
   ExternalLink,
   Copy,
   ChevronRight
@@ -22,29 +17,6 @@ import {
 import chatBotService from '../../services/chatBotService';
 import logoImg from '../../assets/logo-mark.png';
 import './ChatBot.css';
-
-// Audio feedback using Web Audio API
-const playChime = (enabled) => {
-  if (!enabled || typeof window === 'undefined') return;
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
-    gain.gain.setValueAtTime(0.04, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.25);
-  } catch (e) {
-    // Ignore audio permission errors
-  }
-};
 
 // Markdown renderer for rich messages
 const FormattedMessage = ({ text }) => {
@@ -163,7 +135,6 @@ export default function ChatBot() {
   const [messages, setMessages] = useState([INITIAL_MESSAGE]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
   const [hasUnread, setHasUnread] = useState(false);
 
@@ -229,7 +200,6 @@ export default function ChatBot() {
         };
 
         setMessages((prev) => [...prev, botMessage]);
-        playChime(soundEnabled);
 
         if (!isOpen || isMinimized) {
           setHasUnread(true);
@@ -272,10 +242,6 @@ export default function ChatBot() {
   const handleClearChat = () => {
     chatBotService.clearHistory();
     setMessages([INITIAL_MESSAGE]);
-  };
-
-  const handleExport = () => {
-    chatBotService.exportHistory();
   };
 
   return (
@@ -326,39 +292,12 @@ export default function ChatBot() {
 
             <div className="cb-header-controls">
               <button
-                className={`cb-ctrl-btn ${soundEnabled ? 'active' : ''}`}
-                onClick={() => setSoundEnabled((prev) => !prev)}
-                title={soundEnabled ? 'Mute Chime' : 'Enable Chime'}
-                aria-label="Toggle Audio Feedback"
-              >
-                {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
-              </button>
-
-              <button
-                className="cb-ctrl-btn"
-                onClick={handleExport}
-                title="Download Chat Transcript"
-                aria-label="Export conversation"
-              >
-                <Download size={13} />
-              </button>
-
-              <button
                 className="cb-ctrl-btn"
                 onClick={handleClearChat}
                 title="Reset Conversation"
                 aria-label="Clear chat"
               >
                 <RefreshCw size={13} />
-              </button>
-
-              <button
-                className="cb-ctrl-btn"
-                onClick={() => setIsMinimized((prev) => !prev)}
-                title={isMinimized ? 'Expand' : 'Minimize'}
-                aria-label="Minimize or Expand Chat"
-              >
-                {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
               </button>
 
               <button

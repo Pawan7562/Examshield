@@ -6,10 +6,10 @@ const knowledgeBase = [
     id: 'ai_proctoring',
     intents: ['ai', 'proctoring', 'cheat', 'cheating', 'camera', 'face', 'webcam', 'biometric', 'mesh', 'looking away', 'multiple faces', 'person', 'detection'],
     title: 'Autonomous AI Proctoring & Biometric Verification',
-    summary: 'ExamShield uses continuous computer vision and biometric face mesh analytics to safeguard assessment integrity.',
+    summary: 'Nexify Examina uses continuous computer vision and biometric face mesh analytics to safeguard assessment integrity.',
     response: `### 🛡️ Autonomous AI Proctoring & Biometric Engine
 
-ExamShield delivers continuous, non-invasive assessment surveillance running **100% in-browser** via WebRTC and HTML5 Canvas:
+Nexify Examina delivers continuous, non-invasive assessment surveillance running **100% in-browser** via WebRTC and HTML5 Canvas:
 
 * **Biometric Face Mesh**: Maps 468 3D facial landmarks at 30 fps to ensure continuous candidate identity verification.
 * **Absence & Multi-Person Alerts**: Flags when a candidate leaves the camera frame or when unauthorized secondary individuals appear in the room.
@@ -36,7 +36,7 @@ All proctoring occurs client-side without storing biometric face templates, ensu
     summary: 'Enforces an impenetrable sandbox inside modern browsers without requiring invasive root-level software.',
     response: `### 🔒 Browser Kiosk Lockdown & Environment Sandboxing
 
-ExamShield transforms any standard modern browser into an enterprise-grade secure test kiosk without requiring kernel-level drivers:
+Nexify Examina transforms any standard modern browser into an enterprise-grade secure test kiosk without requiring kernel-level drivers:
 
 * **Fullscreen Enforcement**: Candidates must maintain fullscreen mode throughout the test. Any attempt to minimize or exit fullscreen triggers an immediate violation warning.
 * **Tab & Window Interception**: Detects tab-switching, app switching, window blur, and secondary application launches instantly.
@@ -60,7 +60,7 @@ ExamShield transforms any standard modern browser into an enterprise-grade secur
     summary: 'Monaco-powered coding sandbox supporting 20+ languages with automated test case evaluation.',
     response: `### 💻 Integrated Online Coding Assessment Platform
 
-ExamShield includes a full-featured, zero-distraction coding assessment environment designed for computer science and technical hiring:
+Nexify Examina includes a full-featured, zero-distraction coding assessment environment designed for computer science and technical hiring:
 
 * **Languages Supported**: Python, Java, C++, C, JavaScript, TypeScript, Go, Rust, C#, PHP, and Ruby.
 * **Monaco Code Editor**: Professional VS Code editing experience with syntax highlighting, auto-indentation, and bracket matching.
@@ -108,7 +108,7 @@ The College Admin portal empowers academic institutions and professors with comp
     summary: 'A seamless, friction-free test-taking experience from credential entry to auto-submission.',
     response: `### 🎓 Student Exam Experience & Instructions
 
-Taking an exam on ExamShield is designed to be streamlined, transparent, and fair:
+Taking an exam on Nexify Examina is designed to be streamlined, transparent, and fair:
 
 1. **Sign In**: Navigate to the **Student Portal** (\`/student/login\`) and enter your **Student ID/Email** and **Password** provided by your institution.
 2. **Select Assessment**: View your assigned exams on your Student Dashboard. Enter the unique **Exam Key** if required.
@@ -135,7 +135,7 @@ Taking an exam on ExamShield is designed to be streamlined, transparent, and fai
     summary: 'Instant password reset requests and self-serve governance between students and college admins.',
     response: `### 🔑 Student Password Recovery & Governance
 
-ExamShield provides a dedicated institutional password recovery protocol:
+Nexify Examina provides a dedicated institutional password recovery protocol:
 
 * **Forgot Password Link**: On the Student Login page, click **"Forgot Password?"** or visit \`/student-password/forgot\`.
 * **Submit Request**: Enter your registered **Student ID / Email** and your College Name to submit a verified password reset request.
@@ -159,7 +159,7 @@ ExamShield provides a dedicated institutional password recovery protocol:
     summary: 'Tamper-evident scoring, automated evaluation, and court-admissible audit reports.',
     response: `### 📊 Automated Evaluation & Forensic Audit Dossiers
 
-ExamShield provides mathematically accurate grading combined with comprehensive forensic audit records:
+Nexify Examina provides mathematically accurate grading combined with comprehensive forensic audit records:
 
 * **Automated MCQ & Coding Evaluation**: MCQ answers are scored instantly upon submission with zero human latency. Coding solutions run against unit test suites.
 * **Attempt Accuracy**: Tracks exact questions attempted, total questions answered, and score breakdown.
@@ -186,7 +186,7 @@ ExamShield provides mathematically accurate grading combined with comprehensive 
     summary: 'Custom proposals designed for universities, colleges, and testing boards.',
     response: `### 🏛️ Institutional Licensing & Custom Proposals
 
-ExamShield provides dedicated institutional partnerships tailored to your department or university scale:
+Nexify Examina provides dedicated institutional partnerships tailored to your department or university scale:
 
 * **Campus-Wide Deployment**: Unlimited department seats, dedicated compute isolation, and volume-based licensing.
 * **Turnkey LMS Integration**: LTI 1.3 single sign-on with Moodle, Canvas, and Blackboard.
@@ -210,7 +210,7 @@ To request a formal institutional proposal or schedule a faculty walkthrough, pl
     summary: '100% web-based. Zero software installations or administrative privileges required.',
     response: `### ⚙️ System Requirements & Platform Compatibility
 
-Because ExamShield runs natively in HTML5, WebRTC, and WebAssembly, candidate onboarding takes less than 30 seconds:
+Because Nexify Examina runs natively in HTML5, WebRTC, and WebAssembly, candidate onboarding takes less than 30 seconds:
 
 * **Supported Browsers**:
   * Google Chrome (v90+) — *Recommended*
@@ -243,7 +243,7 @@ Because ExamShield runs natively in HTML5, WebRTC, and WebAssembly, candidate on
     summary: 'Bank-grade 256-bit encryption, FERPA/GDPR compliance, and student privacy guarantees.',
     response: `### 🔐 Enterprise Security Architecture & Compliance
 
-ExamShield is engineered to comply with the strictest global educational and privacy standards:
+Nexify Examina is engineered to comply with the strictest global educational and privacy standards:
 
 * **End-to-End Encryption**: All video feeds, audio streams, and test data in transit are encrypted using TLS 1.3 / AES-256.
 * **Privacy-First AI**: Face mesh detection runs directly in the client browser memory. Biometric raw facial geometry is **never sold or persisted permanently**.
@@ -269,9 +269,9 @@ ExamShield is engineered to comply with the strictest global educational and pri
     summary: 'Seamless LTI 1.3 integration with automated roster sync and grade passback.',
     response: `### 🔄 LMS Integration & Enterprise Interoperability
 
-ExamShield connects directly into your existing academic IT infrastructure:
+Nexify Examina connects directly into your existing academic IT infrastructure:
 
-* **LTI 1.3 Certified**: Single Sign-On (SSO) allows students and faculty to launch ExamShield directly from **Moodle**, **Canvas**, **Blackboard Learn**, or **Brightspace D2L**.
+* **LTI 1.3 Certified**: Single Sign-On (SSO) allows students and faculty to launch Nexify Examina directly from **Moodle**, **Canvas**, **Blackboard Learn**, or **Brightspace D2L**.
 * **Automated Roster Synchronization**: One-click class list synchronization imports enrolled students, roll numbers, and emails without manual spreadsheets.
 * **Direct Gradebook Passback**: Validated, tamper-proof final grades and forensic integrity scores return automatically into your LMS course gradebook.
 * **REST API & Webhooks**: Robust developer APIs for universities wanting custom ERP/SIS connectors.`,
@@ -289,8 +289,8 @@ ExamShield connects directly into your existing academic IT infrastructure:
     id: 'demo_trial',
     intents: ['demo', 'trial', 'test', 'pilot', 'free trial', 'walkthrough', 'preview', 'schedule demo'],
     title: 'Schedule Walkthrough & Free Institutional Pilot',
-    summary: 'Experience ExamShield live with your faculty team.',
-    response: `### 🚀 Experience ExamShield: Live Demo & Pilot
+    summary: 'Experience Nexify Examina live with your faculty team.',
+    response: `### 🚀 Experience Nexify Examina: Live Demo & Pilot
 
 We offer immediate ways for your institution to experience the platform:
 
@@ -316,8 +316,8 @@ We offer immediate ways for your institution to experience the platform:
     id: 'company_leadership',
     intents: ['founder', 'ceo', 'pawan', 'pawan kumar', 'yadav', 'prince', 'suraj', 'shruti', 'sachin', 'vishal', 'team', 'leaders', 'leadership', 'mohali', 'headquarters', 'founded', 'feb 2025', 'institution', 'institutes', 'punjab'],
     title: 'Company Leadership & Mohali Headquarters',
-    summary: 'ExamShield founded Feb 2025 in Mohali by Founder & CEO Pawan Kumar Yadav and core team.',
-    response: `### 🏢 About ExamShield — Company & Leadership
+    summary: 'Nexify Examina founded Feb 2025 in Mohali by Founder & CEO Pawan Kumar Yadav and core team.',
+    response: `### 🏢 About Nexify Examina — Company & Leadership
 
 * **Founded**: **February 2025**
 * **Global Headquarters**: **Mohali, Punjab, India** (Phase 8B / Sector 74, Industrial Area — 160055)
@@ -332,14 +332,14 @@ We offer immediate ways for your institution to experience the platform:
 * **Sachin** — Head of AI & Machine Learning
 * **Vishal** — Head of Infrastructure & Security
 
-For institutional partnerships, campus rollouts, or direct meetings with leadership, call **+91 9934290491** or email **support@examshield.com**.`,
+For institutional partnerships, campus rollouts, or direct meetings with leadership, call **+91 9934290491** or email **support@nexifyforge.in**.`,
     suggestions: [
       'Schedule an Institutional Pilot',
       'Explore Platform Features',
       'Contact Founder Office'
     ],
     actions: [
-      { label: 'About ExamShield', url: '/about' },
+      { label: 'About Nexify Examina', url: '/about' },
       { label: 'Contact Founder Office', url: '/contact' }
     ]
   },
@@ -348,12 +348,12 @@ For institutional partnerships, campus rollouts, or direct meetings with leaders
     intents: ['contact', 'email', 'phone', 'support', 'helpdesk', 'office', 'call', 'ticket', 'reach', 'sales', '9934290491', 'helpline', 'number'],
     title: 'Support Desk, Direct Helpline & Office Details',
     summary: 'Direct line +91 9934290491, Mohali HQ, and 24/7 dedicated exam mission control.',
-    response: `### 📞 Contact ExamShield & Founder Helpline
+    response: `### 📞 Contact Nexify Examina & Founder Helpline
 
 Our team and headquarters in Mohali, Punjab are ready to assist you:
 
 * **Direct Phone Helpline**: **+91 9934290491** *(Mon–Sat, 9AM–7PM IST · CEO Office: Pawan Kumar Yadav)*
-* **Official Support Email**: \`support@examshield.com\`
+* **Official Support Email**: \`support@nexifyforge.in\`
 * **Global Headquarters**: Phase 8B / Sector 74, Industrial Area, **Mohali, Punjab — 160055**
 * **Regional Support Hub**: Technology Corridor, Mohali-Chandigarh, Punjab — 160071
 * **Traction**: Over 10+ Registered Colleges & Universities across India.
@@ -451,7 +451,7 @@ exports.handleChatMessage = async (req, res) => {
     if (/^(hi|hello|hey|greetings|good\s*(morning|afternoon|evening)|hola|namaste)\b/i.test(lower)) {
       const greetingResponse = {
         success: true,
-        response: `Hello! 👋 Welcome to **ExamShield**. I am your dedicated AI Academic & Technical Assistant.\n\nI can assist you with:\n* **AI Proctoring & Anti-Cheat Controls** (Face mesh, audio analytics, kiosk lockdown)\n* **Student Exam Room & Login Assistance** (Camera check, timers, question navigation)\n* **College Admin Console** (Scheduling exams, student management, live cockpit)\n* **Online Coding Assessments** (Languages, test cases, sandboxed execution)\n* **Campus Governance & Security Architecture**\n\nHow can I help you today?`,
+        response: `Hello! 👋 Welcome to **Nexify Examina**. I am your dedicated AI Academic & Technical Assistant.\n\nI can assist you with:\n* **AI Proctoring & Anti-Cheat Controls** (Face mesh, audio analytics, kiosk lockdown)\n* **Student Exam Room & Login Assistance** (Camera check, timers, question navigation)\n* **College Admin Console** (Scheduling exams, student management, live cockpit)\n* **Online Coding Assessments** (Languages, test cases, sandboxed execution)\n* **Campus Governance & Security Architecture**\n\nHow can I help you today?`,
         confidence: 0.95,
         intent: 'greeting',
         suggestions: [
@@ -479,7 +479,7 @@ exports.handleChatMessage = async (req, res) => {
     if (/^(thanks|thank you|thx|appreciate it|awesome|great job|perfect|bye|goodbye|see you)\b/i.test(lower)) {
       const thanksResponse = {
         success: true,
-        response: `You're very welcome! 😊 It was a pleasure assisting you. If you or your institution have any more questions about ExamShield, I'm always right here.\n\nBest of luck with your examinations! 🎓`,
+        response: `You're very welcome! 😊 It was a pleasure assisting you. If you or your institution have any more questions about Nexify Examina, I'm always right here.\n\nBest of luck with your examinations! 🎓`,
         confidence: 0.95,
         intent: 'gratitude',
         suggestions: [
@@ -527,7 +527,7 @@ exports.handleChatMessage = async (req, res) => {
     // Contextual fallback response
     const fallbackResponse = {
       success: true,
-      response: `I want to make sure I get you the exact information you need regarding **ExamShield**.\n\nCould you specify which of these key areas you are inquiring about?\n\n* **Live AI Proctoring**: Face tracking, background whisper detection, browser kiosk lockdown.\n* **Student Help**: Accessing the student room, webcam permission, forgot passwords.\n* **College Admin & Faculty**: Creating exams, adding students via CSV, monitoring live radar.\n* **Pricing & Institutional Pilots**: Starter/Pro/Enterprise plans and custom quotes.\n* **Technical Support**: Browser compatibility and minimum bandwidth.\n\nOr click one of the quick topics below to get instant answers!`,
+      response: `I want to make sure I get you the exact information you need regarding **Nexify Examina**.\n\nCould you specify which of these key areas you are inquiring about?\n\n* **Live AI Proctoring**: Face tracking, background whisper detection, browser kiosk lockdown.\n* **Student Help**: Accessing the student room, webcam permission, forgot passwords.\n* **College Admin & Faculty**: Creating exams, adding students via CSV, monitoring live radar.\n* **Pricing & Institutional Pilots**: Starter/Pro/Enterprise plans and custom quotes.\n* **Technical Support**: Browser compatibility and minimum bandwidth.\n\nOr click one of the quick topics below to get instant answers!`,
       confidence: 0.65,
       intent: 'clarification',
       suggestions: [
@@ -591,7 +591,7 @@ exports.getStatus = async (req, res) => {
   return res.json({
     success: true,
     online: true,
-    engine: 'ExamShield Hybrid AI/NLP Engine v2.4',
+    engine: 'Nexify Examina Neural NLP Engine v2.4',
     timestamp: new Date().toISOString()
   });
 };
