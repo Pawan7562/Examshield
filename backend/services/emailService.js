@@ -90,7 +90,7 @@ const createFreshTransporter = () => {
 const parseEmailSender = (raw) => {
   if (!raw) {
     return {
-      name: 'NexifyForge',
+      name: 'Nexify Examina',
       email: process.env.EMAIL_USER || 'exam@nexifyforge.in'
     };
   }
@@ -98,11 +98,11 @@ const parseEmailSender = (raw) => {
   if (match) {
     return { name: match[1].replace(/["']/g, '').trim(), email: match[2].trim() };
   }
-  return { name: 'NexifyForge', email: raw.trim() };
+  return { name: 'Nexify Examina', email: raw.trim() };
 };
 
 const sendViaBrevoApi = async (apiKey, opts) => {
-  const sender = parseEmailSender(opts.from || process.env.EMAIL_FROM || 'NexifyForge <exam@nexifyforge.in>');
+  const sender = parseEmailSender(opts.from || process.env.EMAIL_FROM || 'Nexify Examina <exam@nexifyforge.in>');
   const replyTo = parseEmailSender(opts.replyTo || 'exam@nexifyforge.in');
 
   const toList = Array.isArray(opts.to)
@@ -143,8 +143,8 @@ const sendViaBrevoApi = async (apiKey, opts) => {
     htmlContent: opts.html,
     textContent: opts.text || (opts.html ? opts.html.replace(/<[^>]*>?/gm, '') : ''),
     headers: {
-      'X-Mailer': 'Nexify Forge Dispatcher v2.0',
-      'Feedback-ID': 'exam-monitoring:nexifyforge:transactional',
+      'X-Mailer': 'Nexify Examina Dispatcher v2.0',
+      'Feedback-ID': 'exam-monitoring:nexifyexamina:transactional',
       ...(opts.headers || {})
     },
     ...(attachments.length > 0 ? { attachment: attachments } : {})
@@ -179,7 +179,7 @@ const sendViaBrevoApi = async (apiKey, opts) => {
 // Internal helper: send with retry
 // ─────────────────────────────────────────────────────────────
 const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 4000) => {
-  const defaultSender = 'NexifyForge <exam@nexifyforge.in>';
+  const defaultSender = 'Nexify Examina <exam@nexifyforge.in>';
 
   const from =
     mailOptions.from ||
@@ -192,8 +192,8 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 4000) =
 
   const headers = {
     'X-Priority': '3',
-    'X-Mailer': 'Nexify Forge Dispatcher v2.0',
-    'Feedback-ID': 'exam-monitoring:nexifyforge:transactional',
+    'X-Mailer': 'Nexify Examina Mailer v2.0',
+    'Feedback-ID': 'exam-monitoring:nexifyexamina:transactional',
     'List-Unsubscribe': `<mailto:${process.env.EMAIL_USER || 'support@nexifyforge.in'}?subject=Unsubscribe>`,
     'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     ...(mailOptions.headers || {})
@@ -237,8 +237,8 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 4000) =
     const resendFrom =
       process.env.RESEND_FROM ||
       (process.env.RESEND_DOMAIN
-        ? `ExamShield Portal <noreply@${process.env.RESEND_DOMAIN}>`
-        : 'ExamShield Portal <onboarding@resend.dev>');
+        ? `Nexify Examina <noreply@${process.env.RESEND_DOMAIN}>`
+        : 'Nexify Examina <onboarding@resend.dev>');
 
     console.log(`📤 [Resend] Sending to ${opts.to} | From: ${resendFrom} | Subject: ${opts.subject}`);
     try {
@@ -316,7 +316,7 @@ const sendWithRetry = async (mailOptions, maxRetries = 3, retryDelayMs = 4000) =
         });
         const fallbackOpts = {
           ...opts,
-          from: opts.from || 'NexifyForge <exam@nexifyforge.in>',
+          from: opts.from || 'Nexify Examina <exam@nexifyforge.in>',
         };
         const info = await fallbackTransporter.sendMail(fallbackOpts);
         console.log(`✅ [Resilient Fallback] Delivered successfully! MessageId: ${info.messageId}`);
@@ -456,13 +456,13 @@ const resolveCollegeNameFromDb = async ({ collegeName, collegeId, examId, examKe
 
 // ─────────────────────────────────────────────────────────────
 // Industry-Standard HTML Base Template
-// Nexify Forge (Parent Company) + ExamShield — Exam Monitoring System (Product)
+// Nexify Examina (Primary Brand) + Nexify Forge (Engineering Attribution)
 // + Prominent Academic Institution Showcase
 // ─────────────────────────────────────────────────────────────
 const baseTemplate = (content, {
-  title = 'Nexify Forge — ExamShield',
+  title = 'Nexify Examina — Examination Notice',
   collegeName = 'Your Institution',
-  preheader = 'Official examination notice from ExamShield — Exam Monitoring System (Nexify Forge)',
+  preheader = 'Official examination notice from Nexify Examina',
   badgeText = 'OFFICIAL INVITATION'
 } = {}) => `
 <!DOCTYPE html>
@@ -509,7 +509,7 @@ const baseTemplate = (content, {
         <!-- Main Container (600px Max) -->
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="responsive-table" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);">
           
-          <!-- 1. Sleek Modern Header with Nexify Forge & ExamShield Branding -->
+          <!-- 1. Sleek Modern Header with Nexify Examina Branding -->
           <tr>
             <td class="mobile-padding" style="background-color: #ffffff; padding: 22px 32px 20px; border-bottom: 2px solid #0f2744;">
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
@@ -518,15 +518,15 @@ const baseTemplate = (content, {
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0">
                       <tr>
                         <td valign="middle" style="width: 44px; padding-right: 14px;">
-                          <!-- Nexify Forge Official Monogram Logo -->
-                          <img src="cid:nexifyforge-logo.jpg" alt="Nexify Forge" width="42" height="42" style="display: block; width: 42px; height: 42px; border-radius: 8px; border: 1px solid #e2e8f0; object-fit: contain; background-color: #ffffff;" />
+                          <!-- Nexify Examina Monogram Logo -->
+                          <img src="cid:nexifyforge-logo.jpg" alt="Nexify Examina" width="42" height="42" style="display: block; width: 42px; height: 42px; border-radius: 8px; border: 1px solid #e2e8f0; object-fit: contain; background-color: #ffffff;" />
                         </td>
                         <td valign="middle">
-                          <div style="font-size: 15px; font-weight: 800; color: #0f2744; letter-spacing: 0.6px; text-transform: uppercase; line-height: 1.2;">
-                            NEXIFY FORGE
+                          <div style="font-size: 16px; font-weight: 800; color: #0f2744; letter-spacing: 0.8px; text-transform: uppercase; line-height: 1.2;">
+                            NEXIFY EXAMINA
                           </div>
-                          <div style="font-size: 12px; font-weight: 700; color: #2563eb; letter-spacing: 0.3px; margin-top: 2px;">
-                            ExamShield &mdash; Exam Monitoring System
+                          <div style="font-size: 11px; font-weight: 600; color: #2563eb; letter-spacing: 0.3px; margin-top: 2px;">
+                            Intelligent Examination &amp; Assessment Platform
                           </div>
                         </td>
                       </tr>
@@ -557,7 +557,7 @@ const baseTemplate = (content, {
                       ${collegeName}
                     </div>
                     <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
-                      Administered via <strong>ExamShield</strong> &bull; Developed by <strong>Nexify Forge</strong>
+                      Administered via <strong>Nexify Examina</strong> &bull; Powered by <strong>Nexify Forge</strong>
                     </div>
                   </td>
                 </tr>
@@ -577,12 +577,12 @@ const baseTemplate = (content, {
                 <tr>
                   <td>
                     <div style="font-size: 12px; font-weight: 700; color: #0f2744; line-height: 1.5;">
-                      ExamShield is an examination monitoring platform developed by Nexify Forge.
+                      Nexify Examina is an intelligent examination and assessment platform.
                     </div>
                     <div style="font-size: 11px; color: #475569; margin-top: 4px; line-height: 1.6;">
                       &bull; <strong>Conducting Institution:</strong> ${collegeName}<br>
-                      &bull; <strong>Software Platform:</strong> ExamShield &mdash; Exam Monitoring System<br>
-                      &bull; <strong>Parent Company &amp; Engineering:</strong> Nexify Forge Technologies (<a href="https://nexifyforge.in" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: 600;">nexifyforge.in</a>)
+                      &bull; <strong>Examination Platform:</strong> Nexify Examina<br>
+                      &bull; <strong>Engineering &amp; Technology:</strong> Developed &amp; Powered by <a href="https://nexifyforge.in" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: 600;">Nexify Forge</a>
                     </div>
                   </td>
                 </tr>
@@ -590,7 +590,7 @@ const baseTemplate = (content, {
 
               <!-- Security Notice -->
               <p style="margin: 0 0 10px; color: #475569; font-size: 11px; line-height: 1.55;">
-                🔒 <strong>Security &amp; Integrity Notice:</strong> Nexify Forge, ExamShield, and ${collegeName} will never ask for your password via email. If you receive suspicious communications, please notify <a href="mailto:support@nexifyforge.in" style="color: #2563eb; text-decoration: underline;">support@nexifyforge.in</a>.
+                🔒 <strong>Security &amp; Integrity Notice:</strong> Nexify Examina and ${collegeName} will never ask for your password via email. If you receive suspicious communications, please notify <a href="mailto:support@nexifyforge.in" style="color: #2563eb; text-decoration: underline;">support@nexifyforge.in</a>.
               </p>
 
               <p style="margin: 0 0 16px; color: #64748b; font-size: 11px; line-height: 1.55;">
@@ -605,16 +605,17 @@ const baseTemplate = (content, {
                       <table role="presentation" border="0" cellpadding="0" cellspacing="0">
                         <tr>
                           <td valign="middle" style="padding-right: 10px;">
-                            <img src="cid:nexifyforge-logo.jpg" alt="NF" width="22" height="22" style="display: block; width: 22px; height: 22px; border-radius: 4px; border: 1px solid #e2e8f0;" />
+                            <img src="cid:nexifyforge-logo.jpg" alt="NE" width="22" height="22" style="display: block; width: 22px; height: 22px; border-radius: 4px; border: 1px solid #e2e8f0;" />
                           </td>
                           <td valign="middle" style="font-size: 11px; color: #94a3b8; line-height: 1.4;">
-                            &copy; ${new Date().getFullYear()} <strong>Nexify Forge Technologies</strong>. All rights reserved.<br>
-                            ExamShield &bull; Enterprise Exam Monitoring Solution
+                            &copy; ${new Date().getFullYear()} <strong>Nexify Examina</strong>. All rights reserved.<br>
+                            Developed and powered by <strong>Nexify Forge</strong>.
                           </td>
                         </tr>
                       </table>
                     </td>
                     <td align="right" valign="middle" style="font-size: 11px; color: #94a3b8;">
+                      <a href="https://exam.nexifyforge.in" target="_blank" style="color: #64748b; text-decoration: none; font-weight: 600;">Nexify Examina</a> &bull;
                       <a href="https://nexifyforge.in" target="_blank" style="color: #64748b; text-decoration: none; font-weight: 600;">Nexify Forge</a> &bull;
                       <a href="${resolveStudentLoginUrl()}" target="_blank" style="color: #64748b; text-decoration: none; font-weight: 600;">Exam Portal</a>
                     </td>
@@ -679,7 +680,7 @@ const sendStudentCredentials = async (firstArg, secondArg) => {
     studentEmail: email
   });
 
-  console.log('\n🎓 [Nexify Forge] STUDENT CREDENTIALS:');
+  console.log('\n🎓 [Nexify Examina] STUDENT CREDENTIALS:');
   console.log('  Name:', name, '| Email:', email, '| ID:', studentId, '| College:', collegeName, '| isReset:', isReset);
 
   const effectiveLoginUrl = resolveStudentLoginUrl(loginUrl, examKey, email);
@@ -691,8 +692,8 @@ const sendStudentCredentials = async (firstArg, secondArg) => {
   }) : null;
 
   const actionNotice = isReset
-    ? `Your examination portal access password has been updated by <strong>${collegeName}</strong> on <strong>ExamShield — Exam Monitoring System</strong> (developed by <strong>Nexify Forge</strong>). Below are your verified sign-in credentials.`
-    : `Your official examination access account has been registered by <strong>${collegeName}</strong> on <strong>ExamShield — Exam Monitoring System</strong>, developed by <strong>Nexify Forge</strong>.${examKey ? ' You have also been assigned to an upcoming proctored examination.' : ' Use the credentials below to access your student examination portal.'}`;
+    ? `Your examination portal access password has been updated by <strong>${collegeName}</strong> on <strong>Nexify Examina</strong>. Below are your verified sign-in credentials.`
+    : `Your official examination access account has been registered by <strong>${collegeName}</strong> on <strong>Nexify Examina</strong>.${examKey ? ' You have also been assigned to an upcoming proctored examination.' : ' Use the credentials below to access your student examination portal.'}`;
 
   const content = `
     <div style="display: inline-block; padding: 4px 12px; border-radius: 4px; background-color: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 16px;">
@@ -809,14 +810,14 @@ const sendStudentCredentials = async (firstArg, secondArg) => {
   `;
 
   const subjectLine = isReset
-    ? `[ExamShield] Password Updated — ${collegeName}`
+    ? `[Nexify Examina] Password Updated — ${collegeName}`
     : (examKey
-        ? `[ExamShield] Examination Invitation & Credentials — ${collegeName}`
-        : `[ExamShield] Student Account Credentials — ${collegeName}`);
+        ? `[Nexify Examina] Examination Invitation & Credentials — ${collegeName}`
+        : `[Nexify Examina] Student Account Credentials — ${collegeName}`);
 
   const plainText = [
-    `NEXIFY FORGE - EXAMSHIELD (EXAM MONITORING SYSTEM)`,
-    `A Platform Developed by Nexify Forge Technologies (https://nexifyforge.in)`,
+    `NEXIFY EXAMINA (ONLINE EXAMINATION PLATFORM)`,
+    `Developed and powered by Nexify Forge Technologies (https://nexifyforge.in)`,
     `ORGANIZED & CONDUCTED BY: ${collegeName}`,
     `==================================================`,
     ``,
@@ -843,7 +844,7 @@ const sendStudentCredentials = async (firstArg, secondArg) => {
     `4. Tab switching and external applications are monitored and flagged.`,
     ``,
     `--------------------------------------------------`,
-    `ExamShield is an examination monitoring platform developed by Nexify Forge.`,
+    `Nexify Examina is an intelligent examination platform developed and powered by Nexify Forge.`,
     `Conducting Institution: ${collegeName}`,
     `Website: https://nexifyforge.in | Examination Portal: ${effectiveLoginUrl}`
   ].filter(Boolean).join('\n');
@@ -855,7 +856,7 @@ const sendStudentCredentials = async (firstArg, secondArg) => {
     html: baseTemplate(content, {
       title: subjectLine,
       collegeName,
-      preheader: `Your examination credentials for ${collegeName} on ExamShield (Nexify Forge)`
+      preheader: `Your examination credentials for ${collegeName} on Nexify Examina`
     }),
   }, 3, 3000);
 
@@ -916,7 +917,7 @@ const sendExamNotification = async ({
     </p>
 
     <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.65; color: #334155;">
-      You are officially invited by <strong>${collegeName}</strong> to take your scheduled examination on <strong>ExamShield &mdash; Exam Monitoring System</strong>, developed and powered by <strong>Nexify Forge</strong>. Please review your examination details and instructions below.
+      You are officially invited by <strong>${collegeName}</strong> to take your scheduled examination on <strong>Nexify Examina</strong>. Please review your examination details and instructions below.
     </p>
 
     <!-- Structured Examination Information Section -->
@@ -1009,17 +1010,17 @@ const sendExamNotification = async ({
     </table>
   `;
 
-  const subjectLine = `[ExamShield] Examination Invitation: ${examName} — ${collegeName}`;
+  const subjectLine = `[Nexify Examina] Examination Invitation: ${examName} — ${collegeName}`;
   const plainText = [
-    `NEXIFY FORGE - EXAMSHIELD (EXAM MONITORING SYSTEM)`,
-    `A Platform Developed by Nexify Forge Technologies (https://nexifyforge.in)`,
+    `NEXIFY EXAMINA (ONLINE EXAMINATION PLATFORM)`,
+    `Developed and powered by Nexify Forge Technologies (https://nexifyforge.in)`,
     `ORGANIZED & CONDUCTED BY: ${collegeName}`,
     `==================================================`,
     `EXAMINATION INVITATION`,
     ``,
     `Dear ${name || 'Candidate'},`,
     ``,
-    `You are officially invited by ${collegeName} to take your scheduled examination on ExamShield.`,
+    `You are officially invited by ${collegeName} to take your scheduled examination on Nexify Examina.`,
     ``,
     `EXAMINATION DETAILS:`,
     `- Exam Title: ${examName}`,
@@ -1035,7 +1036,7 @@ const sendExamNotification = async ({
     `1. Please log in 10 minutes before the exam commences.`,
     `2. Keep your webcam active and avoid tab switching.`,
     ``,
-    `ExamShield is an examination monitoring platform developed by Nexify Forge.`
+    `Nexify Examina is an intelligent examination platform developed and powered by Nexify Forge.`
   ].join('\n');
 
   const info = await sendWithRetry({
@@ -1046,7 +1047,7 @@ const sendExamNotification = async ({
       title: subjectLine,
       collegeName,
       badgeText: 'EXAMINATION INVITATION',
-      preheader: `Exam invitation for ${examName} organized by ${collegeName} on ExamShield`
+      preheader: `Exam invitation for ${examName} organized by ${collegeName} on Nexify Examina`
     }),
   });
 
@@ -1100,7 +1101,7 @@ const sendExamReminder = async ({
     </p>
 
     <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.65; color: #334155;">
-      This is a scheduled reminder that your examination <strong>${examName}</strong> organized by <strong>${collegeName}</strong> will commence at <strong>${formattedDate} IST</strong> on <strong>ExamShield &mdash; Exam Monitoring System</strong> (developed by Nexify Forge).
+      This is a scheduled reminder that your examination <strong>${examName}</strong> organized by <strong>${collegeName}</strong> will commence at <strong>${formattedDate} IST</strong> on <strong>Nexify Examina</strong>.
     </p>
 
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
@@ -1147,16 +1148,17 @@ const sendExamReminder = async ({
     </div>
   `;
 
-  const subjectLine = `[ExamShield] ⏰ Reminder: ${examName} starts in 1 hour — ${collegeName}`;
+  const subjectLine = `[Nexify Examina] ⏰ Reminder: ${examName} starts in 1 hour — ${collegeName}`;
   const plainText = [
-    `NEXIFY FORGE - EXAMSHIELD (EXAM MONITORING SYSTEM)`,
+    `NEXIFY EXAMINA (ONLINE EXAMINATION PLATFORM)`,
+    `Developed and powered by Nexify Forge Technologies (https://nexifyforge.in)`,
     `ORGANIZED & CONDUCTED BY: ${collegeName}`,
     `==================================================`,
     `⏰ REMINDER: Your exam "${examName}" starts in 1 hour at ${formattedDate} IST.`,
     `Exam Access Key: ${examKey}`,
     `Portal URL: ${effectiveLoginUrl}`,
     `Ensure your webcam is working and background apps are closed.`,
-    `ExamShield is an examination monitoring platform developed by Nexify Forge.`
+    `Nexify Examina is an intelligent examination platform developed and powered by Nexify Forge.`
   ].join('\n');
 
   await sendWithRetry({
@@ -1167,7 +1169,7 @@ const sendExamReminder = async ({
       title: subjectLine,
       collegeName,
       badgeText: 'FINAL REMINDER',
-      preheader: `Exam reminder: ${examName} at ${collegeName} starts in 1 hour at ${formattedDate} IST`
+      preheader: `Exam reminder: ${examName} at ${collegeName} starts in 1 hour at ${formattedDate} IST on Nexify Examina`
     }),
   });
 };
@@ -1218,7 +1220,7 @@ const sendResultNotification = async ({
     </p>
 
     <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.65; color: #334155;">
-      The official evaluation for <strong>${examName}</strong> conducted by <strong>${collegeName}</strong> on <strong>ExamShield &mdash; Exam Monitoring System</strong> (developed by Nexify Forge) has been published.
+      The official evaluation for <strong>${examName}</strong> conducted by <strong>${collegeName}</strong> on <strong>Nexify Examina</strong> has been published.
     </p>
 
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
@@ -1273,9 +1275,10 @@ const sendResultNotification = async ({
     </div>
   `;
 
-  const subjectLine = `[ExamShield] Result Published: ${examName} — ${collegeName}`;
+  const subjectLine = `[Nexify Examina] Result Published: ${examName} — ${collegeName}`;
   const plainText = [
-    `NEXIFY FORGE - EXAMSHIELD (EXAM MONITORING SYSTEM)`,
+    `NEXIFY EXAMINA (ONLINE EXAMINATION PLATFORM)`,
+    `Developed and powered by Nexify Forge Technologies (https://nexifyforge.in)`,
     `Conducting College: ${collegeName}`,
     `==================================================`,
     `Assessment Result for ${examName}:`,
@@ -1283,7 +1286,7 @@ const sendResultNotification = async ({
     `- Grade: ${grade || 'N/A'}`,
     `- Status: ${String(status).toUpperCase()}`,
     `View details: ${effectiveLoginUrl}`,
-    `ExamShield is an examination monitoring platform developed by Nexify Forge.`
+    `Nexify Examina is an intelligent examination platform developed and powered by Nexify Forge.`
   ].join('\n');
 
   await sendWithRetry({
@@ -1294,7 +1297,7 @@ const sendResultNotification = async ({
       title: subjectLine,
       collegeName,
       badgeText: 'RESULT PUBLISHED',
-      preheader: `Your result for ${examName} at ${collegeName}: ${marksObtained}/${totalMarks} (${String(status).toUpperCase()})`
+      preheader: `Your result for ${examName} at ${collegeName} on Nexify Examina: ${marksObtained}/${totalMarks} (${String(status).toUpperCase()})`
     }),
   });
 };
@@ -1312,11 +1315,11 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
     </div>
 
     <h2 style="margin: 0 0 10px; font-size: 22px; font-weight: 800; color: #0f2744;">
-      Welcome to ExamShield, ${name}!
+      Welcome to Nexify Examina, ${name}!
     </h2>
 
     <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.65; color: #334155;">
-      <strong>${collegeName}</strong> has been successfully registered and onboarded onto <strong>ExamShield &mdash; Exam Monitoring System</strong>, engineered and operated by <strong>Nexify Forge</strong>.
+      <strong>${collegeName}</strong> has been successfully registered and onboarded onto <strong>Nexify Examina</strong> &mdash; Intelligent Examination & Assessment Platform, developed and powered by <strong>Nexify Forge</strong>.
     </p>
 
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
@@ -1347,13 +1350,13 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
     </table>
   `;
 
-  const subjectLine = `[ExamShield] Welcome ${collegeName} — Exam Monitoring System`;
+  const subjectLine = `[Nexify Examina] Welcome ${collegeName} — Examination Platform`;
   const plainText = [
-    `WELCOME TO EXAMSHIELD BY NEXIFY FORGE`,
+    `WELCOME TO NEXIFY EXAMINA`,
     `Institution: ${collegeName}`,
     `Administrator: ${name}`,
     `Admin Login: ${adminLoginUrl}`,
-    `Developed & Maintained by Nexify Forge Technologies (https://nexifyforge.in)`
+    `Nexify Examina is developed and powered by Nexify Forge (https://nexifyforge.in)`
   ].join('\n');
 
   await sendWithRetry({
@@ -1364,7 +1367,7 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
       title: subjectLine,
       collegeName,
       badgeText: 'INSTITUTION ONBOARDING',
-      preheader: `Welcome to ExamShield developed by Nexify Forge for ${collegeName}`
+      preheader: `Welcome to Nexify Examina (powered by Nexify Forge) for ${collegeName}`
     }),
   });
 };

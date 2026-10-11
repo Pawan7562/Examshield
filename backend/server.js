@@ -924,7 +924,7 @@ app.get('/api/test-email', async (req, res) => {
     EMAIL_PORT: process.env.EMAIL_PORT || '587',
     EMAIL_USER: process.env.EMAIL_USER || 'NOT SET',
     EMAIL_PASS: process.env.EMAIL_PASS ? '***SET***' : 'NOT SET',
-    EMAIL_FROM: process.env.EMAIL_FROM || 'NexifyForge <exam@nexifyforge.in>',
+    EMAIL_FROM: process.env.EMAIL_FROM || 'Nexify Examina <exam@nexifyforge.in>',
     NODE_ENV: process.env.NODE_ENV,
   };
 
