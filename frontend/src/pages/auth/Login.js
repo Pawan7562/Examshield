@@ -358,7 +358,7 @@ const Login = ({ role }) => {
                 </div>
                 <span className="login-field-helper">
                   {isStudent
-                    ? 'Accepted: ExamShield Student ID, University Roll Number, or registered email.'
+                    ? 'Accepted: Nexify Examina Student ID, University Roll Number, or registered email.'
                     : 'Enter the registered administrator email for your college.'}
                 </span>
               </div>
@@ -480,7 +480,7 @@ const Login = ({ role }) => {
           <div className="login-meta-nav">
             {!isStudent && (
               <p className="login-meta-text">
-                Looking to deploy ExamShield for your institution?{' '}
+                Looking to deploy Nexify Examina for your institution?{' '}
                 <Link to="/admin/register">Register your college (14-day free trial)</Link>
               </p>
             )}

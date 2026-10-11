@@ -281,7 +281,7 @@ export default function Support() {
             <Phone size={16} /> Call Emergency Desk
           </a>
           <a 
-            href="mailto:support@examshield.com?subject=URGENT:%20Live%20Exam%20Support" 
+            href="mailto:support@nexifyforge.in?subject=URGENT:%20Live%20Exam%20Support" 
             style={{ 
               display: 'inline-flex', 
               alignItems: 'center', 
@@ -296,7 +296,7 @@ export default function Support() {
               textDecoration: 'none' 
             }}
           >
-            <Mail size={16} /> support@examshield.com
+            <Mail size={16} /> support@nexifyforge.in
           </a>
         </div>
       </div>
@@ -504,7 +504,7 @@ export default function Support() {
             <CheckCircle2 size={24} style={{ color: '#16a34a' }} />
             <div>
               <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#16a34a' }}>All Institutional Subsystems Operational</h4>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#4b5563' }}>ExamShield high-availability clusters and AI proctoring vision nodes are responding normally.</p>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#4b5563' }}>Nexify Examina high-availability clusters and AI proctoring vision nodes are responding normally.</p>
             </div>
           </div>
 

@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   Menu
 } from 'lucide-react';
+import logoImg from '../../assets/logo-mark.png';
 import './StudentSidebar.css';
 
 export default function StudentSidebar() {
@@ -105,11 +106,17 @@ export default function StudentSidebar() {
         <div className="sidebar-header">
           <div className="sidebar-logo" onClick={() => navigate('/student/dashboard')} style={{ cursor: 'pointer' }}>
             <div className="sidebar-logo-icon">
-              <Shield size={20} />
+              <img
+                src={logoImg}
+                alt="Nexify Examina Logo"
+                style={{ width: 22, height: 22, objectFit: 'contain' }}
+              />
             </div>
             {!isCollapsed && (
               <div className="sidebar-brand-text">
-                <span className="sidebar-brand-name">ExamShield</span>
+                <span className="sidebar-brand-name">
+                  NEXIFY <span>EXAMINA</span>
+                </span>
                 <span className="sidebar-brand-badge">STUDENT</span>
               </div>
             )}

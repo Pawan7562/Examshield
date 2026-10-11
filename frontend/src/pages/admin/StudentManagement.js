@@ -497,7 +497,7 @@ export default function StudentManagement() {
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Students_Roster');
-      XLSX.writeFile(wb, 'examshield_students_template.xlsx');
+      XLSX.writeFile(wb, 'nexify_examina_students_template.xlsx');
       toast.success('Excel template downloaded');
     } catch (err) {
       toast.error('Failed to create Excel template: ' + err.message);
@@ -512,7 +512,7 @@ export default function StudentManagement() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'examshield_students_template.csv');
+    link.setAttribute('download', 'nexify_examina_students_template.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1128,7 +1128,7 @@ export default function StudentManagement() {
               <span>Automated Candidate Provisioning &amp; Email Delivery</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.84rem', color: '#475569', lineHeight: 1.55 }}>
-              Upload your candidate roster using a <strong>CSV</strong> or <strong>Excel (.xlsx, .xls)</strong> file. Every newly registered student will automatically receive an official <strong>Nexify Forge / ExamShield</strong> email with their temporary credentials and portal login link.
+              Upload your candidate roster using a <strong>CSV</strong> or <strong>Excel (.xlsx, .xls)</strong> file. Every newly registered student will automatically receive an official <strong>Nexify Examina</strong> email with their temporary credentials and portal login link.
             </p>
 
             <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>

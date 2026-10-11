@@ -79,7 +79,7 @@ export default function AdminResetPassword() {
             Reset <span>Admin Password</span>
           </h1>
           <p className="login-page-subtitle">
-            Set a new secure password for your institution's ExamShield administrative account.
+            Set a new secure password for your institution's Nexify Examina administrative account.
           </p>
         </div>
 

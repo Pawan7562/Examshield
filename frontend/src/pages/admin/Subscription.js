@@ -361,7 +361,7 @@ export default function Subscription() {
         amount,
         currency: 'INR',
         order_id: orderId,
-        name: 'ExamShield Enterprise',
+        name: 'Nexify Examina Enterprise',
         description: `${planDetails.name} Institutional License (${billingCycle.toUpperCase()})`,
         theme: { color: '#0a74da' },
         handler: async (response) => {
@@ -455,7 +455,7 @@ export default function Subscription() {
     },
     {
       q: "What happens if our college exceeds candidate seats during an examination?",
-      a: "ExamShield ensures zero exam interruptions for candidates. If you temporarily exceed capacity, candidates can complete tests smoothly, and your administrator dashboard will prompt you to expand seats or upgrade your tier with 1-click."
+      a: "Nexify Examina ensures zero exam interruptions for candidates. If you temporarily exceed capacity, candidates can complete tests smoothly, and your administrator dashboard will prompt you to expand seats or upgrade your tier with 1-click."
     },
     {
       q: "Are the invoices GST compliant and valid for university audits?",
@@ -906,7 +906,7 @@ export default function Subscription() {
           </div>
           <h3>Need over 1,000+ candidate seats or private campus cloud hosting?</h3>
           <p>
-            ExamShield delivers customized solutions for large state universities, autonomous institutes, 
+            Nexify Examina delivers customized solutions for large state universities, autonomous institutes, 
             and recruitment agencies with high concurrency requirements, on-premise deployments, and custom LMS integrations.
           </p>
         </div>
@@ -1104,7 +1104,7 @@ export default function Subscription() {
             <div className="admin-certificate-content">
               <div className="certificate-frame">
                 <div className="certificate-header">
-                  <span className="cert-org">EXAMSHIELD GLOBAL ACCREDITATION</span>
+                  <span className="cert-org">NEXIFY EXAMINA GLOBAL ACCREDITATION</span>
                   <h4 className="cert-title">CERTIFICATE OF PROCTORING LICENSE</h4>
                   <p className="cert-subtitle">Valid Institutional Examination Center Authorization</p>
                 </div>

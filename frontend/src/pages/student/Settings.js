@@ -378,7 +378,7 @@ export default function StudentSettings() {
                 Workstation & Network Verification
               </h3>
               <p>
-                ExamShield verifies screen dimensions, WebRTC streaming latency, and browser stability to ensure you suffer no disconnections during high-stakes evaluations.
+                Nexify Examina verifies screen dimensions, WebRTC streaming latency, and browser stability to ensure you suffer no disconnections during high-stakes evaluations.
               </p>
             </div>
 

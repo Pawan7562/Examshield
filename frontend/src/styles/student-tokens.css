@@ -1,0 +1,211 @@
+/* ══════════════════════════════════════════════════════════════════
+   student-tokens.css — Industry-Grade Design System for ExamShield
+   Inspired by Linear, Vercel, Stripe Dashboard & Notion
+   Strict 4/8px Grid · Accessible WCAG AA · Full Dark/Light Support
+   ══════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ── 1. Color Palette: Blue-Indigo Primary Scale ── */
+  --es-primary-50: #eff6ff;
+  --es-primary-100: #dbeafe;
+  --es-primary-200: #bfdbfe;
+  --es-primary-300: #93c5fd;
+  --es-primary-400: #60a5fa;
+  --es-primary-500: #3b82f6;
+  --es-primary-600: #2563eb;
+  --es-primary-700: #1d4ed8;
+  --es-primary-800: #1e40af;
+  --es-primary-900: #1e3a8a;
+
+  /* Accent: Electric Violet / Cyan */
+  --es-accent: #6366f1;
+  --es-accent-light: #eef2ff;
+  --es-accent-cyan: #06b6d4;
+
+  /* ── 2. Neutrals: Slate Scale (Light Canvas) ── */
+  --es-slate-50: #f8fafc;
+  --es-slate-100: #f1f5f9;
+  --es-slate-200: #e2e8f0;
+  --es-slate-300: #cbd5e1;
+  --es-slate-400: #94a3b8;
+  --es-slate-500: #64748b;
+  --es-slate-600: #475569;
+  --es-slate-700: #334155;
+  --es-slate-800: #1e293b;
+  --es-slate-900: #0f172a;
+  --es-slate-950: #020617;
+
+  /* ── 3. Semantics ── */
+  /* Success: Emerald */
+  --es-success-50: #ecfdf5;
+  --es-success-100: #d1fae5;
+  --es-success-500: #10b981;
+  --es-success-600: #059669;
+  --es-success-700: #047857;
+  --es-success-border: #a7f3d0;
+
+  /* Warning: Amber */
+  --es-warning-50: #fffbeb;
+  --es-warning-100: #fef3c7;
+  --es-warning-500: #f59e0b;
+  --es-warning-600: #d97706;
+  --es-warning-700: #b45309;
+  --es-warning-border: #fde68a;
+
+  /* Danger: Rose / Crimson */
+  --es-danger-50: #fff1f2;
+  --es-danger-100: #ffe4e6;
+  --es-danger-500: #f43f5e;
+  --es-danger-600: #e11d48;
+  --es-danger-700: #be123c;
+  --es-danger-border: #fecdd3;
+
+  /* Info: Sky */
+  --es-info-50: #f0f9ff;
+  --es-info-100: #e0f2fe;
+  --es-info-500: #0284c7;
+  --es-info-border: #bae6fd;
+
+  /* ── 4. Surface & Structural Tokens (Light Mode Default) ── */
+  --es-bg: #f8fafc;
+  --es-surface: #ffffff;
+  --es-surface-raised: #ffffff;
+  --es-surface-subtle: #f8fafc;
+  --es-surface-muted: #f1f5f9;
+  --es-surface-hover: #f8fafc;
+
+  --es-border: #e2e8f0;
+  --es-border-subtle: #edf2f7;
+  --es-border-strong: #cbd5e1;
+  --es-border-focus: #3b82f6;
+
+  --es-text-primary: #0f172a;
+  --es-text-secondary: #334155;
+  --es-text-muted: #64748b;
+  --es-text-faint: #94a3b8;
+
+  /* Sidebar Tokens (Deep Trust Navy) */
+  --es-sidebar-bg: #0b1329;
+  --es-sidebar-border: rgba(255, 255, 255, 0.08);
+  --es-sidebar-text: #94a3b8;
+  --es-sidebar-text-active: #ffffff;
+  --es-sidebar-item-hover: rgba(255, 255, 255, 0.04);
+  --es-sidebar-item-active: rgba(37, 99, 235, 0.12);
+  --es-sidebar-active-glow: #3b82f6;
+
+  /* Top Bar */
+  --es-topbar-bg: rgba(255, 255, 255, 0.88);
+  --es-topbar-border: rgba(226, 232, 240, 0.8);
+
+  /* ── 5. Typography Scale ── */
+  --es-font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --es-font-display: 'Plus Jakarta Sans', var(--es-font-ui);
+  --es-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --es-text-xs: 0.75rem;     /* 12px */
+  --es-text-sm: 0.8125rem;   /* 13px */
+  --es-text-base: 0.875rem;  /* 14px */
+  --es-text-md: 1rem;        /* 16px */
+  --es-text-lg: 1.25rem;     /* 20px */
+  --es-text-xl: 1.5rem;      /* 24px */
+  --es-text-2xl: 2rem;       /* 32px */
+
+  --es-font-normal: 400;
+  --es-font-medium: 500;
+  --es-font-semibold: 600;
+  --es-font-bold: 700;
+
+  /* ── 6. Border Radius Scale ── */
+  --es-radius-xs: 4px;
+  --es-radius-sm: 8px;   /* Buttons, inputs, pills */
+  --es-radius-md: 12px;  /* Small cards, popovers, dropdowns */
+  --es-radius-lg: 16px;  /* Main cards, panels */
+  --es-radius-full: 9999px;
+
+  /* ── 7. Elevation & Shadows ── */
+  --es-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --es-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --es-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --es-shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.03);
+  --es-shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.2);
+
+  /* ── 8. Animation & Transitions ── */
+  --es-transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --es-transition-base: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --es-transition-slow: 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES via [data-theme="dark"]
+   ══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  --es-bg: #070d19;
+  --es-surface: #0e172a;
+  --es-surface-raised: #141f36;
+  --es-surface-subtle: #111b30;
+  --es-surface-muted: #1e293b;
+  --es-surface-hover: #17233d;
+
+  --es-border: rgba(255, 255, 255, 0.08);
+  --es-border-subtle: rgba(255, 255, 255, 0.04);
+  --es-border-strong: rgba(255, 255, 255, 0.16);
+  --es-border-focus: #60a5fa;
+
+  --es-text-primary: #f8fafc;
+  --es-text-secondary: #cbd5e1;
+  --es-text-muted: #94a3b8;
+  --es-text-faint: #64748b;
+
+  --es-sidebar-bg: #060b16;
+  --es-sidebar-border: rgba(255, 255, 255, 0.06);
+
+  --es-topbar-bg: rgba(14, 23, 42, 0.85);
+  --es-topbar-border: rgba(255, 255, 255, 0.08);
+
+  /* Dark mode semantic tweaks for optimal contrast */
+  --es-success-50: rgba(16, 185, 129, 0.12);
+  --es-success-border: rgba(16, 185, 129, 0.28);
+  --es-warning-50: rgba(245, 158, 11, 0.12);
+  --es-warning-border: rgba(245, 158, 11, 0.28);
+  --es-danger-50: rgba(244, 63, 94, 0.12);
+  --es-danger-border: rgba(244, 63, 94, 0.28);
+  --es-info-50: rgba(2, 132, 199, 0.12);
+  --es-info-border: rgba(2, 132, 199, 0.28);
+
+  --es-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --es-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --es-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --es-shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   GLOBAL BASE STYLES & REUSABLE UTILITIES
+   ══════════════════════════════════════════════════════════════════ */
+.es-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+.es-mono {
+  font-family: var(--es-font-mono);
+  font-feature-settings: 'calt' 0;
+  letter-spacing: -0.01em;
+}
+
+/* Accessible focus ring */
+.es-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--es-shadow-focus);
+}
+
+/* Smooth transitions */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

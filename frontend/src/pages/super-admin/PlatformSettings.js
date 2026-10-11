@@ -27,7 +27,7 @@ export default function PlatformSettings() {
     face_detection_threshold: 85,
     tab_switch_limit: 3,
     default_trial_days: 14,
-    system_notice: 'ExamShield cluster operating normally across all availability zones.',
+    system_notice: 'Nexify Examina cluster operating normally across all availability zones.',
   });
 
   const fetchSettings = async () => {

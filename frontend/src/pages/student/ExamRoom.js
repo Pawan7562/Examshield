@@ -12,6 +12,7 @@ import CodingQuestion from '../../components/CodingQuestion';
 import Timer from '../../components/Timer';
 import { parseToIST, formatIST, isExamEnded, isExamStartable, getExamRemainingSeconds } from '../../utils/timezone';
 import './ExamRoom.css';
+import logoImg from '../../assets/logo-mark.png';
 import {
   Shield,
   ShieldAlert,
@@ -1746,11 +1747,11 @@ export default function ExamRoom() {
               justifyContent: 'center',
               boxShadow: '0 4px 10px rgba(10, 116, 218, 0.25)'
             }}>
-              <Shield size={20} />
+              <img src={logoImg} alt="Nexify Examina Logo" style={{ width: 24, height: 24, objectFit: 'contain' }} />
             </div>
             <div>
               <span style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Space Grotesk', sans-serif" }}>
-                ExamShield™
+                Nexify Examina™
               </span>
               <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', background: '#eff6ff', color: '#0a74da', padding: '2px 7px', borderRadius: 6, marginLeft: 8 }}>
                 Secure Gateway
@@ -2026,12 +2027,12 @@ export default function ExamRoom() {
               justifyContent: 'center',
               boxShadow: '0 4px 14px rgba(10, 116, 218, 0.28)'
             }}>
-              <Shield size={24} />
+              <img src={logoImg} alt="Nexify Examina Logo" style={{ width: 26, height: 26, objectFit: 'contain' }} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: '1.02rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Space Grotesk', sans-serif" }}>
-                  ExamShield™ Enterprise
+                  Nexify Examina™ Enterprise
                 </span>
                 <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', background: '#eff6ff', color: '#0a74da', padding: '2px 8px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
                   Proctoring Engine v4.2
@@ -2745,7 +2746,7 @@ export default function ExamRoom() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 14, borderTop: '1px solid #f1f5f9' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                     <span style={{ color: '#64748b' }}>Institution Node</span>
-                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{user?.college_name || 'ExamShield CBT Network'}</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{user?.college_name || 'Nexify Examina CBT Network'}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                     <span style={{ color: '#64748b' }}>Session Token</span>
@@ -2920,12 +2921,12 @@ export default function ExamRoom() {
               justifyContent: 'center',
               boxShadow: '0 4px 12px rgba(10, 116, 218, 0.25)'
             }}>
-              <Shield size={22} />
+              <img src={logoImg} alt="Nexify Examina Logo" style={{ width: 24, height: 24, objectFit: 'contain' }} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Space Grotesk', sans-serif" }}>
-                  ExamShield™
+                  Nexify Examina™
                 </span>
                 <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f1f5f9', color: '#475569', padding: '2px 7px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                   Hardware Checks
@@ -5047,8 +5048,8 @@ export default function ExamRoom() {
         {/* Brand & Exam Title */}
         <div className="er-nav-brand">
           <div className="er-brand-logo">
-            <Shield size={24} />
-            <span>ExamShield</span>
+            <img src={logoImg} alt="Nexify Examina Logo" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+            <span>Nexify Examina</span>
           </div>
           <span className="er-brand-badge">Secure Exam</span>
           <div className="er-nav-exam-title">

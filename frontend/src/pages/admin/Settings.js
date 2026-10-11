@@ -434,7 +434,7 @@ const NotificationsSection = () => {
 ───────────────────────────────────────────── */
 const EmailSection = () => {
   const [form, setForm] = useState({
-    senderName: 'ExamShield Admin',
+    senderName: 'Nexify Examina Admin',
     senderEmail: '',
     replyTo: '',
     studentLoginUrl: '',
@@ -469,7 +469,7 @@ const EmailSection = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0 2rem' }}>
         <FormField label="Sender Name" hint="Name that appears in the From field">
-          <input style={inputStyle} value={form.senderName} onChange={e => setForm({ ...form, senderName: e.target.value })} placeholder="ExamShield Notifications" />
+          <input style={inputStyle} value={form.senderName} onChange={e => setForm({ ...form, senderName: e.target.value })} placeholder="Nexify Examina Notifications" />
         </FormField>
         <FormField label="Sender Email" hint="Must match your configured SMTP user">
           <input style={inputStyle} value={form.senderEmail} onChange={e => setForm({ ...form, senderEmail: e.target.value })} type="email" placeholder="noreply@yourcollege.edu" />
@@ -641,9 +641,9 @@ const DangerSection = () => {
       <DangerCard
         icon={Shield}
         title="Deactivate Account"
-        description="Deactivates your admin account and disables all associated student logins. You can reactivate by contacting ExamShield support."
+        description="Deactivates your admin account and disables all associated student logins. You can reactivate by contacting Nexify Examina support."
         buttonLabel="Deactivate Account"
-        onClick={() => toast.error('Please contact ExamShield support to deactivate your account')}
+        onClick={() => toast.error('Please contact Nexify Examina support to deactivate your account')}
       />
     </div>
   );

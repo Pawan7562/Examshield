@@ -254,7 +254,7 @@ export default function SuperAdminDashboard() {
           <div className="sa-card-header">
             <div>
               <h2 className="sa-card-title">Recent Institutional Registrations</h2>
-              <span className="sa-card-subtitle">Latest colleges onboarding onto ExamShield</span>
+              <span className="sa-card-subtitle">Latest colleges onboarding onto Nexify Examina</span>
             </div>
 
             <Link

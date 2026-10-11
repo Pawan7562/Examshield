@@ -106,6 +106,10 @@
   letter-spacing: -0.02em;
 }
 
+.sidebar-brand-name span {
+  color: #38bdf8;
+}
+
 .sidebar-brand-badge {
   font-size: 0.65rem;
   font-weight: 800;

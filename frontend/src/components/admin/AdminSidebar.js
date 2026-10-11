@@ -15,10 +15,10 @@ import {
   ChevronLeft,
   Menu,
   Brain,
-  ShieldCheck,
   Radio,
   Headphones
 } from 'lucide-react';
+import logoImg from '../../assets/logo-mark.png';
 import './AdminSidebar.css';
 
 export default function AdminSidebar() {
@@ -149,13 +149,17 @@ export default function AdminSidebar() {
         {/* Brand Header */}
         <div className="admin-sidebar-brand">
           <div className="admin-brand-icon-wrap" onClick={() => navigate('/admin/dashboard')}>
-            <ShieldCheck size={26} color="#38bdf8" />
+            <img
+              src={logoImg}
+              alt="Nexify Examina Logo"
+              style={{ width: 28, height: 28, objectFit: 'contain' }}
+            />
           </div>
 
           {!isCollapsed && (
             <div className="admin-brand-info" onClick={() => navigate('/admin/dashboard')}>
               <div className="admin-brand-title">
-                EXAM<span>SHIELD</span>
+                NEXIFY <span>EXAMINA</span>
               </div>
               <div className="admin-brand-tag">COLLEGE ADMIN</div>
             </div>

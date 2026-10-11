@@ -160,7 +160,7 @@ export default function SuperAdminLayout() {
             </button>
 
             <div className="sa-breadcrumbs">
-              <span>ExamShield Network</span>
+              <span>Nexify Examina Network</span>
               <ChevronRight size={14} />
               <span className="sa-breadcrumb-current">{getPageTitle()}</span>
             </div>
