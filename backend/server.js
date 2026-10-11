@@ -26,6 +26,7 @@ const winston = require('winston');
 const cron = require('node-cron');
 const jwt = require('jsonwebtoken');
 const { formatIST } = require('./utils/timezone');
+const { startDailyEmailScheduler, dispatchBatch } = require('./services/autoEmailBatchService');
 
 // Initialize logger with IST timestamps
 const logger = winston.createLogger({
@@ -959,6 +960,32 @@ app.get('/api/test-email', async (req, res) => {
   }
 });
 
+// Automated Daily Email Batch Manual Trigger Endpoint
+app.get('/api/trigger-email-batch', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 300, 300);
+    logger.info(`[Admin Request] Manual trigger for email batch dispatch requested (limit: ${limit})`);
+    
+    if (req.query.async === 'true') {
+      dispatchBatch(limit).catch(err => logger.error('[Async Batch Error]:', err));
+      return res.json({
+        success: true,
+        message: `Batch dispatch of ${limit} emails started in the background. Check logs for delivery progress.`
+      });
+    }
+
+    const result = await dispatchBatch(limit);
+    return res.json({
+      success: result.success,
+      message: result.message || `Dispatched ${result.sentCount} emails. (${result.failCount || 0} failed)`,
+      data: result
+    });
+  } catch (error) {
+    logger.error('Email batch trigger failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found.` });
@@ -1020,6 +1047,8 @@ server.listen(PORT, () => {
   });
 
   // Execute initial lifecycle sweep to close any expired exams and hanging sessions
+  startDailyEmailScheduler();
+
   autoCloseExpiredExams().then((res) => {
     logger.info(`🛡️ Initial Exam Lifecycle sweep complete. (Closed: ${res?.closedExamsCount || 0}, Sessions: ${res?.autoSubmittedSessionsCount || 0})`);
   }).catch((err) => {
