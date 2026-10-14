@@ -16,8 +16,8 @@ const LiveMonitoring = ({ examId, examName }) => {
 
   useEffect(() => {
     // Initialize WebSocket connection for real-time monitoring
-    const wsUrl = process.env.REACT_APP_WS_URL || 
-      (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-3-wydj.onrender.com');
+    const wsUrl = process.env.REACT_APP_WS_URL ||
+      (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://exam.nexifyforge.in');
 
     const newSocket = io(wsUrl, {
       auth: {
@@ -82,7 +82,7 @@ const LiveMonitoring = ({ examId, examName }) => {
     try {
       const response = await adminAPI.getMonitoringData(examId);
       const data = response.data;
-      
+
       setStudents(data.students || []);
       setViolations(data.violations || {});
       setStats({
@@ -98,8 +98,8 @@ const LiveMonitoring = ({ examId, examName }) => {
   };
 
   const updateStudentActivity = (data) => {
-    setStudents(prev => prev.map(student => 
-      student.id === data.studentId 
+    setStudents(prev => prev.map(student =>
+      student.id === data.studentId
         ? { ...student, ...data.activity, lastSeen: new Date() }
         : student
     ));
@@ -110,7 +110,7 @@ const LiveMonitoring = ({ examId, examName }) => {
       ...prev,
       [data.studentId]: [...(prev[data.studentId] || []), data.violation]
     }));
-    
+
     // Show toast notification for serious violations
     if (data.violation.severity === 'high') {
       toast.error(`🚨 High-risk violation detected for ${data.studentName}`, {
@@ -167,7 +167,7 @@ const LiveMonitoring = ({ examId, examName }) => {
 
   const getActivityColor = (activity) => {
     if (!activity) return '#6b7280';
-    
+
     switch (activity.status) {
       case 'active': return '#22c55e';
       case 'idle': return '#f59e0b';
@@ -179,7 +179,7 @@ const LiveMonitoring = ({ examId, examName }) => {
 
   const getActivityStatus = (activity) => {
     if (!activity) return 'Unknown';
-    
+
     switch (activity.status) {
       case 'active': return 'Active';
       case 'idle': return 'Idle';
@@ -199,19 +199,19 @@ const LiveMonitoring = ({ examId, examName }) => {
   };
 
   return (
-    <div style={{ 
-      background: '#0a0a0f', 
-      border: '1px solid rgba(255,255,255,0.1)', 
-      borderRadius: 12, 
+    <div style={{
+      background: '#0a0a0f',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 12,
       padding: 24,
       fontFamily: 'Sora, sans-serif',
       color: '#e2e8f0'
     }}>
       {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 24,
         paddingBottom: 16,
         borderBottom: '1px solid rgba(255,255,255,0.1)'
@@ -221,10 +221,10 @@ const LiveMonitoring = ({ examId, examName }) => {
             📹 Live Monitoring - {examName}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ 
-              width: 8, 
-              height: 8, 
-              borderRadius: '50%', 
+            <div style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
               background: connected ? '#22c55e' : '#ef4444',
               animation: connected ? 'pulse 2s infinite' : 'none'
             }}></div>
@@ -233,7 +233,7 @@ const LiveMonitoring = ({ examId, examName }) => {
             </span>
           </div>
         </div>
-        
+
         {/* Stats */}
         <div style={{ display: 'flex', gap: 16 }}>
           <div style={{ textAlign: 'center' }}>
@@ -259,35 +259,35 @@ const LiveMonitoring = ({ examId, examName }) => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 24 }}>
         {/* Student Grid */}
         <div>
-          <div style={{ 
-            fontSize: 14, 
-            fontWeight: 600, 
-            color: '#a0aec0', 
+          <div style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#a0aec0',
             marginBottom: 16,
             textTransform: 'uppercase',
             letterSpacing: 0.5
           }}>
             Student Activity ({students.length})
           </div>
-          
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: 16,
             maxHeight: '600px',
             overflowY: 'auto',
             paddingRight: 8
           }}>
             {students.map(student => (
-              <div 
+              <div
                 key={student.id}
                 onClick={() => setSelectedStudent(student)}
-                style={{ 
-                  background: 'rgba(255,255,255,0.02)', 
-                  border: selectedStudent?.id === student.id 
-                    ? '2px solid #e94560' 
-                    : '1px solid rgba(255,255,255,0.06)', 
-                  borderRadius: 8, 
+                style={{
+                  background: 'rgba(255,255,255,0.02)',
+                  border: selectedStudent?.id === student.id
+                    ? '2px solid #e94560'
+                    : '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 8,
                   padding: 16,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
@@ -298,14 +298,14 @@ const LiveMonitoring = ({ examId, examName }) => {
                   e.target.style.background = 'rgba(255,255,255,0.04)';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.borderColor = selectedStudent?.id === student.id 
-                    ? '#e94560' 
+                  e.target.style.borderColor = selectedStudent?.id === student.id
+                    ? '#e94560'
                     : 'rgba(255,255,255,0.06)';
                   e.target.style.background = 'rgba(255,255,255,0.02)';
                 }}
               >
                 {/* Status Indicator */}
-                <div style={{ 
+                <div style={{
                   position: 'absolute',
                   top: 12,
                   right: 12,
@@ -326,15 +326,15 @@ const LiveMonitoring = ({ examId, examName }) => {
                 </div>
 
                 {/* Activity Status */}
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   marginBottom: 8
                 }}>
-                  <span style={{ 
-                    fontSize: 11, 
-                    fontWeight: 600, 
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 600,
                     color: getActivityColor(student.activity),
                     background: `${getActivityColor(student.activity)}15`,
                     padding: '2px 8px',
@@ -343,8 +343,8 @@ const LiveMonitoring = ({ examId, examName }) => {
                     {getActivityStatus(student.activity)}
                   </span>
                   <span style={{ fontSize: 10, color: '#718096' }}>
-                    {student.lastSeen ? 
-                      new Date(student.lastSeen).toLocaleTimeString() : 
+                    {student.lastSeen ?
+                      new Date(student.lastSeen).toLocaleTimeString() :
                       'No activity'
                     }
                   </span>
@@ -352,9 +352,9 @@ const LiveMonitoring = ({ examId, examName }) => {
 
                 {/* Current Question */}
                 {student.activity?.currentQuestion && (
-                  <div style={{ 
-                    fontSize: 11, 
-                    color: '#718096', 
+                  <div style={{
+                    fontSize: 11,
+                    color: '#718096',
                     marginBottom: 8,
                     padding: '4px 8px',
                     background: 'rgba(255,255,255,0.02)',
@@ -366,8 +366,8 @@ const LiveMonitoring = ({ examId, examName }) => {
 
                 {/* Violations */}
                 {getViolationCount(student.id) > 0 && (
-                  <div style={{ 
-                    fontSize: 11, 
+                  <div style={{
+                    fontSize: 11,
                     color: '#ef4444',
                     marginBottom: 8,
                     padding: '4px 8px',
@@ -386,14 +386,14 @@ const LiveMonitoring = ({ examId, examName }) => {
                       e.stopPropagation();
                       setWarningModal({ open: true, studentId: student.id, message: '' });
                     }}
-                    style={{ 
+                    style={{
                       flex: 1,
-                      background: 'rgba(245,158,11,0.1)', 
-                      border: '1px solid rgba(245,158,11,0.3)', 
-                      borderRadius: 4, 
-                      padding: '6px 8px', 
-                      color: '#f59e0b', 
-                      cursor: 'pointer', 
+                      background: 'rgba(245,158,11,0.1)',
+                      border: '1px solid rgba(245,158,11,0.3)',
+                      borderRadius: 4,
+                      padding: '6px 8px',
+                      color: '#f59e0b',
+                      cursor: 'pointer',
                       fontSize: 11,
                       fontWeight: 600
                     }}
@@ -405,14 +405,14 @@ const LiveMonitoring = ({ examId, examName }) => {
                       e.stopPropagation();
                       setTerminateModal({ open: true, studentId: student.id, reason: '' });
                     }}
-                    style={{ 
+                    style={{
                       flex: 1,
-                      background: 'rgba(239,68,68,0.1)', 
-                      border: '1px solid rgba(239,68,68,0.3)', 
-                      borderRadius: 4, 
-                      padding: '6px 8px', 
-                      color: '#ef4444', 
-                      cursor: 'pointer', 
+                      background: 'rgba(239,68,68,0.1)',
+                      border: '1px solid rgba(239,68,68,0.3)',
+                      borderRadius: 4,
+                      padding: '6px 8px',
+                      color: '#ef4444',
+                      cursor: 'pointer',
                       fontSize: 11,
                       fontWeight: 600
                     }}
@@ -427,17 +427,17 @@ const LiveMonitoring = ({ examId, examName }) => {
 
         {/* Selected Student Details */}
         {selectedStudent && (
-          <div style={{ 
-            background: 'rgba(255,255,255,0.02)', 
-            border: '1px solid rgba(255,255,255,0.06)', 
-            borderRadius: 8, 
+          <div style={{
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 8,
             padding: 16,
             height: 'fit-content'
           }}>
-            <div style={{ 
-              fontSize: 14, 
-              fontWeight: 600, 
-              color: '#a0aec0', 
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#a0aec0',
               marginBottom: 16,
               textTransform: 'uppercase',
               letterSpacing: 0.5
@@ -460,20 +460,20 @@ const LiveMonitoring = ({ examId, examName }) => {
 
             {/* Camera Feed */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ 
-                fontSize: 12, 
-                fontWeight: 600, 
-                color: '#718096', 
-                marginBottom: 8 
+              <div style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#718096',
+                marginBottom: 8
               }}>
                 📹 Camera Feed
               </div>
-              <div style={{ 
-                background: '#000', 
-                borderRadius: 8, 
-                height: 200, 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                background: '#000',
+                borderRadius: 8,
+                height: 200,
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
                 position: 'relative',
                 overflow: 'hidden'
@@ -481,16 +481,16 @@ const LiveMonitoring = ({ examId, examName }) => {
                 <img
                   ref={el => { if (el) videoRefs.current[selectedStudent.id] = el; }}
                   alt={selectedStudent.name || 'Candidate Feed'}
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
+                  style={{
+                    width: '100%',
+                    height: '100%',
                     objectFit: 'cover',
                     borderRadius: 8,
                     display: 'block'
                   }}
                 />
                 {!selectedStudent.activity?.cameraActive && (
-                  <div style={{ 
+                  <div style={{
                     position: 'absolute',
                     top: 0,
                     left: 0,
@@ -512,11 +512,11 @@ const LiveMonitoring = ({ examId, examName }) => {
 
             {/* Activity Timeline */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ 
-                fontSize: 12, 
-                fontWeight: 600, 
-                color: '#718096', 
-                marginBottom: 8 
+              <div style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#718096',
+                marginBottom: 8
               }}>
                 📊 Activity Timeline
               </div>
@@ -537,20 +537,20 @@ const LiveMonitoring = ({ examId, examName }) => {
             {/* Violations */}
             {getViolationCount(selectedStudent.id) > 0 && (
               <div>
-                <div style={{ 
-                  fontSize: 12, 
-                  fontWeight: 600, 
-                  color: '#718096', 
-                  marginBottom: 8 
+                <div style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#718096',
+                  marginBottom: 8
                 }}>
                   ⚠️ Violations
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {violations[selectedStudent.id]?.map((violation, i) => (
-                    <div 
+                    <div
                       key={i}
-                      style={{ 
-                        fontSize: 10, 
+                      style={{
+                        fontSize: 10,
                         color: '#ef4444',
                         padding: '4px 8px',
                         background: 'rgba(239,68,68,0.1)',

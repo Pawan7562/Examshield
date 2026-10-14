@@ -7,7 +7,7 @@ const getApiBaseUrl = () => {
   }
   return process.env.NODE_ENV === 'development'
     ? 'http://localhost:5000/api'
-    : 'https://examshield-3-wydj.onrender.com/api';
+    : 'https://exam.nexifyforge.in/api';
 };
 
 class ChatBotService {
@@ -243,7 +243,7 @@ class ChatBotService {
     try {
       sessionStorage.removeItem('nexify_examina_chat_session_id');
       this.sessionId = this.getOrInitSessionId();
-    } catch (e) {}
+    } catch (e) { }
   }
 
   exportHistory() {

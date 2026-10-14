@@ -23,17 +23,33 @@ async function main() {
 
   const apiKey = process.env.BREVO_API_KEY || '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';
 
-  // 1. Check Brevo credits before starting
+  // 1. Check Brevo quota before starting
+  let availableCredits = BATCH_LIMIT;
   try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const statsRes = await fetch('https://api.brevo.com/v3/smtp/statistics/reports', {
+      headers: { 'api-key': apiKey, 'accept': 'application/json' }
+    });
+    const statsData = await statsRes.json();
+    const todayReport = statsData.reports?.find(r => r.date === todayStr);
+    const usedToday = todayReport ? (todayReport.requests || 0) : 0;
+
     const accRes = await fetch('https://api.brevo.com/v3/account', {
       headers: { 'api-key': apiKey, 'accept': 'application/json' }
     });
     const accData = await accRes.json();
-    const credits = accData.plan?.[0]?.credits ?? 0;
-    console.log(`📊 Brevo Available Credits: ${credits}`);
+    const isFree = accData.plan?.[0]?.type === 'free' || accData.plan?.[0]?.creditsType === 'sendLimit';
+    const paidCredits = accData.plan?.[0]?.credits || 0;
 
-    if (credits <= 0) {
-      console.log(`\n⚠️  NOTICE: You currently have 0 Brevo credits remaining today.`);
+    if (!isFree && paidCredits > 0) {
+      availableCredits = paidCredits;
+    } else {
+      availableCredits = Math.max(0, 300 - usedToday);
+    }
+    console.log(`📊 Brevo Quota Status: ${usedToday}/300 sent today | Available: ${availableCredits}`);
+
+    if (availableCredits <= 0) {
+      console.log(`\n⚠️  NOTICE: Daily quota of 300 emails has been reached for today (${todayStr}).`);
       console.log(`⏰ Brevo resets at 00:00 UTC (5:30 AM IST).`);
       console.log(`👉 Please run this script tomorrow morning after 5:30 AM IST, or upgrade to Brevo Starter.`);
       console.log(`===============================================================\n`);
@@ -109,9 +125,9 @@ async function main() {
         const tempPassword = generatePassword();
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-        // Update student password in DB
+        // Update student password and credentials_sent_at in DB
         await pool.query(
-          `UPDATE students SET password = $1, updated_at = NOW() WHERE student_id = $2`,
+          `UPDATE students SET password = $1, credentials_sent_at = NOW(), updated_at = NOW() WHERE student_id = $2`,
           [hashedPassword, studentId]
         );
 

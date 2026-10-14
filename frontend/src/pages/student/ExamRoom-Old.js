@@ -41,23 +41,23 @@ export default function ExamRoom() {
   // Setup Socket
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
-    const wsUrl = process.env.REACT_APP_WS_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-3-wydj.onrender.com');
+    const wsUrl = process.env.REACT_APP_WS_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://exam.nexifyforge.in');
     const socket = io(wsUrl, { auth: { token } });
     socketRef.current = socket;
-    
+
     // Cleanup full screen on component unmount
     return () => {
       socket.disconnect();
-      
+
       // Exit full screen and cleanup
       const exitFullScreen = () => {
         try {
           // Check if document is in full screen mode before attempting to exit
-          if (document.fullscreenElement || 
-              document.webkitFullscreenElement || 
-              document.mozFullScreenElement || 
-              document.msFullscreenElement) {
-            
+          if (document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement) {
+
             if (document.exitFullscreen) {
               document.exitFullscreen();
             } else if (document.webkitExitFullscreen) {
@@ -89,7 +89,7 @@ export default function ExamRoom() {
   // ─── Answer Management ──────────────────────────────────────────────────
   const handleAnswer = (questionId, answer) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
-    
+
     // Save to server (optimistic)
     const question = questions.find(q => q.id === questionId);
     if (!question) return;
@@ -97,10 +97,10 @@ export default function ExamRoom() {
     studentAPI.saveAnswer(examId, {
       sessionId: session.id,
       questionId,
-      ...(question.type === 'mcq' ? { selectedOption: answer } : 
-         question.type === 'coding' ? { codeSubmission: answer } : 
-         { answerText: answer }),
-    }).catch(() => {});
+      ...(question.type === 'mcq' ? { selectedOption: answer } :
+        question.type === 'coding' ? { codeSubmission: answer } :
+          { answerText: answer }),
+    }).catch(() => { });
   };
 
   const handleSubmit = async (autoSubmit = false, retryCount = 0) => {
@@ -108,30 +108,30 @@ export default function ExamRoom() {
       console.log('Exam already submitted, ignoring duplicate submission');
       return;
     }
-    
+
     if (!autoSubmit && !window.confirm('Submit exam? You cannot change answers after submission.')) return;
 
     console.log(autoSubmit ? '📤 Auto-submitting exam...' : '📤 Submitting exam...');
     setSubmitted(true);
     if (autoSaveRef.current) clearInterval(autoSaveRef.current);
 
-  try {
+    try {
       // Final save all answers before submission (defensive)
       console.log('💾 Saving final answers (defensive)...');
       try {
         const savePromises = Object.entries(answers).map(([questionId, answer]) => {
           const question = questions.find(q => q.id === questionId);
           if (!question || !answer) return Promise.resolve();
-          
+
           return studentAPI.saveAnswer(examId, {
             sessionId: session.id,
             questionId,
-            ...(question.type === 'mcq' ? { selectedOption: answer } : 
-               question.type === 'coding' ? { codeSubmission: answer } : 
-               { answerText: answer }),
+            ...(question.type === 'mcq' ? { selectedOption: answer } :
+              question.type === 'coding' ? { codeSubmission: answer } :
+                { answerText: answer }),
           });
         });
-        
+
         // Use allSettled so one failed save doesn't block final submission
         await Promise.allSettled(savePromises);
         console.log('✅ Final answer save attempted');
@@ -151,13 +151,13 @@ export default function ExamRoom() {
 
       // Submit exam to backend with retry logic
       console.log('📤 Submitting exam to backend...');
-      
+
       let res;
       try {
         res = await studentAPI.submitExam(examId, submissionData);
       } catch (fetchError) {
         console.error('❌ Network or Server error during submission:', fetchError);
-        
+
         // Retry logic for network errors
         if (retryCount < 2 && autoSubmit) {
           console.log(`🔄 Retrying auto-submission (${retryCount + 1}/2)...`);
@@ -166,7 +166,7 @@ export default function ExamRoom() {
           setSubmitted(false);
           return handleSubmit(autoSubmit, retryCount + 1);
         }
-        
+
         // Extract exact server message if available
         const serverMsg = fetchError.response?.data?.message || fetchError.error || fetchError.message;
         throw new Error(serverMsg || 'Server error: Unable to submit exam');
@@ -180,16 +180,16 @@ export default function ExamRoom() {
       console.log('✅ Exam submitted successfully:', res.data);
       setResult(res.data);
       setPhase('submitted');
-      
+
       // Notify backend via socket
-      socketRef.current?.emit('exam-submitted', { 
-        sessionId: session.id, 
+      socketRef.current?.emit('exam-submitted', {
+        sessionId: session.id,
         examId,
         autoSubmit,
         violationCount,
         submissionTime: new Date().toISOString()
       });
-      
+
       toast.success(res.message || 'Exam submitted successfully!');
 
       // Exit full screen logic...
@@ -199,22 +199,22 @@ export default function ExamRoom() {
             if (document.exitFullscreen) document.exitFullscreen();
             else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
           }
-        } catch (e) {}
+        } catch (e) { }
       };
       setTimeout(exitFullScreen, 1000);
 
     } catch (err) {
       console.error('❌ [PROFESSIONAL] Exam submission failure:', err);
-      
+
       // Extract the most specific message from the server response
       const serverMessage = err.response?.data?.message || err.message;
       const errorMessage = serverMessage || 'An unexpected error occurred. Your answers are saved locally.';
-      
-      toast.error(errorMessage, { 
+
+      toast.error(errorMessage, {
         duration: 8000,
-        id: 'submit-error' 
+        id: 'submit-error'
       });
-      
+
       // Industrial-strength local backup
       try {
         const backupKey = `backup_exam_${examId}_${Date.now()}`;
@@ -227,7 +227,7 @@ export default function ExamRoom() {
       } catch (e) {
         console.error('Failed to create local backup:', e);
       }
-      
+
       setSubmitted(false);
     }
   };
@@ -253,7 +253,7 @@ export default function ExamRoom() {
     // Extract actual payload whether wrapped in response.data or bare
     const data = response.data || response;
     const { message, violationCount: count, autoTerminate } = data;
-    
+
     console.log(`📊 [PROCTORING] Backend Response: count=${count}, terminate=${autoTerminate}, msg="${message}"`);
     setViolationCount(count || 0);
     setWarningMsg(message || '');
@@ -312,14 +312,14 @@ export default function ExamRoom() {
       }
     } catch (error) {
       console.error('❌ [PROCTORING] Violation report failed:', error.response?.data || error.message);
-      
+
       // Even if backend fails, still increment local count as fallback
       setViolationCount(prev => {
         const newCount = prev + 1;
         const maxV = examData?.max_violations || 3;
         setWarningMsg(`⚠️ Warning ${newCount}/${maxV}: ${description}`);
         toast.error(`⚠️ Warning ${newCount}/${maxV}: ${description}`, { duration: 4000 });
-        
+
         if (newCount >= maxV && !submittedRef.current) {
           setWarningMsg('🚨 EXAM TERMINATED: Maximum violations reached.');
           setTimeout(() => handleSubmitRef.current(true), 2000);
@@ -338,28 +338,28 @@ export default function ExamRoom() {
     if (phase !== 'exam') return;
 
     console.log('🛡️ [PROCTORING] Full-screen + tab-switching detection ACTIVE');
-    
+
     let isTabSwitching = false;
 
     // ── Full-Screen Exit Detection ──
     const handleFullscreenChange = () => {
       const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
-      
+
       if (!isFullscreen && !submittedRef.current) {
         console.log('🚨 [PROCTORING] Full-screen exited — counting violation');
         reportViolationRef.current('fullscreen_exit', 'Student exited full-screen mode');
-        
+
         // Re-request full-screen after a short delay
         setTimeout(() => {
           if (!submittedRef.current) {
             const el = document.documentElement;
             try {
               if (el.requestFullscreen) {
-                el.requestFullscreen().catch(() => {});
+                el.requestFullscreen().catch(() => { });
               } else if (el.webkitRequestFullscreen) {
                 el.webkitRequestFullscreen();
               }
-            } catch (e) {}
+            } catch (e) { }
           }
         }, 1000);
       }
@@ -425,16 +425,16 @@ export default function ExamRoom() {
       if (matchedCombo) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         // Escape key: re-request fullscreen instead of counting violation
         if (key === 'escape') {
           const el = document.documentElement;
           try {
-            if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-          } catch (err) {}
+            if (el.requestFullscreen) el.requestFullscreen().catch(() => { });
+          } catch (err) { }
           return false;
         }
-        
+
         reportViolationRef.current('keyboard_shortcut', `Blocked: ${matchedCombo.name}`);
         return false;
       }
@@ -470,7 +470,7 @@ export default function ExamRoom() {
           sessionId: session.id,
           questionId,
           ...(question.type === 'mcq' ? { selectedOption: answer } : question.type === 'coding' ? { codeSubmission: answer } : { answerText: answer }),
-        }).catch(() => {});
+        }).catch(() => { });
       });
     }, 30000);
     return () => clearInterval(autoSaveRef.current);
@@ -482,16 +482,16 @@ export default function ExamRoom() {
       setIsStartingExam(true);
       setLoadingError(null);
       setPhase('loading');
-      
+
       // Show loading toast
       toast.loading('Starting your exam...', { id: 'exam-start' });
 
       const res = await studentAPI.startExam(examId, { examKey });
       console.log('📋 Exam start response:', res.data);
-      
+
       // SIMPLIFIED: Direct data extraction without complex validation
       const responseData = res.data;
-      
+
       console.log('🔍 Response structure analysis:', {
         hasSuccess: 'success' in responseData,
         success: responseData.success,
@@ -499,10 +499,10 @@ export default function ExamRoom() {
         hasDirectData: 'exam' in responseData,
         keys: Object.keys(responseData)
       });
-      
+
       // Extract data from response - try multiple patterns
       let exam, sessionData, questionsData, savedAnswers, time;
-      
+
       if (responseData.data && responseData.data.exam) {
         // Pattern 1: { success: true, data: { exam, session, questions, ... } }
         console.log('📊 Using Pattern 1: data.exam structure');
@@ -528,7 +528,7 @@ export default function ExamRoom() {
         savedAnswers = responseData.savedAnswers || [];
         time = responseData.timeRemaining;
       }
-      
+
       console.log('📊 Extracted data:', {
         hasExam: !!exam,
         hasSession: !!sessionData,
@@ -537,13 +537,13 @@ export default function ExamRoom() {
         examName: exam?.name || 'Unknown',
         sessionId: sessionData?.id || 'Unknown'
       });
-      
+
       // CRITICAL: Force questions to be an array and ensure we have data
       if (!questionsData || !Array.isArray(questionsData)) {
         console.warn('⚠️ Questions data is invalid, creating empty array');
         questionsData = [];
       }
-      
+
       // If we have basic data, proceed regardless of validation issues
       if (exam && sessionData) {
         console.log('✅ Basic data received, proceeding with exam start');
@@ -559,7 +559,7 @@ export default function ExamRoom() {
             optionsCount: questionsData[0].options?.length || 0
           } : null
         });
-        
+
         // Set all data
         setExamData(exam);
         setSession(sessionData);
@@ -577,22 +577,22 @@ export default function ExamRoom() {
           });
         }
         setAnswers(saved);
-        
+
         console.log('💾 Saved answers restored:', Object.keys(saved).length);
-        
+
         // Set current question to first question
         if (questionsData.length > 0) {
           setCurrentQ(0);
         }
-        
+
         // CRITICAL: Force phase change to exam
         setPhase('exam');
         setIsStartingExam(false);
-        
+
         // Update toast to success
         toast.success('Exam started successfully!', { id: 'exam-start' });
         console.log('✅ Exam started successfully with', questionsData.length, 'questions');
-        
+
         // 🖥️ Request Full-Screen Mode after render
         setTimeout(() => {
           const el = document.documentElement;
@@ -609,7 +609,7 @@ export default function ExamRoom() {
             console.warn('Full-screen not available:', e.message);
           }
         }, 500);
-        
+
       } else {
         throw new Error('Required exam data not received');
       }
@@ -617,15 +617,15 @@ export default function ExamRoom() {
     } catch (error) {
       console.error('❌ Failed to start exam:', error);
       setIsStartingExam(false);
-      
+
       const errorMessage = error.message || error.error || (typeof error === 'string' ? error : 'Failed to start exam');
       setLoadingError(errorMessage);
       setPhase('key');
-      
+
       // Update toast to error
-      toast.error(errorMessage, { 
+      toast.error(errorMessage, {
         id: 'exam-start',
-        duration: 5000 
+        duration: 5000
       });
     }
   };
@@ -656,21 +656,21 @@ export default function ExamRoom() {
   // ─── Loading Phase ─────────────────────────────────────────────────────────
   if (phase === 'loading') {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        background: '#0a0a0f', 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        minHeight: '100vh',
+        background: '#0a0a0f',
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
         fontFamily: 'Sora, sans-serif'
       }}>
         <div style={{ textAlign: 'center', maxWidth: 400, padding: 32 }}>
-          <div style={{ 
-            width: 60, 
-            height: 60, 
-            border: '3px solid rgba(233,69,96,0.2)', 
-            borderTop: '3px solid #e94560', 
-            borderRadius: '50%', 
+          <div style={{
+            width: 60,
+            height: 60,
+            border: '3px solid rgba(233,69,96,0.2)',
+            borderTop: '3px solid #e94560',
+            borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto 24px'
           }}></div>
@@ -680,9 +680,9 @@ export default function ExamRoom() {
           <p style={{ fontSize: 14, color: '#718096', lineHeight: 1.6, marginBottom: 20 }}>
             We're preparing your exam questions and setting up your session. This will only take a moment.
           </p>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
             gap: 8,
             marginBottom: 16
           }}>
@@ -703,7 +703,7 @@ export default function ExamRoom() {
             Please wait while we load your exam...
           </p>
         </div>
-        
+
         <style>{`
           @keyframes spin {
             0% { transform: rotate(0deg); }
@@ -757,18 +757,18 @@ export default function ExamRoom() {
     <div data-exam-container style={{ minHeight: '100vh', background: '#080810', fontFamily: 'Sora, sans-serif', display: 'flex' }}>
       {/* Professional Warning Banner */}
       {warningMsg && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          background: warningMsg.includes('🚨') ? '#dc2626' : warningMsg.includes('Warning 3') ? '#dc2626' : warningMsg.includes('Warning 2') ? '#f59e0b' : '#ef4444', 
-          padding: '14px 20px', 
-          textAlign: 'center', 
-          fontWeight: 600, 
-          fontSize: 15, 
-          color: 'white', 
-          zIndex: 9999, 
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          background: warningMsg.includes('🚨') ? '#dc2626' : warningMsg.includes('Warning 3') ? '#dc2626' : warningMsg.includes('Warning 2') ? '#f59e0b' : '#ef4444',
+          padding: '14px 20px',
+          textAlign: 'center',
+          fontWeight: 600,
+          fontSize: 15,
+          color: 'white',
+          zIndex: 9999,
           animation: 'slideDown 0.3s ease',
           boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
           fontFamily: 'Sora, sans-serif'
@@ -783,17 +783,17 @@ export default function ExamRoom() {
                   const currentWarning = parseInt(warningMsg.match(/Warning (\d)/)?.[1] || '0');
                   const isActive = currentWarning >= num;
                   return (
-                    <div 
+                    <div
                       key={num}
-                      style={{ 
-                        width: '14px', 
-                        height: '14px', 
-                        borderRadius: '50%', 
+                      style={{
+                        width: '14px',
+                        height: '14px',
+                        borderRadius: '50%',
                         background: isActive ? '#ffffff' : 'rgba(255,255,255,0.3)',
                         border: '2px solid #ffffff',
                         animation: isActive ? 'pulse 1.5s infinite' : 'none',
                         transition: 'all 0.3s ease'
-                      }} 
+                      }}
                     />
                   );
                 })}
@@ -828,7 +828,7 @@ export default function ExamRoom() {
 
         {/* Professional Proctoring — Camera + Face Detection */}
         {phase === 'exam' && (
-          <ProfessionalProctoring 
+          <ProfessionalProctoring
             sessionId={session?.id}
             examId={examId}
             studentId={user?.id}
@@ -948,54 +948,54 @@ export default function ExamRoom() {
                 <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
                 <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Question Not Available</h2>
                 <p style={{ fontSize: 14, textAlign: 'center', maxWidth: 400, marginBottom: 20 }}>
-                  {currentQ >= questions.length 
+                  {currentQ >= questions.length
                     ? `You've reached the end of the exam. You have ${questions.length} questions in total.`
                     : 'There seems to be an issue loading this question. Please try the options below.'
                   }
                 </p>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  <button 
+                  <button
                     onClick={() => setCurrentQ(0)}
-                    style={{ 
-                      background: 'rgba(233,69,96,0.15)', 
-                      border: '1px solid rgba(233,69,96,0.3)', 
-                      borderRadius: 8, 
-                      padding: '10px 20px', 
-                      color: '#e94560', 
-                      cursor: 'pointer', 
-                      fontFamily: 'Sora, sans-serif', 
+                    style={{
+                      background: 'rgba(233,69,96,0.15)',
+                      border: '1px solid rgba(233,69,96,0.3)',
+                      borderRadius: 8,
+                      padding: '10px 20px',
+                      color: '#e94560',
+                      cursor: 'pointer',
+                      fontFamily: 'Sora, sans-serif',
                       fontSize: 13,
                       fontWeight: 600
                     }}
                   >
                     Go to First Question
                   </button>
-                  <button 
+                  <button
                     onClick={() => setCurrentQ(Math.max(0, currentQ - 1))}
-                    style={{ 
-                      background: 'rgba(59,130,246,0.15)', 
-                      border: '1px solid rgba(59,130,246,0.3)', 
-                      borderRadius: 8, 
-                      padding: '10px 20px', 
-                      color: '#3b82f6', 
-                      cursor: 'pointer', 
-                      fontFamily: 'Sora, sans-serif', 
+                    style={{
+                      background: 'rgba(59,130,246,0.15)',
+                      border: '1px solid rgba(59,130,246,0.3)',
+                      borderRadius: 8,
+                      padding: '10px 20px',
+                      color: '#3b82f6',
+                      cursor: 'pointer',
+                      fontFamily: 'Sora, sans-serif',
                       fontSize: 13,
                       fontWeight: 600
                     }}
                   >
                     Previous Question
                   </button>
-                  <button 
+                  <button
                     onClick={() => window.location.reload()}
-                    style={{ 
-                      background: 'rgba(107,114,128,0.15)', 
-                      border: '1px solid rgba(107,114,128,0.3)', 
-                      borderRadius: 8, 
-                      padding: '10px 20px', 
-                      color: '#6b7280', 
-                      cursor: 'pointer', 
-                      fontFamily: 'Sora, sans-serif', 
+                    style={{
+                      background: 'rgba(107,114,128,0.15)',
+                      border: '1px solid rgba(107,114,128,0.3)',
+                      borderRadius: 8,
+                      padding: '10px 20px',
+                      color: '#6b7280',
+                      cursor: 'pointer',
+                      fontFamily: 'Sora, sans-serif',
                       fontSize: 13,
                       fontWeight: 600
                     }}
@@ -1036,7 +1036,7 @@ export default function ExamRoom() {
                     <textarea value={answers[q.id] || ''} onChange={e => handleAnswer(q.id, e.target.value)}
                       placeholder="Write your code here..."
                       rows={14}
-                  style={{ width: '100%', background: '#0d0d14', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '14px 16px', color: '#22c55e', fontSize: 13, fontFamily: "'JetBrains Mono', monospace", resize: 'vertical' }} />
+                      style={{ width: '100%', background: '#0d0d14', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '14px 16px', color: '#22c55e', fontSize: 13, fontFamily: "'JetBrains Mono', monospace", resize: 'vertical' }} />
                   </div>
                 )}
 

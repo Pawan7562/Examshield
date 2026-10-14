@@ -26,20 +26,36 @@ const dispatchBatch = async (maxLimit = 300) => {
 
   const apiKey = process.env.BREVO_API_KEY || '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';
 
-  // 1. Verify available Brevo credits
+  // 1. Verify available Brevo quota / credits
   let availableCredits = maxLimit;
   try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const statsRes = await fetch('https://api.brevo.com/v3/smtp/statistics/reports', {
+      headers: { 'api-key': apiKey, 'accept': 'application/json' },
+      signal: AbortSignal.timeout(6000)
+    });
+    const statsData = await statsRes.json();
+    const todayReport = statsData.reports?.find(r => r.date === todayStr);
+    const usedToday = todayReport ? (todayReport.requests || 0) : 0;
+
     const accRes = await fetch('https://api.brevo.com/v3/account', {
       headers: { 'api-key': apiKey, 'accept': 'application/json' },
       signal: AbortSignal.timeout(6000)
     });
     const accData = await accRes.json();
-    availableCredits = accData.plan?.[0]?.credits ?? 0;
-    console.log(`📊 [AutoEmailBatch] Brevo Credits Available: ${availableCredits}`);
+    const isFree = accData.plan?.[0]?.type === 'free' || accData.plan?.[0]?.creditsType === 'sendLimit';
+    const paidCredits = accData.plan?.[0]?.credits || 0;
+
+    if (!isFree && paidCredits > 0) {
+      availableCredits = paidCredits;
+    } else {
+      availableCredits = Math.max(0, 300 - usedToday);
+    }
+    console.log(`📊 [AutoEmailBatch] Brevo Usage Today: ${usedToday}/300 | Available Credits: ${availableCredits}`);
 
     if (availableCredits <= 0) {
-      console.log(`⚠️ [AutoEmailBatch] 0 credits remaining today. Skipping dispatch until 00:00 UTC (5:30 AM IST) reset.`);
-      return { success: false, message: '0 Brevo credits remaining today', sentCount: 0 };
+      console.log(`⚠️ [AutoEmailBatch] Daily limit (300) reached for ${todayStr}. Skipping dispatch until reset.`);
+      return { success: false, message: 'Daily limit reached', sentCount: 0 };
     }
   } catch (err) {
     console.warn(`[AutoEmailBatch] Could not verify Brevo credits, proceeding with limit ${maxLimit}:`, err.message);

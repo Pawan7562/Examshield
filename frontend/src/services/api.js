@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 // Use direct backend URL for both development and production
 const developmentApiBaseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 // Priority: env var > hardcoded production URL
-const productionApiBaseURL = process.env.REACT_APP_API_URL || 'https://examshield-3-wydj.onrender.com/api';
+const productionApiBaseURL = process.env.REACT_APP_API_URL || 'https://exam.nexifyforge.in/api';
 
 const API_BASE_URL =
   process.env.NODE_ENV === 'development' ? developmentApiBaseURL : productionApiBaseURL;

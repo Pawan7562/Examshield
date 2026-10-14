@@ -27,9 +27,9 @@ class WebSocketService {
         console.log('🔗 Attempting WebSocket connection to backend...');
 
         // Connect to backend WebSocket server with professional configuration
-        const wsUrl = process.env.REACT_APP_WS_URL || 
-          (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://examshield-3-wydj.onrender.com');
-        
+        const wsUrl = process.env.REACT_APP_WS_URL ||
+          (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://exam.nexifyforge.in');
+
         this.socket = io(wsUrl, {
           auth: {
             token: token
@@ -61,11 +61,11 @@ class WebSocketService {
           clearTimeout(connectionTimeout);
           console.error('❌ WebSocket connection error:', error);
           this.connectionPromise = null;
-          
+
           // Provide user-friendly error message
           const errorMessage = this.getErrorMessage(error);
           console.error(`🔍 Connection failed: ${errorMessage}`);
-          
+
           // Show user-friendly notification
           if (typeof window !== 'undefined') {
             const notification = document.createElement('div');
@@ -77,7 +77,7 @@ class WebSocketService {
               </div>
             `;
             document.body.appendChild(notification);
-            
+
             // Auto-remove after 8 seconds
             setTimeout(() => {
               if (notification.parentNode) {
@@ -85,7 +85,7 @@ class WebSocketService {
               }
             }, 8000);
           }
-          
+
           reject(new Error(errorMessage));
         });
 
@@ -109,7 +109,7 @@ class WebSocketService {
 
   getErrorMessage(error) {
     if (!error) return 'Unknown error';
-    
+
     if (error.message) {
       if (error.message.includes('ECONNREFUSED')) {
         return 'Server is not running or not accessible';
@@ -121,7 +121,7 @@ class WebSocketService {
         return 'Connection was reset by server';
       }
     }
-    
+
     return error.message || error.toString();
   }
 
@@ -129,13 +129,13 @@ class WebSocketService {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
     }
-    
+
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
       this.connected = false;
     }
-    
+
     this.connectionPromise = null;
   }
 
