@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight, Building, KeyRound } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight, Building, KeyRound, Mail } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { authAPI } from '../../services/api';
 import './Login.css';
@@ -9,8 +9,10 @@ export default function AdminResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const tokenFromUrl = searchParams.get('token') || '';
+  const emailFromUrl = searchParams.get('email') || '';
 
   const [token, setToken] = useState(tokenFromUrl);
+  const [email, setEmail] = useState(emailFromUrl);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,14 +25,17 @@ export default function AdminResetPassword() {
     if (tokenFromUrl) {
       setToken(tokenFromUrl);
     }
-  }, [tokenFromUrl]);
+    if (emailFromUrl) {
+      setEmail(emailFromUrl);
+    }
+  }, [tokenFromUrl, emailFromUrl]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     if (!token.trim()) {
-      setError('Please provide a valid administrator reset token.');
+      setError('Please provide a valid administrator reset token or 6-digit code.');
       return;
     }
 
@@ -47,15 +52,21 @@ export default function AdminResetPassword() {
     try {
       setLoading(true);
       const res = await authAPI.collegeResetPassword({
+        email: email.trim(),
         token: token.trim(),
         newPassword
       });
 
-      if (res.data?.success) {
+      const isSuccess = (res && typeof res.success === 'boolean') ? res.success : (res?.data?.success ?? false);
+      const message = res?.message || res?.data?.message || 'Administrator password updated successfully!';
+
+      if (isSuccess) {
         setSuccess(true);
-        toast.success('Administrator password updated successfully!');
+        toast.success(message);
       } else {
-        setError(res.data?.message || 'Failed to reset administrator password.');
+        const errMsg = res?.message || res?.data?.message || 'Failed to reset administrator password.';
+        setError(errMsg);
+        toast.error(errMsg);
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to reset password. The link may have expired.';
@@ -123,27 +134,71 @@ export default function AdminResetPassword() {
                   <div>{error}</div>
                 </div>
               )}
-
-              {!tokenFromUrl && (
-                <div className="login-field-group">
-                  <label htmlFor="reset-token" className="login-field-label">
-                    Administrator Reset Token
-                  </label>
-                  <div className="login-input-wrap">
-                    <input
-                      id="reset-token"
-                      type="text"
-                      className="login-input"
-                      placeholder="Paste your reset token here"
-                      value={token}
-                      onChange={(e) => setToken(e.target.value)}
-                      required
-                    />
-                    <span className="login-input-icon">
-                      <KeyRound size={18} />
-                    </span>
-                  </div>
+              {tokenFromUrl ? (
+                <div style={{
+                  padding: '12px 14px',
+                  background: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  color: '#065f46',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <CheckCircle2 size={18} color="#059669" style={{ flexShrink: 0 }} />
+                  <span>Secure 1-click recovery link verified. Choose your new password below.</span>
                 </div>
+              ) : (
+                <>
+                  <div className="login-field-group">
+                    <label htmlFor="reset-email" className="login-field-label">
+                      Registered College Email
+                    </label>
+                    <div className="login-input-wrap">
+                      <input
+                        id="reset-email"
+                        type="email"
+                        className="login-input"
+                        placeholder="college.admin@institution.edu"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                      <span className="login-input-icon">
+                        <Mail size={18} />
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="login-field-group">
+                    <label htmlFor="reset-token" className="login-field-label">
+                      6-Digit Verification Code or Direct Token
+                    </label>
+                    <div className="login-input-wrap">
+                      <input
+                        id="reset-token"
+                        type="text"
+                        className="login-input"
+                        placeholder="e.g. 582914 or paste token"
+                        value={token}
+                        onChange={(e) => {
+                          let val = e.target.value.trim();
+                          if (val.includes('token=')) {
+                            const match = val.match(/[?&]token=([^&#]+)/);
+                            if (match && match[1]) val = decodeURIComponent(match[1]);
+                          }
+                          setToken(val);
+                        }}
+                        required
+                      />
+                      <span className="login-input-icon">
+                        <KeyRound size={18} />
+                      </span>
+                    </div>
+                  </div>
+                </>
               )}
 
               <div className="login-field-group">

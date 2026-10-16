@@ -53,6 +53,8 @@ const Login = ({ role }) => {
   const [adminResetToken, setAdminResetToken] = useState('');
   const [adminNewPassword, setAdminNewPassword] = useState('');
   const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
+  const [adminShowNewPassword, setAdminShowNewPassword] = useState(false);
+  const [adminShowConfirmPassword, setAdminShowConfirmPassword] = useState(false);
   const [adminForgotLoading, setAdminForgotLoading] = useState(false);
   const [adminForgotMsg, setAdminForgotMsg] = useState('');
 
@@ -66,23 +68,32 @@ const Login = ({ role }) => {
 
   const handleAdminForgotSubmit = async (e) => {
     e.preventDefault();
-    if (!adminForgotEmail.trim()) {
+    const cleanEmail = adminForgotEmail.trim();
+    if (!cleanEmail) {
       toast.error('Please enter your institutional email');
       return;
     }
     try {
       setAdminForgotLoading(true);
-      const res = await authAPI.collegeForgotPassword({ email: adminForgotEmail.trim() });
-      if (res.data?.success) {
-        toast.success(res.data.message || 'Reset link sent to your email');
-        setAdminForgotMsg(res.data.message);
-        if (res.data?.data?.resetToken) {
-          setAdminResetToken(res.data.data.resetToken);
+      setAdminForgotMsg('');
+      const res = await authAPI.collegeForgotPassword({ email: cleanEmail });
+      
+      const isSuccess = (res && typeof res.success === 'boolean') ? res.success : (res?.data?.success ?? true);
+      const message = res?.message || res?.data?.message || 'Password reset instructions dispatched to your email.';
+      const payload = res?.data || res || {};
+      const token = payload.resetToken || res?.resetToken || res?.data?.resetToken;
+
+      if (isSuccess) {
+        toast.success(message);
+        setAdminForgotMsg(message);
+        setTimeout(() => {
           setAdminForgotStep('reset');
-        }
+        }, 1200);
+      } else {
+        toast.error(message);
       }
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Failed to send reset link';
+      const msg = err.response?.data?.message || err.message || 'Failed to send reset link. Please verify your email.';
       toast.error(msg);
     } finally {
       setAdminForgotLoading(false);
@@ -91,8 +102,9 @@ const Login = ({ role }) => {
 
   const handleAdminResetSubmit = async (e) => {
     e.preventDefault();
-    if (!adminResetToken.trim()) {
-      toast.error('Reset token is required');
+    const cleanCode = adminResetToken.trim();
+    if (!cleanCode) {
+      toast.error('Please enter the 6-digit verification code or token');
       return;
     }
     if (adminNewPassword.length < 8) {
@@ -106,17 +118,28 @@ const Login = ({ role }) => {
     try {
       setAdminForgotLoading(true);
       const res = await authAPI.collegeResetPassword({
-        token: adminResetToken.trim(),
+        email: adminForgotEmail.trim(),
+        token: cleanCode,
         newPassword: adminNewPassword
       });
-      if (res.data?.success) {
-        toast.success('Admin password reset successfully! You can now log in.');
+
+      const isSuccess = (res && typeof res.success === 'boolean') ? res.success : (res?.data?.success ?? false);
+      const message = res?.message || res?.data?.message || 'Admin password reset successfully! You can now log in.';
+
+      if (isSuccess) {
+        toast.success(message);
         setShowAdminForgotModal(false);
         setPassword('');
-        if (adminForgotEmail) setIdentifier(adminForgotEmail);
+        if (adminForgotEmail) setIdentifier(adminForgotEmail.trim());
+        setAdminResetToken('');
+        setAdminNewPassword('');
+        setAdminConfirmPassword('');
+        setAdminForgotMsg('');
+      } else {
+        toast.error(message);
       }
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Failed to reset password';
+      const msg = err.response?.data?.message || err.message || 'Failed to reset password. Please check your verification code.';
       toast.error(msg);
     } finally {
       setAdminForgotLoading(false);
@@ -528,21 +551,21 @@ const Login = ({ role }) => {
                   className={`login-modal-tab ${adminForgotStep === 'request' ? 'active' : ''}`}
                   onClick={() => setAdminForgotStep('request')}
                 >
-                  1. Request Reset Link
+                  1. Request Code
                 </button>
                 <button
                   type="button"
                   className={`login-modal-tab ${adminForgotStep === 'reset' ? 'active' : ''}`}
                   onClick={() => setAdminForgotStep('reset')}
                 >
-                  2. Enter Reset Token
+                  2. Enter 6-Digit Code
                 </button>
               </div>
 
               {adminForgotStep === 'request' ? (
                 <form onSubmit={handleAdminForgotSubmit}>
                   <p style={{ fontSize: '0.86rem', color: '#64748b', lineHeight: 1.5, margin: '0 0 16px' }}>
-                    Enter your registered college administrator email. We will generate a secure reset link to restore your institutional access.
+                    Enter your registered college administrator email. We will generate a 6-digit verification code and a secure 1-click link to restore your institutional access.
                   </p>
 
                   <div className="login-field-group" style={{ marginBottom: '16px' }}>
@@ -587,7 +610,7 @@ const Login = ({ role }) => {
                     className="login-submit-button"
                     style={{ width: '100%', marginBottom: '10px' }}
                   >
-                    {adminForgotLoading ? 'Sending Instructions...' : 'Send Password Reset Link'}
+                    {adminForgotLoading ? 'Sending Verification Code...' : 'Send Password Reset Code'}
                   </button>
 
                   <div style={{ textAlign: 'center', marginTop: '12px' }}>
@@ -596,30 +619,43 @@ const Login = ({ role }) => {
                       onClick={() => setAdminForgotStep('reset')}
                       style={{ background: 'none', border: 'none', color: '#0a74da', fontSize: '0.84rem', fontWeight: 600, cursor: 'pointer' }}
                     >
-                      Already have a reset token? Enter token →
+                      Already have a 6-digit code? Enter code →
                     </button>
                   </div>
                 </form>
               ) : (
                 <form onSubmit={handleAdminResetSubmit}>
                   <p style={{ fontSize: '0.86rem', color: '#64748b', lineHeight: 1.5, margin: '0 0 16px' }}>
-                    Provide the security token sent to your institutional email, then choose a strong new password.
+                    Enter the 6-digit verification code sent to <strong>{adminForgotEmail || 'your email'}</strong>, then set your new password.
                   </p>
 
-                  <div className="login-field-group" style={{ marginBottom: '12px' }}>
-                    <label className="login-field-label">Reset Token</label>
+                  <div className="login-field-group" style={{ marginBottom: '14px' }}>
+                    <label className="login-field-label">6-Digit Verification Code</label>
                     <div className="login-input-wrap">
                       <input
                         type="text"
                         className="login-input"
-                        placeholder="Paste security token"
+                        placeholder="e.g. 582914"
                         value={adminResetToken}
-                        onChange={(e) => setAdminResetToken(e.target.value)}
+                        maxLength={64}
+                        onChange={(e) => {
+                          let val = e.target.value.trim();
+                          if (val.includes('token=')) {
+                            const match = val.match(/[?&]token=([^&#]+)/);
+                            if (match && match[1]) val = decodeURIComponent(match[1]);
+                          }
+                          setAdminResetToken(val);
+                        }}
                         required
+                        autoFocus
+                        style={{ letterSpacing: '4px', fontSize: '1.2rem', fontWeight: 700, fontFamily: 'monospace' }}
                       />
                       <span className="login-input-icon">
                         <KeyRound size={18} />
                       </span>
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '4px' }}>
+                      💡 Check your inbox &amp; spam folder for the 6-digit code. Valid for 15 minutes.
                     </div>
                   </div>
 
@@ -627,16 +663,26 @@ const Login = ({ role }) => {
                     <label className="login-field-label">New Password (min 8 characters)</label>
                     <div className="login-input-wrap">
                       <input
-                        type="password"
+                        type={adminShowNewPassword ? 'text' : 'password'}
                         className="login-input"
-                        placeholder="Enter new password"
+                        placeholder="Enter new administrator password"
                         value={adminNewPassword}
                         onChange={(e) => setAdminNewPassword(e.target.value)}
                         required
+                        minLength={8}
                       />
                       <span className="login-input-icon">
                         <Lock size={18} />
                       </span>
+                      <button
+                        type="button"
+                        className="login-toggle-btn"
+                        onClick={() => setAdminShowNewPassword((p) => !p)}
+                        tabIndex={-1}
+                        aria-label={adminShowNewPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {adminShowNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
                     </div>
                   </div>
 
@@ -644,16 +690,26 @@ const Login = ({ role }) => {
                     <label className="login-field-label">Confirm New Password</label>
                     <div className="login-input-wrap">
                       <input
-                        type="password"
+                        type={adminShowConfirmPassword ? 'text' : 'password'}
                         className="login-input"
-                        placeholder="Re-enter new password"
+                        placeholder="Re-enter new administrator password"
                         value={adminConfirmPassword}
                         onChange={(e) => setAdminConfirmPassword(e.target.value)}
                         required
+                        minLength={8}
                       />
                       <span className="login-input-icon">
                         <Lock size={18} />
                       </span>
+                      <button
+                        type="button"
+                        className="login-toggle-btn"
+                        onClick={() => setAdminShowConfirmPassword((p) => !p)}
+                        tabIndex={-1}
+                        aria-label={adminShowConfirmPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {adminShowConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
                     </div>
                   </div>
 

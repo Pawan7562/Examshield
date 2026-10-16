@@ -13,7 +13,7 @@ async function run() {
     for (const evType of eventTypes) {
       let offset = 0;
       const limit = 100;
-      while (offset < 500) {
+      while (offset < 3000) {
         const url = `https://api.brevo.com/v3/smtp/statistics/events?limit=${limit}&offset=${offset}&event=${evType}&sort=desc`;
         const res = await fetch(url, {
           headers: { 'api-key': apiKey, 'accept': 'application/json' }
@@ -34,7 +34,7 @@ async function run() {
 
     // Fetch all students for CGC University
     const studentsRes = await pool.query(`
-      SELECT student_id, name, email, roll_no, created_at 
+      SELECT student_id, name, email, roll_no, created_at, credentials_sent_at 
       FROM students 
       WHERE college_id = '7e0728b7-88b0-4e52-a427-8dd18f259a7a'
       ORDER BY created_at ASC
@@ -45,8 +45,8 @@ async function run() {
     const notReceived = [];
 
     for (const s of totalStudents) {
-      const cleanEmail = s.email.toLowerCase().trim();
-      if (allSentEmails.has(cleanEmail)) {
+      const cleanEmail = (s.email || '').toLowerCase().trim();
+      if (allSentEmails.has(cleanEmail) || s.credentials_sent_at) {
         received.push(s);
       } else {
         notReceived.push(s);

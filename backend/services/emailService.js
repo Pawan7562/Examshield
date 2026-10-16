@@ -1372,12 +1372,162 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
   });
 };
 
+/**
+ * Send College Admin Password Reset Email
+ */
+const sendCollegeAdminPasswordReset = async ({ name, email, collegeName, resetUrl, resetCode, resetToken }) => {
+  const portalUrl = resolvePortalBaseUrl();
+  const fallbackToken = resetToken || resetCode;
+  const safeResetHref = (resetUrl || `${portalUrl}/college/reset-password?token=${encodeURIComponent(fallbackToken)}`).replace(/&/g, '&amp;');
+
+  const content = `
+    <div style="display: inline-block; padding: 4px 12px; border-radius: 4px; background-color: #fef3c7; border: 1px solid #fde68a; color: #92400e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 16px;">
+      ADMINISTRATOR SECURITY VERIFICATION
+    </div>
+
+    <h2 style="margin: 0 0 10px; font-size: 22px; font-weight: 800; color: #0f2744;">
+      Password Reset Verification
+    </h2>
+
+    <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.65; color: #334155;">
+      Hello ${name || 'Administrator'},<br><br>
+      We received a request to reset the administrator credentials for <strong>${collegeName}</strong> on <strong>Nexify Examina</strong>.
+    </p>
+
+    <!-- Prominent 6-Digit Verification Code -->
+    <div style="background: linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%); border: 1.5px solid #bae6fd; border-radius: 12px; padding: 22px 16px; text-align: center; margin: 20px 0;">
+      <div style="font-size: 12px; font-weight: 700; color: #0369a1; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
+        Your 6-Digit Password Reset Code
+      </div>
+      <div style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #0f2744; font-family: 'SFMono-Regular', Consolas, Monaco, monospace; padding: 6px 0;">
+        ${resetCode || resetToken?.slice(0, 6)}
+      </div>
+      <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+        Enter this code on the verification screen &bull; Valid for 15 minutes
+      </div>
+    </div>
+
+    <!-- Alternative Direct 1-Click Link -->
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 16px 0 20px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center" style="border-radius: 6px; background-color: #0f2744;">
+                <a href="${safeResetHref}" target="_blank" style="background-color: #0f2744; border: 1px solid #0f2744; border-radius: 6px; color: #ffffff; display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 700; line-height: 1.2; padding: 12px 30px; text-decoration: none; text-align: center;">
+                  Or Click Here to Reset in Browser &rarr;
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Security Information -->
+    <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 0 6px 6px 0; padding: 12px 16px; margin-bottom: 20px;">
+      <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #1e40af;">
+        <strong>Single-Use Security Notice:</strong> This code is valid for <strong>15 minutes</strong> and will be invalidated once used. If you did not initiate this request, your account remains secure and no action is required.
+      </p>
+    </div>
+  `;
+
+  const subjectLine = `[Nexify Examina] ${resetCode || 'Password Reset'} — Admin Recovery Code for ${collegeName}`;
+  const plainText = [
+    `ADMINISTRATOR PASSWORD RECOVERY CODE`,
+    `------------------------------------`,
+    `Institution: ${collegeName}`,
+    `Verification Code: ${resetCode || resetToken}`,
+    ``,
+    `Enter this 6-digit code in the login window to choose a new password.`,
+    ``,
+    `Or use this direct 1-click link:`,
+    safeResetHref,
+    ``,
+    `This code is valid for 15 minutes and can only be used once.`,
+    `Nexify Examina is developed and powered by Nexify Forge (https://nexifyforge.in)`
+  ].join('\n');
+
+  await sendWithRetry({
+    to: email,
+    subject: subjectLine,
+    text: plainText,
+    html: baseTemplate(content, {
+      title: subjectLine,
+      collegeName,
+      badgeText: 'SECURITY ACCESS RECOVERY',
+      preheader: `Administrator password recovery instructions for ${collegeName} on Nexify Examina`
+    }),
+  });
+};
+
+/**
+ * Send Security Alert after successful password reset
+ */
+const sendPasswordChangedAlert = async ({ name, email, collegeName, ip, userAgent }) => {
+  const portalUrl = resolvePortalBaseUrl();
+  const loginUrl = `${portalUrl}/admin/login`;
+
+  const content = `
+    <div style="display: inline-block; padding: 4px 12px; border-radius: 4px; background-color: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 16px;">
+      SECURITY ALERT: CREDENTIALS UPDATED
+    </div>
+
+    <h2 style="margin: 0 0 10px; font-size: 22px; font-weight: 800; color: #0f2744;">
+      Administrator Password Changed
+    </h2>
+
+    <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.65; color: #334155;">
+      Hello ${name || 'Administrator'},<br><br>
+      The administrator password for <strong>${collegeName}</strong> was recently changed.
+    </p>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 13px; color: #334155;">
+      <div>&bull; <strong>Time:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</div>
+      <div>&bull; <strong>IP Address:</strong> ${ip || 'Unknown'}</div>
+      <div>&bull; <strong>Device / Browser:</strong> ${userAgent || 'Web Client'}</div>
+    </div>
+
+    <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 0 6px 6px 0; padding: 12px 16px; margin-bottom: 20px;">
+      <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #991b1b;">
+        <strong>Didn't make this change?</strong> If you did not authorize this action, your account may be compromised. Please contact support immediately at <a href="mailto:support@nexifyforge.in" style="color: #b91c1c; font-weight: 700;">support@nexifyforge.in</a> to freeze administrative access.
+      </p>
+    </div>
+  `;
+
+  const subjectLine = `[Nexify Examina] Security Alert: Password Updated — ${collegeName}`;
+  const plainText = [
+    `SECURITY ALERT: ADMINISTRATOR PASSWORD CHANGED`,
+    `Institution: ${collegeName}`,
+    `Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`,
+    `If you did not make this change, please contact support@nexifyforge.in immediately.`
+  ].join('\n');
+
+  try {
+    await sendWithRetry({
+      to: email,
+      subject: subjectLine,
+      text: plainText,
+      html: baseTemplate(content, {
+        title: subjectLine,
+        collegeName,
+        badgeText: 'SECURITY NOTIFICATION',
+        preheader: `Security alert: Administrator password changed for ${collegeName}`
+      }),
+    });
+  } catch (err) {
+    console.warn('[AUTH] Could not dispatch password changed security alert email:', err.message);
+  }
+};
+
 module.exports = {
   sendStudentCredentials,
   sendExamNotification,
   sendExamReminder,
   sendResultNotification,
   sendCollegeWelcome,
+  sendCollegeAdminPasswordReset,
+  sendPasswordChangedAlert,
   resolveStudentLoginUrl,
   resolvePortalBaseUrl
 };

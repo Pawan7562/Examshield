@@ -76,12 +76,25 @@ const handleRosterUpload = (req, res, next) => {
 // =====================================================
 // AUTH ROUTES
 // =====================================================
+const rateLimit = require('express-rate-limit');
+const passwordRecoveryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // max 5 attempts per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
+  message: {
+    success: false,
+    message: 'Too many password recovery attempts. Please try again after 15 minutes.'
+  }
+});
+
 const auth = express.Router();
 auth.post('/super-admin/login', authController.superAdminLogin);
 auth.post('/college/register', authController.collegeRegister);
 auth.post('/college/login', authController.collegeLogin);
-auth.post('/college/forgot-password', authController.collegeForgotPassword);
-auth.post('/college/reset-password', authController.collegeResetPassword);
+auth.post('/college/forgot-password', passwordRecoveryLimiter, authController.collegeForgotPassword);
+auth.post('/college/reset-password', passwordRecoveryLimiter, authController.collegeResetPassword);
 auth.post('/student/login', authController.studentLogin);
 auth.post('/refresh', authController.refreshToken);
 auth.get('/me', authenticate, authController.getMe);

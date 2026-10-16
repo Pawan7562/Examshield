@@ -268,6 +268,10 @@ exports.addStudent = async (req, res) => {
 
       await Promise.race([emailPromise, timeoutPromise]);
       emailSent = true;
+      await pool.query(
+        'UPDATE students SET credentials_sent_at = NOW(), updated_at = NOW() WHERE id = $1',
+        [student.id]
+      ).catch(e => console.warn('Could not update credentials_sent_at:', e.message));
       console.log(`✅ [addStudent] Credentials email delivered to: ${cleanEmail}`);
     } catch (emailError) {
       console.error(`❌ [addStudent] Email FAILED for ${cleanEmail}:`);
@@ -951,15 +955,22 @@ exports.bulkUploadStudents = async (req, res) => {
           )
         );
 
-        results.forEach((outcome, idx) => {
+        for (let idx = 0; idx < results.length; idx++) {
+          const outcome = results[idx];
           if (outcome.status === 'fulfilled') {
             emailsSent++;
+            if (batch[idx]?.id) {
+              await pool.query(
+                'UPDATE students SET credentials_sent_at = NOW(), updated_at = NOW() WHERE id = $1',
+                [batch[idx].id]
+              ).catch(e => console.warn('Could not update credentials_sent_at:', e.message));
+            }
             console.log(`   ✅ [bulkUpload] Email delivered to: ${batch[idx].email}`);
           } else {
             emailsFailed++;
             console.error(`   ❌ [bulkUpload] Email failed for ${batch[idx].email}:`, outcome.reason?.message);
           }
-        });
+        }
       }
     }
 
