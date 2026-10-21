@@ -347,46 +347,48 @@ function attachSocketHandlers(io, options = {}) {
       io.to(`stream-${verifiedStudentId}`).volatile.emit('camera-feed', feedPayload);
     });
 
-    // Periodic background monitoring snapshot
+    // Incident evidence monitoring snapshot
     socket.on('monitoring-snapshot', ({ examId, studentId, sessionId, imageData, faceCount, audioLevel, timestamp, isIncident }) => {
       if (!examId || !studentId || !imageData) return;
 
-      if (!studentThumbnails.has(examId)) {
-        studentThumbnails.set(examId, new Map());
-      }
-      const examThumbMap = studentThumbnails.get(examId);
-      if (examThumbMap.size >= 80 && !examThumbMap.has(studentId)) {
-        const oldestKey = examThumbMap.keys().next().value;
-        examThumbMap.delete(oldestKey);
-      }
-      examThumbMap.set(studentId, {
-        studentId,
-        sessionId,
-        imageData,
-        faceCount: typeof faceCount === 'number' ? faceCount : 1,
-        audioLevel: typeof audioLevel === 'number' ? audioLevel : 0,
-        timestamp: timestamp || Date.now(),
-        isIncident: !!isIncident,
-      });
-
-      // Check if any admin or proctor is watching
-      const rooms = io.sockets.adapter?.rooms;
-      const adminRoom = rooms ? rooms.get(`admin-exam-${examId}`) : null;
-      const monitorRoom = rooms ? rooms.get(`exam-monitoring-${examId}`) : null;
-      const hasAdmins = (adminRoom && adminRoom.size > 0) || (monitorRoom && monitorRoom.size > 0);
-
-      if (hasAdmins) {
-        const snapshotPayload = {
-          examId,
+      if (isIncident) {
+        if (!studentThumbnails.has(examId)) {
+          studentThumbnails.set(examId, new Map());
+        }
+        const examThumbMap = studentThumbnails.get(examId);
+        if (examThumbMap.size >= 80 && !examThumbMap.has(studentId)) {
+          const oldestKey = examThumbMap.keys().next().value;
+          examThumbMap.delete(oldestKey);
+        }
+        examThumbMap.set(studentId, {
           studentId,
           sessionId,
           imageData,
-          faceCount,
-          audioLevel,
+          faceCount: typeof faceCount === 'number' ? faceCount : 1,
+          audioLevel: typeof audioLevel === 'number' ? audioLevel : 0,
           timestamp: timestamp || Date.now(),
-          isIncident: !!isIncident,
-        };
-        io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).volatile.emit('candidate-snapshot', snapshotPayload);
+          isIncident: true,
+        });
+
+        // Check if any admin or proctor is watching
+        const rooms = io.sockets.adapter?.rooms;
+        const adminRoom = rooms ? rooms.get(`admin-exam-${examId}`) : null;
+        const monitorRoom = rooms ? rooms.get(`exam-monitoring-${examId}`) : null;
+        const hasAdmins = (adminRoom && adminRoom.size > 0) || (monitorRoom && monitorRoom.size > 0);
+
+        if (hasAdmins) {
+          const snapshotPayload = {
+            examId,
+            studentId,
+            sessionId,
+            imageData,
+            faceCount,
+            audioLevel,
+            timestamp: timestamp || Date.now(),
+            isIncident: true,
+          };
+          io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).volatile.emit('candidate-snapshot', snapshotPayload);
+        }
       }
     });
 

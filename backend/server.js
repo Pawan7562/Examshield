@@ -574,41 +574,44 @@ io.on('connection', (socket) => {
     io.to(`stream-${verifiedStudentId}`).volatile.emit('camera-feed', feedPayload);
   });
 
-  // Periodic background monitoring snapshot (low frequency: e.g. every 12-15s or incident-triggered)
+  // Background monitoring snapshot (incident evidence captures)
   socket.on('monitoring-snapshot', ({ examId, studentId, sessionId, imageData, faceCount, audioLevel, timestamp, isIncident }) => {
     if (!examId || !studentId || !imageData) return;
 
-    if (!studentThumbnails.has(examId)) {
-      studentThumbnails.set(examId, new Map());
-    }
-    const examThumbMap = studentThumbnails.get(examId);
-    // Bounded thumbnail cache: keep up to 80 recent/active thumbnails in memory per exam
-    if (examThumbMap.size >= 80 && !examThumbMap.has(studentId)) {
-      const oldestKey = examThumbMap.keys().next().value;
-      examThumbMap.delete(oldestKey);
-    }
-    examThumbMap.set(studentId, {
-      studentId,
-      sessionId,
-      imageData,
-      faceCount: typeof faceCount === 'number' ? faceCount : 1,
-      audioLevel: typeof audioLevel === 'number' ? audioLevel : 0,
-      timestamp: timestamp || Date.now(),
-      isIncident: !!isIncident,
-    });
+    const verifiedStudentId = (socket.user && socket.user.role === 'student') ? socket.user.id : studentId;
 
-    const snapshotPayload = {
-      examId,
-      studentId,
-      sessionId,
-      imageData,
-      faceCount,
-      audioLevel,
-      timestamp: timestamp || Date.now(),
-      isIncident: !!isIncident,
-    };
-    // Relayed volatilely to monitoring room across cluster (Socket.IO Redis adapter forwards to all proctor nodes)
-    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).volatile.emit('candidate-snapshot', snapshotPayload);
+    if (isIncident) {
+      if (!studentThumbnails.has(examId)) {
+        studentThumbnails.set(examId, new Map());
+      }
+      const examThumbMap = studentThumbnails.get(examId);
+      if (examThumbMap.size >= 80 && !examThumbMap.has(verifiedStudentId)) {
+        const oldestKey = examThumbMap.keys().next().value;
+        examThumbMap.delete(oldestKey);
+      }
+      examThumbMap.set(verifiedStudentId, {
+        studentId: verifiedStudentId,
+        sessionId,
+        imageData,
+        faceCount: typeof faceCount === 'number' ? faceCount : 1,
+        audioLevel: typeof audioLevel === 'number' ? audioLevel : 0,
+        timestamp: timestamp || Date.now(),
+        isIncident: true,
+      });
+
+      const snapshotPayload = {
+        examId,
+        studentId: verifiedStudentId,
+        sessionId,
+        imageData,
+        faceCount,
+        audioLevel,
+        timestamp: timestamp || Date.now(),
+        isIncident: true,
+      };
+      // Relayed volatilely to monitoring room across cluster for incident review
+      io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).volatile.emit('candidate-snapshot', snapshotPayload);
+    }
   });
 
   // Student camera/hardware status update

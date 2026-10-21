@@ -1314,3 +1314,32 @@
     opacity: 0.5;
   }
 }
+
+/* ── SELECTED TARGET SCREEN HIGHLIGHT & BADGES ────────────────────── */
+.proctor-tile.selected-target-screen {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.45), 0 0 28px rgba(56, 189, 248, 0.25) !important;
+}
+
+.screen-target-btn:hover {
+  background: #334155 !important;
+  border-color: #38bdf8 !important;
+}
+
+.screen-target-btn.target-active {
+  background: #0284c7 !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4) !important;
+}
+
+.proctor-target-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  animation: pulse-target-glow 2s infinite ease-in-out;
+}
+
+@keyframes pulse-target-glow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.03); }
+}

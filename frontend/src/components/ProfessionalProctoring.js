@@ -268,34 +268,6 @@ const ProfessionalProctoring = ({
       }
     }, 125);
 
-    // Periodic background surveillance snapshot (optimized for 50,000 candidates: 25s when idle)
-    // Instant incident-triggered snapshots are dispatched immediately on violation detection!
-    const snapshotInterval = setInterval(() => {
-      try {
-        if (isStreamingRequestedRef.current) return; // Skip if high-speed stream is already active
-        const video = videoRef.current;
-        if (!video || video.readyState < 2 || video.videoWidth === 0) return;
-        const isActive = cameraStatusRef.current === 'active' && !cameraOffRef.current;
-        if (!isActive || !socketRef.current || !socketRef.current.connected) return;
-
-        ctx.drawImage(video, 0, 0, 240, 180);
-        const dataUrl = offscreen.toDataURL('image/jpeg', 0.32);
-        const base64Data = dataUrl.split(',')[1];
-        if (base64Data) {
-          socketRef.current.emit('monitoring-snapshot', {
-            examId: examIdRef.current,
-            studentId: studentIdRef.current,
-            sessionId: sessionIdRef.current,
-            imageData: base64Data,
-            faceCount: faceCountRef.current,
-            audioLevel: audioLevelRef.current,
-            timestamp: Date.now(),
-            isIncident: false,
-          });
-        }
-      } catch (_) {}
-    }, 25000);
-
     // Adaptive Telemetry Transmitter: Instant dispatch on state change, 7s idle heartbeat
     let lastActivityState = null;
     let lastActivityTime = 0;
@@ -336,7 +308,6 @@ const ProfessionalProctoring = ({
 
     return () => {
       clearInterval(videoStreamInterval);
-      clearInterval(snapshotInterval);
       clearInterval(telemetryInterval);
     };
   }, [socket, cameraStatus, cameraOff]);

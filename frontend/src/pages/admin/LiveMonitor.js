@@ -302,8 +302,9 @@ export default function LiveMonitor() {
   const [broadcastModal, setBroadcastModal] = useState({ open: false, message: '', urgency: 'normal' });
   const [inspectModal, setInspectModal] = useState({ open: false, student: null, activityData: null });
 
-  // ─── On-Demand 4-Tile Live Video Slots (Default max 4 active streams per proctor) ───
-  const [maxStreams, setMaxStreams] = useState(4);
+  // ─── On-Demand 4-Screen Live Video Slots (Strict 4-screen limit) ──────────────
+  const maxStreams = 4;
+  const [selectedScreenIndex, setSelectedScreenIndex] = useState(0); // 0, 1, 2, or 3
   const [activeSlots, setActiveSlots] = useState([
     { slotIndex: 0, studentId: null, studentName: null, status: 'idle', student: null },
     { slotIndex: 1, studentId: null, studentName: null, status: 'idle', student: null },
@@ -311,8 +312,8 @@ export default function LiveMonitor() {
     { slotIndex: 3, studentId: null, studentName: null, status: 'idle', student: null },
   ]);
   const [candidateThumbnails, setCandidateThumbnails] = useState({}); // studentId -> { imageData, faceCount, audioLevel, timestamp, isIncident }
-  const [enlargedSlot, setEnlargedSlot] = useState(null); // slotIndex | null
-  const [assignModal, setAssignModal] = useState({ open: false, targetSlotIndex: 0 });
+  const [enlargedSlot, setEnlargedSlot] = useState(null); // slot object | null
+  const [assignModal, setAssignModal] = useState({ open: false, targetSlotIndex: 0, searchQuery: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
@@ -572,34 +573,10 @@ export default function LiveMonitor() {
       });
     });
 
-    // Student joined — auto-populate stream if tile is open
+    // Student joined session — updates candidate roster without auto-playing video
     socket.on('student-joined', (data) => {
       toast.success(`Candidate ${data?.studentName || ''} joined session`, { duration: 2500 });
       loadExamMonitoringData(currentExamId);
-
-      if (data?.studentId) {
-        setActiveSlots(prev => {
-          if (prev.some(s => s.studentId === data.studentId)) return prev;
-          const emptyIdx = prev.findIndex(s => !s.studentId);
-          if (emptyIdx !== -1 && emptyIdx < maxStreams) {
-            socket.emit('subscribe-student-stream', {
-              examId: currentExamId,
-              studentId: data.studentId,
-              tileIndex: emptyIdx,
-            });
-            const next = [...prev];
-            next[emptyIdx] = {
-              slotIndex: emptyIdx,
-              studentId: data.studentId,
-              studentName: data.studentName || 'Candidate',
-              status: 'connecting',
-              student: { id: data.studentId, name: data.studentName, status: 'active' },
-            };
-            return next;
-          }
-          return prev;
-        });
-      }
     });
 
     // Student submitted
@@ -642,35 +619,51 @@ export default function LiveMonitor() {
     loadExamMonitoringData(newExamId);
   };
 
-  // ─── On-Demand Stream Slot Management (Max 4 streams enforced) ───
+  // ─── On-Demand 4-Screen Video Switching (Dynamic replacement, 4-screen max quota) ───
   const assignStudentToSlot = useCallback((student, preferredSlot = null) => {
-    if (!student) return;
+    if (!student || !student.id) return;
 
     setActiveSlots(prev => {
-      // Check if student is already active in a slot
+      // 1. If candidate is already displayed in one of the 4 screens, focus on that screen
       const existingIdx = prev.findIndex(s => s.studentId === student.id);
       if (existingIdx !== -1) {
-        toast.info(`${student.name} is already active in Tile ${existingIdx + 1}`);
+        setSelectedScreenIndex(existingIdx);
+        toast.info(`${student.name} is currently live on Screen ${existingIdx + 1}`);
         return prev;
       }
 
-      // Determine destination slot
-      let targetIndex = (preferredSlot !== null && preferredSlot >= 0 && preferredSlot < maxStreams)
+      // 2. Determine target screen (0 to 3):
+      // If a preferredSlot is explicitly provided and valid [0..3], use it.
+      // Otherwise, use selectedScreenIndex if empty, or pick the first empty screen.
+      // If all 4 screens are occupied, dynamically REPLACE the feed in selectedScreenIndex!
+      let targetIndex = (preferredSlot !== null && preferredSlot >= 0 && preferredSlot < 4)
         ? preferredSlot
-        : prev.findIndex(s => !s.studentId);
+        : null;
 
-      if (targetIndex === -1) {
-        targetIndex = 0; // Replace slot 0 if all 4 are occupied
+      if (targetIndex === null) {
+        if (!prev[selectedScreenIndex]?.studentId) {
+          targetIndex = selectedScreenIndex;
+        } else {
+          const firstEmpty = prev.findIndex(s => !s.studentId);
+          if (firstEmpty !== -1) {
+            targetIndex = firstEmpty;
+          } else {
+            // All 4 screens occupied: replace currently selected target screen
+            targetIndex = selectedScreenIndex;
+          }
+        }
       }
 
-      const oldStudentId = prev[targetIndex]?.studentId;
-      if (oldStudentId && socketRef.current?.connected) {
+      // 3. If replacing an existing student on targetIndex, unsubscribe old student first
+      const oldSlot = prev[targetIndex];
+      if (oldSlot?.studentId && socketRef.current?.connected) {
         socketRef.current.emit('unsubscribe-student-stream', {
-          studentId: oldStudentId,
+          studentId: oldSlot.studentId,
           tileIndex: targetIndex,
         });
       }
 
+      // 4. Request and subscribe newly selected candidate's live webcam stream
       if (socketRef.current?.connected) {
         socketRef.current.emit('subscribe-student-stream', {
           examId: currentExamId,
@@ -687,10 +680,19 @@ export default function LiveMonitor() {
         status: 'connecting',
         student,
       };
-      toast.success(`Connected Tile ${targetIndex + 1} to ${student.name}`);
+
+      // Automatically advance target screen selection for subsequent clicks
+      setSelectedScreenIndex((targetIndex + 1) % 4);
+
+      if (oldSlot?.studentId) {
+        toast.success(`Screen ${targetIndex + 1}: Switched to ${student.name}`);
+      } else {
+        toast.success(`Screen ${targetIndex + 1}: Connected live feed for ${student.name}`);
+      }
+
       return next;
     });
-  }, [currentExamId, maxStreams]);
+  }, [currentExamId, selectedScreenIndex]);
 
   const releaseSlot = useCallback((slotIndex) => {
     setActiveSlots(prev => {
@@ -711,45 +713,30 @@ export default function LiveMonitor() {
       };
       return next;
     });
+    setSelectedScreenIndex(slotIndex);
+    toast.success(`Screen ${slotIndex + 1} feed closed`);
   }, []);
 
-  // ─── Auto-Subscribe Open Slots to Active Candidates (Instant Live Streaming) ───
-  useEffect(() => {
-    if (!currentExamId || !socketRef.current?.connected || candidates.length === 0) return;
-
+  const releaseAllSlots = useCallback(() => {
     setActiveSlots(prev => {
-      const activeCandidates = candidates.filter(c => c.status === 'active' && c.id);
-      if (activeCandidates.length === 0) return prev;
-
-      let hasChanges = false;
-      const next = [...prev];
-
-      activeCandidates.forEach(cand => {
-        // Skip if candidate is already in an active tile
-        if (next.some(s => s.studentId === cand.id)) return;
-
-        // Find next empty tile
-        const emptyIdx = next.findIndex(s => !s.studentId);
-        if (emptyIdx !== -1 && emptyIdx < maxStreams) {
-          hasChanges = true;
-          socketRef.current.emit('subscribe-student-stream', {
-            examId: currentExamId,
-            studentId: cand.id,
-            tileIndex: emptyIdx,
+      prev.forEach(slot => {
+        if (slot?.studentId && socketRef.current?.connected) {
+          socketRef.current.emit('unsubscribe-student-stream', {
+            studentId: slot.studentId,
+            tileIndex: slot.slotIndex,
           });
-          next[emptyIdx] = {
-            slotIndex: emptyIdx,
-            studentId: cand.id,
-            studentName: cand.name,
-            status: 'connecting',
-            student: cand,
-          };
         }
       });
-
-      return hasChanges ? next : prev;
+      return [
+        { slotIndex: 0, studentId: null, studentName: null, status: 'idle', student: null },
+        { slotIndex: 1, studentId: null, studentName: null, status: 'idle', student: null },
+        { slotIndex: 2, studentId: null, studentName: null, status: 'idle', student: null },
+        { slotIndex: 3, studentId: null, studentName: null, status: 'idle', student: null },
+      ];
     });
-  }, [currentExamId, candidates, maxStreams]);
+    setSelectedScreenIndex(0);
+    toast.success('All active video feeds stopped');
+  }, []);
 
   // ─── 5. Warning Interventions ─────────────────────────────────────────────────
   const openWarningModal = (student, presetMsg = '', strike = 1) => {
@@ -1214,7 +1201,7 @@ export default function LiveMonitor() {
       <div className="cockpit-viewport">
         {/* Left Column: Candidates Surveillance Grid */}
         <div className="cockpit-grid-container">
-          {/* ─── ON-DEMAND LIVE VIDEO PROCTORING QUAD-GRID (MAX 4 TILES) ─── */}
+          {/* ─── ON-DEMAND LIVE VIDEO PROCTORING QUAD-GRID (STRICT 4-SCREEN LIMIT) ─── */}
           <section className="proctor-quad-section">
             <div className="proctor-quad-header">
               <div className="proctor-quad-title-wrap">
@@ -1223,30 +1210,117 @@ export default function LiveMonitor() {
                   <span>On-Demand Live Video Feeds</span>
                 </h3>
                 <span className="proctor-stream-limit-pill">
-                  {activeSlots.filter(s => s.studentId).length} / {maxStreams} Live Feeds Active
+                  {activeSlots.filter(s => s.studentId).length} / {maxStreams} Screens Active
                 </span>
               </div>
-              <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
-                Server-enforced quota: Select any candidate below to view their live webcam feed on-demand.
+
+              {/* Screen Target Selector & Stop All Controls */}
+              <div className="proctor-quad-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <div className="screen-target-tabs" style={{ display: 'flex', gap: 6 }}>
+                  {[0, 1, 2, 3].map(screenIdx => {
+                    const isOccupied = Boolean(activeSlots[screenIdx]?.studentId);
+                    const isTarget = selectedScreenIndex === screenIdx;
+                    return (
+                      <button
+                        key={`tab-screen-${screenIdx}`}
+                        type="button"
+                        onClick={() => setSelectedScreenIndex(screenIdx)}
+                        className={`screen-target-btn ${isTarget ? 'target-active' : ''}`}
+                        style={{
+                          background: isTarget ? '#0284c7' : '#1e293b',
+                          color: '#fff',
+                          border: isTarget ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: 6,
+                          padding: '4px 10px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          transition: 'all 0.15s ease',
+                        }}
+                        title={`Select Screen ${screenIdx + 1} as next replacement target`}
+                      >
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            background: isOccupied ? '#4ade80' : '#94a3b8',
+                            display: 'inline-block',
+                          }}
+                        />
+                        <span>Screen {screenIdx + 1}</span>
+                        {isTarget && <span style={{ fontSize: '0.62rem', opacity: 0.85 }}>(Target)</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {activeSlots.some(s => s.studentId) && (
+                  <button
+                    type="button"
+                    onClick={releaseAllSlots}
+                    className="cockpit-btn cockpit-btn-outline"
+                    style={{ padding: '4px 10px', fontSize: '0.74rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                    title="Stop all 4 video feeds and halt camera transmission immediately"
+                  >
+                    <X size={12} />
+                    <span>Stop All Feeds</span>
+                  </button>
+                )}
               </div>
+            </div>
+
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '-4px 0 12px' }}>
+              Select any candidate below to stream their webcam on-demand. Feeds will display in{' '}
+              <strong style={{ color: '#38bdf8' }}>Screen {selectedScreenIndex + 1}</strong> (maximum 4 screens active simultaneously).
             </div>
 
             <div className="proctor-quad-grid">
               {activeSlots.map((slot, idx) => {
+                const isTargetScreen = selectedScreenIndex === idx;
+
                 if (!slot.studentId) {
                   return (
                     <div
                       key={`slot-${idx}`}
-                      className="proctor-tile empty-slot"
-                      onClick={() => setAssignModal({ open: true, targetSlotIndex: idx })}
-                      title="Click to assign a candidate live video feed"
+                      className={`proctor-tile empty-slot ${isTargetScreen ? 'selected-target-screen' : ''}`}
+                      onClick={() => setSelectedScreenIndex(idx)}
+                      title="Click to select this screen as active target"
                     >
-                      <div className="empty-slot-content">
+                      <div className="proctor-tile-header" style={{ width: '100%' }}>
+                        <span className="proctor-tile-num">Screen {idx + 1}</span>
+                        {isTargetScreen && (
+                          <span className="proctor-target-badge" style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontSize: '0.66rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+                            TARGET SCREEN
+                          </span>
+                        )}
+                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Empty</span>
+                      </div>
+
+                      <div className="empty-slot-content" style={{ padding: '20px 10px' }}>
                         <div className="empty-slot-icon-wrap">
                           <Plus size={22} />
                         </div>
-                        <div className="empty-slot-label">Tile {idx + 1} Available</div>
-                        <div className="empty-slot-hint">Click to select candidate stream or click "Watch Live" below</div>
+                        <div className="empty-slot-label">Screen {idx + 1} Available</div>
+                        <div className="empty-slot-hint">
+                          Click "Watch Live" on any candidate below, or click button below
+                        </div>
+                        <button
+                          type="button"
+                          className="cockpit-btn cockpit-btn-primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedScreenIndex(idx);
+                            setAssignModal({ open: true, targetSlotIndex: idx, searchQuery: '' });
+                          }}
+                          style={{ marginTop: 10, padding: '5px 12px', fontSize: '0.74rem' }}
+                        >
+                          <Plus size={13} />
+                          <span>Assign Candidate</span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -1256,9 +1330,21 @@ export default function LiveMonitor() {
                 const decibel = audioLevels[slot.studentId] || 0;
 
                 return (
-                  <div key={`slot-${idx}-${slot.studentId}`} className="proctor-tile active-stream">
+                  <div
+                    key={`slot-${idx}-${slot.studentId}`}
+                    className={`proctor-tile active-stream ${isTargetScreen ? 'selected-target-screen' : ''}`}
+                    onClick={() => setSelectedScreenIndex(idx)}
+                    title="Click to set this screen as active target"
+                  >
                     <div className="proctor-tile-header">
-                      <span className="proctor-tile-num">Tile {idx + 1}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="proctor-tile-num">Screen {idx + 1}</span>
+                        {isTargetScreen && (
+                          <span className="proctor-target-badge" style={{ background: 'rgba(56, 189, 248, 0.25)', color: '#38bdf8', fontSize: '0.64rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(56, 189, 248, 0.5)' }}>
+                            TARGET
+                          </span>
+                        )}
+                      </div>
                       <div className={`proctor-tile-state-badge state-badge-${
                         slot.status === 'live' ? 'live'
                         : slot.status === 'camera_unavailable' ? 'unavailable'
@@ -1268,7 +1354,7 @@ export default function LiveMonitor() {
                       }`}>
                         <span className={`status-dot-${slot.status === 'live' ? 'active' : slot.status === 'camera_unavailable' ? 'warning' : 'danger'}`} />
                         <span style={{ textTransform: 'capitalize' }}>
-                          {slot.status === 'camera_unavailable' ? 'Cam Unavailable' : slot.status}
+                          {slot.status === 'camera_unavailable' ? 'Cam Off' : slot.status}
                         </span>
                       </div>
                     </div>
@@ -1304,16 +1390,24 @@ export default function LiveMonitor() {
 
                       <div className="proctor-tile-actions">
                         <button
+                          type="button"
                           className="proctor-tile-btn"
-                          onClick={() => setEnlargedSlot(slot)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEnlargedSlot(slot);
+                          }}
                           title="Enlarge video feed"
                         >
                           <Maximize2 size={12} />
                           <span>Enlarge</span>
                         </button>
                         <button
+                          type="button"
                           className="proctor-tile-btn"
-                          onClick={() => openWarningModal(slot.student || { id: slot.studentId, name: slot.studentName })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openWarningModal(slot.student || { id: slot.studentId, name: slot.studentName });
+                          }}
                           disabled={isTerminated}
                           title="Issue proctor warning"
                         >
@@ -1321,8 +1415,12 @@ export default function LiveMonitor() {
                           <span>Warn</span>
                         </button>
                         <button
+                          type="button"
                           className="proctor-tile-btn btn-stop"
-                          onClick={() => releaseSlot(idx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            releaseSlot(idx);
+                          }}
                           title="Stop live stream and release quota"
                         >
                           <X size={12} />
@@ -1388,15 +1486,31 @@ export default function LiveMonitor() {
                       key={student.id}
                       className={`surveillance-card ${isFlagged && !isTerminated ? 'flagged' : ''} ${isTerminated ? 'terminated' : ''} ${isCurrentlyStreaming ? 'streaming' : ''}`}
                     >
-                      {/* Candidate Surveillance Preview (Background Thumbnail or Radar) */}
+                      {/* Candidate Surveillance Preview (Background Radar or Incident Snapshot) */}
                       <div className="surveillance-frame-wrap">
-                        {thumbnail?.imageData ? (
-                          <img
-                            src={normalizeImageUri(thumbnail.imageData)}
-                            alt={student.name}
-                            className="surveillance-webcam-feed"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
+                        {thumbnail?.isIncident && thumbnail?.imageData ? (
+                          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                            <img
+                              src={normalizeImageUri(thumbnail.imageData)}
+                              alt={student.name}
+                              className="surveillance-webcam-feed"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                            <div style={{
+                              position: 'absolute',
+                              bottom: 6,
+                              left: 6,
+                              background: 'rgba(239, 68, 68, 0.85)',
+                              color: '#fff',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              letterSpacing: '0.04em'
+                            }}>
+                              INCIDENT EVIDENCE
+                            </div>
+                          </div>
                         ) : (
                           <div className="surveillance-radar-placeholder" style={{ display: 'flex' }}>
                             <div className="surveillance-avatar-circle">
@@ -1404,7 +1518,11 @@ export default function LiveMonitor() {
                               <div className="surveillance-scanline" />
                             </div>
                             <span style={{ fontSize: '0.72rem', letterSpacing: '0.04em' }}>
-                              {isTerminated ? 'SESSION TERMINATED' : 'BACKGROUND SURVEILLANCE'}
+                              {isTerminated
+                                ? 'SESSION TERMINATED'
+                                : isCurrentlyStreaming
+                                ? `LIVE ON SCREEN ${activeSlotNum}`
+                                : 'BACKGROUND SURVEILLANCE'}
                             </span>
                           </div>
                         )}
@@ -1431,8 +1549,8 @@ export default function LiveMonitor() {
                           </div>
 
                           {isCurrentlyStreaming ? (
-                            <span className="roster-live-badge">
-                              <Radio size={11} /> Tile {activeSlotNum}
+                            <span className="roster-live-badge" style={{ background: '#0284c7', color: '#fff', padding: '3px 8px', borderRadius: 12, fontSize: '0.7rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <Radio size={11} /> Screen {activeSlotNum}
                             </span>
                           ) : student.warning_count > 0 ? (
                             <div
@@ -1504,6 +1622,7 @@ export default function LiveMonitor() {
                         <div className="surveillance-actions-row">
                           {isCurrentlyStreaming ? (
                             <button
+                              type="button"
                               className="surveillance-action-btn"
                               style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
                               onClick={() => {
@@ -1513,18 +1632,19 @@ export default function LiveMonitor() {
                               title="Stop streaming this student"
                             >
                               <X size={13} />
-                              <span>Stop Tile {activeSlotNum}</span>
+                              <span>Stop Screen {activeSlotNum}</span>
                             </button>
                           ) : (
                             <button
+                              type="button"
                               className="surveillance-action-btn"
                               style={{ background: 'rgba(56, 189, 248, 0.18)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' }}
                               onClick={() => assignStudentToSlot(student)}
                               disabled={isTerminated}
-                              title="Stream live camera feed into next available tile"
+                              title={`Stream live camera feed into Screen ${selectedScreenIndex + 1}`}
                             >
                               <Radio size={13} />
-                              <span>Watch Live</span>
+                              <span>Watch Live (Screen {selectedScreenIndex + 1})</span>
                             </button>
                           )}
 
@@ -2051,6 +2171,226 @@ export default function LiveMonitor() {
                   <span>Issue Warning</span>
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          9. MODAL: ASSIGN CANDIDATE TO TARGET SCREEN
+          ═══════════════════════════════════════════════════════════════════════ */}
+      {assignModal.open && (
+        <div className="cockpit-modal-backdrop" onClick={() => setAssignModal({ open: false, targetSlotIndex: 0, searchQuery: '' })}>
+          <div className="cockpit-modal-card" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+            <div className="cockpit-modal-header">
+              <h3 className="cockpit-modal-title">
+                <Plus size={20} color="#38bdf8" />
+                Assign Candidate to Screen {assignModal.targetSlotIndex + 1}
+              </h3>
+              <button
+                type="button"
+                className="cockpit-modal-close"
+                onClick={() => setAssignModal({ open: false, targetSlotIndex: 0, searchQuery: '' })}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ margin: '0 0 12px', fontSize: '0.82rem', color: '#94a3b8' }}>
+              Select a candidate from the roster below to stream their live webcam into{' '}
+              <strong style={{ color: '#38bdf8' }}>Screen {assignModal.targetSlotIndex + 1}</strong>.
+            </p>
+
+            <div className="cockpit-search-wrap" style={{ marginBottom: 14 }}>
+              <Search size={15} className="cockpit-search-icon" />
+              <input
+                type="text"
+                className="cockpit-search-input"
+                placeholder="Filter by candidate name, roll number..."
+                value={assignModal.searchQuery || ''}
+                onChange={(e) => setAssignModal(prev => ({ ...prev, searchQuery: e.target.value }))}
+                autoFocus
+              />
+            </div>
+
+            <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {candidates
+                .filter(cand => {
+                  if (cand.status === 'terminated') return false;
+                  if (!assignModal.searchQuery) return true;
+                  const q = assignModal.searchQuery.toLowerCase();
+                  return (
+                    cand.name?.toLowerCase().includes(q) ||
+                    cand.studentId?.toLowerCase().includes(q) ||
+                    cand.email?.toLowerCase().includes(q)
+                  );
+                })
+                .slice(0, 20)
+                .map(cand => {
+                  const isAlreadyStreaming = activeSlots.some(s => s.studentId === cand.id);
+                  const currentSlotNum = activeSlots.findIndex(s => s.studentId === cand.id) + 1;
+
+                  return (
+                    <div
+                      key={`assign-cand-${cand.id}`}
+                      style={{
+                        background: '#0d1322',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: 8,
+                        padding: '10px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: '50%',
+                            background: '#1e293b',
+                            color: '#38bdf8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: '0.9rem',
+                          }}
+                        >
+                          {cand.name?.charAt(0)?.toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#f8fafc' }}>
+                            {cand.name}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                            ID: {cand.studentId} • {cand.violation_count > 0 ? `${cand.violation_count} flags` : 'Clean'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {isAlreadyStreaming ? (
+                        <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontWeight: 700 }}>
+                          Active on Screen {currentSlotNum}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="cockpit-btn cockpit-btn-primary"
+                          style={{ padding: '5px 12px', fontSize: '0.74rem' }}
+                          onClick={() => {
+                            assignStudentToSlot(cand, assignModal.targetSlotIndex);
+                            setAssignModal({ open: false, targetSlotIndex: 0, searchQuery: '' });
+                          }}
+                        >
+                          <Radio size={12} />
+                          <span>Stream Here</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+
+            <div className="cockpit-modal-actions" style={{ marginTop: 14 }}>
+              <button
+                type="button"
+                className="cockpit-btn cockpit-btn-outline"
+                onClick={() => setAssignModal({ open: false, targetSlotIndex: 0, searchQuery: '' })}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          10. MODAL: ENLARGE SCREEN VIDEO FEED
+          ═══════════════════════════════════════════════════════════════════════ */}
+      {enlargedSlot && (
+        <div className="cockpit-modal-backdrop" onClick={() => setEnlargedSlot(null)}>
+          <div className="cockpit-modal-card" style={{ maxWidth: 760, padding: 22 }} onClick={e => e.stopPropagation()}>
+            <div className="cockpit-modal-header">
+              <h3 className="cockpit-modal-title">
+                <Maximize2 size={20} color="#38bdf8" />
+                Screen {enlargedSlot.slotIndex + 1}: {enlargedSlot.studentName}
+              </h3>
+              <button
+                type="button"
+                className="cockpit-modal-close"
+                onClick={() => setEnlargedSlot(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{
+              width: '100%',
+              height: 380,
+              borderRadius: 10,
+              overflow: 'hidden',
+              background: '#030712',
+              position: 'relative',
+              marginBottom: 16,
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              boxShadow: '0 0 24px rgba(56, 189, 248, 0.2)'
+            }}>
+              <CandidateWebcamFeed
+                studentId={enlargedSlot.studentId}
+                studentName={enlargedSlot.studentName}
+                isTerminated={enlargedSlot.student?.status === 'terminated'}
+                streamState={enlargedSlot.status}
+              />
+              <div className="surveillance-audio-meter-bar" style={{ height: 6 }}>
+                <div
+                  className={`surveillance-audio-fill ${(audioLevels[enlargedSlot.studentId] || 0) > 40 ? 'spiking' : ''}`}
+                  style={{ width: `${Math.min(100, audioLevels[enlargedSlot.studentId] || 0)}%` }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                Roll No: <strong style={{ color: '#fff' }}>{enlargedSlot.student?.studentId || enlargedSlot.studentId}</strong> •{' '}
+                Audio Decibels: <strong style={{ color: '#38bdf8' }}>{audioLevels[enlargedSlot.studentId] || 0} dB</strong>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="cockpit-btn cockpit-btn-warning"
+                  onClick={() => {
+                    openWarningModal(enlargedSlot.student || { id: enlargedSlot.studentId, name: enlargedSlot.studentName });
+                  }}
+                  style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                >
+                  <AlertTriangle size={14} />
+                  <span>Issue Warning</span>
+                </button>
+                <button
+                  type="button"
+                  className="cockpit-btn"
+                  onClick={() => {
+                    releaseSlot(enlargedSlot.slotIndex);
+                    setEnlargedSlot(null);
+                  }}
+                  style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '6px 14px', fontSize: '0.8rem' }}
+                >
+                  <X size={14} />
+                  <span>Stop Stream</span>
+                </button>
+                <button
+                  type="button"
+                  className="cockpit-btn cockpit-btn-outline"
+                  onClick={() => setEnlargedSlot(null)}
+                  style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
