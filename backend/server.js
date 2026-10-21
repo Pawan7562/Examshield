@@ -176,7 +176,7 @@ setInterval(async () => {
   } catch (_) {
     // Non-blocking background sync
   }
-}, 30 * 1000).unref();
+}, 120 * 1000).unref();
 
 // Exam ownership cache with 5-minute TTL to minimize database queries during high concurrency
 const examCollegeCache = new Map();
@@ -1044,14 +1044,14 @@ app.use((err, req, res, next) => {
 // =====================================================
 const { autoCloseExpiredExams } = require('./services/examLifecycleService');
 
-// Run auto-close every 30 seconds to strictly enforce scheduled end times
+// Run auto-close periodically (every 2 minutes) to enforce scheduled end times while saving compute
 const autoCloseInterval = setInterval(async () => {
   try {
     await autoCloseExpiredExams();
   } catch (err) {
     logger.error('Auto-close exams interval error:', err);
   }
-}, 30000);
+}, 120000);
 
 // =====================================================
 // START SERVER & ENTERPRISE RELIABILITY GUARDS

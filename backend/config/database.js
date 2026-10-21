@@ -48,9 +48,9 @@ const pool = new Pool({
   lookup: (hostname, options, callback) => {
     return dns.lookup(hostname, { ...options, family: 4 }, callback);
   },
-  min: 5, // Keep 5 persistent connections warm to absorb sudden traffic bursts
+  min: 0, // Allows pool to drain to 0 idle connections so Neon can auto-suspend (scale-to-zero)
   max: Number.parseInt(process.env.PG_POOL_MAX || '60', 10),
-  idleTimeoutMillis: 30000, // Clean idle connections after 30 seconds
+  idleTimeoutMillis: 10000, // Disconnect idle clients after 10 seconds to allow Neon compute sleep
   connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '10000', 10),
   statement_timeout: 10000, // Abort runaway queries after 10 seconds to protect pool
   keepAlive: true,
