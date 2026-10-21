@@ -1078,6 +1078,10 @@ server.listen(PORT, () => {
   // Execute initial lifecycle sweep to close any expired exams and hanging sessions
   startDailyEmailScheduler();
 
+  // High-concurrency write-behind autosave flusher (persists buffered answers in bulk)
+  const { startAutosaveFlusher } = require('./services/autosaveBufferService');
+  startAutosaveFlusher(4000);
+
   autoCloseExpiredExams().then((res) => {
     logger.info(`🛡️ Initial Exam Lifecycle sweep complete. (Closed: ${res?.closedExamsCount || 0}, Sessions: ${res?.autoSubmittedSessionsCount || 0})`);
   }).catch((err) => {

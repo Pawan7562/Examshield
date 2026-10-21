@@ -414,7 +414,14 @@ exports.studentLogin = async (req, res) => {
     // Update last login in background (non-blocking for ultra-fast response)
     pool.query('UPDATE students SET last_login = NOW() WHERE id = $1', [student.id]).catch(() => {});
 
-    const tokens = generateTokens({ id: student.id, role: 'student', college_id: student.college_id });
+    const tokens = generateTokens({
+      id: student.id,
+      student_id: student.student_id,
+      name: student.name,
+      email: student.email,
+      role: 'student',
+      college_id: student.college_id
+    });
 
     res.json({
       success: true,

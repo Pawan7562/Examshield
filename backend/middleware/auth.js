@@ -46,7 +46,23 @@ const authenticate = async (req, res, next) => {
       return next();
     }
 
-    // Fetch user based on role using Supabase / Postgres
+    // Fast-path: Pure In-Memory verification for student exam traffic (Zero-DB lookup)
+    if (decoded.role === 'student' && decoded.college_id) {
+      const studentUser = {
+        id: decoded.id,
+        student_id: decoded.student_id || decoded.id,
+        name: decoded.name || 'Student',
+        email: decoded.email || null,
+        college_id: decoded.college_id,
+        role: 'student',
+        is_active: true,
+      };
+      userCache.set(cacheKey, { user: studentUser, expiry: now + (15 * 60 * 1000) });
+      req.user = studentUser;
+      return next();
+    }
+
+    // Fetch user based on role using Supabase / Postgres (Fallback for admins or legacy tokens)
     let user = null;
     
     if (decoded.role === 'super_admin') {

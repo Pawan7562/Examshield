@@ -2098,7 +2098,24 @@ exports.saveAnswer = async (req, res) => {
     const { detectLanguageFromCode } = require('../services/codeExecutionService');
     const resolvedLanguage = selectedLanguage || req.body.language || req.body.selected_language || (codeSubmission ? detectLanguageFromCode(codeSubmission) : null);
 
-    // Use Supabase upsert with explicit onConflict constraint
+    // Fast-path: Buffer into Redis RAM (<1ms latency) to eliminate database write bottlenecks
+    const { bufferAnswer } = require('../services/autosaveBufferService');
+    const bufferRes = await bufferAnswer({
+      sessionId,
+      questionId,
+      studentId,
+      examId: id,
+      answerText,
+      selectedOption,
+      codeSubmission,
+      selectedLanguage: resolvedLanguage
+    });
+
+    if (bufferRes.buffered) {
+      return res.json({ success: true, message: 'Answer saved.' });
+    }
+
+    // Fallback: Direct Supabase upsert with explicit onConflict constraint if Redis is offline
     const { error: saveError } = await supabase
       .from('answers')
       .upsert({
@@ -2145,6 +2162,20 @@ exports.saveAnswersBulk = async (req, res) => {
       return res.json({ success: true, count: 0, message: 'No answers to save.' });
     }
 
+    // Fast-path: Buffer in Redis in-memory hash (<2ms)
+    const { bufferAnswersBulk } = require('../services/autosaveBufferService');
+    const bufferRes = await bufferAnswersBulk({
+      sessionId,
+      studentId,
+      examId: id,
+      answers
+    });
+
+    if (bufferRes.buffered) {
+      return res.json({ success: true, count: bufferRes.count || answers.length, message: `${bufferRes.count || answers.length} answers saved.` });
+    }
+
+    // Fallback: Direct PostgreSQL bulk upsert if Redis is offline
     const { detectLanguageFromCode } = require('../services/codeExecutionService');
     const now = new Date().toISOString();
     const rows = answers
@@ -2278,6 +2309,12 @@ exports.submitExam = async (req, res) => {
         }
       });
     }
+
+    // Flush any pending write-behind autosave answers from Redis to PostgreSQL
+    const { flushSessionAnswers } = require('../services/autosaveBufferService');
+    await flushSessionAnswers(activeSessionId).catch((flushErr) => {
+      console.warn('Notice: flushSessionAnswers error before submission:', flushErr.message);
+    });
 
     // 2. ATOMIC ANSWER UPSERT — If the frontend sent final answers in the payload,
     //    upsert them NOW before evaluation. This is the critical safety net that
