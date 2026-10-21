@@ -48,10 +48,11 @@ const pool = new Pool({
   lookup: (hostname, options, callback) => {
     return dns.lookup(hostname, { ...options, family: 4 }, callback);
   },
-  min: 1, // Keep 1 persistent connection to eliminate cold TLS handshake latency
-  max: Number.parseInt(process.env.PG_POOL_MAX || '20', 10),
-  idleTimeoutMillis: 60000, // Keep warm connections alive for 60 seconds
-  connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '15000', 10),
+  min: 5, // Keep 5 persistent connections warm to absorb sudden traffic bursts
+  max: Number.parseInt(process.env.PG_POOL_MAX || '60', 10),
+  idleTimeoutMillis: 30000, // Clean idle connections after 30 seconds
+  connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '10000', 10),
+  statement_timeout: 10000, // Abort runaway queries after 10 seconds to protect pool
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),

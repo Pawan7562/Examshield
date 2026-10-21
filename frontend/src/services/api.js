@@ -243,6 +243,7 @@ export const adminAPI = {
   getMonitoringData: (id) => api.get(`/admin/exams/${id}/monitor`),
   warnStudent: (examId, data) => api.post(`/admin/exams/${examId}/warn-student`, data),
   terminateStudent: (examId, data) => api.post(`/admin/exams/${examId}/terminate-student`, data),
+  resumeStudent: (examId, data) => api.post(`/admin/exams/${examId}/resume-student`, data),
   broadcastAnnouncement: (examId, data) => api.post(`/admin/exams/${examId}/broadcast`, data),
   getStudentActivity: (examId, studentId) => api.get(`/admin/exams/${examId}/student-activity/${studentId}`),
 

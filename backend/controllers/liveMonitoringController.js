@@ -515,3 +515,72 @@ exports.getStudentActivity = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to get student activity' });
   }
 };
+
+/**
+ * POST /api/admin/exams/:id/resume-student
+ * Admin override: unblock / resume a student whose session was terminated or interrupted
+ */
+exports.resumeStudentExam = async (req, res) => {
+  try {
+    const { id: examId } = req.params;
+    const { studentId, resetViolations = true } = req.body;
+    const collegeId = req.user.id;
+
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'studentId is required' });
+    }
+
+    // Verify exam ownership
+    const { rows: examRows } = await pool.query(
+      'SELECT id, title FROM exams WHERE id = $1 AND college_id = $2',
+      [examId, collegeId]
+    );
+
+    if (examRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Exam not found or unauthorized' });
+    }
+
+    // Reset session back to active and clear termination flag
+    const updateQuery = `
+      UPDATE exam_sessions
+      SET status = 'active',
+          is_auto_submitted = false,
+          auto_submit_reason = null,
+          submitted_at = null,
+          violation_count = CASE WHEN $1 THEN 0 ELSE violation_count END,
+          updated_at = NOW()
+      WHERE exam_id = $2 AND student_id = $3
+      RETURNING id, status, violation_count;
+    `;
+
+    const { rows: updatedRows } = await pool.query(updateQuery, [
+      Boolean(resetViolations),
+      examId,
+      studentId,
+    ]);
+
+    if (updatedRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Session not found for this candidate' });
+    }
+
+    // Notify real-time client via Socket.IO if connected
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`exam_${examId}`).emit('student_resumed', {
+        examId,
+        studentId,
+        message: 'Your exam session has been unlocked by the administrator. You may resume your exam.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Candidate session successfully resumed and unlocked.',
+      data: updatedRows[0],
+    });
+  } catch (error) {
+    console.error('Error in resumeStudentExam:', error);
+    return res.status(500).json({ success: false, message: 'Failed to resume student session', error: error.message });
+  }
+};
+

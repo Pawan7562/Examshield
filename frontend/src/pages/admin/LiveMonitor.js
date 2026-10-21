@@ -23,6 +23,7 @@ import {
   Camera,
   Activity,
   UserX,
+  Unlock,
   Plus,
   Maximize2,
   ChevronLeft,
@@ -819,6 +820,31 @@ export default function LiveMonitor() {
     }
   };
 
+  const handleResumeStudent = async (student) => {
+    if (!student || !currentExamId) return;
+    try {
+      await adminAPI.resumeStudent(currentExamId, {
+        studentId: student.id,
+      });
+
+      toast.success(`Exam session resumed for ${student.name}. Candidate can now re-enter.`);
+      setCandidates(prev => prev.map(c => {
+        if (c.id === student.id) {
+          return { ...c, status: 'in_progress' };
+        }
+        return c;
+      }));
+      setStats(prev => ({
+        ...prev,
+        terminated: Math.max(0, prev.terminated - 1),
+        active: prev.active + 1,
+      }));
+    } catch (err) {
+      console.error('Failed to resume student:', err);
+      toast.error(err?.response?.data?.message || 'Failed to resume student exam');
+    }
+  };
+
   // ─── 7. Broadcast Announcement ────────────────────────────────────────────────
   const handleSendBroadcast = async () => {
     if (!broadcastModal.message.trim()) return;
@@ -1512,15 +1538,26 @@ export default function LiveMonitor() {
                             <span>Warn</span>
                           </button>
 
-                          <button
-                            className="surveillance-action-btn btn-terminate"
-                            onClick={() => openTerminationModal(student)}
-                            disabled={isTerminated}
-                            title="Immediately disqualify and terminate exam session"
-                          >
-                            <UserX size={13} />
-                            <span>Terminate</span>
-                          </button>
+                          {isTerminated ? (
+                            <button
+                              className="surveillance-action-btn btn-resume"
+                              onClick={() => handleResumeStudent(student)}
+                              title="Unlock and resume exam for candidate"
+                              style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.3)' }}
+                            >
+                              <Unlock size={13} />
+                              <span>Resume</span>
+                            </button>
+                          ) : (
+                            <button
+                              className="surveillance-action-btn btn-terminate"
+                              onClick={() => openTerminationModal(student)}
+                              title="Immediately disqualify and terminate exam session"
+                            >
+                              <UserX size={13} />
+                              <span>Terminate</span>
+                            </button>
+                          )}
 
                           <button
                             className="surveillance-action-btn btn-inspect"
@@ -1988,17 +2025,32 @@ export default function LiveMonitor() {
               >
                 Close Inspector
               </button>
-              <button
-                className="cockpit-btn cockpit-btn-warning"
-                onClick={() => {
-                  const st = inspectModal.student;
-                  setInspectModal({ open: false, student: null, activityData: null });
-                  openWarningModal(st);
-                }}
-              >
-                <AlertTriangle size={14} />
-                <span>Issue Warning</span>
-              </button>
+              {inspectModal.student.status === 'terminated' ? (
+                <button
+                  className="cockpit-btn"
+                  style={{ background: '#10b981', color: '#fff', border: 'none' }}
+                  onClick={async () => {
+                    const st = inspectModal.student;
+                    await handleResumeStudent(st);
+                    setInspectModal({ open: false, student: null, activityData: null });
+                  }}
+                >
+                  <Unlock size={14} />
+                  <span>Unlock & Resume Session</span>
+                </button>
+              ) : (
+                <button
+                  className="cockpit-btn cockpit-btn-warning"
+                  onClick={() => {
+                    const st = inspectModal.student;
+                    setInspectModal({ open: false, student: null, activityData: null });
+                    openWarningModal(st);
+                  }}
+                >
+                  <AlertTriangle size={14} />
+                  <span>Issue Warning</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

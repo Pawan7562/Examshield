@@ -1,6 +1,7 @@
 // controllers/examController.js
 const { pool } = require('../config/database');
 const { supabase } = require('../config/supabase-clean');
+const { getRedisClient } = require('../config/redis');
 const { sendExamNotification, sendExamReminder } = require('../services/emailService');
 const { v4: uuidv4 } = require('uuid');
 const { parseToIST, toISTISOString, formatIST, getExamWindowStatus } = require('../utils/timezone');
@@ -1233,6 +1234,9 @@ exports.addQuestions = async (req, res) => {
       console.log('✅ Backend: Exam question count updated successfully');
     }
 
+    const redis = getRedisClient();
+    if (redis) redis.del(`exam:${id}:sanitized_questions`).catch(() => {});
+
     console.log('✅ Backend: Questions added successfully');
     res.json({ success: true, message: `${questions.length} questions added.` });
   } catch (error) {
@@ -1344,6 +1348,9 @@ exports.deleteQuestion = async (req, res) => {
     } else {
       console.log('✅ Backend: Exam question count updated after deletion');
     }
+
+    const redis = getRedisClient();
+    if (redis) redis.del(`exam:${id}:sanitized_questions`).catch(() => {});
 
     console.log('✅ Backend: Question deleted successfully');
     res.json({ success: true, message: 'Question deleted successfully.' });
@@ -1575,25 +1582,47 @@ exports.getExamDetails = async (req, res) => {
       }
     }
 
-    // Get exam questions for this exam (never leak correct_answer to student)
-    const { data: rawQuestions, error: questionsError } = await supabase
-      .from('questions')
-      .select(`
-        id, question_text, type, options,
-        marks, order_index, code_template, time_limit, memory_limit, difficulty, test_cases
-      `)
-      .eq('exam_id', id)
-      .order('order_index', { ascending: true });
+    // High-Concurrency Redis Question Cache (Prevents DB saturation when 2,000+ candidates start simultaneously)
+    let questions = null;
+    const redis = getRedisClient();
+    const cacheKey = `exam:${id}:sanitized_questions`;
+    if (redis) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          questions = JSON.parse(cached);
+        }
+      } catch (cacheErr) {
+        console.warn('Redis cache get warning:', cacheErr.message);
+      }
+    }
 
-    const questions = (rawQuestions || []).map(formatQuestionForStudent);
+    if (!questions) {
+      // Get exam questions for this exam (never leak correct_answer to student)
+      const { data: rawQuestions, error: questionsError } = await supabase
+        .from('questions')
+        .select(`
+          id, question_text, type, options,
+          marks, order_index, code_template, time_limit, memory_limit, difficulty, test_cases
+        `)
+        .eq('exam_id', id)
+        .order('order_index', { ascending: true });
 
-    if (questionsError) {
-      console.error('Exam questions error:', questionsError);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to fetch exam questions',
-        error: questionsError.message
-      });
+      if (questionsError) {
+        console.error('Exam questions error:', questionsError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch exam questions',
+          error: questionsError.message
+        });
+      }
+
+      questions = (rawQuestions || []).map(formatQuestionForStudent);
+
+      // Cache for 1 hour
+      if (redis && questions && questions.length > 0) {
+        redis.set(cacheKey, JSON.stringify(questions), { EX: 3600 }).catch(() => {});
+      }
     }
 
     // Check if student has access to this exam
@@ -2656,50 +2685,52 @@ exports.reportViolation = async (req, res) => {
     let message = `⚠️ Warning ${newCount}/${maxViolations}: ${type} detected.`;
     let autoTerminate = false;
 
-    // Violation thresholds — strict on visual/tab cheating, lenient on ambient audio
-    if (type === 'multiple_faces' && typeCount >= 3) {
+    // Violation thresholds — strict on external cheating, forgiving on ambient webcam/head movements
+    if (type === 'tab_switch' && typeCount >= 5) {
       action = 'terminate';
-      message = '🚨 EXAM TERMINATED: Multiple persons detected 3 times. Your exam has been automatically submitted.';
+      message = '🚨 EXAM TERMINATED: You switched tabs 5 times. Your exam has been automatically submitted.';
       autoTerminate = true;
-    } else if (type === 'tab_switch' && typeCount >= 3) {
+    } else if (type === 'fullscreen_exit' && typeCount >= 5) {
       action = 'terminate';
-      message = '🚨 EXAM TERMINATED: You switched tabs 3 times. Your exam has been automatically submitted.';
+      message = '🚨 EXAM TERMINATED: You exited full-screen 5 times. Your exam has been automatically submitted.';
       autoTerminate = true;
-    } else if (type === 'no_face_detected' && typeCount >= 5) {
+    } else if (type === 'multiple_faces' && typeCount >= 6) {
       action = 'terminate';
-      message = '🚨 EXAM TERMINATED: No face detected repeatedly. Your exam has been automatically submitted.';
+      message = '🚨 EXAM TERMINATED: Multiple persons detected repeatedly. Your exam has been automatically submitted.';
       autoTerminate = true;
-    } else if (type === 'fullscreen_exit' && typeCount >= 3) {
-      action = 'terminate';
-      message = '🚨 EXAM TERMINATED: You exited full-screen 3 times. Your exam has been automatically submitted.';
-      autoTerminate = true;
+    } else if (type === 'no_face_detected') {
+      // NEVER auto-terminate on face absence (students look down at rough paper/calculators)
+      action = 'warning';
+      message = `⚠️ Notice (${typeCount}): Face not detected clearly. Please ensure you are facing the camera and have adequate lighting.`;
+      autoTerminate = false;
+    } else if (type === 'camera_off') {
+      // Warn student without instant kick
+      action = 'warning';
+      message = `⚠️ Warning (${typeCount}): Camera disconnected or unavailable. Please ensure your camera remains active.`;
+      autoTerminate = false;
     } else if (type === 'speech_detected') {
-      if (typeCount >= 12) {
-        action = 'terminate';
-        message = '🚨 EXAM TERMINATED: Sustained voice activity detected repeatedly.';
-        autoTerminate = true;
+      if (typeCount >= 15) {
+        action = 'warning';
+        message = '⚠️ Sustained background voice detected. Please maintain exam room silence.';
       } else {
         action = 'warning';
-        message = `⚠️ Notice (${typeCount}/12): Audio/voice activity detected. Please maintain silence.`;
+        message = `⚠️ Notice (${typeCount}/15): Audio activity detected. Please maintain silence.`;
       }
-    } else if (newCount >= Math.max(maxViolations, 6) && type !== 'speech_detected') {
+      autoTerminate = false;
+    } else if (newCount >= Math.max(maxViolations, 10) && type !== 'no_face_detected' && type !== 'speech_detected') {
       action = 'terminate';
       message = '🚨 EXAM TERMINATED: Maximum violations reached. Your exam has been automatically submitted.';
       autoTerminate = true;
     } else {
       // Warning messages based on violation type with counts
       if (type === 'multiple_faces') {
-        message = `⚠️ Warning ${typeCount}/3: Multiple faces detected! Only you should be visible during the exam.`;
-      } else if (type === 'no_face_detected') {
-        message = `⚠️ Warning ${typeCount}/3: No face detected! Please stay in front of the camera.`;
-      } else if (type === 'camera_off') {
-        message = `⚠️ Warning ${typeCount}/3: Camera is off! Please turn on your camera immediately.`;
+        message = `⚠️ Warning ${typeCount}/6: Multiple faces detected! Only you should be visible during the exam.`;
       } else if (type === 'tab_switch') {
-        message = `⚠️ Warning ${typeCount}/3: Tab switch detected! Stay focused on the exam.`;
+        message = `⚠️ Warning ${typeCount}/5: Tab switch detected! Stay focused on the exam.`;
       } else if (type === 'fullscreen_exit') {
-        message = `⚠️ Warning ${typeCount}/3: Full-screen exited! Please stay in full-screen mode.`;
+        message = `⚠️ Warning ${typeCount}/5: Full-screen exited! Please stay in full-screen mode.`;
       } else if (type === 'window_blur') {
-        message = `⚠️ Warning ${typeCount}/3: Window focus lost! Keep the exam window active.`;
+        message = `⚠️ Warning ${typeCount}/5: Window focus lost! Keep the exam window active.`;
       } else {
         message = `⚠️ Warning ${newCount}/${maxViolations}: ${description || type}`;
       }

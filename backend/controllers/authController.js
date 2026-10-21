@@ -358,7 +358,8 @@ exports.collegeLogin = async (req, res) => {
  */
 exports.studentLogin = async (req, res) => {
   try {
-    const input = (req.body.email || req.body.studentId || req.body.emailOrId || req.body.id || '').trim();
+    const rawInput = (req.body.email || req.body.studentId || req.body.emailOrId || req.body.id || req.body.rollNo || '').trim();
+    const input = rawInput.replace(/\s+/g, ''); // strip accidental internal/copy-paste spaces
     const { password } = req.body;
 
     if (!input || !password) {
@@ -374,19 +375,24 @@ exports.studentLogin = async (req, res) => {
         SELECT s.*, c.name AS college_name
         FROM students s
         LEFT JOIN colleges c ON s.college_id = c.id
-        WHERE s.email = $1 OR LOWER(s.email) = LOWER($1)
+        WHERE s.email ILIKE $1 OR LOWER(TRIM(s.email)) = LOWER($1)
         LIMIT 1;
       `;
-      studentQueryParams = [normalizeEmail(input)];
+      studentQueryParams = [normalizeEmail(rawInput)];
     } else {
       studentQuery = `
         SELECT s.*, c.name AS college_name
         FROM students s
         LEFT JOIN colleges c ON s.college_id = c.id
-        WHERE s.student_id = $1 OR s.student_id ILIKE $1 OR s.roll_no = $1 OR s.roll_no ILIKE $1
+        WHERE s.student_id ILIKE $1 
+           OR s.roll_no ILIKE $1 
+           OR (s.registration_no IS NOT NULL AND s.registration_no ILIKE $1)
+           OR s.email ILIKE $1
+           OR LOWER(REPLACE(s.roll_no, ' ', '')) = LOWER($2)
+           OR LOWER(REPLACE(s.student_id, ' ', '')) = LOWER($2)
         LIMIT 1;
       `;
-      studentQueryParams = [input];
+      studentQueryParams = [rawInput, input];
     }
 
     const dbRes = await pool.query(studentQuery, studentQueryParams);

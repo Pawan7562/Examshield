@@ -524,6 +524,26 @@ export default function CreateExam() {
       }
     }
 
+    // Explicit AM/PM Past Time Safeguard
+    if (details.dateTime) {
+      const scheduledDate = new Date(details.dateTime);
+      const now = new Date();
+      if (scheduledDate < new Date(now.getTime() - 5 * 60000)) {
+        const formattedScheduled = formatIST(details.dateTime, 'full');
+        const formattedNow = formatIST(now, 'full');
+        const confirmed = window.confirm(
+          `⚠️ TIME CHECK WARNING:\n\n` +
+          `The scheduled exam start time is in the PAST:\n` +
+          `• Scheduled Time: ${formattedScheduled}\n` +
+          `• Current Time:   ${formattedNow}\n\n` +
+          `Did you accidentally choose AM instead of PM?\n` +
+          `Exams scheduled in the past will immediately expire.\n\n` +
+          `Click CANCEL to fix the time (e.g. switch AM to PM), or OK to proceed.`
+        );
+        if (!confirmed) return;
+      }
+    }
+
     setLoading(true);
     try {
       // Build sections payload if enabled
@@ -664,6 +684,12 @@ export default function CreateExam() {
                     {details.dateTime && (
                       <div style={{ fontSize: '0.76rem', color: '#0369a1', background: '#f0f9ff', padding: '5px 8px', borderRadius: 6, marginBottom: 12, border: '1px solid #bae6fd' }}>
                         📅 <strong>Scheduled:</strong> {formatIST(details.dateTime, 'full')}
+                      </div>
+                    )}
+                    {details.dateTime && new Date(details.dateTime) < new Date(Date.now() - 5 * 60000) && (
+                      <div style={{ fontSize: '0.78rem', color: '#b91c1c', background: '#fef2f2', padding: '8px 12px', borderRadius: 6, marginBottom: 12, border: '1px solid #f87171', fontWeight: 600 }}>
+                        🚨 <strong>Warning: Selected time is in the PAST!</strong><br />
+                        Did you select AM instead of PM? This exam will immediately expire upon creation unless you set a future time.
                       </div>
                     )}
                     {details.dateTime && new Date(details.dateTime).getFullYear() > new Date().getFullYear() + 1 && (

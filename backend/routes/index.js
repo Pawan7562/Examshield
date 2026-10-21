@@ -154,6 +154,7 @@ admin.get('/monitoring/overview', liveMonitoringController.getLiveOverview);
 admin.get('/exams/:id/monitor', liveMonitoringController.getMonitoringData);
 admin.post('/exams/:id/warn-student', liveMonitoringController.sendWarning);
 admin.post('/exams/:id/terminate-student', liveMonitoringController.terminateStudentExam);
+admin.post('/exams/:id/resume-student', liveMonitoringController.resumeStudentExam);
 admin.post('/exams/:id/broadcast', liveMonitoringController.broadcastAnnouncement);
 admin.get('/exams/:id/student-activity/:studentId', liveMonitoringController.getStudentActivity);
 
