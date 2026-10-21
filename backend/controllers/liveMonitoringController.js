@@ -547,8 +547,7 @@ exports.resumeStudentExam = async (req, res) => {
           is_auto_submitted = false,
           auto_submit_reason = null,
           submitted_at = null,
-          violation_count = CASE WHEN $1 THEN 0 ELSE violation_count END,
-          updated_at = NOW()
+          violation_count = CASE WHEN $1 THEN 0 ELSE violation_count END
       WHERE exam_id = $2 AND student_id = $3
       RETURNING id, status, violation_count;
     `;
@@ -562,6 +561,12 @@ exports.resumeStudentExam = async (req, res) => {
     if (updatedRows.length === 0) {
       return res.status(404).json({ success: false, message: 'Session not found for this candidate' });
     }
+
+    // Also update assignment status to started/in_progress
+    await pool.query(
+      "UPDATE exam_assignments SET status = 'started' WHERE exam_id = $1 AND student_id = $2",
+      [examId, studentId]
+    ).catch(() => {});
 
     // Notify real-time client via Socket.IO if connected
     const io = req.app.get('io');

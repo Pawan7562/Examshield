@@ -386,7 +386,6 @@ exports.studentLogin = async (req, res) => {
         LEFT JOIN colleges c ON s.college_id = c.id
         WHERE s.student_id ILIKE $1 
            OR s.roll_no ILIKE $1 
-           OR (s.registration_no IS NOT NULL AND s.registration_no ILIKE $1)
            OR s.email ILIKE $1
            OR LOWER(REPLACE(s.roll_no, ' ', '')) = LOWER($2)
            OR LOWER(REPLACE(s.student_id, ' ', '')) = LOWER($2)
