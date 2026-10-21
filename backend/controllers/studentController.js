@@ -47,7 +47,8 @@ exports.getStudents = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized college session' });
     }
 
-    const actualLimit = Math.min(Math.max(1, parseInt(limit) || 15), 500);
+    const parsedLimit = (limit === 'all' || limit === 'unlimited') ? 50000 : parseInt(limit);
+    const actualLimit = Math.min(Math.max(1, parsedLimit || 15), 50000);
     const actualPage = Math.max(1, parseInt(page) || 1);
     const actualOffset = (actualPage - 1) * actualLimit;
 

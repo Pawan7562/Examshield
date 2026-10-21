@@ -325,7 +325,7 @@ export default function CreateExam() {
   const location = useLocation();
 
   useEffect(() => {
-    adminAPI.getStudents({ limit: 500 })
+    adminAPI.getStudents({ limit: 'all' })
       .then(res => {
         const list = res.data?.students || res.data?.data?.students || (Array.isArray(res.data) ? res.data : []);
         setAllStudents(list);

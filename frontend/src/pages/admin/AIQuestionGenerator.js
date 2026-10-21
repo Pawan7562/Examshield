@@ -328,7 +328,7 @@ const AIQuestionGenerator = () => {
   // ── On mount: load students + check AI status ────────────────────────────
   useEffect(() => {
     // axios interceptor returns response.data, so `res` IS the JSON body
-    adminAPI.getStudents({ limit: 500 })
+    adminAPI.getStudents({ limit: 'all' })
       .then(res => setAllStudents(res?.data?.students || res?.students || []))
       .catch(() => {});
 

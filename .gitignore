@@ -7,3 +7,7 @@ dist/
 .DS_Store
 .neon
 .env.local
+*.csv
+temp_*
+scratch_*
+re_evaluate_existing.js

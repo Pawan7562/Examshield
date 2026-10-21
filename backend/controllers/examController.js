@@ -211,7 +211,7 @@ const formatQuestionForStudent = (q) => {
 };
 
 // Async function to process exam data without blocking the response
-const processExamDataAsync = async (examId, questions, studentQuestionSets, studentIds, examQuestionRandomization) => {
+const processExamDataAsync = async (examId, questions, studentQuestionSets, studentIds, examQuestionRandomization, collegeId) => {
   console.log('Processing exam data asynchronously for exam:', examId);
   
   try {
@@ -350,29 +350,36 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
     // Handle student assignments if provided
     if (studentIds && studentIds.length > 0) {
       try {
-        // Strict multi-tenant isolation: only assign students belonging to this college
-        const { rows: validStudentRows } = await pool.query(
-          'SELECT id FROM students WHERE id = ANY($1) AND college_id = $2',
-          [studentIds, collegeId]
-        );
-        const validStudentIds = validStudentRows.map(r => r.id);
+        let targetCollegeId = collegeId;
+        if (!targetCollegeId) {
+          const { rows: examRows } = await pool.query('SELECT college_id FROM exams WHERE id = $1', [examId]);
+          targetCollegeId = examRows[0]?.college_id;
+        }
+
+        let validStudentIds = [];
+        if (studentIds === 'all' || studentIds === 'ALL' || (Array.isArray(studentIds) && studentIds.includes('ALL'))) {
+          const { rows: allCollegeStudents } = await pool.query(
+            'SELECT id FROM students WHERE college_id = $1 AND is_active != false',
+            [targetCollegeId]
+          );
+          validStudentIds = allCollegeStudents.map(r => r.id);
+        } else {
+          // Strict multi-tenant isolation: only assign students belonging to this college
+          const { rows: validStudentRows } = await pool.query(
+            'SELECT id FROM students WHERE id = ANY($1) AND college_id = $2',
+            [studentIds, targetCollegeId]
+          );
+          validStudentIds = validStudentRows.map(r => r.id);
+        }
 
         if (validStudentIds.length > 0) {
-          const studentAssignments = validStudentIds.map(studentId => ({
-            exam_id: examId,
-            student_id: studentId,
-            status: 'assigned'
-          }));
-
-          const { error: assignmentError } = await supabase
-            .from('exam_assignments')
-            .insert(studentAssignments);
-
-          if (assignmentError) {
-            console.error('Student assignment error:', assignmentError);
-          } else {
-            console.log('Successfully assigned', validStudentIds.length, 'students to exam');
-          }
+          await pool.query(
+            `INSERT INTO exam_assignments (exam_id, student_id, status, assigned_at)
+             SELECT $1, unnest($2::uuid[]), 'assigned', NOW()
+             ON CONFLICT (exam_id, student_id) DO NOTHING`,
+            [examId, validStudentIds]
+          );
+          console.log('Successfully assigned', validStudentIds.length, 'students to exam');
         }
       } catch (error) {
         console.error('Error assigning students:', error);
@@ -771,7 +778,7 @@ exports.createExam = async (req, res) => {
     // Return immediately after creating the exam, handle questions asynchronously
     if (questions && questions.length > 0 || studentIds && studentIds.length > 0) {
       // Process questions and assignments in background
-      processExamDataAsync(exam.id, questions, studentQuestionSets, studentIds, examQuestionRandomization);
+      processExamDataAsync(exam.id, questions, studentQuestionSets, studentIds, examQuestionRandomization, collegeId);
     }
 
     console.log('Sending exam creation response');
@@ -2355,41 +2362,50 @@ exports.submitExam = async (req, res) => {
         let earnedQMarks = 0;
 
         if (answer.code_submission && answer.code_submission.trim().length > 0) {
-          // Extract question test cases
-          let testCases = [];
-          if (question.test_cases) {
-            testCases = typeof question.test_cases === 'string' ? JSON.parse(question.test_cases) : question.test_cases;
-          }
-          if ((!testCases || testCases.length === 0) && question.options) {
-            try {
-              const opts = typeof question.options === 'string' ? JSON.parse(question.options) : question.options;
-              testCases = opts?.testCases || opts?.test_cases || opts?.examples || [];
-            } catch (_) {}
-          }
-
-          if (Array.isArray(testCases) && testCases.length > 0) {
-            const { evaluateTestCases, detectLanguageFromCode } = require('../services/codeExecutionService');
-            const languageToRun = answer.selected_language || detectLanguageFromCode(answer.code_submission) || 'javascript';
-            try {
-              const evalRes = await evaluateTestCases(
-                answer.code_submission,
-                languageToRun,
-                testCases,
-                {
-                  timeLimitMs: question.time_limit || 2000,
-                  memoryLimitMb: question.memory_limit || 256,
-                  questionMarks: maxQMarks
-                }
-              );
-              earnedQMarks = evalRes.earnedMarks || 0;
-            } catch (evalErr) {
-              console.error('Server-side code evaluation error in submitExam:', evalErr);
-              earnedQMarks = answer.marks_obtained !== null && answer.marks_obtained !== undefined
-                ? Number(answer.marks_obtained)
-                : 0;
-            }
-          } else if (answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
+          // If answer was already evaluated and marked from student's code submission, reuse authoritative marks
+          if (answer.is_evaluated && answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
             earnedQMarks = Number(answer.marks_obtained);
+          } else {
+            // Extract question test cases and rich metadata
+            let testCases = [];
+            let opts = {};
+            if (question.options) {
+              try {
+                opts = typeof question.options === 'string' ? JSON.parse(question.options) : question.options;
+              } catch (_) {}
+            }
+            if (question.test_cases) {
+              testCases = typeof question.test_cases === 'string' ? JSON.parse(question.test_cases) : question.test_cases;
+            }
+            if ((!testCases || testCases.length === 0) && opts) {
+              testCases = opts?.testCases || opts?.test_cases || opts?.examples || [];
+            }
+
+            if (Array.isArray(testCases) && testCases.length > 0) {
+              const { evaluateTestCases, detectLanguageFromCode } = require('../services/codeExecutionService');
+              const languageToRun = answer.selected_language || detectLanguageFromCode(answer.code_submission) || 'javascript';
+              try {
+                const evalRes = await evaluateTestCases(
+                  answer.code_submission,
+                  languageToRun,
+                  testCases,
+                  {
+                    timeLimitMs: question.time_limit || 2000,
+                    memoryLimitMb: question.memory_limit || 256,
+                    questionMarks: maxQMarks,
+                    questionMetadata: opts
+                  }
+                );
+                earnedQMarks = evalRes.earnedMarks || 0;
+              } catch (evalErr) {
+                console.error('Server-side code evaluation error in submitExam:', evalErr);
+                earnedQMarks = answer.marks_obtained !== null && answer.marks_obtained !== undefined
+                  ? Number(answer.marks_obtained)
+                  : 0;
+              }
+            } else if (answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
+              earnedQMarks = Number(answer.marks_obtained);
+            }
           }
         }
 

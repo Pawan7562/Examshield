@@ -597,14 +597,17 @@ exports.reevaluateResult = async (req, res) => {
 
         if (ans.code_submission && ans.code_submission.trim().length > 0) {
           let testCases = [];
+          let opts = {};
+          if (q.options) {
+            try {
+              opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+            } catch (_) {}
+          }
           if (q.test_cases) {
             testCases = typeof q.test_cases === 'string' ? JSON.parse(q.test_cases) : q.test_cases;
           }
-          if ((!testCases || testCases.length === 0) && q.options) {
-            try {
-              const opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
-              testCases = opts?.testCases || opts?.test_cases || opts?.examples || [];
-            } catch (_) {}
+          if ((!testCases || testCases.length === 0) && opts) {
+            testCases = opts?.testCases || opts?.test_cases || opts?.examples || [];
           }
 
           if (Array.isArray(testCases) && testCases.length > 0) {
@@ -617,7 +620,8 @@ exports.reevaluateResult = async (req, res) => {
                 {
                   timeLimitMs: q.time_limit || 2000,
                   memoryLimitMb: q.memory_limit || 256,
-                  questionMarks: maxM
+                  questionMarks: maxM,
+                  questionMetadata: opts
                 }
               );
               earned = evalRes.earnedMarks || 0;
@@ -737,14 +741,17 @@ exports.reevaluateExam = async (req, res) => {
 
           if (ans.code_submission && ans.code_submission.trim().length > 0) {
             let testCases = [];
+            let opts = {};
+            if (q.options) {
+              try {
+                opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+              } catch (_) {}
+            }
             if (q.test_cases) {
               testCases = typeof q.test_cases === 'string' ? JSON.parse(q.test_cases) : q.test_cases;
             }
-            if ((!testCases || testCases.length === 0) && q.options) {
-              try {
-                const opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
-                testCases = opts?.testCases || opts?.test_cases || opts?.examples || [];
-              } catch (_) {}
+            if ((!testCases || testCases.length === 0) && opts) {
+              testCases = opts?.testCases || opts?.test_cases || opts?.examples || [];
             }
 
             if (Array.isArray(testCases) && testCases.length > 0) {
@@ -757,7 +764,8 @@ exports.reevaluateExam = async (req, res) => {
                   {
                     timeLimitMs: q.time_limit || 2000,
                     memoryLimitMb: q.memory_limit || 256,
-                    questionMarks: maxM
+                    questionMarks: maxM,
+                    questionMetadata: opts
                   }
                 );
                 earned = evalRes.earnedMarks || 0;

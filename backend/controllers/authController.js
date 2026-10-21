@@ -35,12 +35,16 @@ const comparePassword = async (plainPassword, hashedPassword) => {
   if (!hashedPassword || !plainPassword) return false;
 
   try {
-    const isBcrypt = hashedPassword.startsWith('$2a$') || hashedPassword.startsWith('$2b$');
+    const isBcrypt = /^\$2[aby]\$/.test(hashedPassword);
     if (isBcrypt) {
-      return await bcrypt.compare(plainPassword, hashedPassword);
+      const match = await bcrypt.compare(plainPassword, hashedPassword);
+      if (!match && plainPassword.trim() !== plainPassword) {
+        return await bcrypt.compare(plainPassword.trim(), hashedPassword);
+      }
+      return match;
     }
     // Legacy transition check: strictly compare if non-bcrypt, but never fallback in catch
-    return plainPassword === hashedPassword;
+    return plainPassword === hashedPassword || plainPassword.trim() === hashedPassword;
   } catch (error) {
     return false;
   }
@@ -270,6 +274,8 @@ exports.collegeLogin = async (req, res) => {
     }
 
     const normalizedEmail = normalizeEmail(email);
+    console.log(`[AUTH] College login attempt for: "${normalizedEmail}"`);
+
     const dbRes = await pool.query(
       'SELECT * FROM colleges WHERE email = $1 OR LOWER(email) = LOWER($1) LIMIT 1',
       [normalizedEmail]
@@ -279,6 +285,7 @@ exports.collegeLogin = async (req, res) => {
     let isPasswordValid = college ? await comparePassword(password, college.password) : false;
 
     if (!college || !isPasswordValid) {
+      console.warn(`[AUTH] College login rejected for: "${normalizedEmail}". Account in DB: ${Boolean(college)}, Password valid: ${isPasswordValid}`);
       const { data: authData, error: authError } = await signInWithSupabaseAuth(normalizedEmail, password);
 
       if (authError || !authData?.user) {
@@ -319,6 +326,7 @@ exports.collegeLogin = async (req, res) => {
     const tokens = generateTokens({ id: college.id, role: 'college_admin' });
 
     const subscriptionExpired = college.subscription_expiry && new Date(college.subscription_expiry) < new Date();
+    console.log(`[AUTH] College login successful for: "${college.email}" (${college.name})`);
 
     res.json({
       success: true,
