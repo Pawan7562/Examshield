@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Production Cluster Orchestration for ExamShield (50k - 100k Users)
 services:
   # 1. Reverse Proxy & Professional Load Balancer
@@ -51,14 +49,6 @@ services:
       - redis
     networks:
       - examshield_network
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 3072M
-        reservations:
-          cpus: '0.5'
-          memory: 1024M
 
   # 3b. High-Concurrency Backend Service (Node 2 - Horizontal Cluster Replica)
   backend_2:
@@ -78,14 +68,6 @@ services:
       - redis
     networks:
       - examshield_network
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 3072M
-        reservations:
-          cpus: '0.5'
-          memory: 1024M
 
   # 4. Frontend Application Server
   frontend:
