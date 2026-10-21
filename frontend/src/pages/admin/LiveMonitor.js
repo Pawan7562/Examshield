@@ -303,7 +303,7 @@ export default function LiveMonitor() {
   const [inspectModal, setInspectModal] = useState({ open: false, student: null, activityData: null });
 
   // ─── On-Demand 4-Screen Live Video Slots (Strict 4-screen limit) ──────────────
-  const maxStreams = 4;
+  const [maxStreams, setMaxStreams] = useState(4);
   const [selectedScreenIndex, setSelectedScreenIndex] = useState(0); // 0, 1, 2, or 3
   const [activeSlots, setActiveSlots] = useState([
     { slotIndex: 0, studentId: null, studentName: null, status: 'idle', student: null },
