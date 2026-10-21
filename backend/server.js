@@ -112,7 +112,7 @@ const io = new Server(server, {
 });
 
 // Horizontal load balancing: Connect Socket.IO to Redis cluster if REDIS_URL is provided (Upstash / ElastiCache)
-const { initRedisAdapter } = require('./config/redis');
+const { initRedisAdapter, getRedisClient } = require('./config/redis');
 initRedisAdapter(io);
 
 // Socket.IO rooms and stream management for exam monitoring
@@ -272,16 +272,23 @@ io.on('connection', (socket) => {
     if (verifiedStudentId) socket.join(`student-${verifiedStudentId}`);
     
     if (sessionId) {
-      activeExamSessions.set(sessionId, {
+      const sessPayload = {
         sessionId,
         studentId: verifiedStudentId,
         studentName: studentName || 'Candidate',
         examId,
         socketId: socket.id,
         status: 'active',
-        connectedAt: new Date(),
-        lastHeartbeat: new Date(),
-      });
+        connectedAt: new Date().toISOString(),
+        lastHeartbeat: new Date().toISOString(),
+      };
+      activeExamSessions.set(sessionId, sessPayload);
+
+      const redis = getRedisClient();
+      if (redis) {
+        redis.hSet(`exam:${examId}:active_sessions`, sessionId, JSON.stringify(sessPayload)).catch(() => {});
+        redis.expire(`exam:${examId}:active_sessions`, 7200).catch(() => {});
+      }
     }
 
     // Inform student whether live streaming is requested by any existing proctor
@@ -319,10 +326,22 @@ io.on('connection', (socket) => {
     socket.join(`admin-exam-${examId}`);
     socket.join(`exam-monitoring-${examId}`);
     
-    // Send current active sessions
-    const sessions = Array.from(activeExamSessions.entries())
+    // Send current active sessions (merging local Map with Redis Cluster if available)
+    let sessions = Array.from(activeExamSessions.entries())
       .filter(([, s]) => s.examId === examId)
       .map(([id, data]) => ({ sessionId: id, ...data }));
+    
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        const clusterMap = await redis.hGetAll(`exam:${examId}:active_sessions`);
+        if (clusterMap && Object.keys(clusterMap).length > 0) {
+          sessions = Object.values(clusterMap).map(s => {
+            try { return JSON.parse(s); } catch (_) { return null; }
+          }).filter(Boolean);
+        }
+      } catch (_) {}
+    }
     
     socket.emit('active-sessions', sessions);
 
@@ -578,25 +597,18 @@ io.on('connection', (socket) => {
       isIncident: !!isIncident,
     });
 
-    // Check if any admin or proctor is actually watching before serializing and broadcasting
-    const adminRoom = io.sockets.adapter.rooms.get(`admin-exam-${examId}`);
-    const monitorRoom = io.sockets.adapter.rooms.get(`exam-monitoring-${examId}`);
-    const hasAdmins = (adminRoom && adminRoom.size > 0) || (monitorRoom && monitorRoom.size > 0);
-
-    if (hasAdmins) {
-      const snapshotPayload = {
-        examId,
-        studentId,
-        sessionId,
-        imageData,
-        faceCount,
-        audioLevel,
-        timestamp: timestamp || Date.now(),
-        isIncident: !!isIncident,
-      };
-      // Relayed volatilely to monitoring room for candidate roster thumbnail display
-      io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).volatile.emit('candidate-snapshot', snapshotPayload);
-    }
+    const snapshotPayload = {
+      examId,
+      studentId,
+      sessionId,
+      imageData,
+      faceCount,
+      audioLevel,
+      timestamp: timestamp || Date.now(),
+      isIncident: !!isIncident,
+    };
+    // Relayed volatilely to monitoring room across cluster (Socket.IO Redis adapter forwards to all proctor nodes)
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).volatile.emit('candidate-snapshot', snapshotPayload);
   });
 
   // Student camera/hardware status update
@@ -621,23 +633,16 @@ io.on('connection', (socket) => {
   socket.on('student-activity', ({ examId, studentId, sessionId, activity }) => {
     if (!examId || !studentId) return;
 
-    // Only broadcast telemetry when proctors are present in the room
-    const adminRoom = io.sockets.adapter.rooms.get(`admin-exam-${examId}`);
-    const monitorRoom = io.sockets.adapter.rooms.get(`exam-monitoring-${examId}`);
-    const hasAdmins = (adminRoom && adminRoom.size > 0) || (monitorRoom && monitorRoom.size > 0);
-
-    if (hasAdmins) {
-      const actPayload = {
-        examId,
-        studentId,
-        sessionId,
-        activity: {
-          ...activity,
-          lastSeen: new Date().toISOString(),
-        },
-      };
-      io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).volatile.emit('student-activity', actPayload);
-    }
+    const actPayload = {
+      examId,
+      studentId,
+      sessionId,
+      activity: {
+        ...activity,
+        lastSeen: new Date().toISOString(),
+      },
+    };
+    io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).volatile.emit('student-activity', actPayload);
   });
 
   // Violation event
@@ -710,6 +715,18 @@ io.on('connection', (socket) => {
     if (activeExamSessions.has(sessionId)) {
       activeExamSessions.get(sessionId).lastHeartbeat = new Date();
     }
+    const redis = getRedisClient();
+    if (redis && examId && sessionId) {
+      redis.hGet(`exam:${examId}:active_sessions`, sessionId).then(raw => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            parsed.lastHeartbeat = new Date().toISOString();
+            redis.hSet(`exam:${examId}:active_sessions`, sessionId, JSON.stringify(parsed)).catch(() => {});
+          } catch (_) {}
+        }
+      }).catch(() => {});
+    }
     const hbPayload = {
       sessionId,
       studentId,
@@ -725,6 +742,10 @@ io.on('connection', (socket) => {
   socket.on('exam-submitted', ({ sessionId, examId, studentId }) => {
     if (activeExamSessions.has(sessionId)) {
       activeExamSessions.get(sessionId).status = 'submitted';
+    }
+    const redis = getRedisClient();
+    if (redis && examId && sessionId) {
+      redis.hDel(`exam:${examId}:active_sessions`, sessionId).catch(() => {});
     }
     const subPayload = {
       sessionId,
@@ -785,6 +806,11 @@ io.on('connection', (socket) => {
         };
         io.to(`admin-exam-${examId}`).to(`exam-monitoring-${examId}`).emit('student-disconnected', dcPayload);
         activeExamSessions.delete(sessionId);
+
+        const redis = getRedisClient();
+        if (redis && examId && sessionId) {
+          redis.hDel(`exam:${examId}:active_sessions`, sessionId).catch(() => {});
+        }
         break;
       }
     }
