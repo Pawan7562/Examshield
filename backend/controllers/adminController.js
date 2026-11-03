@@ -7,6 +7,11 @@ const { autoCloseExpiredExams } = require('../services/examLifecycleService');
 const dashboardCache = new Map();
 const DASHBOARD_CACHE_TTL = 15000;
 
+exports.clearDashboardCache = (collegeId) => {
+  if (collegeId) dashboardCache.delete(collegeId);
+  else dashboardCache.clear();
+};
+
 exports.getDashboard = async (req, res) => {
   try {
     const collegeId = req.user.id;

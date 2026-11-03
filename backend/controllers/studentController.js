@@ -206,10 +206,23 @@ exports.addStudent = async (req, res) => {
           .from('exams')
           .select('*')
           .eq('college_id', collegeId)
+          .not('status', 'in', '("completed","cancelled","ended")')
           .order('created_at', { ascending: false })
           .limit(1);
         if (latestExams && latestExams.length > 0) {
           targetExam = latestExams[0];
+        }
+      }
+
+      // Strict Guard: Check if targetExam has ended or its scheduled date has passed
+      if (targetExam) {
+        const isPast = targetExam.date_time && 
+          (new Date(targetExam.date_time).getTime() + (Number(targetExam.duration) || 60) * 60000) <= Date.now();
+        const isEnded = ['completed', 'cancelled', 'ended'].includes(targetExam.status);
+        if (isPast || isEnded) {
+          console.log(`ℹ️ [StudentController] Exam ${targetExam.id} has ended or scheduled date has passed. Suppressing exam attachment.`);
+          targetExam = null;
+          effectiveExamKey = null;
         }
       }
 
@@ -796,10 +809,23 @@ exports.bulkUploadStudents = async (req, res) => {
           .from('exams')
           .select('*')
           .eq('college_id', collegeId)
+          .not('status', 'in', '("completed","cancelled","ended")')
           .order('created_at', { ascending: false })
           .limit(1);
         if (latestExams && latestExams.length > 0) {
           targetExam = latestExams[0];
+        }
+      }
+
+      // Strict Guard: Check if targetExam has ended or its scheduled date has passed
+      if (targetExam) {
+        const isPast = targetExam.date_time && 
+          (new Date(targetExam.date_time).getTime() + (Number(targetExam.duration) || 60) * 60000) <= Date.now();
+        const isEnded = ['completed', 'cancelled', 'ended'].includes(targetExam.status);
+        if (isPast || isEnded) {
+          console.log(`ℹ️ [StudentController] Target exam ${targetExam.id} has ended or scheduled date has passed. Suppressing exam attachment for bulk upload.`);
+          targetExam = null;
+          effectiveExamKey = null;
         }
       }
 
@@ -1296,8 +1322,15 @@ exports.resendStudentCredentials = async (req, res) => {
         .limit(1);
 
       if (assignments && assignments[0]?.exams) {
-        targetExam = assignments[0].exams;
-        effectiveExamKey = targetExam.exam_key || targetExam.exam_code;
+        const ex = assignments[0].exams;
+        const isPast = ex.date_time && (new Date(ex.date_time).getTime() + (Number(ex.duration) || 60) * 60000) <= Date.now();
+        const isEnded = ['completed', 'cancelled', 'ended'].includes(ex.status);
+        if (!isPast && !isEnded) {
+          targetExam = ex;
+          effectiveExamKey = targetExam.exam_key || targetExam.exam_code;
+        } else {
+          console.log(`ℹ️ [resendStudentCredentials] Assigned exam ${ex.id} has ended or scheduled date has passed. Suppressing exam attachment.`);
+        }
       }
     } catch (_) {}
 

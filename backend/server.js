@@ -910,6 +910,28 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // =====================================================
 // ROUTES
 // =====================================================
+// Request timeout guard: if any route handler hasn't responded within 270s,
+// send a clean 503 JSON error instead of leaving the HTTP pipe open.
+// An open, never-terminated chunked response causes ERR_INCOMPLETE_CHUNKED_ENCODING.
+app.use((req, res, next) => {
+  const TIMEOUT_MS = 270000; // 270s — safely under the 300s Nginx proxy_read_timeout
+  const timer = setTimeout(() => {
+    if (!res.headersSent) {
+      logger.warn(`Request timeout (270s): ${req.method} ${req.originalUrl}`);
+      res.status(503).json({
+        success: false,
+        message: 'Request timed out. The operation took too long to complete. Please try again.',
+      });
+    }
+  }, TIMEOUT_MS);
+
+  // Clear the timer as soon as the response finishes normally
+  res.on('finish', () => clearTimeout(timer));
+  res.on('close', () => clearTimeout(timer));
+
+  next();
+});
+
 const routes = require('./routes');
 app.use('/api', routes);
 
@@ -1059,8 +1081,9 @@ const autoCloseInterval = setInterval(async () => {
 const PORT = process.env.PORT || 5000;
 
 // Prevent race condition 502 Bad Gateway behind reverse proxies (Cloudflare, Render, Nginx, AWS)
-server.keepAliveTimeout = 65000;
-server.headersTimeout = 66000;
+// keepAliveTimeout must be > Nginx proxy_read_timeout (300s) to prevent premature connection close
+server.keepAliveTimeout = 305000;
+server.headersTimeout = 310000;
 
 server.listen(PORT, () => {
   logger.info(`🚀 CollegeExam server running on port ${PORT}`);

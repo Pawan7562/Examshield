@@ -48,11 +48,11 @@ const pool = new Pool({
   lookup: (hostname, options, callback) => {
     return dns.lookup(hostname, { ...options, family: 4 }, callback);
   },
-  min: 0, // Allows pool to drain to 0 idle connections so Neon can auto-suspend (scale-to-zero)
+  min: 2, // Keep 2 warm connections so pool is ready for exam start without cold start delay
   max: Number.parseInt(process.env.PG_POOL_MAX || '60', 10),
-  idleTimeoutMillis: 10000, // Disconnect idle clients after 10 seconds to allow Neon compute sleep
+  idleTimeoutMillis: 30000, // Keep connections alive longer during exam sessions
   connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '10000', 10),
-  statement_timeout: 10000, // Abort runaway queries after 10 seconds to protect pool
+  statement_timeout: 30000, // 30s statement timeout to prevent query aborts under 400-500 concurrent student autosaves
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),

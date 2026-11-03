@@ -1,0 +1,14 @@
+[
+  {
+    "emailOrId": "test_student_1@example.com",
+    "password": "StagingPassword123!"
+  },
+  {
+    "emailOrId": "test_student_2@example.com",
+    "password": "StagingPassword123!"
+  },
+  {
+    "emailOrId": "test_student_3@example.com",
+    "password": "StagingPassword123!"
+  }
+]

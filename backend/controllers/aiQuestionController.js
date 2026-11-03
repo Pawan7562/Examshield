@@ -89,16 +89,26 @@ exports.generateQuestions = async (req, res) => {
     console.log(`   Mode:       ${mode}`);
     console.log(`   AI Active:  ${isApiKeyConfigured()}`);
 
-    // ── Generation ────────────────────────────────────────────────────────────
+    // ── Generation (with hard 150s server-side timeout guard) ─────────────────
+    // Without this, a hung Gemini call leaves the HTTP response open until Nginx
+    // kills the connection → ERR_INCOMPLETE_CHUNKED_ENCODING on the client.
     const startTime = Date.now();
 
-    const result = await generateQuestionBatch({
-      topic: topic.trim(),
-      difficulty,
-      sources,
-      count: requestedCount,
-      mode,
-    });
+    const result = await Promise.race([
+      generateQuestionBatch({
+        topic: topic.trim(),
+        difficulty,
+        sources,
+        count: requestedCount,
+        mode,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error('AI generation timed out after 150 seconds. Please try again.')),
+          150000
+        )
+      ),
+    ]);
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`\n✅ Generation complete: ${result.questions.length} questions in ${elapsed}s`);

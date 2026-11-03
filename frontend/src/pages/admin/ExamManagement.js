@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
-import { formatIST, isExamEnded } from '../../utils/timezone';
+import { formatIST, isExamEnded, parseToIST, toDateTimeLocalValue, toISTISOString } from '../../utils/timezone';
 import toast from 'react-hot-toast';
 import { 
   Plus, 
@@ -101,6 +101,7 @@ export default function ExamManagement() {
     exam: null,
     title: '',
     description: '',
+    dateTime: '',
     duration: 60,
     total_marks: 100,
     passing_marks: 40,
@@ -198,6 +199,7 @@ export default function ExamManagement() {
       exam,
       title: exam.title || exam.name || '',
       description: exam.description || '',
+      dateTime: exam.date_time ? toDateTimeLocalValue(exam.date_time) : '',
       duration: exam.duration || 60,
       total_marks: exam.total_marks || 100,
       passing_marks: exam.passing_marks || 40,
@@ -232,14 +234,32 @@ export default function ExamManagement() {
         monitoring_config: editModal.monitoringConfig
       };
 
-      await adminAPI.updateExam(editModal.exam.id, payload);
+      if (editModal.dateTime) {
+        payload.date_time = toISTISOString(editModal.dateTime);
+        payload.dateTime = payload.date_time;
+
+        // If rescheduled to a future or live window, ensure status does not remain stuck as 'completed'
+        const parsedStart = parseToIST(payload.date_time);
+        if (parsedStart) {
+          const effectiveDuration = parseInt(editModal.duration) || 60;
+          const endTime = parsedStart.getTime() + (effectiveDuration * 60000);
+          if (endTime > Date.now() && payload.status === 'completed') {
+            payload.status = (Date.now() >= parsedStart.getTime() - 15 * 60000) ? 'active' : 'published';
+          }
+        }
+      }
+
+      const res = await adminAPI.updateExam(editModal.exam.id, payload);
+      const updatedExam = res?.data?.exam || {};
 
       // Update in state immediately
       setExams(prev => prev.map(item => {
         if (item.id === editModal.exam.id) {
           return {
             ...item,
-            ...payload
+            ...payload,
+            ...(updatedExam.date_time ? { date_time: updatedExam.date_time } : {}),
+            status: updatedExam.status || payload.status || item.status
           };
         }
         return item;
@@ -250,17 +270,23 @@ export default function ExamManagement() {
         const cached = sessionStorage.getItem('cached_admin_exams');
         if (cached) {
           const list = JSON.parse(cached);
-          const updated = list.map(item => item.id === editModal.exam.id ? { ...item, ...payload } : item);
+          const updated = list.map(item => item.id === editModal.exam.id ? { 
+            ...item, 
+            ...payload,
+            ...(updatedExam.date_time ? { date_time: updatedExam.date_time } : {}),
+            ...(updatedExam.status ? { status: updatedExam.status } : {})
+          } : item);
           sessionStorage.setItem('cached_admin_exams', JSON.stringify(updated));
         }
       } catch (_) {}
 
-      toast.success('Exam details & monitoring settings updated successfully');
+      toast.success('Exam schedule and settings updated successfully');
       setEditModal({ 
         open: false, 
         exam: null, 
         title: '', 
         description: '', 
+        dateTime: '',
         duration: 60, 
         total_marks: 100, 
         passing_marks: 40, 
@@ -487,10 +513,19 @@ export default function ExamManagement() {
         <div className="admin-modal-overlay" onClick={() => !editModal.saving && setEditModal(prev => ({ ...prev, open: false }))}>
           <div 
             className="admin-modal" 
-            style={{ maxWidth: 580, borderRadius: 16 }}
+            style={{ 
+              maxWidth: 600, 
+              width: '100%', 
+              maxHeight: '90vh', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              borderRadius: 16, 
+              overflow: 'hidden',
+              boxShadow: '0 25px 60px -15px rgba(0,0,0,0.3)'
+            }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="admin-modal-header" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <div className="admin-modal-header" style={{ flexShrink: 0, background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(10, 116, 218, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0a74da' }}>
                   <BookOpen size={18} />
@@ -509,8 +544,25 @@ export default function ExamManagement() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveExam}>
-              <div className="admin-modal-content" style={{ padding: '24px 28px' }}>
+            <form 
+              onSubmit={handleSaveExam}
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                flex: 1, 
+                minHeight: 0, 
+                overflow: 'hidden' 
+              }}
+            >
+              <div 
+                className="admin-modal-content" 
+                style={{ 
+                  flex: 1, 
+                  overflowY: 'auto', 
+                  padding: '24px 28px',
+                  minHeight: 0 
+                }}
+              >
                 {/* Title */}
                 <div style={{ marginBottom: 18 }}>
                   <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: 6 }}>
@@ -540,6 +592,31 @@ export default function ExamManagement() {
                     className="admin-form-input"
                     style={{ resize: 'vertical' }}
                   />
+                </div>
+
+                {/* Scheduled Date & Time (IST) */}
+                <div style={{ marginBottom: 18, background: '#f8fafc', padding: '14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>
+                      <Calendar size={15} color="#0a74da" />
+                      <span>Scheduled Date & Time (IST)</span>
+                    </label>
+                    {editModal.exam?.date_time && (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: 6 }}>
+                        Current: {formatIST(editModal.exam.date_time, 'dateTime')}
+                      </span>
+                    )}
+                  </div>
+                  <input 
+                    type="datetime-local"
+                    value={editModal.dateTime || ''}
+                    onChange={e => setEditModal(prev => ({ ...prev, dateTime: e.target.value }))}
+                    className="admin-form-input"
+                    style={{ fontWeight: 600, background: '#ffffff' }}
+                  />
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>
+                    💡 You can edit this schedule anytime (even after publishing). The new schedule reflects immediately on all student dashboards without affecting question banks, candidate answers, or existing submissions.
+                  </p>
                 </div>
 
                 {/* Duration & Type row */}
@@ -706,11 +783,13 @@ export default function ExamManagement() {
               </div>
 
               <div style={{ 
+                flexShrink: 0,
                 padding: '16px 28px', 
                 background: '#f8fafc', 
                 borderTop: '1px solid #e2e8f0', 
                 display: 'flex', 
                 justifyContent: 'flex-end',
+                alignItems: 'center',
                 gap: 12
               }}>
                 <Button 
@@ -728,6 +807,7 @@ export default function ExamManagement() {
                   size="md" 
                   icon={Save}
                   loading={editModal.saving}
+                  style={{ minWidth: 170, fontWeight: 700 }}
                 >
                   Save Exam Changes
                 </Button>

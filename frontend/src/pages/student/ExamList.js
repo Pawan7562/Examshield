@@ -38,6 +38,9 @@ export default function ExamList() {
   };
 
   const isCompletedExam = (exam) => {
+    if (exam.date_time) {
+      return isExamEnded(exam) || exam.session_status === 'submitted' || exam.session_status === 'terminated';
+    }
     return isExamEnded(exam) || exam.session_status === 'submitted' || exam.status === 'completed';
   };
 

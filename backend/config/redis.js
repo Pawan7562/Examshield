@@ -42,10 +42,8 @@ const initRedisAdapter = async (io) => {
       url: redisUrl,
       socket: {
         reconnectStrategy: (retries) => {
-          if (retries >= 2) {
-            return false; // Stop reconnecting after 2 failed attempts
-          }
-          return 500;
+          // Robust exponential backoff with max 3s delay; keep trying so network blips auto-heal
+          return Math.min(retries * 100, 3000);
         },
         connectTimeout: 5000,
       }
@@ -71,13 +69,22 @@ const initRedisAdapter = async (io) => {
       }
     });
 
+    redisClient.on('ready', () => {
+      isRedisConnected = true;
+    });
+    redisClient.on('end', () => {
+      isRedisConnected = false;
+    });
+
     await Promise.all([
       pubClient.connect(),
       subClient.connect(),
       redisClient.connect()
     ]);
 
-    io.adapter(createAdapter(pubClient, subClient));
+    if (io && typeof io.adapter === 'function') {
+      io.adapter(createAdapter(pubClient, subClient));
+    }
     isRedisConnected = true;
     logger.info('✅ Connected to Redis: Socket.IO multi-instance clustering & load balancing active!');
     return true;
@@ -95,10 +102,10 @@ const initRedisAdapter = async (io) => {
 };
 
 /**
- * Get standard Redis key-value client for caching
+ * Get standard Redis key-value client for caching (returns null if disconnected or closed)
  */
 const getRedisClient = () => {
-  return isRedisConnected ? redisClient : null;
+  return (redisClient && redisClient.isOpen) ? redisClient : null;
 };
 
 /**

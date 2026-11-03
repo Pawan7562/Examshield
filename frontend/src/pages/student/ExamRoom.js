@@ -1132,6 +1132,78 @@ export default function ExamRoom() {
 
   // ─── Fetch Exam Details ───────────────────────────────────────────────────────
   // ─── Fetch Exam Details & Auto-Fill Access Key ──────────────────────────────
+  // ─── Fetch Exam Details & Real-Time Reschedule Synchronization ────────────
+  const refreshExamDetails = useCallback(async (isSilent = false) => {
+    if (!examId) return;
+    try {
+      const r = await studentAPI.getExamDetails(examId);
+      if (r.success && r.data) {
+        setExamData(r.data);
+        const examObj = r.data.exam;
+        const hasSubmittedSession = r.data.existingSession?.status === 'submitted' || r.data.existingSession?.status === 'terminated';
+
+        if (hasSubmittedSession) {
+          setPhase('submitted');
+          const sess = r.data.existingSession;
+          const totalM = r.data.exam?.total_marks ? Number(r.data.exam.total_marks) : 100;
+          const score = sess.total_score !== undefined && sess.total_score !== null ? Number(sess.total_score) : 0;
+          const pct = sess.percentage !== undefined && sess.percentage !== null && !isNaN(sess.percentage)
+            ? Number(sess.percentage)
+            : (totalM > 0 ? Math.round((score / totalM) * 100) : 0);
+          const qTotal = sess.questionsTotal || r.data.questions?.length || 2;
+          const qAttempted = sess.questionsAttempted || (score > 0 && qTotal > 0 ? qTotal : qTotal);
+          setResult({
+            score: score,
+            totalMarks: totalM,
+            percentage: pct,
+            status: sess.result_status || (pct >= 40 ? 'Passed' : 'Completed'),
+            questionsAttempted: qAttempted,
+            questionsTotal: qTotal,
+            isPending: sess.result_status === 'pending'
+          });
+          return;
+        }
+
+        const isEndedNow = r.data.isEnded || isExamEnded(examObj);
+        if (isEndedNow) {
+          setPhase('ended');
+          return;
+        } else {
+          // If the candidate was previously on 'ended' screen due to an expired prior schedule,
+          // restore access automatically upon rescheduling
+          setPhase(prev => {
+            if (prev === 'ended') {
+              const start = examObj.date_time ? parseToIST(examObj.date_time) : null;
+              if (start && Date.now() < start.getTime()) {
+                return 'waiting';
+              }
+              return 'key';
+            }
+            return prev;
+          });
+        }
+
+        // Automatically pre-fill the official access key for the student
+        const key = examObj?.exam_code || examObj?.exam_key;
+        if (key) {
+          setExamKey(prev => prev || String(key).trim().toUpperCase());
+        }
+
+        if (!isSilent) {
+          notify.success('Assessment schedule synchronized with server.');
+        }
+      }
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || '';
+      if (err?.response?.data?.isEnded || errMsg.toLowerCase().includes('ended')) {
+        setPhase('ended');
+      }
+      if (!isSilent) {
+        notify.warn('Could not refresh exam schedule.');
+      }
+    }
+  }, [examId]);
+
   useEffect(() => {
     // Check URL parameters for pre-supplied access key
     try {
@@ -1142,60 +1214,19 @@ export default function ExamRoom() {
       }
     } catch (_) {}
 
-    if (examId) {
-      studentAPI.getExamDetails(examId)
-        .then(r => {
-          if (r.success && r.data) {
-            setExamData(r.data);
-            const examObj = r.data.exam;
-            const hasSubmittedSession = r.data.existingSession?.status === 'submitted' || r.data.existingSession?.status === 'terminated';
+    refreshExamDetails(true);
+  }, [refreshExamDetails]);
 
-            if (hasSubmittedSession) {
-              setPhase('submitted');
-              const sess = r.data.existingSession;
-              const totalM = r.data.exam?.total_marks ? Number(r.data.exam.total_marks) : 100;
-              const score = sess.total_score !== undefined && sess.total_score !== null ? Number(sess.total_score) : 0;
-              const pct = sess.percentage !== undefined && sess.percentage !== null && !isNaN(sess.percentage)
-                ? Number(sess.percentage)
-                : (totalM > 0 ? Math.round((score / totalM) * 100) : 0);
-              const qTotal = sess.questionsTotal || r.data.questions?.length || 2;
-              const qAttempted = sess.questionsAttempted || (score > 0 && qTotal > 0 ? qTotal : qTotal);
-              setResult({
-                score: score,
-                totalMarks: totalM,
-                percentage: pct,
-                status: sess.result_status || (pct >= 40 ? 'Passed' : 'Completed'),
-                questionsAttempted: qAttempted,
-                questionsTotal: qTotal,
-                isPending: sess.result_status === 'pending'
-              });
-              return;
-            }
+  // Periodic polling for real-time exam rescheduling updates (every 20s while not in live exam/submitted)
+  useEffect(() => {
+    if (!examId || phase === 'exam' || phase === 'submitted') return;
 
-            // If exam has already ended according to its scheduled end time or backend check
-            if (r.data.isEnded || isExamEnded(examObj)) {
-              setPhase('ended');
-              return;
-            }
+    const interval = setInterval(() => {
+      refreshExamDetails(true);
+    }, 20000);
 
-            // Automatically pre-fill the official access key for the student
-            const key = examObj?.exam_code || examObj?.exam_key;
-            if (key) {
-              setExamKey(String(key).trim().toUpperCase());
-            }
-
-            // Industry standard: Verification must strictly occur ONLY when the candidate
-            // explicitly clicks the "Verify Student" button.
-          }
-        })
-        .catch((err) => {
-          const errMsg = err?.response?.data?.message || '';
-          if (err?.response?.data?.isEnded || errMsg.toLowerCase().includes('ended')) {
-            setPhase('ended');
-          }
-        });
-    }
-  }, [examId]);
+    return () => clearInterval(interval);
+  }, [examId, phase, refreshExamDetails]);
 
   // ─── Answer Handler & Offline Local Backup ──────────────────────────────────
   // ─── Answer Handler & Offline Local Backup ──────────────────────────────────
@@ -1855,6 +1886,45 @@ export default function ExamRoom() {
               </div>
             )}
 
+            {/* Scheduled Assessment Timing Card */}
+            {(exam.date_time || exam.dateTime) && (
+              <div style={{
+                background: '#f8fafc',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 14,
+                padding: '14px 16px',
+                marginBottom: 20
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569' }}>
+                    <Clock size={14} color="#0a74da" />
+                    <span>Scheduled Assessment Window</span>
+                  </div>
+                  {isExamEnded(exam) ? (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '2px 8px', borderRadius: 6, border: '1px solid #fecaca' }}>
+                      Concluded
+                    </span>
+                  ) : isExamStartable(exam) ? (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: 6, border: '1px solid #bbf7d0', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a' }} />
+                      Live / Ready
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1d4ed8', background: '#eff6ff', padding: '2px 8px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+                      Upcoming
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
+                  {formatIST(exam.date_time || exam.dateTime, 'full')}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: '#64748b' }}>
+                  <span>Duration: <strong style={{ color: '#0f172a' }}>{exam.duration || 60} Minutes</strong></span>
+                  <span>Timezone: <strong style={{ color: '#0a74da' }}>Indian Standard Time (IST)</strong></span>
+                </div>
+              </div>
+            )}
+
             {/* Access Key Input */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -2111,6 +2181,13 @@ export default function ExamRoom() {
                   <span>Key:</span>
                   <strong style={{ fontFamily: "'JetBrains Mono', monospace", color: '#0f172a' }}>{examKey || exam.exam_code || 'VERIFIED'}</strong>
                 </span>
+                {(exam.date_time || exam.dateTime) && (
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e40af', background: '#dbeafe', padding: '3px 10px', borderRadius: 6, border: '1px solid #93c5fd', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <Clock size={12} color="#1d4ed8" />
+                    <span>Scheduled:</span>
+                    <strong style={{ color: '#1e3a8a' }}>{formatIST(exam.date_time || exam.dateTime, 'full')}</strong>
+                  </span>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, color: '#15803d' }}>
@@ -2129,14 +2206,31 @@ export default function ExamRoom() {
               </p>
             </div>
 
-            {/* 4-KPI Metric Strip */}
+            {/* 5-KPI Metric Strip */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
               gap: 14,
               paddingTop: 18,
               borderTop: '1px solid #f1f5f9'
             }}>
+              {(exam.date_time || exam.dateTime) && (
+                <div style={{ background: '#f8fafc', border: '1.5px solid #bfdbfe', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#eff6ff', color: '#0a74da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Clock size={20} />
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: '0.72rem', color: '#0a74da', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Scheduled Window</div>
+                    <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {formatIST(exam.date_time || exam.dateTime, 'date')}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#0a74da', fontWeight: 700 }}>
+                      {formatIST(exam.date_time || exam.dateTime, 'time')} IST
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: '#eff6ff', color: '#0a74da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Clock size={20} />
@@ -4194,7 +4288,7 @@ export default function ExamRoom() {
                     <span>Candidate Session Credentials &amp; Parameters</span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
                     <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
                       <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Candidate</div>
                       <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{user?.name || 'Verified Student'}</div>
@@ -4206,6 +4300,18 @@ export default function ExamRoom() {
                       <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{exam.title || 'Official Exam'}</div>
                       <div style={{ fontSize: '0.72rem', color: '#0a74da', fontWeight: 600 }}>{exam.subject || 'Standard'}</div>
                     </div>
+
+                    {(exam.date_time || exam.dateTime) && (
+                      <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: '12px 14px' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#0a74da', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Scheduled Timing</div>
+                        <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
+                          {formatIST(exam.date_time || exam.dateTime, 'time')} IST
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#0a74da', fontWeight: 600 }}>
+                          {formatIST(exam.date_time || exam.dateTime, 'date')}
+                        </div>
+                      </div>
+                    )}
 
                     <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
                       <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Duration &amp; Marks</div>
@@ -4551,15 +4657,35 @@ export default function ExamRoom() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
-              onClick={() => navigate('/student/dashboard')}
+              onClick={() => refreshExamDetails(false)}
               style={{
                 padding: '12px 24px',
                 borderRadius: 12,
                 background: '#0a74da',
                 color: '#fff',
                 border: 'none',
+                fontWeight: 700,
+                fontSize: '0.92rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 4px 12px rgba(10, 116, 218, 0.25)'
+              }}
+            >
+              <RefreshCw size={16} />
+              <span>Check for Rescheduled Exam</span>
+            </button>
+            <button
+              onClick={() => navigate('/student/dashboard')}
+              style={{
+                padding: '12px 24px',
+                borderRadius: 12,
+                background: '#f1f5f9',
+                color: '#475569',
+                border: '1.5px solid #cbd5e1',
                 fontWeight: 700,
                 fontSize: '0.92rem',
                 cursor: 'pointer',
@@ -4575,15 +4701,15 @@ export default function ExamRoom() {
               style={{
                 padding: '12px 24px',
                 borderRadius: 12,
-                background: '#f1f5f9',
-                color: '#334155',
-                border: '1px solid #cbd5e1',
-                fontWeight: 700,
+                background: '#ffffff',
+                color: '#64748b',
+                border: '1.5px solid #e2e8f0',
+                fontWeight: 600,
                 fontSize: '0.92rem',
-                cursor: 'pointer',
+                cursor: 'pointer'
               }}
             >
-              <span>View All Exams</span>
+              <span>All Exams</span>
             </button>
           </div>
         </div>

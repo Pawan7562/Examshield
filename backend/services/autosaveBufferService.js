@@ -178,14 +178,15 @@ const flushDirtySessions = async () => {
 
   isFlushing = true;
   try {
-    // Pop up to 30 dirty sessions per cycle
-    const dirtyItems = await redis.sPop(DIRTY_SESSIONS_SET, 30);
+    // Pop up to 100 dirty sessions per cycle (scaled for 400-500 concurrent students)
+    const dirtyItems = await redis.sPop(DIRTY_SESSIONS_SET, 100);
     if (!dirtyItems || (Array.isArray(dirtyItems) && dirtyItems.length === 0)) {
       return;
     }
 
     const items = Array.isArray(dirtyItems) ? dirtyItems : [dirtyItems];
-    let totalFlushedRows = 0;
+    const allRows = [];
+    const keysToDelete = [];
 
     for (const item of items) {
       if (!item) continue;
@@ -196,11 +197,25 @@ const flushDirtySessions = async () => {
       const entries = await redis.hGetAll(hashKey);
       if (!entries || Object.keys(entries).length === 0) continue;
 
-      const rows = Object.values(entries).map(raw => JSON.parse(raw));
-      if (rows.length > 0) {
-        await persistAnswersToPostgres(rows);
-        totalFlushedRows += rows.length;
-        await redis.del(hashKey);
+      for (const raw of Object.values(entries)) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed) allRows.push(parsed);
+        } catch (_) {}
+      }
+      keysToDelete.push(hashKey);
+    }
+
+    let totalFlushedRows = 0;
+    if (allRows.length > 0) {
+      // Chunk in blocks of 200 rows for single-roundtrip Postgres upserts
+      for (let i = 0; i < allRows.length; i += 200) {
+        const chunk = allRows.slice(i, i + 200);
+        await persistAnswersToPostgres(chunk);
+      }
+      totalFlushedRows = allRows.length;
+      if (keysToDelete.length > 0) {
+        await redis.del(keysToDelete);
       }
     }
 

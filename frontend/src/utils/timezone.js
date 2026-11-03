@@ -124,26 +124,17 @@ export function toISTISOString(dateInput) {
     return `${str}.000+05:30`;
   }
   const date = parseToIST(dateInput);
-  if (!date) return str;
+  if (!date || isNaN(date.getTime())) return null;
 
-  // Format parts in IST
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-
-  const parts = formatter.formatToParts(date);
-  const map = {};
-  for (const p of parts) map[p.type] = p.value;
-
-  const ms = String(date.getMilliseconds()).padStart(3, '0');
-  return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}.${ms}+05:30`;
+  const istDate = new Date(date.getTime() + 5.5 * 3600 * 1000);
+  const year = istDate.getUTCFullYear();
+  const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(istDate.getUTCDate()).padStart(2, '0');
+  const hour = String(istDate.getUTCHours()).padStart(2, '0');
+  const minute = String(istDate.getUTCMinutes()).padStart(2, '0');
+  const second = String(istDate.getUTCSeconds()).padStart(2, '0');
+  const ms = String(istDate.getUTCMilliseconds()).padStart(3, '0');
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}.${ms}+05:30`;
 }
 
 /**
@@ -151,22 +142,16 @@ export function toISTISOString(dateInput) {
  * Output: "YYYY-MM-DDTHH:mm"
  */
 export function toDateTimeLocalValue(dateInput) {
-  const date = parseToIST(dateInput) || new Date();
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-
-  const parts = formatter.formatToParts(date);
-  const map = {};
-  for (const p of parts) map[p.type] = p.value;
-
-  return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}`;
+  if (!dateInput) return '';
+  const date = parseToIST(dateInput);
+  if (!date || isNaN(date.getTime())) return '';
+  const istDate = new Date(date.getTime() + 5.5 * 3600 * 1000);
+  const year = istDate.getUTCFullYear();
+  const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(istDate.getUTCDate()).padStart(2, '0');
+  const hour = String(istDate.getUTCHours()).padStart(2, '0');
+  const minute = String(istDate.getUTCMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
 /**
@@ -175,17 +160,22 @@ export function toDateTimeLocalValue(dateInput) {
  */
 export function isExamEnded(exam) {
   if (!exam) return false;
-  if (exam.status === 'completed' || exam.status === 'cancelled') return true;
+  if (exam.status === 'cancelled') return true;
   if (exam.session_status === 'submitted' || exam.session_status === 'terminated') return true;
-  if (!exam.date_time) return false;
 
-  const start = parseToIST(exam.date_time);
-  if (!start) return false;
+  const dateStr = exam.date_time || exam.dateTime || exam.scheduled_at || exam.start_time;
+  if (dateStr) {
+    const start = parseToIST(dateStr);
+    if (start) {
+      const startTime = start.getTime();
+      const durationMs = (Number(exam.duration) || 60) * 60000;
+      const endTime = startTime + durationMs;
+      // Strictly time-based: if the scheduled end time is in the future, it has NOT ended
+      return Date.now() > endTime;
+    }
+  }
 
-  const startTime = start.getTime();
-  const durationMs = (Number(exam.duration) || 60) * 60000;
-  const endTime = startTime + durationMs;
-  return Date.now() > endTime;
+  return exam.status === 'completed';
 }
 
 /**
@@ -196,15 +186,15 @@ export function isExamEnded(exam) {
  */
 export function isExamStartable(exam, earlyAccessMinutes = 15) {
   if (!exam) return false;
-  if (isExamEnded(exam)) return false;
   if (exam.session_status === 'submitted' || exam.session_status === 'terminated') return false;
-  if (exam.status === 'completed' || exam.status === 'cancelled') return false;
+  if (exam.status === 'cancelled') return false;
 
-  if (!exam.date_time) {
+  const dateStr = exam.date_time || exam.dateTime || exam.scheduled_at || exam.start_time;
+  if (!dateStr) {
     return exam.status === 'published' || exam.status === 'active';
   }
 
-  const start = parseToIST(exam.date_time);
+  const start = parseToIST(dateStr);
   if (!start) return false;
 
   const startTime = start.getTime();
@@ -238,10 +228,13 @@ export function getExamRemainingSeconds(exam, sessionStartedAt = null) {
 
   // Window remaining based on scheduled end
   let windowRemainingSec = totalDurationSec;
-  if (exam.date_time) {
-    const start = parseToIST(exam.date_time);
+  let scheduledStartMs = null;
+  const dateStr = exam.date_time || exam.dateTime || exam.scheduled_at || exam.start_time;
+  if (dateStr) {
+    const start = parseToIST(dateStr);
     if (start) {
-      const endTime = start.getTime() + totalDurationSec * 1000;
+      scheduledStartMs = start.getTime();
+      const endTime = scheduledStartMs + totalDurationSec * 1000;
       windowRemainingSec = Math.max(0, Math.floor((endTime - now) / 1000));
     }
   }
@@ -251,7 +244,11 @@ export function getExamRemainingSeconds(exam, sessionStartedAt = null) {
   if (sessionStartedAt) {
     const sessionStartMs = new Date(sessionStartedAt).getTime();
     if (!isNaN(sessionStartMs)) {
-      sessionRemainingSec = Math.max(0, Math.floor((totalDurationSec * 1000 - (now - sessionStartMs)) / 1000));
+      // If the session was started before the scheduled start window (e.g. from an earlier schedule),
+      // do not let that stale timestamp count against the candidate
+      if (!scheduledStartMs || sessionStartMs >= (scheduledStartMs - 15 * 60 * 1000)) {
+        sessionRemainingSec = Math.max(0, Math.floor((totalDurationSec * 1000 - (now - sessionStartMs)) / 1000));
+      }
     }
   }
 

@@ -454,6 +454,54 @@ const resolveCollegeNameFromDb = async ({ collegeName, collegeId, examId, examKe
   return collegeName || 'Your Institution';
 };
 
+/**
+ * Guard: Check if an exam has ended or its scheduled date has passed.
+ * Returns { isEnded: boolean, reason?: string }
+ */
+const isExamEndedOrPassed = async ({ examId, examKey, examDate, examDuration } = {}) => {
+  const now = new Date();
+
+  // 1. Direct date check if examDate is provided
+  if (examDate) {
+    const start = new Date(examDate);
+    const durationMins = Number(examDuration) || 60;
+    const end = new Date(start.getTime() + durationMins * 60000);
+    if (!isNaN(end.getTime()) && end <= now) {
+      return { isEnded: true, reason: `scheduled date/time passed (${end.toISOString()} <= ${now.toISOString()})` };
+    }
+  }
+
+  // 2. Query database for status and date_time if examId or examKey is provided
+  if (examId || (examKey && examKey !== 'N/A' && examKey !== 'TBD')) {
+    try {
+      const { pool } = require('../config/database');
+      const query = examId
+        ? 'SELECT id, status, date_time, duration FROM exams WHERE id = $1 LIMIT 1'
+        : 'SELECT id, status, date_time, duration FROM exams WHERE exam_code = $1 OR exam_key = $1 LIMIT 1';
+      const param = examId || examKey;
+      const res = await pool.query(query, [param]);
+      if (res.rows.length > 0) {
+        const ex = res.rows[0];
+        if (['completed', 'cancelled', 'ended'].includes(ex.status)) {
+          return { isEnded: true, reason: `exam status is '${ex.status}'` };
+        }
+        if (ex.date_time) {
+          const start = new Date(ex.date_time);
+          const durationMins = Number(ex.duration) || 60;
+          const end = new Date(start.getTime() + durationMins * 60000);
+          if (!isNaN(end.getTime()) && end <= now) {
+            return { isEnded: true, reason: `scheduled end passed (${end.toISOString()} <= ${now.toISOString()})` };
+          }
+        }
+      }
+    } catch (_) {
+      // Non-fatal fallback
+    }
+  }
+
+  return { isEnded: false };
+};
+
 // ─────────────────────────────────────────────────────────────
 // Industry-Standard HTML Base Template
 // Nexify Examina (Primary Brand) + Nexify Forge (Engineering Attribution)
@@ -649,7 +697,7 @@ const sendStudentCredentials = async (firstArg, secondArg) => {
     opts = firstArg;
   }
 
-  const { 
+  let { 
     name, 
     email, 
     studentId, 
@@ -663,11 +711,29 @@ const sendStudentCredentials = async (firstArg, secondArg) => {
     examDate,
     examDuration,
     subject,
-    isReset = false
+    isReset = false,
+    onlyIfExamUpcoming = false
   } = opts;
 
   if (!email) {
     throw new Error('Recipient email is required for credentials dispatch.');
+  }
+
+  // Strict Guard: Never include expired/past exam details in student credentials emails
+  if (examKey || examDate || examId) {
+    const endCheck = await isExamEndedOrPassed({ examId, examKey, examDate, examDuration });
+    if (endCheck.isEnded) {
+      if (onlyIfExamUpcoming) {
+        logger.warn(`🛑 [EmailService] ABORTED credentials dispatch to ${email}: Associated exam has ended or scheduled date has passed (${endCheck.reason}).`);
+        return { success: false, skipped: true, reason: endCheck.reason };
+      }
+      logger.warn(`🛑 [EmailService] Suppressed expired exam details in credentials email to ${email}: ${endCheck.reason}`);
+      examKey = null;
+      examDate = null;
+      examName = null;
+      examDuration = null;
+      subject = null;
+    }
   }
 
   // Dynamically resolve college name from database if not explicitly set
@@ -881,6 +947,13 @@ const sendExamNotification = async ({
   examId,
   studentId
 }) => {
+  // Strict Guard: Never send exam notification if the exam has ended or its scheduled date has passed
+  const endCheck = await isExamEndedOrPassed({ examId, examKey, examDate, examDuration });
+  if (endCheck.isEnded) {
+    logger.warn(`🛑 [EmailService] ABORTED Exam Notification to ${email}: Exam "${examName || examKey || examId}" has ended or scheduled date has passed (${endCheck.reason}).`);
+    return { success: false, skipped: true, reason: endCheck.reason };
+  }
+
   if (!examKey || examKey === 'N/A') {
     throw new Error('Valid exam key is required for email notification');
   }
@@ -1071,6 +1144,13 @@ const sendExamReminder = async ({
   examId,
   studentId
 }) => {
+  // Strict Guard: Never send exam reminder if the exam has ended or its scheduled date has passed
+  const endCheck = await isExamEndedOrPassed({ examId, examKey, examDate, examDuration });
+  if (endCheck.isEnded) {
+    logger.warn(`🛑 [EmailService] ABORTED Exam Reminder to ${email}: Exam "${examName || examKey || examId}" has ended or scheduled date has passed (${endCheck.reason}).`);
+    return { success: false, skipped: true, reason: endCheck.reason };
+  }
+
   const collegeName = await resolveCollegeNameFromDb({
     collegeName: rawCollegeName,
     collegeId,

@@ -22,6 +22,16 @@ function parseToIST(dateInput) {
   // Replace space separator with standard ISO 'T'
   str = str.replace(' ', 'T');
 
+  // Handle invalid hour 24 if sent by any client (e.g. 2026-10-25T24:33)
+  if (str.includes('T24:')) {
+    str = str.replace('T24:', 'T00:');
+    const d = new Date(str.includes('+') || str.endsWith('Z') ? str : `${str}+05:30`);
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() + 1);
+      return d;
+    }
+  }
+
   // If input is YYYY-MM-DDTHH:mm (HTML5 datetime-local without seconds/tz)
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(str)) {
     str = `${str}:00+05:30`;
@@ -40,27 +50,26 @@ function parseToIST(dateInput) {
 /**
  * Returns an ISO-formatted string explicitly carrying the +05:30 IST offset.
  * Example: 2026-09-27T10:30:00.000+05:30
+ * Uses exact UTC arithmetic (+330 minutes) to guarantee standard ISO 8601
+ * representation where hour is strictly 00..23 (preventing PostgreSQL 'hour 24' errors).
  */
 function toISTISOString(dateInput) {
   const date = parseToIST(dateInput) || new Date();
-  // Compute IST date parts via Intl
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
+  if (isNaN(date.getTime())) return new Date().toISOString();
 
-  const parts = formatter.formatToParts(date);
-  const map = {};
-  for (const p of parts) map[p.type] = p.value;
+  // Shift UTC time by exactly +05:30 (IST offset: 330 minutes)
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(date.getTime() + istOffsetMs);
 
-  const ms = String(date.getMilliseconds()).padStart(3, '0');
-  return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}.${ms}+05:30`;
+  const year = istDate.getUTCFullYear();
+  const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(istDate.getUTCDate()).padStart(2, '0');
+  const hour = String(istDate.getUTCHours()).padStart(2, '0');
+  const minute = String(istDate.getUTCMinutes()).padStart(2, '0');
+  const second = String(istDate.getUTCSeconds()).padStart(2, '0');
+  const ms = String(istDate.getUTCMilliseconds()).padStart(3, '0');
+
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}.${ms}+05:30`;
 }
 
 /**

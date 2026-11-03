@@ -211,6 +211,57 @@ const formatQuestionForStudent = (q) => {
   };
 };
 
+/**
+ * Authoritative Exam Metadata Lookup (Direct PostgreSQL Query)
+ * Ensures rescheduled date/time, duration, and status updates reflect immediately across all Exam Room endpoints.
+ */
+const getCachedExamMeta = async (examId) => {
+  if (!examId) return null;
+  const { rows } = await pool.query('SELECT * FROM exams WHERE id = $1', [examId]);
+  return rows[0] || null;
+};
+
+/**
+ * High-Concurrency Authoritative Exam Questions Cache for Marking Engine (TTL: 300s)
+ * Strictly internal to submitExam, never exposed to students.
+ */
+const getCachedAuthoritativeQuestions = async (examId) => {
+  if (!examId) return [];
+  const redis = getRedisClient();
+  const cacheKey = `exam:${examId}:authoritative_questions`;
+  if (redis) {
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (_) {}
+  }
+
+  const { rows } = await pool.query(
+    'SELECT * FROM questions WHERE exam_id = $1 ORDER BY order_index ASC',
+    [examId]
+  );
+  if (rows && rows.length > 0 && redis) {
+    redis.set(cacheKey, JSON.stringify(rows), { EX: 300 }).catch(() => {});
+  }
+  return rows || [];
+};
+
+/**
+ * Invalidate all cached data for an exam
+ */
+const invalidateExamCaches = (examId, collegeId) => {
+  const redis = getRedisClient();
+  if (redis && examId) {
+    redis.del(`exam:${examId}:sanitized_questions`).catch(() => {});
+    redis.del(`exam:${examId}:authoritative_questions`).catch(() => {});
+    redis.del(`exam:${examId}:meta`).catch(() => {});
+  }
+  try {
+    const { clearDashboardCache } = require('./adminController');
+    if (clearDashboardCache) clearDashboardCache(collegeId);
+  } catch (_) {}
+};
+
 // Async function to process exam data without blocking the response
 const processExamDataAsync = async (examId, questions, studentQuestionSets, studentIds, examQuestionRandomization, collegeId) => {
   console.log('Processing exam data asynchronously for exam:', examId);
@@ -402,9 +453,19 @@ const processExamDataAsync = async (examId, questions, studentQuestionSets, stud
           // Get exam details for email
           const { data: examData } = await supabase
             .from('exams')
-            .select('title, subject, date_time, duration, exam_code, college_id')
+            .select('title, subject, date_time, duration, exam_code, college_id, status')
             .eq('id', examId)
             .maybeSingle();
+
+          const isExamPastOrEnded = examData && (
+            ['completed', 'cancelled', 'ended'].includes(examData.status) ||
+            (examData.date_time && (new Date(examData.date_time).getTime() + (examData.duration || 60) * 60000) <= Date.now())
+          );
+
+          if (isExamPastOrEnded) {
+            console.log(`ℹ️ [AssignStudents] Exam ${examId} scheduled date has passed or status is ended. Skipping student notification dispatch.`);
+            return;
+          }
 
           let resolvedCollegeName = 'Your Institution';
           if (examData?.college_id) {
@@ -655,7 +716,15 @@ exports.createExam = async (req, res) => {
 
     // Set default values for missing required fields
     const examType = type || 'mcq';
-    const examDateTime = dateTime ? toISTISOString(dateTime) : toISTISOString(new Date());
+    let examDateTime;
+    try {
+      examDateTime = dateTime ? toISTISOString(dateTime) : toISTISOString(new Date());
+      if (typeof examDateTime === 'string' && examDateTime.includes('T24:')) {
+        examDateTime = examDateTime.replace('T24:', 'T00:');
+      }
+    } catch (dateErr) {
+      examDateTime = new Date().toISOString();
+    }
     const examDuration = duration || 60;
     const examTotalMarks = totalMarks || 100;
     const examSubject = subject || 'General';
@@ -842,6 +911,7 @@ exports.updateExam = async (req, res) => {
 
     const examTitle = title || name;
     const examDuration = duration !== undefined ? parseInt(duration) : undefined;
+    const examTotal = totalMarks !== undefined ? parseInt(totalMarks) : (total_marks !== undefined ? parseInt(total_marks) : undefined);
     let examPass = passingMarks !== undefined ? parseInt(passingMarks) : (passing_marks !== undefined ? parseInt(passing_marks) : undefined);
     if (examPass !== undefined && !isNaN(examPass) && examTotal !== undefined && examTotal > 0) {
       if (examPass > examTotal && examPass <= 100) {
@@ -900,11 +970,76 @@ exports.updateExam = async (req, res) => {
       updateValues.push(instructions);
       idx++;
     }
-    if (examDate) {
+
+    // Scheduled Date & Time Update (anchored to IST)
+    const rawDateTime = dateTime !== undefined ? dateTime : date_time;
+    if (rawDateTime) {
+      let resolvedDateTime;
+      try {
+        resolvedDateTime = toISTISOString(rawDateTime);
+        if (typeof resolvedDateTime === 'string' && resolvedDateTime.includes('T24:')) {
+          resolvedDateTime = resolvedDateTime.replace('T24:', 'T00:');
+        }
+      } catch (dateErr) {
+        resolvedDateTime = new Date(rawDateTime).toISOString();
+      }
       updateFields.push(`date_time = $${idx}`);
-      updateValues.push(new Date(examDate));
+      updateValues.push(resolvedDateTime);
       idx++;
+
+      // When rescheduling to a future or live window, ensure status is not stuck as 'completed'
+      const parsedStart = parseToIST(resolvedDateTime);
+      if (parsedStart) {
+        const effectiveDuration = examDuration || 60;
+        const endTime = parsedStart.getTime() + (effectiveDuration * 60000);
+        if (endTime > Date.now()) {
+          const autoStatus = (Date.now() >= parsedStart.getTime() - 15 * 60000) ? 'active' : 'published';
+          
+          // If status was already pushed into updateFields as 'completed', replace it with autoStatus
+          const statusIdx = updateFields.findIndex(f => f.startsWith('status ='));
+          if (statusIdx >= 0) {
+            if (updateValues[statusIdx + 2] === 'completed') {
+              updateValues[statusIdx + 2] = autoStatus;
+            }
+          } else {
+            updateFields.push(`status = CASE WHEN status = 'completed' THEN '${autoStatus}' ELSE status END`);
+          }
+
+          // Reset stale auto-expired sessions from the previous schedule so candidates can take the rescheduled exam
+          try {
+            await pool.query(
+              `UPDATE exam_sessions
+               SET status = 'active',
+                   started_at = NULL,
+                   submitted_at = NULL,
+                   is_auto_submitted = false,
+                   auto_submit_reason = NULL,
+                   violation_count = 0
+               WHERE exam_id = $1
+                 AND (
+                   auto_submit_reason = 'scheduled_time_expired'
+                   OR (started_at IS NOT NULL AND started_at < $2::timestamptz - INTERVAL '15 minutes')
+                 )`,
+              [id, resolvedDateTime]
+            );
+
+            // Clean up results calculated solely for auto-expired sessions
+            await pool.query(
+              `DELETE FROM results
+               WHERE exam_id = $1
+                 AND student_id IN (
+                   SELECT student_id FROM exam_sessions
+                   WHERE exam_id = $1 AND (auto_submit_reason = 'scheduled_time_expired' OR started_at IS NULL)
+                 )`,
+              [id]
+            );
+          } catch (sessionResetErr) {
+            console.warn('⚠️ [UPDATE_EXAM] Session reset notice for rescheduled exam:', sessionResetErr.message);
+          }
+        }
+      }
     }
+
     const monConfig = monitoringConfig !== undefined ? monitoringConfig : monitoring_config;
     if (monConfig !== undefined) {
       updateFields.push(`monitoring_config = $${idx}`);
@@ -932,7 +1067,9 @@ exports.updateExam = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Exam not found or unauthorized' });
     }
 
-    res.json({ success: true, message: 'Exam updated.', data: { exam: rows[0] } });
+    invalidateExamCaches(id, collegeId);
+
+    res.json({ success: true, message: 'Exam updated successfully.', data: { exam: rows[0] } });
   } catch (error) {
     console.error('Update exam error:', error);
     res.status(500).json({ success: false, message: 'Update failed', error: error.message });
@@ -1036,8 +1173,18 @@ exports.publishExam = async (req, res) => {
 
     console.log('✅ Backend: Exam published successfully');
 
-    // Notify assigned students
+    // Notify assigned students (only if exam date has not passed and status is not completed)
     try {
+      const isExamPastOrEnded = completeExamData && (
+        ['completed', 'cancelled', 'ended'].includes(completeExamData.status) ||
+        (completeExamData.date_time && (new Date(completeExamData.date_time).getTime() + (completeExamData.duration || 60) * 60000) <= Date.now())
+      );
+
+      if (isExamPastOrEnded) {
+        console.log(`ℹ️ [PublishExam] Exam ${id} scheduled date has passed or status is ended. Skipping student notification dispatch.`);
+        return res.json({ success: true, message: 'Exam published successfully (notifications skipped for past exam)', data: completeExamData });
+      }
+
       const { data: assignments } = await supabase
         .from('exam_assignments')
         .select('student_id')
@@ -1234,8 +1381,7 @@ exports.addQuestions = async (req, res) => {
       console.log('✅ Backend: Exam question count updated successfully');
     }
 
-    const redis = getRedisClient();
-    if (redis) redis.del(`exam:${id}:sanitized_questions`).catch(() => {});
+    invalidateExamCaches(id);
 
     console.log('✅ Backend: Questions added successfully');
     res.json({ success: true, message: `${questions.length} questions added.` });
@@ -1349,8 +1495,7 @@ exports.deleteQuestion = async (req, res) => {
       console.log('✅ Backend: Exam question count updated after deletion');
     }
 
-    const redis = getRedisClient();
-    if (redis) redis.del(`exam:${id}:sanitized_questions`).catch(() => {});
+    invalidateExamCaches(id);
 
     console.log('✅ Backend: Question deleted successfully');
     res.json({ success: true, message: 'Question deleted successfully.' });
@@ -1485,7 +1630,7 @@ exports.getStudentExams = async (req, res) => {
     // Get all student's sessions to attach accurate session_status
     const { data: studentSessions } = await supabase
       .from('exam_sessions')
-      .select('exam_id, status, submitted_at')
+      .select('exam_id, status, submitted_at, started_at, auto_submit_reason')
       .eq('student_id', studentId);
 
     const sessionMap = new Map();
@@ -1500,13 +1645,31 @@ exports.getStudentExams = async (req, res) => {
     const enrichedExams = (exams || []).map(exam => {
       const session = sessionMap.get(exam.id);
       let effectiveStatus = exam.status;
+      let sessionStatus = session?.status || null;
+      let submittedAt = session?.submitted_at || null;
 
       if (exam.date_time) {
         const start = parseToIST(exam.date_time);
         if (start) {
-          const endTime = start.getTime() + (Number(exam.duration) || 60) * 60000;
+          const startTime = start.getTime();
+          const endTime = startTime + (Number(exam.duration) || 60) * 60000;
           if (now > endTime) {
             effectiveStatus = 'completed';
+          } else {
+            if (effectiveStatus === 'completed') {
+              effectiveStatus = (now >= startTime - 15 * 60000) ? 'active' : 'published';
+            }
+            if (session) {
+              const sessionStartMs = session.started_at ? new Date(session.started_at).getTime() : 0;
+              const isStale = (
+                session.auto_submit_reason === 'scheduled_time_expired' ||
+                (sessionStartMs && sessionStartMs < startTime - 15 * 60000)
+              );
+              if (isStale) {
+                sessionStatus = null;
+                submittedAt = null;
+              }
+            }
           }
         }
       }
@@ -1514,8 +1677,8 @@ exports.getStudentExams = async (req, res) => {
       return {
         ...exam,
         status: effectiveStatus,
-        session_status: session?.status || null,
-        submitted_at: session?.submitted_at || null,
+        session_status: sessionStatus,
+        submitted_at: submittedAt,
       };
     });
 
@@ -1538,26 +1701,8 @@ exports.getExamDetails = async (req, res) => {
 
     console.log('📊 Backend: Getting exam details:', { examId: id, studentId, collegeId });
 
-    // Get exam details
-    const { data: exam, error: examError } = await supabase
-      .from('exams')
-      .select(`
-        id, title, type, subject, date_time, duration, total_marks,
-        passing_marks, status, is_proctored, instructions,
-        max_violations, created_at, updated_at, exam_code, exam_key, monitoring_config, college_id
-      `)
-      .eq('id', id)
-      .maybeSingle();
-
-    if (examError) {
-      console.error('Exam details error:', examError);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to fetch exam details',
-        error: examError.message
-      });
-    }
-
+    // 1. High-Concurrency Cached Exam Metadata Lookup (TTL: 300s, shared across all candidates)
+    const exam = await getCachedExamMeta(id);
     if (!exam) {
       return res.status(404).json({
         success: false,
@@ -1565,24 +1710,7 @@ exports.getExamDetails = async (req, res) => {
       });
     }
 
-    // Verify college or explicit assignment authorization
-    if (collegeId && exam.college_id && exam.college_id !== collegeId) {
-      const { data: assignments } = await supabase
-        .from('exam_assignments')
-        .select('student_id')
-        .eq('exam_id', id)
-        .eq('student_id', studentId)
-        .limit(1);
-
-      if (!assignments || assignments.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: 'You are not authorized for this examination.'
-        });
-      }
-    }
-
-    // High-Concurrency Redis Question Cache (Prevents DB saturation when 2,000+ candidates start simultaneously)
+    // 2. High-Concurrency Redis Question Cache (TTL: 300s, sanitized for candidates)
     let questions = null;
     const redis = getRedisClient();
     const cacheKey = `exam:${id}:sanitized_questions`;
@@ -1593,93 +1721,103 @@ exports.getExamDetails = async (req, res) => {
           questions = JSON.parse(cached);
         }
       } catch (cacheErr) {
-        console.warn('Redis cache get warning:', cacheErr.message);
+        console.warn('⚠️ [CACHE] Redis question cache get warning, falling back to DB:', cacheErr.message);
       }
     }
 
     if (!questions) {
-      // Get exam questions for this exam (never leak correct_answer to student)
-      const { data: rawQuestions, error: questionsError } = await supabase
-        .from('questions')
-        .select(`
-          id, question_text, type, options,
-          marks, order_index, code_template, time_limit, memory_limit, difficulty, test_cases
-        `)
-        .eq('exam_id', id)
-        .order('order_index', { ascending: true });
-
-      if (questionsError) {
-        console.error('Exam questions error:', questionsError);
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to fetch exam questions',
-          error: questionsError.message
-        });
-      }
-
+      const { rows: rawQuestions } = await pool.query(
+        `SELECT id, question_text, type, options, marks, order_index, code_template, time_limit, memory_limit, difficulty, test_cases
+         FROM questions
+         WHERE exam_id = $1
+         ORDER BY order_index ASC`,
+        [id]
+      );
       questions = (rawQuestions || []).map(formatQuestionForStudent);
-
-      // Cache for 1 hour
       if (redis && questions && questions.length > 0) {
-        redis.set(cacheKey, JSON.stringify(questions), { EX: 3600 }).catch(() => {});
+        redis.set(cacheKey, JSON.stringify(questions), { EX: 300 }).catch(() => {});
       }
     }
 
-    // Check if student has access to this exam
-    const { data: assignments, error: assignmentError } = await supabase
-      .from('exam_assignments')
-      .select('student_id')
-      .eq('exam_id', id)
-      .eq('student_id', studentId);
+    // 3. Parallelized direct indexed database queries for student authorization & active session
+    const [assignmentsRes, sessionRes] = await Promise.all([
+      pool.query(
+        'SELECT student_id FROM exam_assignments WHERE exam_id = $1 AND student_id = $2 LIMIT 1',
+        [id, studentId]
+      ),
+      pool.query(
+        'SELECT id, status, submitted_at, started_at, violation_count, is_auto_submitted, auto_submit_reason FROM exam_sessions WHERE student_id = $1 AND exam_id = $2 ORDER BY started_at DESC LIMIT 1',
+        [studentId, id]
+      )
+    ]);
 
-    let hasAccess = false;
-    if (!assignmentError && assignments && assignments.length > 0) {
-      hasAccess = true;
-    }
+    const assignments = assignmentsRes.rows;
+    const existingSession = sessionRes.rows[0] || null;
+    const hasAccess = assignments.length > 0;
 
-    // Check if student already has a session (active or submitted)
-    const { data: existingSession } = await supabase
-      .from('exam_sessions')
-      .select('id, status, submitted_at, started_at, violation_count, is_auto_submitted, auto_submit_reason')
-      .eq('exam_id', id)
-      .eq('student_id', studentId)
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    let studentResult = null;
-    if (existingSession) {
-      const { data: resRow } = await supabase
-        .from('results')
-        .select('*')
-        .eq('exam_id', id)
-        .eq('student_id', studentId)
-        .maybeSingle();
-      studentResult = resRow;
+    // Strict Tenant Isolation: verify college or explicit assignment
+    if (collegeId && exam.college_id && exam.college_id !== collegeId && !hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized for this examination.'
+      });
     }
 
     // Check timing strictly
     const windowStatus = getExamWindowStatus(exam.date_time, exam.duration || 60, 15);
     let effectiveStatus = exam.status;
-    const isEnded = exam.status === 'completed' || !!windowStatus?.isEnded;
+    const isEnded = windowStatus?.isValid ? !!windowStatus.isEnded : (exam.status === 'completed' || exam.status === 'cancelled');
     if (isEnded) {
       effectiveStatus = 'completed';
-      if (exam.status !== 'completed') {
+      if (exam.status !== 'completed' && exam.status !== 'cancelled') {
         checkAndCloseSpecificExam(id).catch(() => {});
+      }
+    } else if (effectiveStatus === 'completed') {
+      effectiveStatus = windowStatus?.isLive ? 'active' : 'published';
+    }
+
+    // Verify if existingSession is from a stale/expired previous schedule
+    let validSession = existingSession;
+    if (existingSession && !isEnded && exam.date_time) {
+      const scheduledStart = parseToIST(exam.date_time);
+      const scheduledStartMs = scheduledStart ? scheduledStart.getTime() : 0;
+      const sessionStartMs = existingSession.started_at ? new Date(existingSession.started_at).getTime() : 0;
+      const isStale = (
+        existingSession.auto_submit_reason === 'scheduled_time_expired' ||
+        (scheduledStartMs && sessionStartMs && sessionStartMs < scheduledStartMs - 15 * 60000)
+      );
+      if (isStale) {
+        validSession = null;
       }
     }
 
-    console.log('📊 Backend: Exam access check:', { hasAccess, examId: id, studentId, existingStatus: existingSession?.status, isEnded });
+    let studentResult = null;
+    if (validSession && validSession.status === 'submitted') {
+      const resQuery = await pool.query(
+        'SELECT marks_obtained, percentage, status FROM results WHERE exam_id = $1 AND student_id = $2 LIMIT 1',
+        [id, studentId]
+      );
+      studentResult = resQuery.rows[0] || null;
+    }
+
+    console.log('📊 Backend: Exam access check:', { hasAccess, examId: id, studentId, existingStatus: validSession?.status, isEnded });
 
     res.json({
       success: true,
       data: {
-        exam: { ...exam, status: effectiveStatus },
+        exam: {
+          ...exam,
+          date_time: exam.date_time,
+          dateTime: exam.date_time,
+          status: effectiveStatus,
+          windowStatus
+        },
+        windowStatus: windowStatus,
         isEnded: isEnded,
         questions: questions || [],
         hasAccess: hasAccess,
-        existingSession: existingSession ? {
-          ...existingSession,
+        existingSession: validSession ? {
+          ...validSession,
           total_score: studentResult?.marks_obtained !== undefined && studentResult?.marks_obtained !== null ? Number(studentResult.marks_obtained) : null,
           percentage: studentResult?.percentage !== undefined && studentResult?.percentage !== null ? Number(studentResult.percentage) : null,
           result_status: studentResult?.status ?? null,
@@ -1715,22 +1853,10 @@ exports.startExam = async (req, res) => {
       studentId: studentId
     });
 
-    // Validate exam using Supabase
-    const { data: examData, error: examError } = await supabase
-      .from('exams')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // Validate exam using cached metadata (TTL: 300s)
+    const examData = await getCachedExamMeta(id);
 
-    console.log('📊 Backend: Exam data check:', {
-      examError: examError,
-      examData: examData,
-      examFound: !!examData,
-      examCode: examData?.exam_code,
-      providedKey: examKey
-    });
-
-    if (examError || !examData) {
+    if (!examData) {
       console.log('❌ Backend: Exam not found');
       return res.status(404).json({ success: false, message: 'Exam not found.' });
     }
@@ -1771,7 +1897,7 @@ exports.startExam = async (req, res) => {
     });
 
     // 1. Strict End Time Check: Students must NOT be allowed to enter or start after scheduled time has expired
-    if (examData.status === 'completed' || windowStatus.isEnded) {
+    if (windowStatus.isEnded || examData.status === 'cancelled') {
       console.log('❌ Backend: Attempt to start an exam that has ended. Blocking entry.');
       await checkAndCloseSpecificExam(id).catch(() => {});
       return res.status(400).json({
@@ -1801,7 +1927,36 @@ exports.startExam = async (req, res) => {
       .maybeSingle();
 
     if (existingSession) {
-      if (existingSession.status === 'submitted' || existingSession.status === 'terminated') {
+      // Check if session is stale from an expired previous schedule
+      const scheduledStart = parseToIST(examData.date_time);
+      const scheduledStartMs = scheduledStart ? scheduledStart.getTime() : 0;
+      const sessionStartMs = existingSession.started_at ? new Date(existingSession.started_at).getTime() : 0;
+      const isStaleFromOldSchedule = (
+        existingSession.auto_submit_reason === 'scheduled_time_expired' ||
+        (scheduledStartMs && sessionStartMs && sessionStartMs < scheduledStartMs - 15 * 60000)
+      );
+
+      if (isStaleFromOldSchedule) {
+        console.log('🔄 Backend: Rescheduled exam detected - resetting stale session for student:', studentId);
+        const freshStartedAt = new Date().toISOString();
+        await pool.query(
+          `UPDATE exam_sessions
+           SET status = 'active',
+               started_at = $1,
+               submitted_at = NULL,
+               is_auto_submitted = false,
+               auto_submit_reason = NULL,
+               violation_count = 0
+           WHERE id = $2`,
+          [freshStartedAt, existingSession.id]
+        );
+        existingSession.status = 'active';
+        existingSession.started_at = freshStartedAt;
+        existingSession.submitted_at = null;
+        existingSession.is_auto_submitted = false;
+        existingSession.auto_submit_reason = null;
+        existingSession.violation_count = 0;
+      } else if (existingSession.status === 'submitted' || existingSession.status === 'terminated') {
         console.log('ℹ️ Backend: Session already submitted or terminated.');
         return res.status(200).json({
           success: false,
@@ -1814,6 +1969,7 @@ exports.startExam = async (req, res) => {
           }
         });
       }
+
       // Resume existing session
       const { data: rawQuestions, error: questionsError } = await supabase
         .from('questions')
@@ -1829,8 +1985,11 @@ exports.startExam = async (req, res) => {
 
       const nowMs = Date.now();
       const sessionDurationMs = (examData.duration || 60) * 60 * 1000;
-      const sessionStartMs = new Date(existingSession.started_at || existingSession.start_time || existingSession.created_at || nowMs).getTime();
-      const sessionRemainingSec = Math.max(0, Math.floor((sessionDurationMs - (nowMs - sessionStartMs)) / 1000));
+      let effectiveSessionStartMs = new Date(existingSession.started_at || existingSession.start_time || existingSession.created_at || nowMs).getTime();
+      if (scheduledStartMs && effectiveSessionStartMs < scheduledStartMs - 15 * 60000) {
+        effectiveSessionStartMs = nowMs;
+      }
+      const sessionRemainingSec = Math.max(0, Math.floor((sessionDurationMs - (nowMs - effectiveSessionStartMs)) / 1000));
       const windowRemainingSec = windowStatus?.endTime ? Math.max(0, Math.floor((windowStatus.endTime - nowMs) / 1000)) : sessionRemainingSec;
       const timeRemaining = Math.min(sessionRemainingSec, windowRemainingSec);
 
@@ -2230,25 +2389,18 @@ exports.submitExam = async (req, res) => {
     // 1. Fetch Session (by sessionId or fallback to latest session for this student & exam)
     let sessionData = null;
     if (sessionId) {
-      const { data } = await supabase
-        .from('exam_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .eq('student_id', studentId)
-        .maybeSingle();
-      sessionData = data;
+      const sessRes = await pool.query(
+        'SELECT * FROM exam_sessions WHERE id = $1 AND student_id = $2',
+        [sessionId, studentId]
+      );
+      sessionData = sessRes.rows[0];
     }
-
     if (!sessionData) {
-      const { data } = await supabase
-        .from('exam_sessions')
-        .select('*')
-        .eq('exam_id', id)
-        .eq('student_id', studentId)
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      sessionData = data;
+      const sessRes = await pool.query(
+        'SELECT * FROM exam_sessions WHERE student_id = $1 AND exam_id = $2 ORDER BY started_at DESC LIMIT 1',
+        [studentId, id]
+      );
+      sessionData = sessRes.rows[0];
     }
 
     if (!sessionData) {
@@ -2258,30 +2410,33 @@ exports.submitExam = async (req, res) => {
 
     const activeSessionId = sessionData.id;
 
-    // If session is ALREADY submitted, fetch existing result and return success immediately
+    // 2. Fetch authoritative questions & exam meta in parallel (from Redis RAM cache)
+    const [questions, examData] = await Promise.all([
+      getCachedAuthoritativeQuestions(id),
+      getCachedExamMeta(id)
+    ]);
+
+    if (!questions || questions.length === 0) {
+      console.error('❌ [SUBMIT-EXAM] Failed to retrieve questions for evaluation');
+      return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to retrieve questions for evaluation' });
+    }
+
+    // 3. Strict Idempotency: If session is ALREADY submitted, fetch existing result and return immediately
     if (sessionData.status === 'submitted') {
-      const { data: existingResult } = await supabase
-        .from('results')
-        .select('*')
-        .eq('exam_id', id)
-        .eq('student_id', studentId)
-        .maybeSingle();
-
-      const { data: totalQs } = await supabase
-        .from('questions')
-        .select('id')
-        .eq('exam_id', id);
-
-      const { data: sessionAnswers } = await supabase
-        .from('answers')
-        .select('id, selected_option, answer_text, code_submission')
-        .eq('session_id', activeSessionId);
-
-      const attemptedCount = (sessionAnswers || []).filter(a => 
-        (a.selected_option !== null && a.selected_option !== undefined && String(a.selected_option).trim() !== '') ||
-        (a.answer_text !== null && a.answer_text !== undefined && String(a.answer_text).trim() !== '') ||
-        (a.code_submission !== null && a.code_submission !== undefined && String(a.code_submission).trim() !== '')
-      ).length;
+      const [resResult, ansCountRes] = await Promise.all([
+        pool.query('SELECT * FROM results WHERE exam_id = $1 AND student_id = $2 LIMIT 1', [id, studentId]),
+        pool.query(
+          `SELECT count(id) FROM answers 
+           WHERE session_id = $1 AND (
+             (selected_option IS NOT NULL AND TRIM(selected_option::text) != '') OR
+             (answer_text IS NOT NULL AND TRIM(answer_text::text) != '') OR
+             (code_submission IS NOT NULL AND TRIM(code_submission::text) != '')
+           )`,
+          [activeSessionId]
+        )
+      ]);
+      const existingResult = resResult.rows[0];
+      const attemptedCount = parseInt(ansCountRes.rows[0]?.count || 0);
 
       console.log('ℹ️ [SUBMIT-EXAM] Session already sealed as submitted. Returning existing result.');
       return res.json({
@@ -2292,7 +2447,7 @@ exports.submitExam = async (req, res) => {
           totalMarks: existingResult?.total_marks ?? 0,
           percentage: existingResult?.percentage ?? 0,
           status: existingResult?.status || 'completed',
-          questionsTotal: totalQs?.length || 0,
+          questionsTotal: questions.length,
           questionsAttempted: attemptedCount,
           result: {
             id: existingResult?.id || activeSessionId,
@@ -2302,7 +2457,7 @@ exports.submitExam = async (req, res) => {
             percentage: existingResult?.percentage ?? 0,
             status: existingResult?.status || 'completed',
             submittedAt: sessionData.submitted_at || new Date().toISOString(),
-            questionsTotal: totalQs?.length || 0,
+            questionsTotal: questions.length,
             questionsAttempted: attemptedCount,
             isPending: existingResult?.status === 'pending'
           }
@@ -2310,95 +2465,83 @@ exports.submitExam = async (req, res) => {
       });
     }
 
-    // Flush any pending write-behind autosave answers from Redis to PostgreSQL
-    const { flushSessionAnswers } = require('../services/autosaveBufferService');
-    await flushSessionAnswers(activeSessionId).catch((flushErr) => {
-      console.warn('Notice: flushSessionAnswers error before submission:', flushErr.message);
-    });
+    // 4. Collect all student answers from 3 authoritative sources:
+    //    Source A: Redis autosave buffer
+    //    Source B: PostgreSQL persisted answers
+    //    Source C: Final payload answers
+    const redis = getRedisClient();
+    const answerMap = new Map(); // question_id -> merged answer object
 
-    // 2. ATOMIC ANSWER UPSERT — If the frontend sent final answers in the payload,
-    //    upsert them NOW before evaluation. This is the critical safety net that
-    //    ensures no answer is lost due to prior network failures or silent errors.
-    if (Array.isArray(submittedAnswers) && submittedAnswers.length > 0) {
-      console.log(`💾 [SUBMIT-EXAM] Atomically upserting ${submittedAnswers.length} final answers from payload...`);
-      const { detectLanguageFromCode } = require('../services/codeExecutionService');
-      const now = new Date().toISOString();
-      const answerRows = submittedAnswers
-        .filter(a => a && a.questionId)
-        .map(a => {
-          const resolvedLang = a.selectedLanguage || a.language || a.selected_language || (a.codeSubmission ? detectLanguageFromCode(a.codeSubmission) : null);
-          return {
-            session_id: activeSessionId,
-            question_id: a.questionId,
-            student_id: studentId,
-            exam_id: id,
-            answer_text: a.answerText ?? null,
-            selected_option: a.selectedOption ?? null,
-            code_submission: a.codeSubmission ?? null,
-            selected_language: resolvedLang,
-            updated_at: now,
-          };
-        });
-
-      if (answerRows.length > 0) {
-        try {
-          const { error: upsertAnswersError } = await supabase
-            .from('answers')
-            .upsert(answerRows, { onConflict: 'session_id,question_id' });
-
-          if (upsertAnswersError) {
-            console.error('❌ [SUBMIT-EXAM] Final answer upsert error:', upsertAnswersError.message);
-            // Do NOT abort — proceed with whatever is in DB
-          } else {
-            console.log(`✅ [SUBMIT-EXAM] Atomically saved ${answerRows.length} final answers.`);
+    // Source A: Redis autosave buffer
+    if (redis) {
+      try {
+        const hashEntries = await redis.hGetAll(`autosave:session:${activeSessionId}:answers`);
+        if (hashEntries) {
+          for (const raw of Object.values(hashEntries)) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.question_id) {
+              answerMap.set(String(parsed.question_id), parsed);
+            }
           }
-        } catch (upsertErr) {
-          console.error('❌ [SUBMIT-EXAM] Final answer upsert exception:', upsertErr.message);
-          // Do NOT abort — proceed with whatever is in DB
         }
+      } catch (redisErr) {
+        console.warn('⚠️ [SUBMIT-EXAM] Redis session answers read warning:', redisErr.message);
       }
     }
 
-    // 3. Fetch ALL questions for this exam
-    const { data: questions, error: questionsError } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('exam_id', id);
-
-    if (questionsError || !questions) {
-      console.error('❌ [SUBMIT-EXAM] Error fetching questions for marking:', questionsError);
-      return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to retrieve questions for evaluation', error: questionsError?.message });
+    // Source B: PostgreSQL existing answers
+    const existingDbAnswers = await pool.query(
+      'SELECT id, question_id, answer_text, selected_option, code_submission, selected_language, marks_obtained, is_evaluated FROM answers WHERE session_id = $1',
+      [activeSessionId]
+    );
+    for (const row of existingDbAnswers.rows) {
+      const qId = String(row.question_id);
+      if (!answerMap.has(qId)) {
+        answerMap.set(qId, row);
+      } else {
+        const buffered = answerMap.get(qId);
+        answerMap.set(qId, {
+          ...row,
+          ...buffered,
+          answer_text: buffered.answer_text ?? row.answer_text,
+          selected_option: buffered.selected_option ?? row.selected_option,
+          code_submission: buffered.code_submission ?? row.code_submission,
+          selected_language: buffered.selected_language ?? row.selected_language
+        });
+      }
     }
 
-    // 4. Fetch ALL answers for this session from DB (now includes atomically upserted ones)
-    const { data: answers, error: answersError } = await supabase
-      .from('answers')
-      .select('*')
-      .eq('session_id', activeSessionId);
-
-    if (answersError) {
-      console.error('❌ [SUBMIT-EXAM] Error fetching answers for marking:', answersError);
-      return res.status(500).json({ success: false, message: 'CRITICAL ERROR: Failed to fetch student answers', error: answersError?.message });
+    // Source C: Submitted payload answers (guarantees latest frontend answers)
+    if (Array.isArray(submittedAnswers) && submittedAnswers.length > 0) {
+      const { detectLanguageFromCode } = require('../services/codeExecutionService');
+      for (const a of submittedAnswers) {
+        if (!a || !a.questionId) continue;
+        const qId = String(a.questionId);
+        const resolvedLang = a.selectedLanguage || a.language || a.selected_language || (a.codeSubmission ? detectLanguageFromCode(a.codeSubmission) : null);
+        const prior = answerMap.get(qId) || {};
+        answerMap.set(qId, {
+          ...prior,
+          question_id: a.questionId,
+          answer_text: a.answerText !== undefined ? a.answerText : prior.answer_text ?? null,
+          selected_option: a.selectedOption !== undefined ? a.selectedOption : prior.selected_option ?? null,
+          code_submission: a.codeSubmission !== undefined ? a.codeSubmission : prior.code_submission ?? null,
+          selected_language: resolvedLang || prior.selected_language || null,
+        });
+      }
     }
 
-    console.log(`📊 [SUBMIT-EXAM] Marking Engine starting: ${questions.length} questions, ${answers?.length || 0} answers in DB`);
-
-    // 5. Marking Engine for MCQ, Coding, and Descriptive
+    // 5. Marking Engine: evaluate all answers in-memory
     let mcqMarks = 0;
     let codingMarks = 0;
     let subjectiveMarks = 0;
     let questionsAttempted = 0;
-    const evaluatedUpdates = [];
+    const evaluatedAnswerRows = [];
     const questionMap = new Map((questions || []).map(q => [String(q.id), q]));
 
-    for (const answer of answers || []) {
-      const question = questionMap.get(String(answer.question_id));
-      if (!question) {
-        console.warn(`⚠️ [SUBMIT-EXAM] Answer for unknown question ID: ${answer.question_id}`);
-        continue;
-      }
+    for (const [qId, answer] of answerMap.entries()) {
+      const question = questionMap.get(qId);
+      if (!question) continue;
 
-      // Count as attempted if any response was recorded
       const hasResponse = (
         (answer.selected_option !== null && answer.selected_option !== undefined && String(answer.selected_option).trim() !== '') ||
         (answer.answer_text !== null && answer.answer_text !== undefined && String(answer.answer_text).trim() !== '') ||
@@ -2417,10 +2560,13 @@ exports.submitExam = async (req, res) => {
         const finalMarks = Math.max(0, marksObtained);
         mcqMarks += finalMarks;
 
-        evaluatedUpdates.push({
-          id: answer.id,
+        evaluatedAnswerRows.push({
+          question_id: question.id,
           is_correct: isCorrect,
           marks_obtained: finalMarks,
+          answer_text: answer.answer_text ?? null,
+          selected_option: answer.selected_option ?? null,
+          code_submission: answer.code_submission ?? null,
           selected_language: null
         });
       } else if (question.type === 'coding') {
@@ -2428,17 +2574,13 @@ exports.submitExam = async (req, res) => {
         let earnedQMarks = 0;
 
         if (answer.code_submission && answer.code_submission.trim().length > 0) {
-          // If answer was already evaluated and marked from student's code submission, reuse authoritative marks
           if (answer.is_evaluated && answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
             earnedQMarks = Number(answer.marks_obtained);
           } else {
-            // Extract question test cases and rich metadata
             let testCases = [];
             let opts = {};
             if (question.options) {
-              try {
-                opts = typeof question.options === 'string' ? JSON.parse(question.options) : question.options;
-              } catch (_) {}
+              try { opts = typeof question.options === 'string' ? JSON.parse(question.options) : question.options; } catch (_) {}
             }
             if (question.test_cases) {
               testCases = typeof question.test_cases === 'string' ? JSON.parse(question.test_cases) : question.test_cases;
@@ -2464,7 +2606,6 @@ exports.submitExam = async (req, res) => {
                 );
                 earnedQMarks = evalRes.earnedMarks || 0;
               } catch (evalErr) {
-                console.error('Server-side code evaluation error in submitExam:', evalErr);
                 earnedQMarks = answer.marks_obtained !== null && answer.marks_obtained !== undefined
                   ? Number(answer.marks_obtained)
                   : 0;
@@ -2476,62 +2617,33 @@ exports.submitExam = async (req, res) => {
         }
 
         codingMarks += earnedQMarks;
-
         const { detectLanguageFromCode } = require('../services/codeExecutionService');
         const finalLang = answer.selected_language || (answer.code_submission ? detectLanguageFromCode(answer.code_submission) : null);
-        evaluatedUpdates.push({
-          id: answer.id,
+        evaluatedAnswerRows.push({
+          question_id: question.id,
           is_correct: earnedQMarks >= maxQMarks,
           marks_obtained: earnedQMarks,
+          answer_text: answer.answer_text ?? null,
+          selected_option: answer.selected_option ?? null,
+          code_submission: answer.code_submission ?? null,
           selected_language: finalLang
         });
       } else if (question.type === 'subjective') {
-        if (answer.marks_obtained !== null && answer.marks_obtained !== undefined) {
-          subjectiveMarks += Number(answer.marks_obtained);
-        }
+        const subjMarks = answer.marks_obtained !== null && answer.marks_obtained !== undefined ? Number(answer.marks_obtained) : 0;
+        subjectiveMarks += subjMarks;
+        evaluatedAnswerRows.push({
+          question_id: question.id,
+          is_correct: false,
+          marks_obtained: subjMarks,
+          answer_text: answer.answer_text ?? null,
+          selected_option: answer.selected_option ?? null,
+          code_submission: answer.code_submission ?? null,
+          selected_language: null
+        });
       }
     }
 
-    // 6. Parameterized BATCH UPDATE for all evaluated answers in ONE statement!
-    if (evaluatedUpdates.length > 0) {
-      try {
-        await pool.query(
-          `UPDATE answers AS a
-           SET is_correct = u.is_correct,
-               marks_obtained = u.marks_obtained,
-               is_evaluated = true,
-               selected_language = COALESCE(u.selected_language, a.selected_language),
-               updated_at = NOW()
-           FROM jsonb_to_recordset($1::jsonb) AS u(
-             id uuid,
-             is_correct boolean,
-             marks_obtained numeric,
-             selected_language text
-           )
-           WHERE a.id = u.id AND a.session_id = $2`,
-          [JSON.stringify(evaluatedUpdates), activeSessionId]
-        );
-      } catch (batchErr) {
-        console.warn('⚠️ [SUBMIT-EXAM] Batch answers evaluation update failed, falling back to individual updates:', batchErr.message);
-        for (const u of evaluatedUpdates) {
-          await supabase.from('answers').update({
-            is_correct: u.is_correct,
-            marks_obtained: u.marks_obtained,
-            is_evaluated: true,
-            selected_language: u.selected_language,
-            updated_at: new Date().toISOString()
-          }).eq('id', u.id).catch(() => {});
-        }
-      }
-    }
-
-    // 6. Fetch Exam Meta for Final Result Status
-    const { data: examData } = await supabase
-      .from('exams')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
+    // Compute grades and pass/fail status
     const sumOfQuestionMarks = (questions || []).reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
     const totalPossibleMarks = sumOfQuestionMarks > 0 ? sumOfQuestionMarks : (Number(examData?.total_marks) || 100);
     const configuredPassing = Number(examData?.passing_marks);
@@ -2549,53 +2661,149 @@ exports.submitExam = async (req, res) => {
     const finalStatus = isPassed ? 'pass' : 'fail';
     const resultStatus = hasSubjective ? 'pending' : finalStatus;
 
-    console.log('📊 [SUBMIT-EXAM] Marking complete:', { totalEarnedMarks, mcqMarks, codingMarks, subjectiveMarks, totalPossibleMarks, passThresholdMarks, resultStatus, percentage: roundedPct, grade: computedGrade, questionsAttempted, questionsTotal: questions.length, answersInDB: answers?.length || 0 });
-
-    // 7. Update Session Status to 'submitted'
-    const submissionTime = new Date().toISOString();
-    await supabase
-      .from('exam_sessions')
-      .update({
-        status: 'submitted',
-        submitted_at: submissionTime,
-        is_auto_submitted: !!autoSubmit,
-        auto_submit_reason: terminationReason || sessionData.auto_submit_reason || null
-      })
-      .eq('id', activeSessionId);
-
-    // 8. Upsert Result Record (prevents constraint conflict on student_id, exam_id)
-    console.log('📊 [SUBMIT-EXAM] Saving result record for session', activeSessionId);
+    // 6. SINGLE ATOMIC DATABASE TRANSACTION
+    const client = await pool.connect();
     let resultRecord = null;
-    try {
-      const { data: upsertedResult, error: resultError } = await supabase
-        .from('results')
-        .upsert({
-          session_id: activeSessionId,
-          student_id: studentId,
-          exam_id: id,
-          mcq_marks: mcqMarks,
-          coding_marks: codingMarks,
-          subjective_marks: subjectiveMarks,
-          total_marks: totalPossibleMarks,
-          marks_obtained: totalEarnedMarks,
-          percentage: roundedPct,
-          grade: computedGrade,
-          status: resultStatus,
-          submitted_at: submissionTime,
-          updated_at: submissionTime
-        }, {
-          onConflict: 'student_id,exam_id'
-        })
-        .select()
-        .maybeSingle();
+    const submissionTime = new Date().toISOString();
 
-      if (resultError) {
-        console.warn('⚠️ [SUBMIT-EXAM] Results upsert warning:', resultError.message);
-      } else {
-        resultRecord = upsertedResult;
+    try {
+      await client.query('BEGIN');
+
+      // Strict row-level lock on the session
+      const lockRes = await client.query(
+        'SELECT status FROM exam_sessions WHERE id = $1 FOR UPDATE',
+        [activeSessionId]
+      );
+      if (lockRes.rows[0]?.status === 'submitted') {
+        await client.query('ROLLBACK');
+        console.log('ℹ️ [SUBMIT-EXAM] Concurrent submit caught by row lock. Returning existing result.');
+        const resQuery = await pool.query(
+          'SELECT * FROM results WHERE exam_id = $1 AND student_id = $2 LIMIT 1',
+          [id, studentId]
+        );
+        const existingResult = resQuery.rows[0];
+        return res.json({
+          success: true,
+          message: 'Exam has already been submitted successfully.',
+          data: {
+            score: existingResult?.marks_obtained ?? totalEarnedMarks,
+            totalMarks: totalPossibleMarks,
+            percentage: existingResult?.percentage ?? roundedPct,
+            status: existingResult?.status || 'completed',
+            questionsTotal: questions.length,
+            questionsAttempted,
+            result: {
+              id: existingResult?.id || activeSessionId,
+              score: existingResult?.marks_obtained ?? totalEarnedMarks,
+              marksObtained: existingResult?.marks_obtained ?? totalEarnedMarks,
+              totalMarks: totalPossibleMarks,
+              percentage: existingResult?.percentage ?? roundedPct,
+              status: existingResult?.status || 'completed',
+              submittedAt: submissionTime,
+              questionsTotal: questions.length,
+              questionsAttempted,
+              isPending: existingResult?.status === 'pending'
+            }
+          }
+        });
       }
-    } catch (upsertErr) {
-      console.warn('⚠️ [SUBMIT-EXAM] Results upsert exception:', upsertErr.message);
+
+      // Step 6A: Batch multi-row upsert for evaluated answers
+      if (evaluatedAnswerRows.length > 0) {
+        const valueClauses = [];
+        const params = [];
+        let pIdx = 1;
+        for (const a of evaluatedAnswerRows) {
+          valueClauses.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, NOW())`);
+          params.push(
+            activeSessionId,
+            a.question_id,
+            studentId,
+            id,
+            a.answer_text,
+            a.selected_option,
+            a.code_submission,
+            a.selected_language,
+            a.is_correct,
+            a.marks_obtained,
+            true
+          );
+        }
+        const ansUpsertSql = `
+          INSERT INTO answers (
+            session_id, question_id, student_id, exam_id,
+            answer_text, selected_option, code_submission, selected_language,
+            is_correct, marks_obtained, is_evaluated, updated_at
+          )
+          VALUES ${valueClauses.join(', ')}
+          ON CONFLICT (session_id, question_id)
+          DO UPDATE SET
+            answer_text = EXCLUDED.answer_text,
+            selected_option = EXCLUDED.selected_option,
+            code_submission = EXCLUDED.code_submission,
+            selected_language = EXCLUDED.selected_language,
+            is_correct = EXCLUDED.is_correct,
+            marks_obtained = EXCLUDED.marks_obtained,
+            is_evaluated = EXCLUDED.is_evaluated,
+            updated_at = NOW();
+        `;
+        await client.query(ansUpsertSql, params);
+      }
+
+      // Step 6B: Update exam_sessions status to 'submitted'
+      await client.query(
+        `UPDATE exam_sessions
+         SET status = 'submitted',
+             submitted_at = $1,
+             is_auto_submitted = $2,
+             auto_submit_reason = $3
+         WHERE id = $4`,
+        [submissionTime, !!autoSubmit, terminationReason || sessionData.auto_submit_reason || null, activeSessionId]
+      );
+
+      // Step 6C: Upsert results
+      const resUpsertSql = `
+        INSERT INTO results (
+          session_id, student_id, exam_id,
+          mcq_marks, coding_marks, subjective_marks,
+          total_marks, marks_obtained, percentage, grade,
+          status, submitted_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (student_id, exam_id)
+        DO UPDATE SET
+          session_id = EXCLUDED.session_id,
+          mcq_marks = EXCLUDED.mcq_marks,
+          coding_marks = EXCLUDED.coding_marks,
+          subjective_marks = EXCLUDED.subjective_marks,
+          total_marks = EXCLUDED.total_marks,
+          marks_obtained = EXCLUDED.marks_obtained,
+          percentage = EXCLUDED.percentage,
+          grade = EXCLUDED.grade,
+          status = EXCLUDED.status,
+          submitted_at = EXCLUDED.submitted_at,
+          updated_at = EXCLUDED.updated_at
+        RETURNING *;
+      `;
+      const resQuery = await client.query(resUpsertSql, [
+        activeSessionId, studentId, id,
+        mcqMarks, codingMarks, subjectiveMarks,
+        totalPossibleMarks, totalEarnedMarks, roundedPct, computedGrade,
+        resultStatus, submissionTime, submissionTime
+      ]);
+      resultRecord = resQuery.rows[0];
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
+    // Clean up Redis session autosave buffer in background
+    if (redis) {
+      redis.del(`autosave:session:${activeSessionId}:answers`).catch(() => {});
     }
 
     console.log('✅ [SUBMIT-EXAM] Submission sequence complete.');
@@ -2609,7 +2817,7 @@ exports.submitExam = async (req, res) => {
         status: resultStatus,
         questionsTotal: questions.length,
         questionsAttempted,
-        answersRecorded: answers?.length || 0,
+        answersRecorded: evaluatedAnswerRows.length,
         result: {
           id: resultRecord?.id || activeSessionId,
           score: totalEarnedMarks,

@@ -68,8 +68,11 @@ export default function StudentDashboard() {
   // Filter exams that are active or scheduled in the future (exclude completed and time-expired)
   const upcomingExams = useMemo(() => {
     return exams.filter(e => {
-      const isDone = isExamEnded(e) || e.session_status === 'submitted' || e.session_status === 'terminated' || e.status === 'completed';
-      return !isDone && (e.status === 'published' || e.status === 'active');
+      const isEnded = isExamEnded(e);
+      if (isEnded) return false;
+      const isSubmitted = e.session_status === 'submitted' || e.session_status === 'terminated';
+      if (isSubmitted) return false;
+      return e.status === 'published' || e.status === 'active' || (!isEnded && !!e.date_time);
     });
   }, [exams]);
 
