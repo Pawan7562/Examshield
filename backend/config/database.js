@@ -29,10 +29,16 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-const createPoolConfig = (connectionString) => {
-  const parsedUrl = new URL(connectionString);
-  parsedUrl.searchParams.set('sslmode', 'verify-full');
-  return { connectionString: parsedUrl.toString(), ssl: { rejectUnauthorized: true } };
+const shouldEnableSsl = () => {
+  if (process.env.DB_SSL === 'true') return { rejectUnauthorized: false };
+  if (process.env.DB_SSL === 'false') return false;
+  if (process.env.DATABASE_URL) {
+    if (process.env.DATABASE_URL.includes('sslmode=disable') || process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('@postgres') || process.env.DATABASE_URL.includes('@examshield_postgres')) {
+      return false;
+    }
+    return { rejectUnauthorized: false };
+  }
+  return false;
 };
 
 const pool = new Pool({
@@ -48,14 +54,14 @@ const pool = new Pool({
   lookup: (hostname, options, callback) => {
     return dns.lookup(hostname, { ...options, family: 4 }, callback);
   },
-  min: 2, // Keep 2 warm connections so pool is ready for exam start without cold start delay
-  max: Number.parseInt(process.env.PG_POOL_MAX || '60', 10),
-  idleTimeoutMillis: 30000, // Keep connections alive longer during exam sessions
+  min: 2, // Keep 2 warm connections per container
+  max: Number.parseInt(process.env.PG_POOL_MAX || '25', 10),
+  idleTimeoutMillis: 30000,
   connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECTION_TIMEOUT_MS || '10000', 10),
-  statement_timeout: 30000, // 30s statement timeout to prevent query aborts under 400-500 concurrent student autosaves
+  statement_timeout: 30000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),
+  ssl: shouldEnableSsl(),
 });
 
 pool.on('connect', () => {

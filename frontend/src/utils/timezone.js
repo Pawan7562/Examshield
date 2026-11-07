@@ -184,7 +184,7 @@ export function isExamEnded(exam) {
  * Allows early access window (default 15 minutes before scheduled start).
  * NEVER returns true if the scheduled end time has already expired.
  */
-export function isExamStartable(exam, earlyAccessMinutes = 15) {
+export function isExamStartable(exam, earlyAccessMinutes = 30) {
   if (!exam) return false;
   if (exam.session_status === 'submitted' || exam.session_status === 'terminated') return false;
   if (exam.status === 'cancelled') return false;

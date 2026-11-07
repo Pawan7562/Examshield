@@ -20,10 +20,10 @@ function getJavaDeserializer(type, varName, lineVar) {
     return `String ${varName} = parseString(${lineVar});`;
   }
   if (normType === 'int[]' || normType === 'vector<int>') {
-    return `int[] ${varName} = parseIntArray(${lineVar});`;
+    return `int[] ${varName} = parseIntArray(${lineVar}, sc);`;
   }
   if (normType === 'string[]' || normType === 'vector<string>') {
-    return `String[] ${varName} = parseStringArray(${lineVar});`;
+    return `String[] ${varName} = parseStringArray(${lineVar}, sc);`;
   }
 
   return `String ${varName} = parseString(${lineVar});`;
@@ -39,17 +39,28 @@ function wrapJavaFunction(studentCode, metadata = {}) {
         { name: 'target', type: 'int' }
       ];
 
+  const allPrimitives = parameters.every(p => {
+    const t = (p.type || 'int').toLowerCase().replace(/\s+/g, '').trim();
+    return ['int', 'long', 'double', 'float', 'boolean', 'bool'].includes(t);
+  });
+
   const paramParsingLines = parameters.map((param, idx) => {
     const pName = param.name || `arg_${idx}`;
     const pType = param.type || 'int';
     const lineVar = `line_${idx}`;
     const deserializer = getJavaDeserializer(pType, pName, lineVar);
 
+    if (allPrimitives) {
+      return `        String ${lineVar} = sc.hasNext() ? sc.next().trim() : "";
+        ${deserializer}`;
+    }
+
     return `        String ${lineVar} = sc.hasNextLine() ? sc.nextLine().trim() : "";
         ${deserializer}`;
   }).join('\n\n');
 
   const paramCallArgs = parameters.map((param, idx) => param.name || `arg_${idx}`).join(', ');
+  const cleanStudentCode = (studentCode || '').replace(/\bpublic\s+class\b/g, 'class');
 
   return `// ============================================================================
 // Auto-Generated ExamShield Java LeetCode Test Harness
@@ -59,7 +70,7 @@ import java.util.*;
 import java.io.*;
 
 // ── STUDENT IMPLEMENTATION START ────────────────────────────────────────────
-${studentCode}
+${cleanStudentCode}
 // ── STUDENT IMPLEMENTATION END ──────────────────────────────────────────────
 
 // ── GENERATED TEST RUNNER ───────────────────────────────────────────────────
@@ -95,13 +106,23 @@ public class Main {
         return s;
     }
 
-    static int[] parseIntArray(String s) {
+    static int[] parseIntArray(String s, Scanner sc) {
         s = s.trim();
         if (s.startsWith("[")) s = s.substring(1);
         if (s.endsWith("]")) s = s.substring(0, s.length() - 1);
         s = s.trim();
         if (s.isEmpty()) return new int[0];
-        String[] parts = s.split(",");
+        String[] parts = s.split("[,\\s]+");
+        if (parts.length == 1 && sc != null && sc.hasNextLine()) {
+            String nextLine = sc.nextLine().trim();
+            if (!nextLine.isEmpty()) {
+                if (nextLine.startsWith("[")) nextLine = nextLine.substring(1);
+                if (nextLine.endsWith("]")) nextLine = nextLine.substring(0, nextLine.length() - 1);
+                nextLine = nextLine.trim();
+                String[] parts2 = nextLine.split("[,\\s]+");
+                if (parts2.length > 0) parts = parts2;
+            }
+        }
         int[] res = new int[parts.length];
         for (int i = 0; i < parts.length; i++) {
             res[i] = parseInt(parts[i]);
@@ -109,18 +130,36 @@ public class Main {
         return res;
     }
 
-    static String[] parseStringArray(String s) {
+    static int[] parseIntArray(String s) {
+        return parseIntArray(s, null);
+    }
+
+    static String[] parseStringArray(String s, Scanner sc) {
         s = s.trim();
         if (s.startsWith("[")) s = s.substring(1);
         if (s.endsWith("]")) s = s.substring(0, s.length() - 1);
         s = s.trim();
         if (s.isEmpty()) return new String[0];
-        String[] parts = s.split(",");
+        String[] parts = s.split("[,\\s]+");
+        if (parts.length == 1 && sc != null && sc.hasNextLine()) {
+            String nextLine = sc.nextLine().trim();
+            if (!nextLine.isEmpty()) {
+                if (nextLine.startsWith("[")) nextLine = nextLine.substring(1);
+                if (nextLine.endsWith("]")) nextLine = nextLine.substring(0, nextLine.length() - 1);
+                nextLine = nextLine.trim();
+                String[] parts2 = nextLine.split("[,\\s]+");
+                if (parts2.length > 0) parts = parts2;
+            }
+        }
         String[] res = new String[parts.length];
         for (int i = 0; i < parts.length; i++) {
             res[i] = parseString(parts[i]);
         }
         return res;
+    }
+
+    static String[] parseStringArray(String s) {
+        return parseStringArray(s, null);
     }
 
     static void printResult(Object obj) {

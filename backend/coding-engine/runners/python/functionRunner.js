@@ -11,6 +11,11 @@ function wrapPythonFunction(studentCode, metadata = {}) {
         { name: 'target', type: 'int' }
       ];
 
+  const allPrimitives = parameters.every(p => {
+    const t = (p.type || 'int').toLowerCase().replace(/\s+/g, '').trim();
+    return ['int', 'long', 'float', 'double', 'bool', 'boolean', 'str', 'string'].includes(t) && !t.includes('list') && !t.includes('[]');
+  });
+
   const paramParsingLines = parameters.map((param, idx) => {
     const pName = param.name || `arg_${idx}`;
     const pType = (param.type || '').toLowerCase();
@@ -26,12 +31,26 @@ function wrapPythonFunction(studentCode, metadata = {}) {
       conversion = `str(__parsed_${idx})`;
     }
 
+    if (allPrimitives) {
+      return `    __line_${idx} = tokens[${idx}] if ${idx} < len(tokens) else ""
+    __parsed_${idx} = _parse_val(__line_${idx})
+    ${pName} = ${conversion}`;
+    }
+
     return `    __line_${idx} = lines[${idx}] if ${idx} < len(lines) else ""
     __parsed_${idx} = _parse_val(__line_${idx})
     ${pName} = ${conversion}`;
   }).join('\n');
 
   const paramCallArgs = parameters.map((param, idx) => param.name || `arg_${idx}`).join(', ');
+
+  const inputExtraction = allPrimitives
+    ? `    raw_input_data = sys.stdin.read().strip()
+    tokens = raw_input_data.split()`
+    : `    raw_input_data = sys.stdin.read().strip()
+    lines = [l.strip() for l in raw_input_data.splitlines() if l.strip()]
+    if len(lines) >= 2 and len(lines[0].split()) == 1 and len(lines[1].split()) > 1:
+        lines = [lines[1]] + lines[2:]`;
 
   return `# ============================================================================
 # Auto-Generated ExamShield Python LeetCode Test Harness
@@ -58,19 +77,19 @@ def _parse_val(raw_str):
     try:
         return json.loads(raw)
     except Exception:
-        # Check if comma or space separated numbers
-        clean = raw.strip("[]")
-        if "," in clean:
-            parts = [p.strip() for p in clean.split(",") if p.strip()]
+        # Check if space or comma separated numbers
+        clean = raw.strip("[]").strip()
+        if clean:
+            sep = "," if "," in clean else None
+            parts = clean.split(sep)
             try:
-                return [int(p) for p in parts]
+                return [int(p.strip()) for p in parts if p.strip()]
             except Exception:
-                return parts
+                return [p.strip() for p in parts if p.strip()]
         return raw
 
 if __name__ == '__main__':
-    raw_input_data = sys.stdin.read()
-    lines = [l for l in raw_input_data.split('\\n') if l.strip()]
+${inputExtraction}
 
 ${paramParsingLines}
 

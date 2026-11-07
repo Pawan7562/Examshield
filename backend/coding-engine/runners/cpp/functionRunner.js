@@ -51,12 +51,25 @@ function wrapCppFunction(studentCode, metadata = {}) {
         { name: 'target', type: 'int' }
       ];
 
-  // Parameter parsing statements
+  // Parameter parsing statements: intelligently handle space-separated tokens for primitives (e.g. "5 2")
+  const allPrimitives = parameters.every(p => {
+    const t = (p.type || 'int').toLowerCase().replace(/[&*]/g, '').trim();
+    return ['int', 'long', 'longlong', 'int64_t', 'double', 'float', 'bool', 'boolean'].includes(t);
+  });
+
   const paramParsingLines = parameters.map((param, idx) => {
     const pName = param.name || `arg_${idx}`;
     const pType = param.type || 'int';
     const lineVar = `__line_${idx}`;
     const deserializer = getCppDeserializer(pType, pName, lineVar);
+
+    if (allPrimitives) {
+      return `    string ${lineVar};
+    if (!(cin >> ${lineVar})) {
+        ${lineVar} = "";
+    }
+    ${deserializer}`;
+    }
 
     return `    string ${lineVar};
     if (!getline(cin, ${lineVar})) {
@@ -134,12 +147,24 @@ static inline vector<int> parseVectorInt(string s) {
     if (s.empty()) return res;
     if (s.front() == '[') s = s.substr(1);
     if (!s.empty() && s.back() == ']') s.pop_back();
+    for (char &c : s) {
+        if (c == ',') c = ' ';
+    }
     stringstream ss(s);
-    string token;
-    while (getline(ss, token, ',')) {
-        string t = trimString(token);
-        if (!t.empty()) {
-            try { res.push_back(stoi(t)); } catch (...) {}
+    int val;
+    while (ss >> val) {
+        res.push_back(val);
+    }
+    // If only 1 number was provided and cin still has input, it might be competitive programming format (N on line 1, elements on line 2)
+    if (res.size() == 1) {
+        string nextLine;
+        if (getline(cin, nextLine)) {
+            for (char &c : nextLine) if (c == ',') c = ' ';
+            stringstream ss2(nextLine);
+            vector<int> res2;
+            int v2;
+            while (ss2 >> v2) res2.push_back(v2);
+            if (!res2.empty()) return res2;
         }
     }
     return res;

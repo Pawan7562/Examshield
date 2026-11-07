@@ -12,6 +12,7 @@ const { supabase } = require('../config/supabase-clean');
 const { pool } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const { sendCollegeWelcome } = require('../services/emailService');
+const { getRedisClient } = require('../config/redis');
 
 /**
  * Generate JWT tokens
@@ -366,6 +367,48 @@ exports.studentLogin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email / Student ID and password are required.' });
     }
 
+    // High-concurrency Fast-Auth Redis Cache: skips DB & bcrypt for reconnecting/refreshing students (1ms response)
+    const redis = getRedisClient();
+    const cacheHash = crypto.createHash('sha256').update(`${input.toLowerCase()}:${password}`).digest('hex');
+    const authCacheKey = `fast_auth:student:${cacheHash}`;
+
+    if (redis) {
+      try {
+        const cachedRaw = await redis.get(authCacheKey);
+        if (cachedRaw) {
+          const cachedStudent = JSON.parse(cachedRaw);
+          if (cachedStudent && cachedStudent.id) {
+            const tokens = generateTokens({
+              id: cachedStudent.id,
+              student_id: cachedStudent.student_id,
+              name: cachedStudent.name,
+              email: cachedStudent.email,
+              role: 'student',
+              college_id: cachedStudent.college_id
+            });
+            pool.query('UPDATE students SET last_login = NOW() WHERE id = $1', [cachedStudent.id]).catch(() => {});
+            return res.json({
+              success: true,
+              message: 'Login successful',
+              data: {
+                user: {
+                  id: cachedStudent.id,
+                  studentId: cachedStudent.student_id,
+                  name: cachedStudent.name,
+                  email: cachedStudent.email,
+                  rollNo: cachedStudent.roll_no,
+                  collegeName: cachedStudent.college_name || null,
+                  collegeId: cachedStudent.college_id,
+                  role: 'student',
+                },
+                ...tokens,
+              },
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
     const isEmailInput = input.includes('@');
     let studentQuery;
     let studentQueryParams;
@@ -375,7 +418,7 @@ exports.studentLogin = async (req, res) => {
         SELECT s.*, c.name AS college_name
         FROM students s
         LEFT JOIN colleges c ON s.college_id = c.id
-        WHERE s.email ILIKE $1 OR LOWER(TRIM(s.email)) = LOWER($1)
+        WHERE LOWER(s.email) = $1 OR s.email = $1
         LIMIT 1;
       `;
       studentQueryParams = [normalizeEmail(rawInput)];
@@ -413,6 +456,9 @@ exports.studentLogin = async (req, res) => {
 
     // Update last login in background (non-blocking for ultra-fast response)
     pool.query('UPDATE students SET last_login = NOW() WHERE id = $1', [student.id]).catch(() => {});
+    if (redis && student) {
+      redis.set(authCacheKey, JSON.stringify(student), { EX: 1800 }).catch(() => {});
+    }
 
     const tokens = generateTokens({
       id: student.id,

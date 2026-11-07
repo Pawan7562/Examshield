@@ -330,136 +330,19 @@ async function executeOnJudge0(sourceCode, language, stdin = '', timeLimitSec = 
   };
 }
 
-/**
- * Find local g++ compiler path on the machine
- */
-function findGppPath() {
-  const candidates = [
-    'C:\\MinGW\\bin\\g++.exe',
-    'C:\\msys64\\mingw64\\bin\\g++.exe',
-    'C:\\Program Files\\mingw-w64\\bin\\g++.exe',
-    'g++'
-  ];
-  for (const c of candidates) {
-    try {
-      if (fs.existsSync(c)) return c;
-    } catch (_) {}
-  }
-  return null;
-}
+const {
+  compileOnce,
+  findGppPath,
+  findJavaPaths,
+  findPythonPath,
+  sanitizeCompilerError,
+} = require('../coding-engine/secureSandbox');
 
 /**
- * Native local C++ compiler and execution sandbox (MinGW / GCC)
- * Instant compilation and execution with zero external network dependency.
- */
-function executeLocalCpp(sourceCode, stdin = '', timeLimitMs = 2500) {
-  return new Promise((resolve) => {
-    try {
-      const gppPath = findGppPath();
-      if (!gppPath) {
-        return resolve(null);
-      }
-      const gppDir = path.dirname(gppPath);
-      const compileEnv = {
-        ...process.env,
-        PATH: `${gppDir};${process.env.PATH || ''}`,
-        SystemRoot: process.env.SystemRoot || 'C:\\Windows'
-      };
-
-      const id = Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-      const tmpDir = os.tmpdir();
-      const srcFile = path.join(tmpDir, `sol_${id}.cpp`);
-      const exeFile = path.join(tmpDir, `sol_${id}.exe`);
-
-      fs.writeFileSync(srcFile, sourceCode, 'utf8');
-
-      const cleanFiles = () => {
-        try { if (fs.existsSync(srcFile)) fs.unlinkSync(srcFile); } catch (_) {}
-        try { if (fs.existsSync(exeFile)) fs.unlinkSync(exeFile); } catch (_) {}
-      };
-
-      const compileStart = Date.now();
-      execFile(gppPath, ['-O2', srcFile, '-o', exeFile], { env: compileEnv, timeout: 8000 }, (compErr, _, compStderr) => {
-        if (compErr) {
-          cleanFiles();
-          return resolve({
-            status: 'Compilation Error',
-            judgeStatus: 'Compilation Error',
-            stdout: '',
-            stderr: compStderr || compErr.message,
-            error: compStderr || compErr.message,
-            timeMs: Date.now() - compileStart,
-            memoryKb: 0
-          });
-        }
-
-        const execStart = Date.now();
-        const runEnv = {
-          ...process.env,
-          PATH: `${gppDir};${process.env.SystemRoot || 'C:\\Windows'}\\System32;${process.env.PATH || ''}`,
-          SystemRoot: process.env.SystemRoot || 'C:\\Windows'
-        };
-
-        try {
-          const child = execFile(exeFile, [], { env: runEnv, timeout: timeLimitMs + 500, maxBuffer: 1024 * 1024 }, (runErr, stdout, stderr) => {
-            cleanFiles();
-            const elapsed = Date.now() - execStart;
-
-            if (runErr && (runErr.killed || runErr.signal === 'SIGTERM')) {
-              return resolve({
-                status: 'Time Limit Exceeded',
-                judgeStatus: 'Time Limit Exceeded',
-                stdout: stdout || '',
-                stderr: 'Execution timed out',
-                error: 'Time Limit Exceeded',
-                timeMs: Math.max(timeLimitMs, elapsed),
-                memoryKb: 12000
-              });
-            }
-
-            if (runErr) {
-              return resolve({
-                status: 'Runtime Error',
-                judgeStatus: 'Runtime Error',
-                stdout: stdout || '',
-                stderr: stderr || runErr.message,
-                error: stderr || runErr.message,
-                timeMs: elapsed,
-                memoryKb: 12000
-              });
-            }
-
-            return resolve({
-              status: 'Success',
-              judgeStatus: 'Accepted',
-              stdout: stdout ? stdout.trim() : '',
-              stderr: stderr || null,
-              error: null,
-              timeMs: Math.max(1, elapsed),
-              memoryKb: 12000
-            });
-          });
-
-          if (stdin && child && child.stdin) {
-            child.stdin.write(String(stdin));
-            child.stdin.end();
-          }
-        } catch (execSpawnErr) {
-          cleanFiles();
-          resolve(null);
-        }
-      });
-    } catch (e) {
-      resolve(null);
-    }
-  });
-}
-
-/**
- * Universal resilient code runner with zero-failure fallbacks:
+ * Universal resilient code runner with zero-failure local-first execution:
  * - JS: Local Node.js runtime (instant).
- * - C++, Python, Java: High-speed Judge0 CE with fast non-blocking token polling.
- * - Auto-fallback to local compilers if Cloud API is degraded.
+ * - C++, Python, Java: High-speed local sandbox (< 50ms, zero external dependencies).
+ * - Exotic languages / fallback: Cloud Judge0 CE with non-blocking token polling.
  */
 async function runSingleCase(sourceCode, language, stdin = '', timeLimitMs = 2000, memoryLimitMb = 256) {
   const lang = (language || 'javascript').toLowerCase();
@@ -470,23 +353,36 @@ async function runSingleCase(sourceCode, language, stdin = '', timeLimitMs = 200
     return await executeLocalNode(sourceCode, stdin, timeLimitMs);
   }
 
-  // 2. High-speed Cloud execution via Judge0 CE with non-blocking polling (< 1.2s)
+  // 2. High-speed local sandboxed execution (C++, Python, Java)
   try {
-    const res = await executeOnJudge0(sourceCode, lang, stdin, timeLimitSec, memoryLimitMb);
-    if (res && res.status) return res;
-  } catch (judgeErr) {
-    console.warn(`Judge0 CE polling notice (${judgeErr.message}). Checking local fallbacks...`);
-
-    // 3. Fallback for C++
-    if (lang === 'cpp' || lang === 'c++' || lang === 'c') {
-      try {
-        const localCppRes = await executeLocalCpp(sourceCode, stdin, timeLimitMs);
-        if (localCppRes) return localCppRes;
-      } catch (_) {}
+    const handle = await compileOnce(lang, sourceCode, { timeLimitMs, memoryLimitMb });
+    if (handle.compileFailed) {
+      return {
+        status: handle.status || 'Compilation Error',
+        judgeStatus: handle.judgeStatus || 'Compilation Error',
+        stdout: '',
+        stderr: handle.error,
+        error: handle.error,
+        timeMs: handle.timeMs || 0,
+        memoryKb: 0,
+      };
     }
 
-    throw new Error(`Compiler execution error for ${language}: ${judgeErr.message}`);
+    if (!handle.isCloudFallback) {
+      try {
+        return await handle.runTestCase(stdin, timeLimitMs);
+      } finally {
+        if (typeof handle.cleanup === 'function') {
+          handle.cleanup();
+        }
+      }
+    }
+  } catch (localErr) {
+    console.warn(`Local execution notice for ${language}: ${localErr.message}. Attempting Judge0...`);
   }
+
+  // 3. Fallback to Judge0 CE (exotic languages or missing local toolchains)
+  return await executeOnJudge0(sourceCode, lang, stdin, timeLimitSec, memoryLimitMb);
 }
 
 const {

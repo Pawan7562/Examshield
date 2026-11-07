@@ -9,20 +9,39 @@ const { evaluateMCQAnswer, calculateGrade } = require('../utils/evaluation');
  */
 exports.getResults = async (req, res) => {
   try {
-    const { examId, page = 1, limit = 30 } = req.query;
+    const { examId, page = 1, limit = 5000 } = req.query;
     const collegeId = req.user.id;
-    const offset = (page - 1) * limit;
+
+    const isAll = limit === 'all' || limit === 'unlimited';
+    const parsedLimit = isAll ? 50000 : Math.max(1, parseInt(limit) || 5000);
+    const parsedPage = Math.max(1, parseInt(page) || 1);
+    const offset = isAll ? 0 : (parsedPage - 1) * parsedLimit;
 
     let whereClause = 'WHERE e.college_id = $1';
-    const params = [collegeId];
+    const filterParams = [collegeId];
     let paramIndex = 2;
 
     if (examId) {
       whereClause += ` AND r.exam_id = $${paramIndex++}`;
-      params.push(examId);
+      filterParams.push(examId);
     }
 
-    const result = await query(
+    // 1. Authoritative stats query across ALL matching results in the database
+    const statsPromise = query(
+      `SELECT 
+         COUNT(*)::int as total,
+         COUNT(*) FILTER (WHERE LOWER(r.status) = 'pass')::int as passed,
+         COUNT(*) FILTER (WHERE LOWER(r.status) = 'fail')::int as failed,
+         COUNT(*) FILTER (WHERE LOWER(r.status) = 'pending')::int as pending,
+         COALESCE(ROUND(AVG(r.percentage), 1), 0) as average_percentage
+       FROM results r
+       JOIN exams e ON r.exam_id = e.id
+       ${whereClause}`,
+      filterParams
+    );
+
+    // 2. Query full result rows (up to parsedLimit)
+    const resultsPromise = query(
       `SELECT r.id, r.student_id, r.exam_id, r.session_id,
               r.marks_obtained, r.percentage, r.grade, r.status,
               r.mcq_marks, r.subjective_marks, r.coding_marks,
@@ -44,13 +63,40 @@ exports.getResults = async (req, res) => {
        ${whereClause}
        ORDER BY r.created_at DESC
        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-      [...params, limit, offset]
+      [...filterParams, parsedLimit, offset]
     );
+
+    const [statsResult, resultsResult] = await Promise.all([statsPromise, resultsPromise]);
+
+    const statsRow = statsResult.rows[0] || {};
+    const totalCount = statsRow.total || 0;
+    const passedCount = statsRow.passed || 0;
+    const failedCount = statsRow.failed || 0;
+    const pendingCount = statsRow.pending || 0;
+    const passRate = totalCount > 0 ? ((passedCount / totalCount) * 100).toFixed(1) : '0.0';
+
+    const stats = {
+      total: totalCount,
+      passed: passedCount,
+      failed: failedCount,
+      pending: pendingCount,
+      passRate
+    };
 
     res.json({ 
       success: true, 
-      results: result.rows,
-      data: { results: result.rows } 
+      results: resultsResult.rows,
+      stats,
+      pagination: {
+        total: totalCount,
+        page: parsedPage,
+        limit: parsedLimit,
+        pages: Math.ceil(totalCount / parsedLimit) || 1
+      },
+      data: { 
+        results: resultsResult.rows,
+        stats
+      } 
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch results', error: error.message });
@@ -118,49 +164,101 @@ exports.evaluateResult = async (req, res) => {
     const { evaluations } = req.body; // [{answerId, marksObtained, remarks}]
     const collegeId = req.user.id;
 
+    // 1. Fetch current result record and verify college ownership
+    const resultCheck = await query(
+      `SELECT r.*, e.passing_marks as exam_passing_marks, e.total_marks as exam_total_marks
+       FROM results r
+       JOIN exams e ON r.exam_id = e.id
+       WHERE r.id = $1 AND e.college_id = $2`,
+      [id, collegeId]
+    );
+
+    if (resultCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Result not found or unauthorized' });
+    }
+    const currentResult = resultCheck.rows[0];
+    const { exam_id, student_id } = currentResult;
+
+    // 2. Update specific evaluated answers (marks, remarks, is_evaluated)
+    if (Array.isArray(evaluations) && evaluations.length > 0) {
+      for (const ev of evaluations) {
+        if (!ev || !ev.answerId) continue;
+        const awardedMarks = Math.max(0, parseFloat(ev.marksObtained) || 0);
+        await query(
+          `UPDATE answers 
+           SET marks_obtained = $1, 
+               evaluator_remarks = $2, 
+               is_evaluated = true, 
+               is_correct = ($1 > 0),
+               updated_at = NOW()
+           WHERE id = $3`,
+          [awardedMarks, ev.remarks || null, ev.answerId]
+        );
+      }
+    }
+
+    // 3. Recalculate marks across ALL answers for this candidate & exam
+    const allAnswersRes = await query(
+      `SELECT a.marks_obtained, q.type
+       FROM answers a
+       JOIN questions q ON a.question_id = q.id
+       WHERE a.exam_id = $1 AND a.student_id = $2`,
+      [exam_id, student_id]
+    );
+
+    let totalObtained = 0;
+    let mcqMarks = 0;
     let subjectiveMarks = 0;
     let codingMarks = 0;
 
-    for (const ev of evaluations) {
-      const answerResult = await query(
-        `UPDATE answers SET marks_obtained = $1, evaluator_remarks = $2, is_evaluated = true
-         WHERE id = $3
-         RETURNING type`,
-        [ev.marksObtained, ev.remarks, ev.answerId]
-      );
-      const answerType = answerResult.rows[0]?.type;
-      if (answerType === 'subjective') subjectiveMarks += ev.marksObtained;
-      if (answerType === 'coding') codingMarks += ev.marksObtained;
+    for (const ans of allAnswersRes.rows) {
+      const m = parseFloat(ans.marks_obtained) || 0;
+      totalObtained += m;
+      if (ans.type === 'mcq' || ans.type === 'true_false') {
+        mcqMarks += m;
+      } else if (ans.type === 'coding') {
+        codingMarks += m;
+      } else {
+        subjectiveMarks += m;
+      }
     }
+    totalObtained = Math.round(totalObtained * 100) / 100;
 
-    // Recalculate total
-    const resultData = await query('SELECT *, mcq_marks FROM results WHERE id = $1', [id]);
-    const result = resultData.rows[0];
-    
-    const totalObtained = (result.mcq_marks || 0) + subjectiveMarks + codingMarks;
-    const percentage = result.total_marks > 0
-      ? Math.round((totalObtained / result.total_marks) * 100 * 10) / 10
-      : 0;
-
-    const getGrade = (pct) => {
-      if (pct >= 90) return 'A+'; if (pct >= 80) return 'A';
-      if (pct >= 70) return 'B+'; if (pct >= 60) return 'B';
-      if (pct >= 50) return 'C'; return 'F';
-    };
-
-    // Get passing marks
-    const examData = await query('SELECT passing_marks FROM exams WHERE id = $1', [result.exam_id]);
-    const status = totalObtained >= examData.rows[0].passing_marks ? 'pass' : 'fail';
+    // 4. Calculate percentage, grade, and pass/fail status
+    const examTotal = parseFloat(currentResult.total_marks) || parseFloat(currentResult.exam_total_marks) || 100;
+    const percentage = examTotal > 0 ? Math.round(((totalObtained / examTotal) * 100) * 10) / 10 : 0;
+    const passingCutoff = parseFloat(currentResult.exam_passing_marks) || Math.round(examTotal * 0.4);
+    const status = (totalObtained >= passingCutoff || percentage >= 40) ? 'pass' : 'fail';
+    const grade = calculateGrade(percentage);
 
     await query(
-      `UPDATE results SET marks_obtained = $1, subjective_marks = $2, coding_marks = $3,
-       percentage = $4, grade = $5, status = $6, evaluated_at = NOW()
-       WHERE id = $7`,
-      [totalObtained, subjectiveMarks, codingMarks, percentage, getGrade(percentage), status, id]
+      `UPDATE results 
+       SET marks_obtained = $1,
+           mcq_marks = $2,
+           subjective_marks = $3,
+           coding_marks = $4,
+           percentage = $5,
+           grade = $6,
+           status = $7,
+           evaluated_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $8`,
+      [totalObtained, mcqMarks, subjectiveMarks, codingMarks, percentage, grade, status, id]
     );
 
-    res.json({ success: true, message: 'Evaluation saved.', data: { totalObtained, percentage, status } });
+    res.json({
+      success: true,
+      message: 'Evaluation saved successfully.',
+      data: {
+        marksObtained: totalObtained,
+        totalObtained,
+        percentage,
+        grade,
+        status
+      }
+    });
   } catch (error) {
+    console.error('evaluateResult error:', error);
     res.status(500).json({ success: false, message: 'Evaluation failed', error: error.message });
   }
 };

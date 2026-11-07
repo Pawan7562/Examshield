@@ -325,8 +325,8 @@ const ProfessionalProctoring = ({
     const now = Date.now();
     const COOLDOWN_MAP = {
       camera_off: 15000,
-      multiple_faces: 8000,
-      no_face_detected: 8000,
+      multiple_faces: 15000,
+      no_face_detected: 25000,
       speech_detected: 25000,
       tab_switch: 10000,
       window_blur: 10000,

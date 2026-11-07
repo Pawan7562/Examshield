@@ -152,7 +152,7 @@ function nowIST() {
 /**
  * Calculates start, end, and window evaluation in IST
  */
-function getExamWindowStatus(dateTimeInput, durationMinutes = 60, earlyAccessMinutes = 15) {
+function getExamWindowStatus(dateTimeInput, durationMinutes = 60, earlyAccessMinutes = 30) {
   const start = parseToIST(dateTimeInput);
   if (!start) return { isValid: false };
 

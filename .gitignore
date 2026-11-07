@@ -11,3 +11,4 @@ dist/
 temp_*
 scratch_*
 re_evaluate_existing.js
+*.tar.gz

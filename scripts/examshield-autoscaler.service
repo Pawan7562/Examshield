@@ -1,0 +1,20 @@
+[Unit]
+Description=ExamShield Dynamic Auto-Scaler & Self-Healing Daemon
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/Examshield
+ExecStart=/usr/bin/node /var/www/Examshield/scripts/autoscaler.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+Environment=REDIS_URL=redis://127.0.0.1:6379
+
+[Install]
+WantedBy=multi-user.target
+

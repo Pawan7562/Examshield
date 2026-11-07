@@ -336,6 +336,7 @@ export default function ExamRoom() {
   const questionsRef = useRef([]);
   const debounceTimersRef = useRef({});
   const isFlushingRef = useRef(false);
+  const startTriggeredRef = useRef(false);
 
   // Keep refs current
   useEffect(() => { sessionRef.current = session; }, [session]);
@@ -870,22 +871,19 @@ export default function ExamRoom() {
     }
   }, [examId, violationCount, exitFullScreen]);
 
-  // ─── Face Violation Handler (from ProfessionalProctoring) ────────────────────
+  // ─── Face Violation Handler (Flag & Warn Only — Avoids False Positive Terminations) ────
   const handleFaceViolation = useCallback((type) => {
     if (resolvedMonitoringConfig.face_detection === false) return;
     setFaceAlert(type);
-    setViolationCount(prev => {
-      const next = prev + 1;
-      if (next >= 5) {
-        setTimeout(() => {
-          notify.error('Too many proctoring violations recorded. Exam is being auto-submitted.');
-          handleSubmit(true);
-        }, 0);
-      }
-      return next;
-    });
+    setViolationCount(prev => prev + 1);
+    // Visual alert to candidate to readjust position without abruptly terminating their exam
+    if (type === 'no_face_detected') {
+      notify.warn('Proctor Notice: Face not clearly centered. Please adjust your camera angle.');
+    } else if (type === 'multiple_faces') {
+      notify.warn('Proctor Notice: Multiple faces detected in frame.');
+    }
     setTimeout(() => setFaceAlert(null), 5000);
-  }, [handleSubmit, resolvedMonitoringConfig.face_detection]);
+  }, [resolvedMonitoringConfig.face_detection]);
 
   // ─── Tab Switch & Window Focus Detection ───────────────────────────────────
   useEffect(() => {
@@ -1505,7 +1503,12 @@ export default function ExamRoom() {
                              errMsg.toLowerCase().includes('waiting');
 
       if (phase === 'waiting' || isTimingNotice) {
-        setWaitingStatus(errMsg || 'Synchronizing with server start authorization...');
+        setWaitingStatus('Server cluster is provisioning your session... Retrying in 3s. Please stay on this screen.');
+        startTriggeredRef.current = false;
+        setTimeout(() => {
+          const key = (keyToUse || examKey || examData?.exam?.exam_code || examData?.exam?.exam_key || '').trim();
+          triggerBackendStart(key);
+        }, 3000);
       } else {
         exitFullScreen();
         setPhase('key');
@@ -1655,9 +1658,15 @@ export default function ExamRoom() {
       if (diff <= 1000) {
         // Scheduled start time reached!
         setWaitingCountdown({ hours: 0, minutes: 0, seconds: 0, totalMs: 0, isReady: true });
-        if (!isStartingExam) {
+        if (!isStartingExam && !startTriggeredRef.current) {
+          startTriggeredRef.current = true;
           const key = (examKey || examData?.exam?.exam_code || examData?.exam?.exam_key || '').trim();
-          triggerBackendStart(key);
+          // Jitter the backend start call across 0 to 3500ms to distribute concurrent load smoothly
+          const jitterMs = Math.floor(Math.random() * 3500);
+          setWaitingStatus('Your examination slot is opening... Connecting to server cluster...');
+          setTimeout(() => {
+            triggerBackendStart(key);
+          }, jitterMs);
         }
       } else {
         const totalSecs = Math.floor(diff / 1000);

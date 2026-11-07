@@ -178,8 +178,8 @@ const flushDirtySessions = async () => {
 
   isFlushing = true;
   try {
-    // Pop up to 100 dirty sessions per cycle (scaled for 400-500 concurrent students)
-    const dirtyItems = await redis.sPop(DIRTY_SESSIONS_SET, 100);
+    // Pop up to 300 dirty sessions per cycle (scaled for 800+ concurrent students)
+    const dirtyItems = await redis.sPop(DIRTY_SESSIONS_SET, 300);
     if (!dirtyItems || (Array.isArray(dirtyItems) && dirtyItems.length === 0)) {
       return;
     }

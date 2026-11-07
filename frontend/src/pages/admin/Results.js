@@ -119,6 +119,7 @@ export default function Results() {
   });
   const [exams, setExams] = useState([]);
   const [selectedExam, setSelectedExam] = useState('');
+  const [serverStats, setServerStats] = useState(null);
   const [loading, setLoading] = useState(() => {
     try {
       if (!storageKey) return true;
@@ -134,10 +135,14 @@ export default function Results() {
   const fetchResults = async (examId, showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const r = await adminAPI.getResults({ examId }, { bypassCache: true });
+      const r = await adminAPI.getResults({ examId, limit: 'all' }, { bypassCache: true });
       const raw = r.data || r;
       const list = raw.results || raw.data?.results || (Array.isArray(raw) ? raw : []);
+      const statsData = raw.stats || raw.data?.stats || null;
       setResults(list);
+      if (statsData) {
+        setServerStats(statsData);
+      }
       if (storageKey) {
         sessionStorage.setItem(storageKey, JSON.stringify(list));
       }
@@ -346,6 +351,10 @@ export default function Results() {
   };
 
   const getStatistics = () => {
+    // Prefer authoritative server-side totals across all candidates if provided
+    if (serverStats && typeof serverStats.total === 'number' && serverStats.total > 0) {
+      return serverStats;
+    }
     if (results.length === 0) return null;
     
     const total = results.length;

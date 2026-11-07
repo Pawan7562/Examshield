@@ -1764,7 +1764,7 @@ exports.getExamDetails = async (req, res) => {
     }
 
     // Check timing strictly
-    const windowStatus = getExamWindowStatus(exam.date_time, exam.duration || 60, 15);
+    const windowStatus = getExamWindowStatus(exam.date_time, exam.duration || 60, 30);
     let effectiveStatus = exam.status;
     const isEnded = windowStatus?.isValid ? !!windowStatus.isEnded : (exam.status === 'completed' || exam.status === 'cancelled');
     if (isEnded) {
@@ -1884,7 +1884,7 @@ exports.startExam = async (req, res) => {
     console.log('✅ Backend: Exam key validated successfully');
 
     // Check if exam is active (within time window) strictly evaluated in IST
-    const windowStatus = getExamWindowStatus(examData.date_time, examData.duration || 60, 15);
+    const windowStatus = getExamWindowStatus(examData.date_time, examData.duration || 60, 30);
 
     console.log('⏰ Backend: Exam timing check (IST):', {
       nowIST: formatIST(windowStatus.now, 'full'),
