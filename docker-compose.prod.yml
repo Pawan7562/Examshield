@@ -5,6 +5,7 @@ services:
     image: nginx:alpine
     container_name: examshield_load_balancer
     restart: always
+    mem_limit: 128m
     ports:
       - "80:80"
       - "443:443"
@@ -23,9 +24,10 @@ services:
     image: redis:7-alpine
     container_name: examshield_redis
     restart: always
+    mem_limit: 512m
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -38,6 +40,7 @@ services:
     image: postgres:alpine
     container_name: examshield_postgres
     restart: always
+    mem_limit: 800m
     environment:
       POSTGRES_DB: examshield_prod
       POSTGRES_USER: examshield_admin
@@ -73,6 +76,7 @@ services:
     image: examshield-frontend:latest
     container_name: examshield-frontend-1
     restart: always
+    mem_limit: 64m
     environment:
       NODE_ENV: production
     networks:
@@ -86,6 +90,7 @@ services:
     image: examshield-backend:latest
     container_name: examshield-backend-1
     restart: always
+    mem_limit: 250m
     env_file: ./backend/.env
     environment:
       NODE_ENV: production
