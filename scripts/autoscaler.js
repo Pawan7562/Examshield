@@ -12,7 +12,7 @@ const fs = require('fs');
 const Redis = require('redis');
 
 const CONFIG = {
-  minInstances: 6,
+  minInstances: 16,
   maxInstances: 16,
   checkIntervalMs: 10000,        // Check metrics every 10 seconds
   cooldownPeriodMs: 300000,      // 5 minutes cooldown before scale-down
