@@ -2247,7 +2247,12 @@ exports.startExam = async (req, res) => {
 exports.saveAnswer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { sessionId, questionId, answerText, selectedOption, codeSubmission, selectedLanguage } = req.body;
+    const sessionId = req.body.sessionId || req.body.session_id;
+    const questionId = req.body.questionId || req.body.question_id;
+    const answerText = req.body.answerText !== undefined ? req.body.answerText : req.body.answer_text;
+    const selectedOption = req.body.selectedOption !== undefined ? req.body.selectedOption : req.body.selected_option;
+    const codeSubmission = req.body.codeSubmission !== undefined ? req.body.codeSubmission : req.body.code_submission;
+    const selectedLanguage = req.body.selectedLanguage || req.body.selected_language || req.body.language;
     const studentId = req.user.id;
 
     if (!sessionId || !questionId) {
@@ -2310,7 +2315,8 @@ exports.saveAnswer = async (req, res) => {
 exports.saveAnswersBulk = async (req, res) => {
   try {
     const { id } = req.params;
-    const { sessionId, answers } = req.body;
+    const sessionId = req.body.sessionId || req.body.session_id;
+    const answers = req.body.answers;
     const studentId = req.user.id;
 
     if (!sessionId) {
@@ -2381,7 +2387,8 @@ exports.saveAnswersBulk = async (req, res) => {
 exports.submitExam = async (req, res) => {
   try {
     const { id } = req.params;
-    const { sessionId, autoSubmit, violationCount, tabSwitchCount, terminationReason, answers: submittedAnswers } = req.body;
+    const sessionId = req.body.sessionId || req.body.session_id;
+    const { autoSubmit, violationCount, tabSwitchCount, terminationReason, answers: submittedAnswers } = req.body;
     const studentId = req.user.id;
 
     console.log('🚀 [SUBMIT-EXAM] Processing submission:', { examId: id, sessionId, studentId, finalAnswersInPayload: Array.isArray(submittedAnswers) ? submittedAnswers.length : 0 });
@@ -2515,16 +2522,20 @@ exports.submitExam = async (req, res) => {
     if (Array.isArray(submittedAnswers) && submittedAnswers.length > 0) {
       const { detectLanguageFromCode } = require('../services/codeExecutionService');
       for (const a of submittedAnswers) {
-        if (!a || !a.questionId) continue;
-        const qId = String(a.questionId);
-        const resolvedLang = a.selectedLanguage || a.language || a.selected_language || (a.codeSubmission ? detectLanguageFromCode(a.codeSubmission) : null);
+        const rawQId = a?.questionId || a?.question_id;
+        if (!rawQId) continue;
+        const qId = String(rawQId);
+        const resolvedCode = a.codeSubmission !== undefined ? a.codeSubmission : (a.code_submission !== undefined ? a.code_submission : null);
+        const resolvedOpt = a.selectedOption !== undefined ? a.selectedOption : (a.selected_option !== undefined ? a.selected_option : null);
+        const resolvedText = a.answerText !== undefined ? a.answerText : (a.answer_text !== undefined ? a.answer_text : null);
+        const resolvedLang = a.selectedLanguage || a.language || a.selected_language || (resolvedCode ? detectLanguageFromCode(resolvedCode) : null);
         const prior = answerMap.get(qId) || {};
         answerMap.set(qId, {
           ...prior,
-          question_id: a.questionId,
-          answer_text: a.answerText !== undefined ? a.answerText : prior.answer_text ?? null,
-          selected_option: a.selectedOption !== undefined ? a.selectedOption : prior.selected_option ?? null,
-          code_submission: a.codeSubmission !== undefined ? a.codeSubmission : prior.code_submission ?? null,
+          question_id: qId,
+          answer_text: resolvedText !== null ? resolvedText : prior.answer_text ?? null,
+          selected_option: resolvedOpt !== null ? resolvedOpt : prior.selected_option ?? null,
+          code_submission: resolvedCode !== null ? resolvedCode : prior.code_submission ?? null,
           selected_language: resolvedLang || prior.selected_language || null,
         });
       }
@@ -2845,7 +2856,10 @@ exports.submitExam = async (req, res) => {
  */
 exports.reportViolation = async (req, res) => {
   try {
-    const { sessionId, examId, type, description } = req.body;
+    const sessionId = req.body.sessionId || req.body.session_id;
+    const examId = req.body.examId || req.body.exam_id;
+    const type = req.body.type || req.body.violation_type || req.body.violationType;
+    const description = req.body.description || req.body.details;
     const studentId = req.user.id;
 
     // Get exam proctoring configuration

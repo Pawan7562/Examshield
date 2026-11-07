@@ -65,16 +65,21 @@ const bufferAnswersBulk = async ({ sessionId, studentId, examId, answers }) => {
     const hashEntries = {};
 
     for (const a of answers) {
-      if (!a || !a.questionId) continue;
-      hashEntries[String(a.questionId)] = JSON.stringify({
+      const qId = a?.questionId || a?.question_id;
+      if (!qId) continue;
+      const selectedOpt = a.selectedOption !== undefined ? a.selectedOption : a.selected_option;
+      const ansTxt = a.answerText !== undefined ? a.answerText : a.answer_text;
+      const codeSub = a.codeSubmission !== undefined ? a.codeSubmission : a.code_submission;
+      const lang = a.selectedLanguage || a.language || a.selected_language || null;
+      hashEntries[String(qId)] = JSON.stringify({
         session_id: sessionId,
-        question_id: a.questionId,
+        question_id: qId,
         student_id: studentId,
         exam_id: examId,
-        answer_text: a.answerText ?? null,
-        selected_option: a.selectedOption ?? null,
-        code_submission: a.codeSubmission ?? null,
-        selected_language: a.selectedLanguage || a.language || a.selected_language || null,
+        answer_text: ansTxt ?? null,
+        selected_option: selectedOpt ?? null,
+        code_submission: codeSub ?? null,
+        selected_language: lang,
         updated_at: now
       });
     }

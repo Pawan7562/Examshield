@@ -116,3 +116,4 @@ log "Active backups retained: ${TOTAL_BACKUPS} | Available disk space: ${AVAILAB
 log "=================================================================="
 
 exit 0
+
