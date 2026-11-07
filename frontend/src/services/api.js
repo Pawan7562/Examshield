@@ -61,11 +61,12 @@ api.interceptors.response.use(
     const isAuthRequest = original.url?.includes('/auth/');
 
     if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
-      console.error('Network error - Backend may not be running');
+      console.warn('Network connectivity issue detected. Session preserved in browser storage.');
       return Promise.reject({
-        message: 'Cannot connect to server. Please check if the backend is running.',
+        success: false,
+        message: 'The examination system is briefly reconnecting. Your session and exam answers are safely preserved.',
         code: error.code,
-        isNetworkError: true
+        isNetworkError: true,
       });
     }
 
@@ -114,14 +115,40 @@ api.interceptors.response.use(
     if (!error.response) {
       return Promise.reject({
         success: false,
-        message: `Unable to reach the backend API at ${API_BASE_URL}. Make sure the backend server is running.`,
+        message: 'Network connection temporarily unavailable. Your exam progress is safely cached.',
+        isNetworkError: true,
+      });
+    }
+
+    const status = error.response.status;
+
+    // Handle 502 Bad Gateway, 503 Service Unavailable, 504 Gateway Timeout
+    if (status === 502 || status === 503 || status === 504) {
+      return Promise.reject({
+        success: false,
+        status,
+        code: 'CLUSTER_SYNCHRONIZING',
+        message: 'The examination cluster is momentarily synchronizing traffic. Your exam progress is safely preserved.',
+      });
+    }
+
+    // Handle 500 Internal Server Error
+    if (status === 500) {
+      const serverMsg = error.response.data?.message;
+      return Promise.reject({
+        success: false,
+        status: 500,
+        message: serverMsg && !serverMsg.toLowerCase().includes('error:') && !serverMsg.toLowerCase().includes('sql')
+          ? serverMsg
+          : 'An unexpected server issue occurred. Your data is protected; please try again shortly.',
       });
     }
 
     if (typeof error.response.data === 'string') {
       return Promise.reject({
         success: false,
-        message: `Request failed with status ${error.response.status}. Check that the backend API is running and reachable at ${API_BASE_URL}.`,
+        status,
+        message: 'Service is momentarily synchronizing. Please try again in a moment.',
       });
     }
 

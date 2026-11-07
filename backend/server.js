@@ -1053,10 +1053,21 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ success: false, message: 'Referenced record does not exist.' });
   }
 
-  res.status(err.status || 500).json({
+  const isProduction = process.env.NODE_ENV === 'production';
+  const statusCode = err.status || err.statusCode || 500;
+  
+  let safeMessage = err.message || 'An unexpected error occurred.';
+  if (isProduction && statusCode === 500) {
+    const lower = safeMessage.toLowerCase();
+    if (lower.includes('syntax') || lower.includes('postgres') || lower.includes('query') || lower.includes('relation') || lower.includes('column') || lower.includes('fatal') || lower.includes('pool')) {
+      safeMessage = 'An unexpected server issue occurred while processing your request. Please try again or notify exam administration.';
+    }
+  }
+
+  res.status(statusCode).json({
     success: false,
-    message: err.message || 'Internal server error.',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    message: safeMessage,
+    ...(!isProduction && { stack: err.stack }),
   });
 });
 

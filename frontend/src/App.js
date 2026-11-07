@@ -2,6 +2,8 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import ErrorBoundary from './components/common/ErrorBoundary';
+import NotFound from './pages/public/NotFound';
 
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -84,24 +86,25 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
 function App() {
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <AuthProvider>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: '#fffdf8',
-              color: '#2d3138',
-              border: '1px solid rgba(255, 184, 0, 0.25)',
-              fontFamily: 'Manrope, sans-serif',
-            },
-            success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
-            error: { iconTheme: { primary: '#d34235', secondary: '#fff' } },
-          }}
-        />
+    <ErrorBoundary>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <AuthProvider>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: '#0e1726',
+                color: '#e2e8f0',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                fontFamily: 'Inter, sans-serif',
+              },
+              success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+              error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+            }}
+          />
 
-        <Suspense fallback={<PageFallback />}>
-          <Routes>
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
             <Route path="/" element={<Home />} />
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
@@ -193,76 +196,13 @@ function App() {
             <Route path="settings" element={<PlatformSettings />} />
           </Route>
 
-            <Route path="*" element={<NotFoundPage />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </AuthProvider>
     </BrowserRouter>
+  </ErrorBoundary>
   );
 }
-
-function NotFoundPage() {
-  return (
-    <div style={loadingStyles.page}>
-      <div style={loadingStyles.card}>
-        <h1 style={loadingStyles.heading}>404</h1>
-        <p style={loadingStyles.text}>Page not found</p>
-        <a href="/" style={loadingStyles.link}>
-          Back to Home
-        </a>
-      </div>
-    </div>
-  );
-}
-
-const loadingStyles = {
-  page: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'linear-gradient(180deg, #fff8e7 0%, #fffdf9 100%)',
-    padding: 16,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 360,
-    padding: 32,
-    borderRadius: 18,
-    background: 'rgba(255,255,255,0.94)',
-    border: '1px solid rgba(255,184,0,0.18)',
-    boxShadow: '0 16px 38px rgba(191,156,53,0.16)',
-    textAlign: 'center',
-    fontFamily: 'Manrope, sans-serif',
-  },
-  spinner: {
-    width: 34,
-    height: 34,
-    margin: '0 auto',
-    border: '3px solid rgba(255,184,0,0.2)',
-    borderTopColor: '#0a74da',
-    borderRadius: '50%',
-    animation: 'spin 0.8s linear infinite',
-  },
-  heading: {
-    margin: 0,
-    fontSize: 72,
-    lineHeight: 1,
-    color: '#0a74da',
-    fontWeight: 900,
-  },
-  text: {
-    margin: '16px 0 0',
-    color: '#7a818b',
-    fontWeight: 700,
-  },
-  link: {
-    display: 'inline-block',
-    marginTop: 18,
-    color: '#9b6c00',
-    fontWeight: 800,
-    textDecoration: 'none',
-  },
-};
 
 export default App;
