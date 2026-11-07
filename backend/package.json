@@ -15,6 +15,8 @@
     "seed": "node config/seed.js",
     "check": "node start-backend.js",
     "test": "node tests/coding_exam_system.test.js",
+    "db:backup": "node scripts/backup_manager.js backup",
+    "db:list-backups": "node scripts/backup_manager.js list",
     "start:prod": "NODE_ENV=production node server.js"
   },
   "dependencies": {
