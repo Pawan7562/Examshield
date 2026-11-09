@@ -95,3 +95,4 @@ SELECT id, title, exam_code FROM exams;
   username: 'root',
   password: 'a?2n,rVia15/Qqih'
 });
+
