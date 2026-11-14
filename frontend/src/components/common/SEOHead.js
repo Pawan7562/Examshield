@@ -2,46 +2,56 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /**
- * Lightweight dynamic SEO Head manager for React SPA
- * Updates document.title, meta descriptions, canonical URLs, and robots directives per route
+ * Enterprise dynamic SEO Head manager for React SPA
+ * Dynamically synchronizes document.title, meta descriptions, canonical URLs,
+ * Open Graph, Twitter Cards, robots directives, and JSON-LD structured data.
  */
 export default function SEOHead({
   title,
   description,
+  keywords,
   canonical,
   noIndex = false,
   jsonLd = null,
+  ogImage = 'https://exam.nexifyforge.in/logo.png',
+  ogType = 'website',
 }) {
   const location = useLocation();
 
   useEffect(() => {
+    const siteBrand = 'Nexify Examina';
+    const baseDomain = 'https://exam.nexifyforge.in';
+
     // 1. Update Title
-    const siteBrand = 'Nexify Examina | Nexify Forge';
+    let fullTitle = title;
     if (title) {
-      document.title = title.includes('Nexify Examina') || title.includes('Nexify Forge') || title.includes('ExamShield')
+      fullTitle = title.includes(siteBrand)
         ? title
         : `${title} | ${siteBrand}`;
+      document.title = fullTitle;
     }
 
-    // 2. Update Meta Description
-    if (description) {
-      let descMeta = document.querySelector('meta[name="description"]');
-      if (!descMeta) {
-        descMeta = document.createElement('meta');
-        descMeta.setAttribute('name', 'description');
-        document.head.appendChild(descMeta);
+    // Helper to safely set meta tag content
+    const setMetaTag = (attributeName, attributeValue, contentValue) => {
+      if (!contentValue) return;
+      let el = document.querySelector(`meta[${attributeName}="${attributeValue}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attributeName, attributeValue);
+        document.head.appendChild(el);
       }
-      descMeta.setAttribute('content', description);
+      el.setAttribute('content', contentValue);
+    };
+
+    // 2. Meta Description & Keywords
+    if (description) {
+      setMetaTag('name', 'description', description);
+    }
+    if (keywords) {
+      setMetaTag('name', 'keywords', keywords);
     }
 
-    // 3. Update Robots (Allow indexing on public pages, block indexing on private admin/student pages)
-    let robotsMeta = document.querySelector('meta[name="robots"]');
-    if (!robotsMeta) {
-      robotsMeta = document.createElement('meta');
-      robotsMeta.setAttribute('name', 'robots');
-      document.head.appendChild(robotsMeta);
-    }
-
+    // 3. Robots Directives
     const isPrivate = noIndex ||
       location.pathname.startsWith('/admin') ||
       location.pathname.startsWith('/student') ||
@@ -52,14 +62,16 @@ export default function SEOHead({
       location.pathname.includes('reset-password') ||
       location.pathname.includes('password-reset');
 
-    if (isPrivate) {
-      robotsMeta.setAttribute('content', 'noindex, nofollow, noarchive');
-    } else {
-      robotsMeta.setAttribute('content', 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1');
-    }
+    setMetaTag(
+      'name',
+      'robots',
+      isPrivate
+        ? 'noindex, nofollow, noarchive'
+        : 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1'
+    );
 
-    // 4. Update Canonical Link
-    const targetCanonical = canonical || `https://exam.nexifyforge.in${location.pathname === '/' ? '' : location.pathname}`;
+    // 4. Canonical URL
+    const targetCanonical = canonical || `${baseDomain}${location.pathname === '/' ? '' : location.pathname}`;
     let canonicalLink = document.querySelector('link[rel="canonical"]');
     if (!canonicalLink) {
       canonicalLink = document.createElement('link');
@@ -68,7 +80,22 @@ export default function SEOHead({
     }
     canonicalLink.setAttribute('href', targetCanonical);
 
-    // 5. Inject Structured Data JSON-LD if provided
+    // 5. Open Graph Meta Tags
+    setMetaTag('property', 'og:type', ogType);
+    setMetaTag('property', 'og:url', targetCanonical);
+    setMetaTag('property', 'og:title', fullTitle || 'Nexify Examina — Enterprise AI Exam Proctoring Platform');
+    setMetaTag('property', 'og:description', description || 'Secure every assessment with continuous biometric verification and live invigilation.');
+    setMetaTag('property', 'og:image', ogImage);
+    setMetaTag('property', 'og:site_name', siteBrand);
+
+    // 6. Twitter Card Meta Tags
+    setMetaTag('name', 'twitter:card', 'summary_large_image');
+    setMetaTag('name', 'twitter:url', targetCanonical);
+    setMetaTag('name', 'twitter:title', fullTitle || 'Nexify Examina — Enterprise AI Exam Proctoring Platform');
+    setMetaTag('name', 'twitter:description', description || 'Secure every assessment with continuous biometric verification and live invigilation.');
+    setMetaTag('name', 'twitter:image', ogImage);
+
+    // 7. Inject Structured Data JSON-LD
     let scriptTag = document.getElementById('dynamic-jsonld');
     if (jsonLd) {
       if (!scriptTag) {
@@ -81,7 +108,7 @@ export default function SEOHead({
     } else if (scriptTag) {
       scriptTag.remove();
     }
-  }, [title, description, canonical, noIndex, jsonLd, location.pathname]);
+  }, [title, description, keywords, canonical, noIndex, jsonLd, ogImage, ogType, location.pathname]);
 
   return null;
 }

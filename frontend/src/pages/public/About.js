@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import SEOHead from '../../components/common/SEOHead';
 import {
   ArrowRight, ShieldCheck, Building2, Users, Globe, Award,
   CheckCircle2, Sparkles, TrendingUp, Heart, Lightbulb, Target,
@@ -128,6 +129,19 @@ export default function AboutPage() {
 
   return (
     <PublicLayout>
+      <SEOHead
+        title="About Us & Leadership Team | Nexify Examina"
+        description="Learn about Nexify Examina by Nexify Forge, founded in Mohali by Pawan Kumar Yadav. Our mission is to protect academic credential integrity with advanced AI proctoring and privacy-first security."
+        keywords="about Nexify Examina, Nexify Forge founders, online exam software company Mohali, Pawan Kumar Yadav Examina, academic credential integrity, AI invigilation mission"
+        canonical="https://exam.nexifyforge.in/about"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'AboutPage',
+          name: 'About Nexify Examina & Nexify Forge',
+          url: 'https://exam.nexifyforge.in/about',
+          description: 'Mission, history, core values, and founding leadership team behind Nexify Examina.',
+        }}
+      />
       {/* ── Hero ── */}
       <section className="about-hero-section public-shell" aria-labelledby="about-h1">
         <div className="features-hero-eyebrow">

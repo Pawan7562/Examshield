@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import SEOHead from '../../components/common/SEOHead';
 import {
   ArrowRight, Eye, Mic, Monitor, ShieldCheck, Lock, ScanFace,
   FileText, Layers, Activity, CheckCircle2, Zap, BarChart3,
@@ -336,6 +337,19 @@ export default function FeaturesPage() {
 
   return (
     <PublicLayout>
+      <SEOHead
+        title="Features & AI Invigilation Capabilities | Nexify Examina"
+        description="Explore Nexify Examina's 6 layers of exam integrity: continuous biometric face verification, gaze tracking, browser kiosk lockdown, acoustic monitoring, and court-admissible audit logs."
+        keywords="AI exam proctoring features, browser lockdown, biometric exam verification, gaze tracking proctoring, online exam cheat prevention, acoustic speech detection, LMS exam integration"
+        canonical="https://exam.nexifyforge.in/features"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          name: 'Nexify Examina Platform Features',
+          url: 'https://exam.nexifyforge.in/features',
+          description: 'Comprehensive features breakdown for AI exam proctoring, kiosk sandbox lockdown, and live invigilation command center.',
+        }}
+      />
       {/* ── Hero ── */}
       <section className="features-hero-section public-shell" aria-labelledby="features-hero-h1">
         <div className="features-hero-eyebrow">

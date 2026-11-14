@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import SEOHead from '../../components/common/SEOHead';
 import {
   ArrowRight, CheckCircle2, ShieldCheck, ScanFace, LockKeyhole,
   Eye, Mic, FileText, Users, Building2, GraduationCap, Sparkles,
@@ -129,6 +130,18 @@ export default function HowItWorksPage() {
 
   return (
     <PublicLayout>
+      <SEOHead
+        title="How It Works: End-to-End Online Exam Proctoring Lifecycle | Nexify Examina"
+        description="Discover how Nexify Examina delivers cheat-proof exams in 5 steps: pre-exam roster sync, biometric check-in, kiosk sandbox activation, real-time AI invigilation, and forensic audit dossiers."
+        keywords="how online proctoring works, exam proctoring process, online test invigilation steps, biometric exam check-in, cheating prevention lifecycle"
+        canonical="https://exam.nexifyforge.in/how-it-works"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'HowTo',
+          name: 'How Online Exam Proctoring Works with Nexify Examina',
+          description: 'A 5-phase breakdown of institution exam setup, biometric candidate check-in, kiosk lockdown, and AI invigilation.',
+        }}
+      />
       {/* Hero */}
       <section className="hiw-hero-section public-shell" aria-labelledby="hiw-hero-h1">
         <div className="hiw-hero-eyebrow">

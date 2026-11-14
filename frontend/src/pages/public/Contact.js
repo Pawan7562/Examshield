@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, Mail, Phone, MessageCircle, MapPin, Clock, CheckCircle2, Building2, Users, Sparkles, ShieldCheck, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import SEOHead from '../../components/common/SEOHead';
 import PublicLayout from '../../components/public/PublicLayout';
 import './Contact.css';
 
@@ -77,6 +78,19 @@ export default function Contact() {
 
   return (
     <PublicLayout>
+      <SEOHead
+        title="Contact Us & Request Institutional Demo | Nexify Examina"
+        description="Get in touch with Nexify Examina sales, technical support, and campus deployment engineers. Schedule a customized university demo or pilot trial in Mohali, Punjab."
+        keywords="contact Nexify Examina, schedule exam software demo, university exam proctoring support, Nexify Forge contact, Mohali Punjab exam software"
+        canonical="https://exam.nexifyforge.in/contact"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'ContactPage',
+          name: 'Contact Nexify Examina & Nexify Forge',
+          url: 'https://exam.nexifyforge.in/contact',
+          description: 'Institutional sales, 24/7 technical support, and campus demo booking.',
+        }}
+      />
       {/* Hero */}
       <section className="contact-hero-section public-shell" aria-labelledby="contact-hero-h1">
         <div className="contact-hero-eyebrow">

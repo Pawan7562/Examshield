@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import SEOHead from '../../components/common/SEOHead';
 import { ArrowRight, Check, X, Star, Zap, Shield, Headphones } from 'lucide-react';
 import PublicLayout from '../../components/public/PublicLayout';
 import { pricingPlans } from './publicContent';
@@ -21,8 +22,29 @@ export default function PricingPage() {
 
   const billingLabel = billingCycle === 'monthly' ? 'INR / month' : 'INR / year';
 
+  const pricingJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: 'Nexify Examina Institutional License',
+    description: 'Enterprise AI exam-proctoring SaaS for colleges and universities with biometric facial verification and kiosk lockdown.',
+    offers: {
+      '@type': 'AggregateOffer',
+      priceCurrency: 'INR',
+      lowPrice: '999',
+      highPrice: '79990',
+      offerCount: '3',
+    },
+  };
+
   return (
     <PublicLayout>
+      <SEOHead
+        title="Institutional & University Pricing Plans | Nexify Examina"
+        description="Transparent institutional pricing for AI exam proctoring: Basic, Standard, and Premium university tiers with unlimited exams, coding sandbox, and live invigilation."
+        keywords="AI exam proctoring cost, online proctoring pricing, university exam software cost, college exam monitoring subscription, secure exam software price"
+        canonical="https://exam.nexifyforge.in/pricing"
+        jsonLd={pricingJsonLd}
+      />
       <section className="public-shell public-page-hero pricing-hero">
         <div className="public-page-copy">
           <div className="pricing-badge">

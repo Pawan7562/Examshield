@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import SEOHead from '../../components/common/SEOHead';
 import TopTicker from '../../components/public/landing/TopTicker';
 import Navbar from '../../components/public/landing/Navbar';
 import HeroSection from '../../components/public/landing/HeroSection';
@@ -19,13 +20,50 @@ import { ThemeProvider } from '../../context/ThemeContext';
 import './Home.css';
 
 export default function Home() {
-  useEffect(() => {
-    // Ensure document title and canonical meta tags on mount
-    document.title = 'Nexify Examina — Enterprise AI Exam Proctoring & Live Invigilation Platform';
-  }, []);
+  const homeJsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': 'https://exam.nexifyforge.in/#organization',
+        name: 'Nexify Examina',
+        url: 'https://exam.nexifyforge.in/',
+        logo: 'https://exam.nexifyforge.in/logo.png',
+        founder: {
+          '@type': 'Person',
+          name: 'Pawan Kumar Yadav',
+        },
+        foundingLocation: {
+          '@type': 'Place',
+          name: 'Mohali, Punjab, India',
+        },
+        description: 'Enterprise AI exam-proctoring SaaS for universities, certification boards, and colleges.',
+      },
+      {
+        '@type': 'SoftwareApplication',
+        '@id': 'https://exam.nexifyforge.in/#software',
+        name: 'Nexify Examina Enterprise Proctoring Platform',
+        applicationCategory: 'EducationalSoftware',
+        operatingSystem: 'All modern browsers (Chrome, Edge, Safari, Firefox)',
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'INR',
+          description: 'Institutional trial & pilot available',
+        },
+      },
+    ],
+  };
 
   return (
     <ThemeProvider>
+      <SEOHead
+        title="Nexify Examina — Enterprise AI Exam Proctoring & Live Invigilation Platform"
+        description="Nexify Examina is the enterprise AI exam-proctoring SaaS for universities, certification boards, and colleges. Zero software installation, neural biometric verification, browser kiosk lockdown, and court-admissible audit dossiers."
+        keywords="Nexify Examina, AI exam proctoring, online exam monitoring, university proctoring software, browser lockdown kiosk, biometric facial verification, cheating prevention, exam integrity"
+        canonical="https://exam.nexifyforge.in/"
+        jsonLd={homeJsonLd}
+      />
       <div className="es-landing-wrapper">
         {/* 1. Live ticker bar */}
         <TopTicker />
