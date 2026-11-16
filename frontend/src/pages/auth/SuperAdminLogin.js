@@ -65,14 +65,18 @@ export default function SuperAdminLogin() {
       navigate('/super-admin/dashboard');
     } catch (err) {
       console.error('Super Admin login error:', err);
-      const displayMsg =
+      const rawMsg =
         err?.response?.data?.message ||
         err?.data?.message ||
         err?.message ||
         (typeof err === 'string' ? err : 'Super admin authentication failed. Please verify credentials.');
 
+      let displayMsg = rawMsg;
+      if (rawMsg.includes('Invalid') || rawMsg.includes('password')) {
+        displayMsg = 'The master administrator email or password does not match our root credentials. Access has been restricted.';
+      }
+
       setErrorMessage(displayMsg);
-      toast.error(displayMsg);
     } finally {
       setLoading(false);
     }
@@ -124,8 +128,13 @@ export default function SuperAdminLogin() {
             {/* Error Banner */}
             {errorMessage && (
               <div className="login-error-banner" role="alert">
-                <AlertCircle />
-                <div>{errorMessage}</div>
+                <div className="login-error-icon-box">
+                  <AlertCircle size={18} />
+                </div>
+                <div className="login-error-content">
+                  <div className="login-error-title">Super Admin Authentication Failed</div>
+                  <div className="login-error-desc">{errorMessage}</div>
+                </div>
                 <button
                   type="button"
                   className="login-error-close"
@@ -133,7 +142,7 @@ export default function SuperAdminLogin() {
                   title="Dismiss error"
                   aria-label="Dismiss"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
             )}

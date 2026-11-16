@@ -273,14 +273,20 @@ const Login = ({ role }) => {
     } catch (err) {
       console.error('Login error details:', err);
       const resCode = err?.response?.data?.code || err?.data?.code;
-      const displayMsg =
+      const rawMsg =
         err?.response?.data?.message ||
         err?.data?.message ||
         err?.message ||
         (typeof err === 'string' ? err : 'Unable to sign in. Please verify your credentials.');
 
+      let displayMsg = rawMsg;
+      if (rawMsg.includes('Invalid Student ID') || rawMsg.includes('Invalid email or password') || rawMsg.includes('password')) {
+        displayMsg = isStudent
+          ? 'The Student ID, Roll Number, or password does not match our records. Please verify your credentials or contact your college exam department.'
+          : 'The institutional email or password does not match our records. Please verify your credentials or use the password reset link below.';
+      }
+
       setErrorMessage(displayMsg);
-      toast.error(displayMsg);
 
       // If college account is pending approval or rejected, auto-open status tracker!
       if (resCode === 'ACCOUNT_PENDING_APPROVAL' || resCode === 'ACCOUNT_REJECTED') {
@@ -354,8 +360,15 @@ const Login = ({ role }) => {
             {/* Error Banner */}
             {errorMessage && (
               <div className="login-error-banner" role="alert">
-                <AlertCircle />
-                <div>{errorMessage}</div>
+                <div className="login-error-icon-box">
+                  <AlertCircle size={18} />
+                </div>
+                <div className="login-error-content">
+                  <div className="login-error-title">
+                    {isStudent ? 'Candidate Authentication Failed' : 'Authentication Failed'}
+                  </div>
+                  <div className="login-error-desc">{errorMessage}</div>
+                </div>
                 <button
                   type="button"
                   className="login-error-close"
@@ -363,7 +376,7 @@ const Login = ({ role }) => {
                   title="Dismiss error"
                   aria-label="Dismiss"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
             )}

@@ -375,8 +375,13 @@ export default function Register() {
                   {/* Error Banner */}
                   {errorMessage && (
                     <div className="register-error-banner" role="alert">
-                      <AlertCircle size={18} />
-                      <div>{errorMessage}</div>
+                      <div className="register-error-icon-box">
+                        <AlertCircle size={18} />
+                      </div>
+                      <div className="register-error-content">
+                        <div className="register-error-title">Registration Incomplete</div>
+                        <div className="register-error-desc">{errorMessage}</div>
+                      </div>
                       <button
                         type="button"
                         className="register-error-close"
@@ -384,7 +389,7 @@ export default function Register() {
                         title="Dismiss"
                         aria-label="Dismiss error"
                       >
-                        <X size={16} />
+                        <X size={15} />
                       </button>
                     </div>
                   )}
