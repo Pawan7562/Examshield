@@ -29,14 +29,15 @@ export default function ExamQuestions() {
       setLoading(true);
       const response = await adminAPI.getExamQuestions(id);
       
-      const qList = response.data?.questions || 
-                    response.data?.data?.questions || 
-                    (Array.isArray(response.data?.data) ? response.data.data : []) || 
-                    (Array.isArray(response.data) ? response.data : []);
+      const raw = response?.data || response;
+      const qList = raw?.questions || 
+                    response?.questions || 
+                    (Array.isArray(raw) ? raw : []) || 
+                    (Array.isArray(raw?.data) ? raw.data : []);
       
-      setQuestions(qList);
+      setQuestions(qList || []);
 
-      const examData = response.data?.exam || response.data?.data?.exam;
+      const examData = raw?.exam || response?.exam || raw?.data?.exam;
       if (examData) {
         setExam(examData);
       }

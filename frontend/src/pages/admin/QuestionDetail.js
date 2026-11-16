@@ -19,7 +19,7 @@ export default function QuestionDetail() {
       setLoading(true);
       // Get all questions for the exam and find the specific one
       const response = await adminAPI.getExamQuestions(id);
-      const questions = response.data.questions || [];
+      const questions = response?.questions || response?.data?.questions || (Array.isArray(response) ? response : []);
       const foundQuestion = questions.find(q => q.id === questionId);
       
       if (foundQuestion) {

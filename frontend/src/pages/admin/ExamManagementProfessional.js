@@ -50,7 +50,7 @@ export default function ExamManagementProfessional() {
         sort_by: sortBy,
         sort_order: sortOrder
       });
-      const examsData = response.data.exams || [];
+      const examsData = response?.exams || response?.data?.exams || (Array.isArray(response) ? response : []);
       setExams(examsData);
       updateStats(examsData);
     } catch (error) {

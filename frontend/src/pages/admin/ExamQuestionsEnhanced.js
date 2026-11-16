@@ -22,7 +22,7 @@ export default function ExamQuestionsEnhanced() {
     try {
       setLoading(true);
       const response = await adminAPI.getExamQuestions(id);
-      setQuestions(response.data.questions || []);
+      setQuestions(response?.questions || response?.data?.questions || (Array.isArray(response) ? response : []));
     } catch (error) {
       toast.error('Failed to load questions');
       console.error('Load questions error:', error);

@@ -394,7 +394,7 @@ export default function Subscription() {
     setSubmittingQuote(true);
     try {
       const res = await subscriptionAPI.requestQuote(quoteForm);
-      toast.success(res.data.message || 'Quote request submitted successfully!');
+      toast.success(res?.message || res?.data?.message || 'Quote request submitted successfully!');
       setShowQuoteModal(false);
       setQuoteForm({
         candidateCapacity: '1000',

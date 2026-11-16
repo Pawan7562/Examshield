@@ -1011,7 +1011,11 @@ exports.deleteCollegeByAdmin = async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Delete college error:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete college', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete institution.',
+      error: process.env.NODE_ENV === 'production' ? undefined : error.message
+    });
   } finally {
     client.release();
   }
@@ -1051,7 +1055,12 @@ exports.toggleCollegeStatus = async (req, res) => {
       data: { college: updated.rows[0] },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Status update failed', error: error.message });
+    console.error('toggleCollegeStatus error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Status update failed',
+      error: process.env.NODE_ENV === 'production' ? undefined : error.message
+    });
   }
 };
 
@@ -1322,7 +1331,11 @@ exports.approveCollege = async (req, res) => {
     });
   } catch (error) {
     console.error('Approve college error:', error);
-    res.status(500).json({ success: false, message: 'Failed to approve college', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to approve college',
+      error: process.env.NODE_ENV === 'production' ? undefined : error.message
+    });
   }
 };
 
@@ -1370,6 +1383,10 @@ exports.rejectCollege = async (req, res) => {
     });
   } catch (error) {
     console.error('Reject college error:', error);
-    res.status(500).json({ success: false, message: 'Failed to reject college', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reject college',
+      error: process.env.NODE_ENV === 'production' ? undefined : error.message
+    });
   }
 };

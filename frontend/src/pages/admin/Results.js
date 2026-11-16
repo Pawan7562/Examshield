@@ -202,7 +202,7 @@ export default function Results() {
 
     try {
       const res = await adminAPI.getSubmission(result.id);
-      const payload = res.data?.data || res.data;
+      const payload = res?.data?.data || res?.data || res;
       if (payload && payload.questions) {
         // Preload any marks and remarks into editing states
         const marksInit = {};
@@ -238,7 +238,7 @@ export default function Results() {
       await adminAPI.reevaluateResult(resultId);
       toast.success('Exam answers re-evaluated successfully with updated auto-marking!');
       const res = await adminAPI.getSubmission(resultId);
-      const payload = res.data?.data || res.data;
+      const payload = res?.data?.data || res?.data || res;
       if (payload) {
         setSubmissionModal(prev => ({
           ...prev,
@@ -269,7 +269,7 @@ export default function Results() {
       });
       toast.success('Marks updated successfully!');
       const res = await adminAPI.getSubmission(submissionModal.resultId);
-      const payload = res.data?.data || res.data;
+      const payload = res?.data?.data || res?.data || res;
       if (payload) {
         setSubmissionModal(prev => ({
           ...prev,
@@ -289,7 +289,7 @@ export default function Results() {
     try {
       setLoading(true);
       const res = await adminAPI.reevaluateExam(selectedExam);
-      toast.success(res.data?.message || 'Exam submissions re-evaluated successfully!');
+      toast.success(res?.message || res?.data?.message || 'Exam submissions re-evaluated successfully!');
       fetchResults(selectedExam, false);
     } catch (err) {
       toast.error('Batch re-evaluation failed');

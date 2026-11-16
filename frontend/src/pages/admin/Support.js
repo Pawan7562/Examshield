@@ -69,10 +69,11 @@ export default function Support() {
   const fetchTickets = async () => {
     try {
       const res = await adminAPI.getSupportTickets();
-      if (res.data?.data) {
-        setTickets(res.data.data.tickets || []);
-        if (res.data.data.stats) {
-          setStats(res.data.data.stats);
+      const payload = res?.data || res;
+      if (payload) {
+        setTickets(payload.tickets || payload.data?.tickets || []);
+        if (payload.stats || payload.data?.stats) {
+          setStats(payload.stats || payload.data?.stats);
         }
       }
     } catch (err) {
@@ -83,8 +84,9 @@ export default function Support() {
   const fetchFaqs = async () => {
     try {
       const res = await adminAPI.getSupportFaqs();
-      if (res.data?.data?.faqs) {
-        setFaqs(res.data.data.faqs);
+      const payload = res?.data || res;
+      if (payload?.faqs || payload?.data?.faqs) {
+        setFaqs(payload.faqs || payload.data?.faqs || []);
       }
     } catch (err) {
       console.error('Error fetching FAQs:', err);
@@ -94,8 +96,9 @@ export default function Support() {
   const fetchStatus = async () => {
     try {
       const res = await adminAPI.getSystemStatus();
-      if (res.data?.data) {
-        setSystemStatus(res.data.data);
+      const payload = res?.data || res;
+      if (payload) {
+        setSystemStatus(payload.data || payload);
       }
     } catch (err) {
       console.error('Error fetching system status:', err);
@@ -116,7 +119,7 @@ export default function Support() {
     setSubmitting(true);
     try {
       const res = await adminAPI.createSupportTicket(ticketForm);
-      toast.success(res.data?.message || 'Support ticket submitted successfully!');
+      toast.success(res?.message || res?.data?.message || 'Support ticket submitted successfully!');
       setCreateModalOpen(false);
       setTicketForm({
         subject: '',

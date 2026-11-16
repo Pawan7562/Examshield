@@ -36,10 +36,11 @@ const PasswordReset = () => {
     try {
       setLoading(true);
       const response = await api.get(`/student-password/verify-token?token=${token}&userId=${userId}`);
+      const resData = response?.data || response;
       
-      if (response.data.success) {
+      if (resData?.success) {
         setTokenValid(true);
-        setStudentInfo(response.data.data);
+        setStudentInfo(resData.data || resData.student || resData);
         setStep('reset');
       } else {
         setTokenValid(false);
@@ -67,13 +68,14 @@ const PasswordReset = () => {
         email,
         userId: studentId
       });
+      const resData = response?.data || response;
 
-      if (response.data.success) {
+      if (resData?.success) {
         toast.success('Password reset instructions sent to your official email');
         setEmail('');
         setStudentId('');
       } else {
-        toast.error(response.data.message || 'Failed to send reset instructions');
+        toast.error(resData?.message || 'Failed to send reset instructions');
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to send reset instructions');
@@ -107,8 +109,9 @@ const PasswordReset = () => {
         userId,
         newPassword
       });
+      const resData = response?.data || response;
 
-      if (response.data.success) {
+      if (resData?.success) {
         toast.success('Password reset successfully');
         setNewPassword('');
         setConfirmPassword('');
@@ -116,7 +119,7 @@ const PasswordReset = () => {
           window.location.href = '/student/login';
         }, 2000);
       } else {
-        toast.error(response.data.message || 'Failed to reset password');
+        toast.error(resData?.message || 'Failed to reset password');
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to reset password');

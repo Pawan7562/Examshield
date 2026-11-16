@@ -48,8 +48,9 @@ const ChangePassword = () => {
     try {
       setRequestsLoading(true);
       const res = await studentAPI.getMyPasswordRequests();
-      if (res.data?.success) {
-        setMyRequests(res.data.data?.requests || []);
+      const resData = res?.data || res;
+      if (resData?.success || Array.isArray(resData?.requests)) {
+        setMyRequests(resData?.requests || resData?.data?.requests || []);
       }
     } catch (err) {
       console.error('Failed to load password requests:', err);
@@ -119,15 +120,16 @@ const ChangePassword = () => {
         newPassword: formData.newPassword
       });
 
-      if (res.data?.success) {
-        toast.success(res.data.message || 'Password changed successfully!');
+      const resData = res?.data || res;
+      if (resData?.success) {
+        toast.success(resData?.message || res?.message || 'Password changed successfully!');
         setFormData({
           currentPassword: '',
           newPassword: '',
           confirmPassword: ''
         });
       } else {
-        toast.error(res.data?.message || 'Failed to change password');
+        toast.error(resData?.message || res?.message || 'Failed to change password');
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to update password';
@@ -144,13 +146,14 @@ const ChangePassword = () => {
       const res = await studentAPI.requestPasswordAssistance({
         reason: `${reason}${additionalNotes ? ' — ' + additionalNotes : ''}`
       });
+      const resData = res?.data || res;
 
-      if (res.data?.success) {
-        toast.success(res.data.message || 'Password reset request submitted to your College Administration.');
+      if (resData?.success) {
+        toast.success(resData?.message || res?.message || 'Password reset request submitted to your College Administration.');
         setAdditionalNotes('');
         fetchMyRequests();
       } else {
-        toast.error(res.data?.message || 'Failed to submit assistance request');
+        toast.error(resData?.message || res?.message || 'Failed to submit assistance request');
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to submit password reset request';

@@ -346,8 +346,9 @@ export default function LiveMonitor() {
   const loadExamMonitoringData = useCallback(async (examId) => {
     try {
       const res = await adminAPI.getMonitoringData(examId);
-      if (res.success && res.data) {
-        applyMonitoringData(res.data);
+      const data = res?.data || res;
+      if (data && (data.exam || data.students || data.sessions)) {
+        applyMonitoringData(data);
       }
     } catch (err) {
       console.error('Error fetching exam monitoring details:', err);
@@ -363,17 +364,19 @@ export default function LiveMonitor() {
       const directPromise = targetPreloadId ? adminAPI.getMonitoringData(targetPreloadId).catch(() => null) : Promise.resolve(null);
 
       const [overviewRes, directRes] = await Promise.all([overviewPromise, directPromise]);
+      const overviewData = overviewRes?.data || overviewRes;
 
-      if (overviewRes.success && overviewRes.data) {
-        const exams = overviewRes.data.exams || [];
+      if (overviewData) {
+        const exams = overviewData.exams || [];
         setExamsList(exams);
         try { sessionStorage.setItem('cached_admin_monitor_exams', JSON.stringify(exams)); } catch (_) {}
 
-        const targetId = forcedExamId || paramExamId || overviewRes.data.activeExamId || (exams[0] ? exams[0].id : null);
+        const targetId = forcedExamId || paramExamId || overviewData.activeExamId || (exams[0] ? exams[0].id : null);
         if (targetId) {
           setCurrentExamId(targetId);
-          if (directRes && directRes.data && targetId === targetPreloadId) {
-            applyMonitoringData(directRes.data);
+          const directData = directRes?.data || directRes;
+          if (directData && (directData.exam || directData.students || directData.sessions) && targetId === targetPreloadId) {
+            applyMonitoringData(directData);
           } else {
             await loadExamMonitoringData(targetId);
           }

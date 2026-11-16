@@ -334,7 +334,10 @@ const AIQuestionGenerator = () => {
 
     // Use adminAPI so auth token is attached automatically
     adminAPI.getAIStatus()
-      .then(res => { if (res?.data) setApiStatus(res.data); })
+      .then(res => {
+        const s = res?.data || res;
+        if (s && typeof s.configured !== 'undefined') setApiStatus(s);
+      })
       .catch(() => {});
   }, []);
 

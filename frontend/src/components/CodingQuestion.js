@@ -297,14 +297,16 @@ const CodingQuestion = ({ question, answer, onAnswer, sessionId, examId, initial
         examId
       });
 
-      if (res?.data) {
-        setTestResults(res.data);
-        toast.success(`Evaluated: ${res.data.passedTestCases}/${res.data.totalTestCases} test cases passed (${res.data.earnedMarks}/${res.data.maxMarks} marks)`);
-      } else if (res?.success) {
-        setTestResults(res);
-        toast.success('Code submitted and evaluated successfully!');
+      const data = res?.data || res;
+      if (data && (typeof data.passedTestCases !== 'undefined' || data.success)) {
+        setTestResults(data);
+        if (typeof data.passedTestCases !== 'undefined') {
+          toast.success(`Evaluated: ${data.passedTestCases}/${data.totalTestCases || 0} test cases passed (${data.earnedMarks || 0}/${data.maxMarks || 0} marks)`);
+        } else {
+          toast.success('Code submitted and evaluated successfully!');
+        }
       } else {
-        setTestResults({ error: res?.message || 'Evaluation error' });
+        setTestResults({ error: res?.message || data?.message || 'Evaluation error' });
       }
     } catch (error) {
       console.error('Error submitting code:', error);
