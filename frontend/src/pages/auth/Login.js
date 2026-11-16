@@ -273,11 +273,45 @@ const Login = ({ role }) => {
     } catch (err) {
       console.error('Login error details:', err);
       const resCode = err?.response?.data?.code || err?.data?.code;
+      const suggestedRole = err?.response?.data?.suggestedRole || err?.data?.suggestedRole;
       const rawMsg =
         err?.response?.data?.message ||
         err?.data?.message ||
         err?.message ||
         (typeof err === 'string' ? err : 'Unable to sign in. Please verify your credentials.');
+
+      // Intelligent Auto-Switching between Student & College Admin
+      if (resCode === 'COLLEGE_ADMIN_ACCOUNT' || suggestedRole === 'admin') {
+        setActiveRole('admin');
+        if (location.pathname.includes('/student')) {
+          navigate('/admin/login', { replace: true });
+        }
+        toast('Detected College Administrator account. Switched to College Admin tab.', {
+          icon: '🏫',
+          duration: 6000,
+        });
+        setErrorMessage('Detected College Administrator account. Please enter your administrator password to sign in.');
+        return;
+      }
+
+      if (resCode === 'STUDENT_ACCOUNT' || suggestedRole === 'student') {
+        setActiveRole('student');
+        if (location.pathname.includes('/admin')) {
+          navigate('/student/login', { replace: true });
+        }
+        toast('Detected Student account. Switched to Student Portal tab.', {
+          icon: '🎓',
+          duration: 6000,
+        });
+        setErrorMessage('Detected Student candidate credentials. Please enter your student password to sign in.');
+        return;
+      }
+
+      if (resCode === 'SUPER_ADMIN_ACCOUNT') {
+        setErrorMessage('This email is registered as a Super Administrator. Please sign in via the Super Admin portal at /super-admin/login.');
+        toast.error('Please visit /super-admin/login to sign in.');
+        return;
+      }
 
       let displayMsg = rawMsg;
       if (rawMsg.includes('Invalid Student ID') || rawMsg.includes('Invalid email or password') || rawMsg.includes('password')) {

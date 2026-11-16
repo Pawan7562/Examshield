@@ -51,86 +51,7 @@ const comparePassword = async (plainPassword, hashedPassword) => {
   }
 };
 
-const createSupabaseAuthClient = () => {
-  const authUrl = process.env.SUPABASE_AUTH_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const authKey = process.env.SUPABASE_AUTH_ANON_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!authUrl || !authKey) throw new Error('Supabase Auth fallback is not configured.');
 
-  return createClient(authUrl, authKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-};
-
-const signInWithSupabaseAuth = async (email, password) => {
-  try {
-    const authClient = createSupabaseAuthClient();
-    const { data, error } = await authClient.auth.signInWithPassword({ email, password });
-
-    try {
-      await authClient.auth.signOut();
-    } catch (signOutError) {
-      // quiet cleanup
-    }
-
-    return { data, error };
-  } catch (err) {
-    return { data: null, error: err };
-  }
-};
-
-const getCollegeDisplayName = (authUser, email) =>
-  authUser?.user_metadata?.collegeName ||
-  authUser?.user_metadata?.college_name ||
-  authUser?.user_metadata?.institution ||
-  authUser?.user_metadata?.name ||
-  email.split('@')[0];
-
-const syncCollegeFromSupabaseAuth = async ({ authUser, email, password, existingCollege }) => {
-  const hashedPassword = await bcrypt.hash(password, 12);
-  const now = new Date().toISOString();
-
-  if (existingCollege) {
-    const { data: updatedCollege, error } = await supabase
-      .from('colleges')
-      .update({
-        email,
-        password: hashedPassword,
-        name: existingCollege.name || getCollegeDisplayName(authUser, email),
-        updated_at: now,
-      })
-      .eq('id', existingCollege.id)
-      .select('*')
-      .single();
-
-    if (error) throw error;
-    return updatedCollege;
-  }
-
-  const trialExpiry = new Date();
-  trialExpiry.setDate(trialExpiry.getDate() + 14);
-
-  const { data: createdCollege, error } = await supabase
-    .from('colleges')
-    .insert([{
-      id: authUser.id,
-      name: getCollegeDisplayName(authUser, email),
-      email,
-      password: hashedPassword,
-      subscription_plan: 'basic',
-      subscription_expiry: trialExpiry.toISOString(),
-      is_active: true,
-      created_at: now,
-      updated_at: now,
-    }])
-    .select('*')
-    .single();
-
-  if (error) throw error;
-  return createdCollege;
-};
 
 // =====================================================
 // SUPER ADMIN AUTH
@@ -281,41 +202,55 @@ exports.collegeLogin = async (req, res) => {
     );
     let college = dbRes.rows[0] || null;
 
-    let isPasswordValid = college ? await comparePassword(password, college.password) : false;
+    if (!college) {
+      console.warn(`[AUTH] College login rejected: "${normalizedEmail}" not found in colleges table.`);
 
-    if (!college || !isPasswordValid) {
-      console.warn(`[AUTH] College login rejected for: "${normalizedEmail}". Account in DB: ${Boolean(college)}, Password valid: ${isPasswordValid}`);
-      const { data: authData, error: authError } = await signInWithSupabaseAuth(normalizedEmail, password);
-
-      if (authError || !authData?.user) {
-        return res.status(401).json({
+      // Cross-portal intelligent check: Check if user is registered as a Student
+      const studentCheck = await pool.query(
+        'SELECT id, name FROM students WHERE LOWER(email) = $1 LIMIT 1',
+        [normalizedEmail]
+      );
+      if (studentCheck.rows.length > 0) {
+        return res.status(400).json({
           success: false,
-          message: college
-            ? 'Invalid email or password.'
-            : 'No administrator account found with this email. Please verify your credentials.',
+          code: 'STUDENT_ACCOUNT',
+          message: 'This email is registered as a Student candidate. Please switch to the "Student Portal" tab or sign in at /student/login.',
+          suggestedRole: 'student',
         });
       }
 
-      try {
-        college = await syncCollegeFromSupabaseAuth({
-          authUser: authData.user,
-          email: normalizedEmail,
-          password,
-          existingCollege: college || null,
-        });
-        isPasswordValid = true;
-      } catch (syncError) {
-        console.error('College profile sync error:', syncError);
-        return res.status(500).json({
+      // Cross-portal intelligent check: Check if user is registered as Super Admin
+      const superAdminCheck = await pool.query(
+        'SELECT id, name FROM super_admins WHERE LOWER(email) = $1 LIMIT 1',
+        [normalizedEmail]
+      );
+      if (superAdminCheck.rows.length > 0) {
+        return res.status(400).json({
           success: false,
-          message: 'Login failed while syncing your account profile.',
-          error: syncError.message,
+          code: 'SUPER_ADMIN_ACCOUNT',
+          message: 'This email is registered as a Super Administrator account. Please sign in at /super-admin/login.',
+          suggestedRole: 'super_admin',
         });
       }
+
+      return res.status(401).json({
+        success: false,
+        message: 'No administrator account found with this email. Please verify your credentials or register your institution.',
+      });
+    }
+
+    const trimmedPassword = (password || '').trim();
+    let isPasswordValid = await comparePassword(password, college.password);
+    if (!isPasswordValid && trimmedPassword && trimmedPassword !== password) {
+      isPasswordValid = await comparePassword(trimmedPassword, college.password);
     }
 
     if (!isPasswordValid) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+      console.warn(`[AUTH] College login password mismatch for: "${normalizedEmail}"`);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password. Please verify your password or use the forgot password option.',
+      });
     }
 
     // CHECK SUPER ADMIN APPROVAL STATUS
@@ -460,14 +395,54 @@ exports.studentLogin = async (req, res) => {
     const dbRes = await pool.query(studentQuery, studentQueryParams);
     const student = dbRes.rows[0] || null;
 
+    if (!student) {
+      // Cross-portal intelligent check: Check if user is registered as a College Administrator
+      if (isEmailInput) {
+        const normEmail = normalizeEmail(rawInput);
+        const collegeCheck = await pool.query(
+          'SELECT id, name FROM colleges WHERE LOWER(email) = $1 LIMIT 1',
+          [normEmail]
+        );
+        if (collegeCheck.rows.length > 0) {
+          return res.status(400).json({
+            success: false,
+            code: 'COLLEGE_ADMIN_ACCOUNT',
+            message: 'This email is registered as a College Administrator account. Please switch to the "College Admin" tab or sign in at /admin/login.',
+            suggestedRole: 'admin',
+          });
+        }
+
+        const superCheck = await pool.query(
+          'SELECT id, name FROM super_admins WHERE LOWER(email) = $1 LIMIT 1',
+          [normEmail]
+        );
+        if (superCheck.rows.length > 0) {
+          return res.status(400).json({
+            success: false,
+            code: 'SUPER_ADMIN_ACCOUNT',
+            message: 'This email is registered as a Super Administrator account. Please sign in at /super-admin/login.',
+            suggestedRole: 'super_admin',
+          });
+        }
+      }
+
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid Student ID/Email or password.',
+      });
+    }
+
     const trimmedPassword = (password || '').trim();
-    let isPasswordValid = student ? await comparePassword(password, student.password) : false;
+    let isPasswordValid = await comparePassword(password, student.password);
     if (!isPasswordValid && trimmedPassword && trimmedPassword !== password) {
       isPasswordValid = await comparePassword(trimmedPassword, student.password);
     }
 
-    if (!student || !isPasswordValid) {
-      return res.status(401).json({ success: false, message: 'Invalid Student ID/Email or password.' });
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid Student ID/Email or password.',
+      });
     }
 
     if (student.is_active === false) {
