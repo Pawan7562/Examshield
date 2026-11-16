@@ -1,0 +1,185 @@
+# Production High-Concurrency Cluster Orchestration for ExamShield on KVM 2 VPS (Dual-Project Safe)
+services:
+  # 1. Reverse Proxy & Cluster Load Balancer (Bound to 127.0.0.1:8081 for Host Nginx)
+  load_balancer:
+    image: nginx:alpine
+    container_name: examshield_load_balancer
+    restart: always
+    mem_limit: 128m
+    ports:
+      - "127.0.0.1:8081:80"
+    volumes:
+      - ./nginx/nginx.kvm2.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/error_pages:/usr/share/nginx/html/error_pages:ro
+    depends_on:
+      - backend_1
+      - backend_2
+      - backend_3
+      - backend_4
+      - backend_5
+      - backend_6
+      - frontend
+    networks:
+      - examshield_network
+
+  # 2. Redis Cache & Socket.IO Pub/Sub Backbone
+  redis:
+    image: redis:7-alpine
+    container_name: examshield_redis
+    restart: always
+    mem_limit: 256m
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    networks:
+      examshield_network:
+        aliases:
+          - redis
+
+  # 3. Dedicated High-Performance PostgreSQL
+  postgres:
+    image: postgres:alpine
+    container_name: examshield_postgres
+    restart: always
+    mem_limit: 800m
+    environment:
+      POSTGRES_DB: examshield_prod
+      POSTGRES_USER: examshield_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-Ex@mShield_Pr0d_Db_2026!}
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c max_connections=300
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c work_mem=8MB
+      -c maintenance_work_mem=64MB
+      -c wal_buffers=16MB
+      -c min_wal_size=256MB
+      -c max_wal_size=1GB
+      -c checkpoint_completion_target=0.9
+      -c synchronous_commit=off
+      -c random_page_cost=1.1
+    networks:
+      examshield_network:
+        aliases:
+          - postgres
+
+  # 4. Frontend Application Server (Pre-built React SPA)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.vps
+    image: examshield-frontend:latest
+    container_name: examshield-frontend-1
+    restart: always
+    mem_limit: 64m
+    environment:
+      NODE_ENV: production
+    networks:
+      - examshield_network
+
+  # 5. Scaled Backend Cluster Nodes (Nodes 1 - 6)
+  backend_1: &backend_template
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: examshield-backend:latest
+    container_name: examshield-backend-1
+    restart: always
+    mem_limit: 220m
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_1
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      examshield_network:
+        aliases:
+          - backend
+
+  backend_2:
+    <<: *backend_template
+    container_name: examshield-backend-2
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_2
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_3:
+    <<: *backend_template
+    container_name: examshield-backend-3
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_3
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_4:
+    <<: *backend_template
+    container_name: examshield-backend-4
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_4
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_5:
+    <<: *backend_template
+    container_name: examshield-backend-5
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_5
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_6:
+    <<: *backend_template
+    container_name: examshield-backend-6
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_6
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+networks:
+  examshield_network:
+    name: examshield_network
+    driver: bridge
+
+volumes:
+  redis_data:
+    name: examshield_redis_data
+  postgres_data:
+    name: examshield_postgres_data
