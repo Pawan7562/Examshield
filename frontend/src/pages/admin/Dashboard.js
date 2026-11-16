@@ -28,7 +28,8 @@ import {
   X,
   Radio,
   Eye,
-  Camera
+  Camera,
+  Bell
 } from 'lucide-react';
 import './Dashboard.css';
 
