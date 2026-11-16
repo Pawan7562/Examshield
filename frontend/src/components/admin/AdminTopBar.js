@@ -1,201 +1,224 @@
-// src/components/admin/AdminTopBar.js — Institutional College Admin Top Navigation Bar
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+// src/components/admin/AdminTopBar.js — Ultra-Modern Emerald College Admin Top Navigation Bar
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  Trophy,
-  CreditCard,
-  Settings,
-  Radio,
-  Brain,
-  Headphones,
-  PlusCircle,
-  ShieldCheck,
-  Building2,
-  LogOut,
-  Clock,
   Search,
-  ChevronRight
+  Bell,
+  Maximize2,
+  Minimize2,
+  Moon,
+  Sun,
+  CheckCircle2,
+  Info,
+  AlertTriangle,
+  X,
+  ExternalLink
 } from 'lucide-react';
-import { formatIST } from '../../utils/timezone';
+import './AdminSidebar.css';
 
 export default function AdminTopBar() {
-  const { user, logout } = useAuth();
-  const location = useLocation();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef(null);
+  const searchInputRef = useRef(null);
 
-  // Real-time clock tick for live examination vigilance
+  // Close notifications dropdown on outside click
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Compute page meta from current pathname
-  const getPageMeta = (pathname) => {
-    if (pathname.includes('/monitoring')) {
-      return {
-        section: 'Command Center',
-        title: 'Live Surveillance Cockpit',
-        icon: Radio,
-        isLive: true
-      };
-    }
-    if (pathname.includes('/students')) {
-      return {
-        section: 'Academic & Candidates',
-        title: 'Candidate Registry & Enrollment',
-        icon: Users
-      };
-    }
-    if (pathname.includes('/exams/create')) {
-      return {
-        section: 'Examinations Center',
-        title: 'Create Examination Wizard',
-        icon: PlusCircle
-      };
-    }
-    if (pathname.includes('/ai-questions')) {
-      return {
-        section: 'AI Intelligence',
-        title: 'AI Question Studio v2',
-        icon: Brain
-      };
-    }
-    if (pathname.includes('/exams')) {
-      return {
-        section: 'Examinations Center',
-        title: 'Examination Management',
-        icon: FileText
-      };
-    }
-    if (pathname.includes('/results')) {
-      return {
-        section: 'Academic & Candidates',
-        title: 'Gradebook & Forensic Dossiers',
-        icon: Trophy
-      };
-    }
-    if (pathname.includes('/subscription')) {
-      return {
-        section: 'Institutional Control',
-        title: 'License & Quota Management',
-        icon: CreditCard
-      };
-    }
-    if (pathname.includes('/settings')) {
-      return {
-        section: 'Institutional Control',
-        title: 'Proctoring Rules & College Profile',
-        icon: Settings
-      };
-    }
-    if (pathname.includes('/support')) {
-      return {
-        section: 'Support',
-        title: 'Institutional Helpdesk & SLA',
-        icon: Headphones
-      };
-    }
-    return {
-      section: 'Command Center',
-      title: 'Institutional Dashboard Overview',
-      icon: LayoutDashboard
+  // Keyboard shortcut: Ctrl + K or Cmd + K to focus search
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
     };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Handle Fullscreen Toggle
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+        setIsFullscreen(false);
+      }
+    }
   };
 
-  const meta = getPageMeta(location.pathname);
-  const PageIcon = meta.icon;
-
-  const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (!searchTerm.trim()) return;
+    navigate(`/admin/students?search=${encodeURIComponent(searchTerm.trim())}`);
   };
 
-  const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : 'AD';
-  const collegeName = user?.collegeName || user?.college_name || 'Partner Institution';
+  const notifications = [
+    {
+      id: 1,
+      type: 'success',
+      title: 'Exam started successfully',
+      sub: 'AIML – Semester III',
+      time: '2m ago',
+      path: '/admin/monitoring',
+    },
+    {
+      id: 2,
+      type: 'info',
+      title: '482 students logged in',
+      sub: 'Attendance verified via biometric & IP',
+      time: '2m ago',
+      path: '/admin/students',
+    },
+    {
+      id: 3,
+      type: 'warning',
+      title: 'Camera issue detected in hall B',
+      sub: 'AI proctor auto-recalibrating camera stream',
+      time: '5m ago',
+      path: '/admin/monitoring',
+    },
+    {
+      id: 4,
+      type: 'success',
+      title: 'Result published for BCA – Sem I',
+      sub: 'Gradebook & rank audits compiled',
+      time: '10m ago',
+      path: '/admin/results',
+    },
+  ];
 
   return (
-    <header className="admin-topbar" role="banner">
-      <div className="admin-topbar-inner">
-        {/* Left: Breadcrumb Navigation */}
-        <div className="admin-topbar-left">
-          <div className="admin-topbar-breadcrumbs">
-            <span className="topbar-crumb-section">
-              <Building2 size={13} className="crumb-icon" aria-hidden="true" />
-              <span>{meta.section}</span>
-            </span>
-            <ChevronRight size={13} className="topbar-crumb-separator" aria-hidden="true" />
-            <div className="topbar-crumb-current">
-              <PageIcon size={15} className={`crumb-page-icon ${meta.isLive ? 'live-icon' : ''}`} aria-hidden="true" />
-              <h1>{meta.title}</h1>
+    <header className="admin-emerald-topbar">
+      {/* ──── CAPSULE SEARCH BAR ──── */}
+      <form onSubmit={handleSearchSubmit} className="topbar-search-form">
+        <div className="topbar-search-wrapper">
+          <Search size={17} className="topbar-search-icon" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            className="topbar-search-input"
+            placeholder="Search students, exams, or roll number..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <kbd className="topbar-shortcut-badge">Ctrl + K</kbd>
+        </div>
+      </form>
+
+      {/* ──── TOP BAR RIGHT ACTION ICONS ──── */}
+      <div className="topbar-actions-group">
+        {/* Notifications Icon with Badge & Popover */}
+        <div className="topbar-notif-container" ref={notifRef}>
+          <button
+            type="button"
+            className={`topbar-action-icon-btn ${showNotifications ? 'active' : ''}`}
+            onClick={() => setShowNotifications(!showNotifications)}
+            title="System alerts & proctoring notifications"
+            aria-label="Notifications"
+          >
+            <Bell size={18} />
+            <span className="notif-red-counter">3</span>
+          </button>
+
+          {showNotifications && (
+            <div className="topbar-notif-dropdown">
+              <div className="notif-dropdown-header">
+                <div>
+                  <div className="notif-dropdown-title">Recent Notifications</div>
+                  <div className="notif-dropdown-sub">Live alerts from proctoring engine</div>
+                </div>
+                <button
+                  type="button"
+                  className="notif-close-btn"
+                  onClick={() => setShowNotifications(false)}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <div className="notif-dropdown-list">
+                {notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    className="notif-dropdown-item"
+                    onClick={() => {
+                      setShowNotifications(false);
+                      navigate(n.path);
+                    }}
+                  >
+                    <div className={`notif-item-icon ${n.type}`}>
+                      {n.type === 'success' && <CheckCircle2 size={15} />}
+                      {n.type === 'info' && <Info size={15} />}
+                      {n.type === 'warning' && <AlertTriangle size={15} />}
+                    </div>
+                    <div className="notif-item-content">
+                      <div className="notif-item-title">{n.title}</div>
+                      <div className="notif-item-sub">{n.sub}</div>
+                      <div className="notif-item-time">{n.time}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="notif-dropdown-footer">
+                <button
+                  type="button"
+                  className="notif-view-all-link"
+                  onClick={() => {
+                    setShowNotifications(false);
+                    navigate('/admin/monitoring');
+                  }}
+                >
+                  <span>View All Live Telemetry</span>
+                  <ExternalLink size={13} />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Right: Actions, Real-Time Telemetry & Profile */}
-        <div className="admin-topbar-right">
-          {/* Live Telemetry Pill */}
-          <div className="admin-topbar-telemetry" title="Continuous biometric & browser monitoring status">
-            <span className="telemetry-beacon">
-              <span className="beacon-ping" />
-              <span className="beacon-dot" />
-            </span>
-            <span className="telemetry-text">PROCTOR ENGINE: <strong>OPERATIONAL</strong></span>
-          </div>
+        {/* Fullscreen Toggle */}
+        <button
+          type="button"
+          className="topbar-action-icon-btn"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          aria-label="Toggle Fullscreen"
+        >
+          {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+        </button>
 
-          {/* Real-time Clock (IST) */}
-          <div className="admin-topbar-clock" title="Official examination server time (IST)">
-            <Clock size={14} className="clock-icon" aria-hidden="true" />
-            <span>{formatIST(currentTime, 'timeOnly')} IST</span>
-          </div>
+        {/* Dark/Light Mode Toggle */}
+        <button
+          type="button"
+          className="topbar-action-icon-btn"
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          title="Toggle display mode"
+          aria-label="Toggle theme"
+        >
+          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
 
-          {/* Quick Schedule Exam Action Button */}
-          {location.pathname !== '/admin/exams/create' && (
-            <Link
-              to="/admin/exams/create"
-              className="admin-topbar-action-btn primary"
-              title="Schedule a new proctored exam"
-            >
-              <PlusCircle size={15} aria-hidden="true" />
-              <span>New Exam</span>
-            </Link>
-          )}
-
-          {/* Real-Time Cockpit Shortcut */}
-          {!location.pathname.includes('/monitoring') && (
-            <Link
-              to="/admin/monitoring"
-              className="admin-topbar-action-btn secondary live-cta"
-              title="Open Live Surveillance Cockpit"
-            >
-              <Radio size={14} className="live-radio-icon" aria-hidden="true" />
-              <span>Live Cockpit</span>
-            </Link>
-          )}
-
-          {/* College Identity & Profile Capsule */}
-          <div className="admin-topbar-user">
-            <div className="admin-user-avatar" title={`Signed in as ${user?.name || 'Administrator'}`}>
-              {initials}
-            </div>
-            <div className="admin-user-info">
-              <span className="user-name">{user?.name || 'College Admin'}</span>
-              <span className="college-title">{collegeName}</span>
-            </div>
-            <button
-              type="button"
-              className="admin-topbar-logout-btn"
-              onClick={handleLogout}
-              title="Sign out of Admin Console"
-              aria-label="Sign out of Admin Console"
-            >
-              <LogOut size={16} aria-hidden="true" />
-            </button>
-          </div>
+        {/* Online Status Pill / Avatar Circle */}
+        <div className="topbar-status-circle" title="All Examination Systems Operational">
+          <span className="status-emerald-pulse" />
         </div>
       </div>
     </header>
