@@ -56,7 +56,7 @@ api.interceptors.response.use(
     console.error('Error config:', error.config);
     console.error('Error message:', error.message);
     console.error('Error response:', error.response);
-    
+
     const original = error.config || {};
     const isAuthRequest = original.url?.includes('/auth/');
 
@@ -179,7 +179,7 @@ const getTenantCacheScope = () => {
       const u = JSON.parse(userStr);
       return u.id || u.collegeId || 'auth';
     }
-  } catch (_) {}
+  } catch (_) { }
   const token = localStorage.getItem('accessToken');
   return token ? token.slice(-16) : 'anon';
 };

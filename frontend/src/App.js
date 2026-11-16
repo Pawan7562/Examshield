@@ -66,19 +66,24 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div style={loadingStyles.page}>
-        <div style={loadingStyles.card}>
-          <div style={loadingStyles.spinner} />
-          <p style={loadingStyles.text}>Loading Exam Monitoring...</p>
-        </div>
-      </div>
-    );
+    return <PageFallback />;
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    if (window.location.pathname.startsWith('/super-admin')) {
+      return <Navigate to="/super-admin/login" replace />;
+    }
+    if (window.location.pathname.startsWith('/student')) {
+      return <Navigate to="/student/login" replace />;
+    }
+    return <Navigate to="/login" replace />;
+  }
+
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    const redirect = user.role === 'student' ? '/student/dashboard' : '/admin/dashboard';
+    let redirect = '/login';
+    if (user.role === 'student') redirect = '/student/dashboard';
+    else if (user.role === 'super_admin') redirect = '/super-admin/dashboard';
+    else if (user.role === 'college_admin') redirect = '/admin/dashboard';
     return <Navigate to={redirect} replace />;
   }
   return children;

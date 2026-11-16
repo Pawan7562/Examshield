@@ -309,304 +309,304 @@ export default function Register() {
                 <>
                   {/* Stepper Tabs */}
                   <div className="register-stepper" role="navigation" aria-label="Registration steps">
-                <button
-                  type="button"
-                  className={`register-step-item ${step === 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}
-                  onClick={() => setStep(1)}
-                >
-                  <div className="register-step-circle">
-                    {step > 1 ? <CheckCircle2 size={18} /> : '1'}
-                  </div>
-                  <div className="register-step-info">
-                    <span className="register-step-num">Step 1</span>
-                    <span className="register-step-name">Institution Details</span>
-                  </div>
-                </button>
-
-                <div className="register-step-connector">
-                  <div
-                    className="register-step-connector-fill"
-                    style={{ width: step > 1 ? '100%' : '0%' }}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  className={`register-step-item ${step === 2 ? 'active' : ''}`}
-                  onClick={() => {
-                    if (form.collegeName.trim()) setStep(2);
-                  }}
-                >
-                  <div className="register-step-circle">2</div>
-                  <div className="register-step-info">
-                    <span className="register-step-num">Step 2</span>
-                    <span className="register-step-name">Admin Credentials</span>
-                  </div>
-                </button>
-              </div>
-
-              {/* Error Banner */}
-              {errorMessage && (
-                <div className="register-error-banner" role="alert">
-                  <AlertCircle size={18} />
-                  <div>{errorMessage}</div>
-                  <button
-                    type="button"
-                    className="register-error-close"
-                    onClick={() => setErrorMessage('')}
-                    title="Dismiss"
-                    aria-label="Dismiss error"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-
-              {/* Registration Form */}
-              <form onSubmit={step === 1 ? handleNextStep : handleSubmit} className="register-form" noValidate>
-                {step === 1 ? (
-                  <>
-                    <div className="register-field-group">
-                      <label htmlFor="reg-college-name" className="register-field-label">
-                        <span>College / University Name <span className="required-star">*</span></span>
-                      </label>
-                      <div className="register-input-wrap">
-                        <input
-                          id="reg-college-name"
-                          type="text"
-                          className="register-input"
-                          value={form.collegeName}
-                          onChange={handleChange('collegeName')}
-                          placeholder="e.g. Indian Institute of Technology / Harvard University"
-                          required
-                          autoFocus
-                        />
-                        <div className="register-input-icon">
-                          <Building2 size={18} />
-                        </div>
+                    <button
+                      type="button"
+                      className={`register-step-item ${step === 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}
+                      onClick={() => setStep(1)}
+                    >
+                      <div className="register-step-circle">
+                        {step > 1 ? <CheckCircle2 size={18} /> : '1'}
                       </div>
-                    </div>
-
-                    <div className="register-field-row">
-                      <div className="register-field-group">
-                        <label htmlFor="reg-website" className="register-field-label">
-                          <span>Institutional Website</span>
-                          <span className="register-field-optional">Optional</span>
-                        </label>
-                        <div className="register-input-wrap">
-                          <input
-                            id="reg-website"
-                            type="url"
-                            className="register-input"
-                            value={form.website}
-                            onChange={handleChange('website')}
-                            placeholder="https://college.edu"
-                          />
-                          <div className="register-input-icon">
-                            <Globe size={18} />
-                          </div>
-                        </div>
+                      <div className="register-step-info">
+                        <span className="register-step-num">Step 1</span>
+                        <span className="register-step-name">Institution Details</span>
                       </div>
+                    </button>
 
-                      <div className="register-field-group">
-                        <label htmlFor="reg-address" className="register-field-label">
-                          <span>Campus Location / City</span>
-                          <span className="register-field-optional">Optional</span>
-                        </label>
-                        <div className="register-input-wrap">
-                          <input
-                            id="reg-address"
-                            type="text"
-                            className="register-input"
-                            value={form.address}
-                            onChange={handleChange('address')}
-                            placeholder="City, State, Country"
-                          />
-                          <div className="register-input-icon">
-                            <MapPin size={18} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="register-btn-row">
-                      <button type="submit" className="register-btn-primary">
-                        <span>Continue to Admin Setup</span>
-                        <ArrowRight size={18} />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="register-field-row">
-                      <div className="register-field-group">
-                        <label htmlFor="reg-admin-name" className="register-field-label">
-                          <span>Administrator Name <span className="required-star">*</span></span>
-                        </label>
-                        <div className="register-input-wrap">
-                          <input
-                            id="reg-admin-name"
-                            type="text"
-                            className="register-input"
-                            value={form.name}
-                            onChange={handleChange('name')}
-                            placeholder="Dr. Rajesh Kumar"
-                            required
-                            autoFocus
-                          />
-                          <div className="register-input-icon">
-                            <User size={18} />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="register-field-group">
-                        <label htmlFor="reg-admin-phone" className="register-field-label">
-                          <span>Phone Number</span>
-                          <span className="register-field-optional">Optional</span>
-                        </label>
-                        <div className="register-input-wrap">
-                          <input
-                            id="reg-admin-phone"
-                            type="tel"
-                            className="register-input"
-                            value={form.phone}
-                            onChange={handleChange('phone')}
-                            placeholder="+91 98765 43210"
-                          />
-                          <div className="register-input-icon">
-                            <Phone size={18} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="register-field-group">
-                      <label htmlFor="reg-admin-email" className="register-field-label">
-                        <span>Work / Institutional Email <span className="required-star">*</span></span>
-                      </label>
-                      <div className="register-input-wrap">
-                        <input
-                          id="reg-admin-email"
-                          type="email"
-                          className="register-input"
-                          value={form.email}
-                          onChange={handleChange('email')}
-                          placeholder="admin@college.edu.in"
-                          required
-                        />
-                        <div className="register-input-icon">
-                          <Mail size={18} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="register-field-group">
-                      <label htmlFor="reg-admin-password" className="register-field-label">
-                        <span>Account Password <span className="required-star">*</span></span>
-                        <span className="register-field-optional">Min. 8 characters</span>
-                      </label>
-                      <div className="register-input-wrap">
-                        <input
-                          id="reg-admin-password"
-                          type={showPassword ? 'text' : 'password'}
-                          className="register-input"
-                          value={form.password}
-                          onChange={handleChange('password')}
-                          placeholder="Create a strong password"
-                          required
-                        />
-                        <div className="register-input-icon">
-                          <Lock size={18} />
-                        </div>
-                        <button
-                          type="button"
-                          className="register-input-toggle"
-                          onClick={() => setShowPassword(!showPassword)}
-                          aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-
-                      {/* Password strength visualizer */}
-                      {form.password && (
-                        <div className="password-meter">
-                          <div className="password-meter-bars">
-                            <div className={`password-meter-bar ${pwdStrength.score >= 1 ? pwdStrength.colorClass : ''}`} />
-                            <div className={`password-meter-bar ${pwdStrength.score >= 2 ? pwdStrength.colorClass : ''}`} />
-                            <div className={`password-meter-bar ${pwdStrength.score >= 3 ? pwdStrength.colorClass : ''}`} />
-                            <div className={`password-meter-bar ${pwdStrength.score >= 4 ? pwdStrength.colorClass : ''}`} />
-                          </div>
-                          <div className="password-meter-label">
-                            <span>Strength: {pwdStrength.label}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Terms Checkbox */}
-                    <label className="register-terms-label">
-                      <input
-                        type="checkbox"
-                        className="register-terms-checkbox"
-                        checked={agreeTerms}
-                        onChange={(e) => setAgreeTerms(e.target.checked)}
+                    <div className="register-step-connector">
+                      <div
+                        className="register-step-connector-fill"
+                        style={{ width: step > 1 ? '100%' : '0%' }}
                       />
-                      <span>
-                        I agree to the <Link to="/contact" target="_blank">Terms of Service</Link> &amp;{' '}
-                        <Link to="/contact" target="_blank">Privacy Policy</Link>, and acknowledge the 14-day free trial.
-                      </span>
-                    </label>
+                    </div>
 
-                    {/* Action Buttons */}
-                    <div className="register-btn-row">
+                    <button
+                      type="button"
+                      className={`register-step-item ${step === 2 ? 'active' : ''}`}
+                      onClick={() => {
+                        if (form.collegeName.trim()) setStep(2);
+                      }}
+                    >
+                      <div className="register-step-circle">2</div>
+                      <div className="register-step-info">
+                        <span className="register-step-num">Step 2</span>
+                        <span className="register-step-name">Admin Credentials</span>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Error Banner */}
+                  {errorMessage && (
+                    <div className="register-error-banner" role="alert">
+                      <AlertCircle size={18} />
+                      <div>{errorMessage}</div>
                       <button
                         type="button"
-                        className="register-btn-back"
-                        onClick={() => setStep(1)}
-                        disabled={loading}
+                        className="register-error-close"
+                        onClick={() => setErrorMessage('')}
+                        title="Dismiss"
+                        aria-label="Dismiss error"
                       >
-                        <ArrowLeft size={16} />
-                        <span>Back</span>
-                      </button>
-
-                      <button
-                        type="submit"
-                        className="register-btn-primary"
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 size={18} className="animate-spin" />
-                            <span>Creating Account...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>Complete Registration</span>
-                            <ArrowRight size={18} />
-                          </>
-                        )}
+                        <X size={16} />
                       </button>
                     </div>
-                  </>
-                )}
-              </form>
+                  )}
 
-              {/* Card Meta & Navigation */}
-              <div className="register-card-meta">
-                <div>
-                  Already have an institutional account?{' '}
-                  <Link to="/admin/login">Sign in to College Admin</Link>
-                </div>
+                  {/* Registration Form */}
+                  <form onSubmit={step === 1 ? handleNextStep : handleSubmit} className="register-form" noValidate>
+                    {step === 1 ? (
+                      <>
+                        <div className="register-field-group">
+                          <label htmlFor="reg-college-name" className="register-field-label">
+                            <span>College / University Name <span className="required-star">*</span></span>
+                          </label>
+                          <div className="register-input-wrap">
+                            <input
+                              id="reg-college-name"
+                              type="text"
+                              className="register-input"
+                              value={form.collegeName}
+                              onChange={handleChange('collegeName')}
+                              placeholder="e.g. Indian Institute of Technology / Harvard University"
+                              required
+                              autoFocus
+                            />
+                            <div className="register-input-icon">
+                              <Building2 size={18} />
+                            </div>
+                          </div>
+                        </div>
 
-                <div>
-                  <Link to="/student/login" className="register-meta-student-pill">
-                    <GraduationCap size={15} />
-                    <span>Are you a student? Take an exam via Student Portal &rarr;</span>
-                  </Link>
-                </div>
-              </div>
+                        <div className="register-field-row">
+                          <div className="register-field-group">
+                            <label htmlFor="reg-website" className="register-field-label">
+                              <span>Institutional Website</span>
+                              <span className="register-field-optional">Optional</span>
+                            </label>
+                            <div className="register-input-wrap">
+                              <input
+                                id="reg-website"
+                                type="url"
+                                className="register-input"
+                                value={form.website}
+                                onChange={handleChange('website')}
+                                placeholder="https://college.edu"
+                              />
+                              <div className="register-input-icon">
+                                <Globe size={18} />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="register-field-group">
+                            <label htmlFor="reg-address" className="register-field-label">
+                              <span>Campus Location / City</span>
+                              <span className="register-field-optional">Optional</span>
+                            </label>
+                            <div className="register-input-wrap">
+                              <input
+                                id="reg-address"
+                                type="text"
+                                className="register-input"
+                                value={form.address}
+                                onChange={handleChange('address')}
+                                placeholder="City, State, Country"
+                              />
+                              <div className="register-input-icon">
+                                <MapPin size={18} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="register-btn-row">
+                          <button type="submit" className="register-btn-primary">
+                            <span>Continue to Admin Setup</span>
+                            <ArrowRight size={18} />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="register-field-row">
+                          <div className="register-field-group">
+                            <label htmlFor="reg-admin-name" className="register-field-label">
+                              <span>Administrator Name <span className="required-star">*</span></span>
+                            </label>
+                            <div className="register-input-wrap">
+                              <input
+                                id="reg-admin-name"
+                                type="text"
+                                className="register-input"
+                                value={form.name}
+                                onChange={handleChange('name')}
+                                placeholder="Dr. Rajesh Kumar"
+                                required
+                                autoFocus
+                              />
+                              <div className="register-input-icon">
+                                <User size={18} />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="register-field-group">
+                            <label htmlFor="reg-admin-phone" className="register-field-label">
+                              <span>Phone Number</span>
+                              <span className="register-field-optional">Optional</span>
+                            </label>
+                            <div className="register-input-wrap">
+                              <input
+                                id="reg-admin-phone"
+                                type="tel"
+                                className="register-input"
+                                value={form.phone}
+                                onChange={handleChange('phone')}
+                                placeholder="+91 98765 43210"
+                              />
+                              <div className="register-input-icon">
+                                <Phone size={18} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="register-field-group">
+                          <label htmlFor="reg-admin-email" className="register-field-label">
+                            <span>Work / Institutional Email <span className="required-star">*</span></span>
+                          </label>
+                          <div className="register-input-wrap">
+                            <input
+                              id="reg-admin-email"
+                              type="email"
+                              className="register-input"
+                              value={form.email}
+                              onChange={handleChange('email')}
+                              placeholder="admin@college.edu.in"
+                              required
+                            />
+                            <div className="register-input-icon">
+                              <Mail size={18} />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="register-field-group">
+                          <label htmlFor="reg-admin-password" className="register-field-label">
+                            <span>Account Password <span className="required-star">*</span></span>
+                            <span className="register-field-optional">Min. 8 characters</span>
+                          </label>
+                          <div className="register-input-wrap">
+                            <input
+                              id="reg-admin-password"
+                              type={showPassword ? 'text' : 'password'}
+                              className="register-input"
+                              value={form.password}
+                              onChange={handleChange('password')}
+                              placeholder="Create a strong password"
+                              required
+                            />
+                            <div className="register-input-icon">
+                              <Lock size={18} />
+                            </div>
+                            <button
+                              type="button"
+                              className="register-input-toggle"
+                              onClick={() => setShowPassword(!showPassword)}
+                              aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            >
+                              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+
+                          {/* Password strength visualizer */}
+                          {form.password && (
+                            <div className="password-meter">
+                              <div className="password-meter-bars">
+                                <div className={`password-meter-bar ${pwdStrength.score >= 1 ? pwdStrength.colorClass : ''}`} />
+                                <div className={`password-meter-bar ${pwdStrength.score >= 2 ? pwdStrength.colorClass : ''}`} />
+                                <div className={`password-meter-bar ${pwdStrength.score >= 3 ? pwdStrength.colorClass : ''}`} />
+                                <div className={`password-meter-bar ${pwdStrength.score >= 4 ? pwdStrength.colorClass : ''}`} />
+                              </div>
+                              <div className="password-meter-label">
+                                <span>Strength: {pwdStrength.label}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Terms Checkbox */}
+                        <label className="register-terms-label">
+                          <input
+                            type="checkbox"
+                            className="register-terms-checkbox"
+                            checked={agreeTerms}
+                            onChange={(e) => setAgreeTerms(e.target.checked)}
+                          />
+                          <span>
+                            I agree to the <Link to="/contact" target="_blank">Terms of Service</Link> &amp;{' '}
+                            <Link to="/contact" target="_blank">Privacy Policy</Link>, and acknowledge the 14-day free trial.
+                          </span>
+                        </label>
+
+                        {/* Action Buttons */}
+                        <div className="register-btn-row">
+                          <button
+                            type="button"
+                            className="register-btn-back"
+                            onClick={() => setStep(1)}
+                            disabled={loading}
+                          >
+                            <ArrowLeft size={16} />
+                            <span>Back</span>
+                          </button>
+
+                          <button
+                            type="submit"
+                            className="register-btn-primary"
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <>
+                                <Loader2 size={18} className="animate-spin" />
+                                <span>Creating Account...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Complete Registration</span>
+                                <ArrowRight size={18} />
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </form>
+
+                  {/* Card Meta & Navigation */}
+                  <div className="register-card-meta">
+                    <div>
+                      Already have an institutional account?{' '}
+                      <Link to="/admin/login">Sign in to College Admin</Link>
+                    </div>
+
+                    <div>
+                      <Link to="/student/login" className="register-meta-student-pill">
+                        <GraduationCap size={15} />
+                        <span>Are you a student? Take an exam via Student Portal &rarr;</span>
+                      </Link>
+                    </div>
+                  </div>
                 </>
               )}
             </div>

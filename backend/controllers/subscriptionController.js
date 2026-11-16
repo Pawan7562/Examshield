@@ -198,6 +198,13 @@ const PLANS = {
   }
 };
 
+const getPlanDetails = (planKey) => {
+  const normalized = (planKey || 'basic').toLowerCase().trim();
+  const found = PLANS.monthly[normalized] || PLANS.annually[normalized];
+  if (found) return found;
+  return PLANS.monthly.basic;
+};
+
 /**
  * GET /api/subscriptions/plans
  */
@@ -713,8 +720,8 @@ exports.createCollegeByAdmin = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const planKey = PLANS[subscription_plan] ? subscription_plan : 'basic';
-    const planDetails = PLANS[planKey];
+    const planDetails = getPlanDetails(subscription_plan);
+    const planKey = planDetails.id;
 
     const months = Math.max(1, parseInt(duration_months, 10) || 1);
     const startDate = new Date();
@@ -858,8 +865,8 @@ exports.updateCollegePlan = async (req, res) => {
     }
 
     const college = collegeRes.rows[0];
-    const targetPlan = plan && PLANS[plan] ? plan : college.subscription_plan || 'basic';
-    const planDetails = PLANS[targetPlan];
+    const planDetails = getPlanDetails(plan || college.subscription_plan);
+    const targetPlan = planDetails.id;
 
     let newExpiry;
     if (custom_expiry) {
@@ -970,14 +977,22 @@ exports.resetCollegePassword = async (req, res) => {
  * DELETE /api/super-admin/colleges/:id
  */
 exports.deleteCollegeByAdmin = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
-    const college = await pool.query('SELECT id, name FROM colleges WHERE id = $1', [id]);
+    const college = await client.query('SELECT id, name FROM colleges WHERE id = $1', [id]);
     if (college.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'College not found.' });
     }
 
-    await pool.query('DELETE FROM colleges WHERE id = $1', [id]);
+    await client.query('BEGIN');
+    await client.query('DELETE FROM student_password_requests WHERE college_id = $1', [id]);
+    await client.query('DELETE FROM support_tickets WHERE college_id = $1', [id]);
+    await client.query('DELETE FROM subscriptions WHERE college_id = $1', [id]);
+    await client.query('DELETE FROM exams WHERE college_id = $1 OR created_by = $1', [id]);
+    await client.query('DELETE FROM students WHERE college_id = $1', [id]);
+    await client.query('DELETE FROM colleges WHERE id = $1', [id]);
+    await client.query('COMMIT');
 
     await logAudit({
       actor_id: req.user?.id,
@@ -994,8 +1009,11 @@ exports.deleteCollegeByAdmin = async (req, res) => {
       message: `Institution "${college.rows[0].name}" deleted from the platform.`,
     });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Delete college error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete college', error: error.message });
+  } finally {
+    client.release();
   }
 };
 
@@ -1128,8 +1146,8 @@ exports.recordManualPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Selected institution not found.' });
     }
 
-    const targetPlan = PLANS[plan] ? plan : 'basic';
-    const planDetails = PLANS[targetPlan];
+    const planDetails = getPlanDetails(plan);
+    const targetPlan = planDetails.id;
     const finalAmount = amount !== undefined && amount !== '' ? parseFloat(amount) : planDetails.price;
 
     const startDate = new Date();

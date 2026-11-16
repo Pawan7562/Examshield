@@ -29,7 +29,7 @@ export default function AuditLogs() {
       const res = await superAdminAPI.getAuditLogs({
         action: actionFilter !== 'all' ? actionFilter : undefined,
       });
-      setLogs(res.data.logs || []);
+      setLogs(res?.logs || res?.data?.logs || []);
     } catch (err) {
       console.error('Error fetching audit logs:', err);
       toast.error('Failed to load audit logs');

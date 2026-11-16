@@ -89,7 +89,8 @@ export default function CollegeManagement() {
     setLoading(true);
     try {
       const res = await superAdminAPI.getColleges({ search: search || undefined });
-      setColleges(res.data.colleges || []);
+      const list = res?.colleges || res?.data?.colleges || (Array.isArray(res) ? res : []);
+      setColleges(list);
     } catch (err) {
       console.error('Error fetching colleges:', err);
       toast.error('Failed to load institutions');
@@ -107,13 +108,13 @@ export default function CollegeManagement() {
   const toggleCollege = async (id, name, currentIsActive) => {
     setTogglingId(id);
     try {
-      await superAdminAPI.toggleCollege(id);
+      const res = await superAdminAPI.toggleCollege(id);
       const nextState = !currentIsActive;
-      toast.success(`${name} ${nextState ? 'activated successfully' : 'suspended'}`);
+      toast.success(res?.message || res?.data?.message || `${name} ${nextState ? 'activated successfully' : 'suspended'}`);
       fetchColleges();
     } catch (err) {
       console.error('Error toggling college status:', err);
-      toast.error('Failed to change college status');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to change college status');
     } finally {
       setTogglingId(null);
     }
@@ -143,12 +144,12 @@ export default function CollegeManagement() {
     setSubmitting(true);
     try {
       const res = await superAdminAPI.onboardCollege(onboardData);
-      toast.success(res.data.message || 'College onboarded successfully!');
+      toast.success(res?.message || res?.data?.message || 'College onboarded successfully!');
       setShowOnboardModal(false);
       fetchColleges();
     } catch (err) {
       console.error('Onboard error:', err);
-      toast.error(err.response?.data?.message || 'Failed to onboard institution');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to onboard institution');
     } finally {
       setSubmitting(false);
     }
@@ -174,12 +175,12 @@ export default function CollegeManagement() {
     setSubmitting(true);
     try {
       const res = await superAdminAPI.updateCollege(activeCollege.id, editData);
-      toast.success(res.data.message || 'College profile updated successfully');
+      toast.success(res?.message || res?.data?.message || 'College profile updated successfully');
       setShowEditModal(false);
       fetchColleges();
     } catch (err) {
       console.error('Edit error:', err);
-      toast.error(err.response?.data?.message || 'Failed to update institution');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to update institution');
     } finally {
       setSubmitting(false);
     }
@@ -210,12 +211,12 @@ export default function CollegeManagement() {
         notes: planData.notes,
       };
       const res = await superAdminAPI.updateCollegePlan(activeCollege.id, payload);
-      toast.success(res.data.message || 'Plan and licensing updated');
+      toast.success(res?.message || res?.data?.message || 'Plan and licensing updated');
       setShowPlanModal(false);
       fetchColleges();
     } catch (err) {
       console.error('Plan update error:', err);
-      toast.error(err.response?.data?.message || 'Failed to update license tier');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to update license tier');
     } finally {
       setSubmitting(false);
     }
@@ -238,11 +239,11 @@ export default function CollegeManagement() {
     setSubmitting(true);
     try {
       const res = await superAdminAPI.resetCollegePassword(activeCollege.id, { new_password: newPassword });
-      toast.success(res.data.message || 'Password reset successfully');
+      toast.success(res?.message || res?.data?.message || 'Password reset successfully');
       setShowResetPasswordModal(false);
     } catch (err) {
       console.error('Password reset error:', err);
-      toast.error(err.response?.data?.message || 'Failed to reset password');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to reset password');
     } finally {
       setSubmitting(false);
     }
@@ -260,12 +261,12 @@ export default function CollegeManagement() {
     setSubmitting(true);
     try {
       const res = await superAdminAPI.deleteCollege(activeCollege.id);
-      toast.success(res.data.message || 'Institution deleted');
+      toast.success(res?.message || res?.data?.message || 'Institution deleted');
       setShowDeleteModal(false);
       fetchColleges();
     } catch (err) {
       console.error('Delete error:', err);
-      toast.error(err.response?.data?.message || 'Failed to delete institution');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to delete institution');
     } finally {
       setSubmitting(false);
     }
@@ -276,11 +277,11 @@ export default function CollegeManagement() {
     setApprovingId(id);
     try {
       const res = await superAdminAPI.approveCollege(id);
-      toast.success(res.data?.message || `${name} approved successfully!`);
+      toast.success(res?.message || res?.data?.message || `${name} approved successfully!`);
       fetchColleges();
     } catch (err) {
       console.error('Approval error:', err);
-      toast.error(err.response?.data?.message || 'Failed to approve college');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to approve college');
     } finally {
       setApprovingId(null);
     }
@@ -300,12 +301,12 @@ export default function CollegeManagement() {
     setSubmitting(true);
     try {
       const res = await superAdminAPI.rejectCollege(activeCollege.id, { reason: rejectReason });
-      toast.success(res.data?.message || `${activeCollege.name} registration rejected.`);
+      toast.success(res?.message || res?.data?.message || `${activeCollege.name} registration rejected.`);
       setShowRejectModal(false);
       fetchColleges();
     } catch (err) {
       console.error('Rejection error:', err);
-      toast.error(err.response?.data?.message || 'Failed to reject college');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to reject college');
     } finally {
       setSubmitting(false);
     }

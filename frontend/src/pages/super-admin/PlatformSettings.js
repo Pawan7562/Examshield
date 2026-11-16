@@ -34,9 +34,7 @@ export default function PlatformSettings() {
     setLoading(true);
     try {
       const res = await superAdminAPI.getSettings();
-      if (res.data?.settings) {
-        setSettings(res.data.settings);
-      }
+      const s = res?.settings || res?.data?.settings; if (s) { setSettings(s); }
     } catch (err) {
       console.error('Error fetching settings:', err);
       toast.error('Failed to load system settings');
@@ -54,7 +52,7 @@ export default function PlatformSettings() {
     setSaving(true);
     try {
       const res = await superAdminAPI.updateSettings(settings);
-      toast.success(res.data?.message || 'Platform governance settings updated!');
+      toast.success(res?.message || res?.data?.message || 'Platform governance settings updated!');
     } catch (err) {
       console.error('Error saving settings:', err);
       toast.error(err.response?.data?.message || 'Failed to update settings');

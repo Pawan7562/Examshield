@@ -58,9 +58,10 @@ export default function PaymentManagement() {
         status: statusFilter !== 'all' ? statusFilter : undefined,
         plan: planFilter !== 'all' ? planFilter : undefined,
       });
-      setPayments(res.data.payments || []);
-      if (res.data.metrics) {
-        setMetrics(res.data.metrics);
+      setPayments(res?.payments || res?.data?.payments || []);
+      const metrics = res?.metrics || res?.data?.metrics;
+      if (metrics) {
+        setMetrics(metrics);
       }
     } catch (err) {
       console.error('Error fetching payments:', err);
@@ -73,7 +74,7 @@ export default function PaymentManagement() {
   const fetchCollegeList = async () => {
     try {
       const res = await superAdminAPI.getColleges({});
-      setColleges(res.data.colleges || []);
+      setColleges(res?.colleges || res?.data?.colleges || []);
     } catch (err) {
       console.error('Error fetching colleges for payment dropdown:', err);
     }
@@ -109,7 +110,7 @@ export default function PaymentManagement() {
     setSubmitting(true);
     try {
       const res = await superAdminAPI.recordManualPayment(recordData);
-      toast.success(res.data.message || 'Payment recorded successfully');
+      toast.success(res?.message || res?.data?.message || 'Payment recorded successfully');
       setShowRecordModal(false);
       fetchPayments();
     } catch (err) {

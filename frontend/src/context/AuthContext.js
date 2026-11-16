@@ -5,20 +5,36 @@ import api, { clearApiCache } from '../services/api';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const userData = localStorage.getItem('user');
+      if (token && userData) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        return JSON.parse(userData);
+      }
+    } catch (_) {
+      localStorage.clear();
+      sessionStorage.clear();
+      clearApiCache();
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     const userData = localStorage.getItem('user');
     if (token && userData) {
       try {
-        setUser(JSON.parse(userData));
+        const parsed = JSON.parse(userData);
+        setUser(parsed);
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       } catch (_) {
         localStorage.clear();
         sessionStorage.clear();
         clearApiCache();
+        setUser(null);
       }
     }
     setLoading(false);
