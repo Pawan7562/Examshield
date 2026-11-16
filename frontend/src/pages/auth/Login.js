@@ -82,7 +82,7 @@ const Login = ({ role }) => {
       setAdminForgotLoading(true);
       setAdminForgotMsg('');
       const res = await authAPI.collegeForgotPassword({ email: cleanEmail });
-      
+
       const isSuccess = (res && typeof res.success === 'boolean') ? res.success : (res?.data?.success ?? true);
       const message = res?.message || res?.data?.message || 'Password reset instructions dispatched to your email.';
       const payload = res?.data || res || {};

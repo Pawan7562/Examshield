@@ -32,7 +32,11 @@ if (!fs.existsSync(uploadDir)) {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  filename: (req, file, cb) => {
+    const safeExt = path.extname(file.originalname).toLowerCase();
+    const safeBase = path.basename(file.originalname, safeExt).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
+    cb(null, `${Date.now()}-${safeBase}${safeExt}`);
+  },
 });
 
 const upload = multer({
@@ -74,30 +78,25 @@ const handleRosterUpload = (req, res, next) => {
 };
 
 // =====================================================
-// AUTH ROUTES
+// AUTH ROUTES & ENTERPRISE RATE LIMITING
 // =====================================================
-const rateLimit = require('express-rate-limit');
-const passwordRecoveryLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // max 5 attempts per 15 minutes per IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => req.method === 'OPTIONS',
-  message: {
-    success: false,
-    message: 'Too many password recovery attempts. Please try again after 15 minutes.'
-  }
-});
+const {
+  superAdminLoginLimiter,
+  collegeLoginLimiter,
+  collegeRegisterLimiter,
+  studentLoginLimiter,
+  passwordRecoveryLimiter
+} = require('../middleware/rateLimiter');
 
 const auth = express.Router();
-auth.post('/super-admin/login', authController.superAdminLogin);
-auth.post('/college/register', authController.collegeRegister);
+auth.post('/super-admin/login', superAdminLoginLimiter, authController.superAdminLogin);
+auth.post('/college/register', collegeRegisterLimiter, authController.collegeRegister);
 auth.get('/college/application-status', authController.getCollegeApplicationStatus);
 auth.post('/college/application-status', authController.getCollegeApplicationStatus);
-auth.post('/college/login', authController.collegeLogin);
+auth.post('/college/login', collegeLoginLimiter, authController.collegeLogin);
 auth.post('/college/forgot-password', passwordRecoveryLimiter, authController.collegeForgotPassword);
 auth.post('/college/reset-password', passwordRecoveryLimiter, authController.collegeResetPassword);
-auth.post('/student/login', authController.studentLogin);
+auth.post('/student/login', studentLoginLimiter, authController.studentLogin);
 auth.post('/refresh', authController.refreshToken);
 auth.get('/me', authenticate, authController.getMe);
 router.use('/auth', auth);

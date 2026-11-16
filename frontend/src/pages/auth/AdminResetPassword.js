@@ -129,9 +129,14 @@ export default function AdminResetPassword() {
           ) : (
             <form onSubmit={handleSubmit} className="login-form">
               {error && (
-                <div className="login-error-banner" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle size={18} style={{ flexShrink: 0 }} />
-                  <div>{error}</div>
+                <div className="login-error-banner" role="alert">
+                  <div className="login-error-icon-box">
+                    <AlertCircle size={18} />
+                  </div>
+                  <div className="login-error-content">
+                    <div className="login-error-title">Password Recovery Notice</div>
+                    <div className="login-error-desc">{error}</div>
+                  </div>
                 </div>
               )}
               {tokenFromUrl ? (

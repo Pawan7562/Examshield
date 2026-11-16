@@ -62,7 +62,74 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      const isExamRoom = window.location.pathname.includes('/exam/');
+      const path = window.location.pathname;
+      const isExamRoom = path.includes('/exam/');
+      const isSuperAdmin = path.startsWith('/super-admin');
+      const isCollegeAdmin = path.startsWith('/admin');
+      const isStudent = path.startsWith('/student');
+
+      // Context-aware UI configurations
+      let config = {
+        pill: 'APPLICATION RECOVERY MODE',
+        heading: 'Display Temporarily Interrupted',
+        subtext: 'A client-side interface issue occurred. The system has automatically protected your active session.',
+        protectionTitle: 'Session State Preserved',
+        protectionDesc: 'Your session credentials and records are safely cached. Refreshing will restore the interface.',
+        reloadLabel: 'Reload & Restore Screen',
+        dashboardLabel: 'Return to Home',
+        supportNote: 'If this screen reappears, please refresh your browser cache or contact support@nexifyforge.in.',
+        detailsLabel: 'Technical Diagnostics ▼',
+      };
+
+      if (isExamRoom) {
+        config = {
+          pill: 'EXAMINATION SAFE MODE ACTIVE',
+          heading: 'Assessment Display Interrupted',
+          subtext: 'A client-side interface event occurred. The exam security engine has automatically secured your submission.',
+          protectionTitle: 'Candidate Answers Protected',
+          protectionDesc: 'All attempted answers, question selections, and remaining exam timer are safely saved in local storage. Refreshing will immediately restore your active exam without penalty.',
+          reloadLabel: 'Reload & Resume Exam',
+          dashboardLabel: 'Return to Student Dashboard',
+          supportNote: 'If this screen reappears, please notify your college invigilator or hall proctor immediately.',
+          detailsLabel: 'Proctor Technical Details ▼',
+        };
+      } else if (isSuperAdmin) {
+        config = {
+          pill: 'SYSTEM RECOVERY SHIELD ACTIVE',
+          heading: 'Executive Console Interrupted',
+          subtext: 'A client-side interface event occurred in the Super Admin command center. Multi-tenant governance data remains intact.',
+          protectionTitle: 'Platform Telemetry & State Preserved',
+          protectionDesc: 'Your administrative session credentials, tenant caches, and audit buffers are safely preserved. Refreshing will reconnect to the live cluster telemetry.',
+          reloadLabel: 'Reload & Reconnect Console',
+          dashboardLabel: 'Return to Super Admin Dashboard',
+          supportNote: 'If this issue persists, review backend container telemetry or check platform audit logs.',
+          detailsLabel: 'Platform Diagnostics & Telemetry ▼',
+        };
+      } else if (isCollegeAdmin) {
+        config = {
+          pill: 'INSTITUTIONAL SAFE MODE ACTIVE',
+          heading: 'Administrative Workspace Interrupted',
+          subtext: 'A client-side interface event occurred in the college management portal. Academic records and rosters remain secure.',
+          protectionTitle: 'Institution Data Protected',
+          protectionDesc: 'Your college configurations, candidate rosters, and exam scheduling states are safely stored in the cloud. Refreshing will restore your workspace.',
+          reloadLabel: 'Reload & Restore Workspace',
+          dashboardLabel: 'Return to College Dashboard',
+          supportNote: 'If this screen persists, please contact Nexify Examina Technical Support at support@nexifyforge.in.',
+          detailsLabel: 'Workspace Diagnostics ▼',
+        };
+      } else if (isStudent) {
+        config = {
+          pill: 'STUDENT PORTAL SAFE MODE',
+          heading: 'Student Portal Interrupted',
+          subtext: 'A client-side interface event occurred. Your candidate profile and upcoming exam schedules remain intact.',
+          protectionTitle: 'Candidate Profile Preserved',
+          protectionDesc: 'Your student credentials and exam eligibility records are safely cached. Refreshing will restore your dashboard.',
+          reloadLabel: 'Reload & Restore Portal',
+          dashboardLabel: 'Return to Student Dashboard',
+          supportNote: 'If this screen reappears, please contact your college examination department.',
+          detailsLabel: 'Candidate Session Details ▼',
+        };
+      }
 
       return (
         <div style={styles.wrapper}>
@@ -92,28 +159,22 @@ class ErrorBoundary extends React.Component {
 
             <div style={styles.statusPill}>
               <span style={styles.statusDot} />
-              Application Safe Mode Active
+              {config.pill}
             </div>
 
-            <h1 style={styles.heading}>Display Temporarily Interrupted</h1>
+            <h1 style={styles.heading}>{config.heading}</h1>
 
-            <p style={styles.subtext}>
-              A client-side interface issue occurred. The system has automatically protected your session.
-            </p>
+            <p style={styles.subtext}>{config.subtext}</p>
 
-            {/* Exam Data Protection Guarantee Banner */}
+            {/* Data Protection Guarantee Banner */}
             <div style={styles.protectionBox}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 <path d="M9 12l2 2 4-4" />
               </svg>
               <div>
-                <div style={styles.protectionTitle}>Candidate Answers Protected</div>
-                <div style={styles.protectionDesc}>
-                  {isExamRoom
-                    ? 'All attempted answers, question selections, and remaining exam timer are safely saved in your browser storage. Refreshing will immediately restore your active exam.'
-                    : 'Your session credentials and records are safely cached. Refreshing will restore the dashboard.'}
-                </div>
+                <div style={styles.protectionTitle}>{config.protectionTitle}</div>
+                <div style={styles.protectionDesc}>{config.protectionDesc}</div>
               </div>
             </div>
 
@@ -128,23 +189,21 @@ class ErrorBoundary extends React.Component {
                   <path d="M23 4v6h-6M1 20v-6h6" />
                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                 </svg>
-                {this.state.isRetrying ? 'Restoring View...' : 'Reload & Restore Screen'}
+                {this.state.isRetrying ? 'Restoring View...' : config.reloadLabel}
               </button>
 
               <button onClick={this.handleGoDashboard} style={styles.secondaryBtn}>
-                Return to Dashboard
+                {config.dashboardLabel}
               </button>
             </div>
 
-            {/* Proctor Assistance */}
-            <div style={styles.supportNote}>
-              If this screen reappears, please notify your college invigilator or exam proctor.
-            </div>
+            {/* Context-aware Assistance Note */}
+            <div style={styles.supportNote}>{config.supportNote}</div>
 
             {/* Collapsible Diagnostics */}
             <div style={{ marginTop: 20 }}>
               <button onClick={this.toggleDetails} style={styles.toggleBtn}>
-                {this.state.showDetails ? 'Hide Diagnostics ▲' : 'Proctor Technical Details ▼'}
+                {this.state.showDetails ? 'Hide Diagnostics ▲' : config.detailsLabel}
               </button>
 
               {this.state.showDetails && (

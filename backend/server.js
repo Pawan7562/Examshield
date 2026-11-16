@@ -845,67 +845,20 @@ app.options('*', cors(corsOptions));
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
 
-// Rate limiting - optimized for 50k-100k users and shared college campus NAT IPs
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20000,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    // If request has Authorization header, isolate quota per user session rather than whole college IP
-    const auth = req.headers.authorization;
-    if (auth && auth.startsWith('Bearer ')) {
-      return `auth_${auth.slice(-32)}`;
-    }
-    return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip;
-  },
-  skip: (req) => req.method === 'OPTIONS',
-  message: { success: false, message: 'Too many requests. Please try again later.' },
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5000, // accommodates full college campus batches logging in concurrently from same NAT IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    const accountIdentifier = req.body?.student_id || req.body?.studentId || req.body?.email || req.body?.enrollment_number;
-    if (accountIdentifier) {
-      return `auth_id_${String(accountIdentifier).trim().toLowerCase()}`;
-    }
-    return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip;
-  },
-  skip: (req) => req.method === 'OPTIONS',
-  message: { success: false, message: 'Too many login attempts for this account. Please try again in 15 minutes.' },
-});
-
-const codeExecLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 60, // 60 code runs/submissions per candidate per minute
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    const auth = req.headers.authorization;
-    if (auth && auth.startsWith('Bearer ')) {
-      return `code_${auth.slice(-32)}`;
-    }
-    return req.ip;
-  },
-  skip: (req) => req.method === 'OPTIONS',
-  message: { success: false, message: 'Code execution rate limit reached. Please wait a moment before running or submitting again.' },
-});
-
-app.use('/api/', limiter);
-app.use('/api/auth/', authLimiter);
-app.use('/api/student/run-code', codeExecLimiter);
-app.use('/api/student/submit-code', codeExecLimiter);
-app.use('/api/code/', codeExecLimiter);
-
+// Body parsers MUST be mounted BEFORE rate limiters so keyGenerator can inspect req.body!
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Enterprise Rate Limiting Architecture
+const { apiGeneralLimiter, codeExecutionLimiter } = require('./middleware/rateLimiter');
+app.use('/api/', apiGeneralLimiter);
+app.use('/api/student/run-code', codeExecutionLimiter);
+app.use('/api/student/submit-code', codeExecutionLimiter);
+app.use('/api/code/', codeExecutionLimiter);
+
+// Secure uploads directory (Restricted to authenticated access)
+const { authenticate } = require('./middleware/auth');
+app.use('/uploads', authenticate, express.static(path.join(__dirname, 'uploads')));
 
 // =====================================================
 // ROUTES
