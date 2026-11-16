@@ -12,14 +12,12 @@ import {
   ExternalLink,
   Activity,
   Server,
+  Database,
   ChevronRight,
-  ShieldAlert,
-  Sparkles,
-  Zap,
-  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+import logoImg from '../../assets/logo-mark.png';
 import '../../pages/super-admin/SuperAdmin.css';
 
 export default function SuperAdminLayout() {
@@ -35,158 +33,120 @@ export default function SuperAdminLayout() {
   };
 
   const getPageTitle = () => {
-    if (location.pathname.includes('/colleges')) return 'Institutional Tenants';
-    if (location.pathname.includes('/payments')) return 'Financial Ledger & Subscriptions';
-    if (location.pathname.includes('/audit-logs')) return 'Security Audit & Compliance';
+    if (location.pathname.includes('/colleges')) return 'Multi-Tenant Directory & Onboarding';
+    if (location.pathname.includes('/payments')) return 'Payments, MRR & Financial Ledger';
+    if (location.pathname.includes('/audit-logs')) return 'Security Audit & Compliance Logs';
     if (location.pathname.includes('/settings')) return 'Platform Governance & Policies';
-    return 'Executive Overview';
+    return 'Platform Executive Command Center';
   };
 
-  const navGroups = [
+  const navLinks = [
     {
-      group: 'Overview',
-      items: [
-        {
-          to: '/super-admin/dashboard',
-          icon: LayoutDashboard,
-          label: 'Executive Command',
-          badge: 'Live',
-        },
-      ],
+      to: '/super-admin/dashboard',
+      icon: LayoutDashboard,
+      label: 'Executive Overview',
+      badge: 'Live',
     },
     {
-      group: 'Tenancy Management',
-      items: [
-        {
-          to: '/super-admin/colleges',
-          icon: Building2,
-          label: 'Institutional Tenants',
-          badge: null,
-        },
-      ],
+      to: '/super-admin/colleges',
+      icon: Building2,
+      label: 'Tenants & Onboarding',
+      badge: null,
     },
     {
-      group: 'Financials & Billing',
-      items: [
-        {
-          to: '/super-admin/payments',
-          icon: CreditCard,
-          label: 'Revenue & Ledger',
-          badge: null,
-        },
-      ],
+      to: '/super-admin/payments',
+      icon: CreditCard,
+      label: 'Payments & Revenue',
+      badge: 'Ledger',
     },
     {
-      group: 'Platform & Security',
-      items: [
-        {
-          to: '/super-admin/audit-logs',
-          icon: ShieldCheck,
-          label: 'Audit & Compliance',
-          badge: null,
-        },
-        {
-          to: '/super-admin/settings',
-          icon: Sliders,
-          label: 'Platform Settings',
-          badge: null,
-        },
-      ],
+      to: '/super-admin/audit-logs',
+      icon: ShieldCheck,
+      label: 'Audit & Compliance',
+      badge: null,
+    },
+    {
+      to: '/super-admin/settings',
+      icon: Sliders,
+      label: 'Platform Governance',
+      badge: null,
     },
   ];
 
   return (
     <div className="sa-layout">
-      {/* Mobile Drawer Backdrop */}
-      {mobileOpen && (
-        <div
-          className="sa-mobile-backdrop"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+      <div className="sa-bg-mesh" aria-hidden="true" />
 
-      {/* ──── ENTERPRISE SIDEBAR (Width 240px) ──── */}
+      {/* ──── SIDEBAR ──── */}
       <aside className={`sa-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
         {/* Brand Header */}
-        <div className="sa-sidebar-header">
-          <Link
-            to="/super-admin/dashboard"
-            className="sa-sidebar-brand"
-            onClick={() => setMobileOpen(false)}
-          >
-            <div className="sa-brand-icon">
-              <ShieldCheck size={20} className="sa-brand-icon-svg" />
-            </div>
-            <div className="sa-brand-text">
-              <span className="sa-brand-name">Nexify Examina</span>
-              <span className="sa-brand-tier">Root Control Console</span>
-            </div>
-          </Link>
-        </div>
+        <Link to="/super-admin/dashboard" className="sa-sidebar-brand" onClick={() => setMobileOpen(false)}>
+          <img src={logoImg} alt="Nexify Examina Logo" className="sa-brand-logo" />
+          <div className="sa-brand-text-stack">
+            <span className="sa-brand-title">
+              Nexify<span>Examina</span>
+            </span>
+            <span className="sa-brand-badge">
+              <span className="sa-pulse-bullet" />
+              ROOT ADMIN CONSOLE
+            </span>
+          </div>
+        </Link>
 
-        {/* Navigation Groups */}
-        <nav className="sa-sidebar-nav">
-          {navGroups.map((group) => (
-            <div key={group.group} className="sa-nav-group">
-              <div className="sa-nav-group-title">{group.group}</div>
-              <div className="sa-nav-group-items">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}
-                      onClick={() => setMobileOpen(false)}
-                    >
-                      <Icon size={18} className="sa-nav-icon" />
-                      <span className="sa-nav-label">{item.label}</span>
-                      {item.badge && <span className="sa-nav-badge">{item.badge}</span>}
-                    </NavLink>
-                  );
-                })}
-              </div>
+        {/* Navigation */}
+        <nav className="sa-nav">
+          <div className="sa-nav-section-title">GOVERNANCE &amp; OVERSIGHT</div>
+          {navLinks.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => setMobileOpen(false)}
+              >
+                <Icon />
+                <span>{item.label}</span>
+                {item.badge && <span className="sa-nav-badge">{item.badge}</span>}
+              </NavLink>
+            );
+          })}
+
+          <div className="sa-cluster-box">
+            <div className="sa-cluster-header">
+              <span>SYSTEM CLUSTER</span>
+              <span className="sa-pulse-bullet" />
             </div>
-          ))}
+            <div className="sa-cluster-row">
+              <span>Neon Database</span>
+              <span className="sa-cluster-val">Connected</span>
+            </div>
+            <div className="sa-cluster-row">
+              <span>AI Proctoring</span>
+              <span className="sa-cluster-val">1080p Mesh</span>
+            </div>
+          </div>
         </nav>
 
-        {/* Cluster Status Chip */}
-        <div className="sa-sidebar-cluster">
-          <div className="sa-cluster-status-box">
-            <div className="sa-cluster-header">
-              <span className="sa-pulse-indicator" />
-              <span className="sa-cluster-title">Mesh Cluster</span>
-            </div>
-            <div className="sa-cluster-desc">6 KVM Nodes Operational</div>
-          </div>
-        </div>
-
-        {/* User Profile & Sign Out Footer */}
+        {/* Footer Profile & Logout */}
         <div className="sa-sidebar-footer">
-          <div className="sa-user-card">
-            <div className="sa-user-avatar">
-              {user?.name ? user.name.slice(0, 2).toUpperCase() : 'SA'}
-            </div>
+          <div className="sa-sidebar-user">
+            <div className="sa-user-avatar">SA</div>
             <div className="sa-user-info">
-              <div className="sa-user-name">{user?.name || 'Administrator'}</div>
-              <div className="sa-user-email">{user?.email || 'superadmin@nexifyforge.in'}</div>
+              <span className="sa-user-name">{user?.name || 'Master Admin'}</span>
+              <span className="sa-user-role">SUPER ADMINISTRATOR</span>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="sa-logout-btn"
-              title="Sign Out of Root Console"
-              aria-label="Sign Out"
-            >
-              <LogOut size={16} />
-            </button>
           </div>
+
+          <button type="button" onClick={handleLogout} className="sa-logout-btn">
+            <LogOut size={15} />
+            <span>Sign Out</span>
+          </button>
         </div>
       </aside>
 
-      {/* ──── MAIN VIEWPORT ──── */}
-      <div className="sa-main-viewport">
+      {/* ──── MAIN CONTENT CONTAINER ──── */}
+      <div className="sa-main">
         {/* Topbar */}
         <header className="sa-topbar">
           <div className="sa-topbar-left">
@@ -194,39 +154,33 @@ export default function SuperAdminLayout() {
               type="button"
               className="sa-mobile-toggle"
               onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Toggle Navigation"
+              aria-label="Toggle navigation"
             >
-              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
 
             <div className="sa-breadcrumbs">
-              <span className="sa-breadcrumb-root">Super Admin</span>
-              <ChevronRight size={13} className="sa-breadcrumb-sep" />
+              <span>Nexify Examina Network</span>
+              <ChevronRight size={14} />
               <span className="sa-breadcrumb-current">{getPageTitle()}</span>
             </div>
           </div>
 
           <div className="sa-topbar-right">
-            <div className="sa-live-status-pill">
-              <span className="sa-live-dot" />
-              <span>Cluster Synced</span>
+            <div className="sa-health-pill">
+              <span className="sa-health-dot" />
+              <span>Mesh Status: 100% Operational</span>
             </div>
 
-            <Link
-              to="/"
-              target="_blank"
-              rel="noreferrer"
-              className="sa-portal-link"
-              title="Open Public Candidate Portal"
-            >
-              <span>Candidate Portal</span>
-              <ExternalLink size={12} />
+            <Link to="/" target="_blank" rel="noreferrer" className="sa-public-link" title="Visit Public Landing Page">
+              <span>View Landing</span>
+              <ExternalLink size={13} />
             </Link>
           </div>
         </header>
 
-        {/* Main Canvas */}
-        <main className="sa-canvas">
+        {/* Page View Outlet */}
+        <main className="sa-content">
           <Outlet />
         </main>
       </div>

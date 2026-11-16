@@ -16,9 +16,6 @@ import {
   DollarSign,
   AlertCircle,
   X,
-  IndianRupee,
-  Clock,
-  Check,
 } from 'lucide-react';
 import { superAdminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -62,9 +59,9 @@ export default function PaymentManagement() {
         plan: planFilter !== 'all' ? planFilter : undefined,
       });
       setPayments(res?.payments || res?.data?.payments || []);
-      const m = res?.metrics || res?.data?.metrics;
-      if (m) {
-        setMetrics(m);
+      const metrics = res?.metrics || res?.data?.metrics;
+      if (metrics) {
+        setMetrics(metrics);
       }
     } catch (err) {
       console.error('Error fetching payments:', err);
@@ -125,31 +122,33 @@ export default function PaymentManagement() {
   };
 
   return (
-    <div className="sa-page-shell">
+    <>
       {/* ──── PAGE HEADER ──── */}
-      <div className="sa-page-header">
-        <div className="sa-page-title-stack">
-          <h1 className="sa-page-title">Payment &amp; Financial Ledger</h1>
-          <p className="sa-page-subtitle">
-            Audit multi-tenant revenue streams, track university subscription renewals, and log manual offline receipts with real-time MRR analytics.
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: '1.55rem', fontWeight: 800, color: 'var(--sa-text)', margin: '0 0 4px' }}>
+            Payment &amp; Financial Ledger
+          </h1>
+          <p style={{ color: 'var(--sa-text-muted)', fontSize: '0.9rem', margin: 0 }}>
+            Audit multi-tenant revenue streams, track university subscription renewals, and log manual offline receipts.
           </p>
         </div>
 
-        <div className="sa-page-actions">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
             type="button"
-            className="sa-btn-secondary"
+            className="sa-action-btn sa-btn-secondary"
             onClick={fetchPayments}
             disabled={loading}
             title="Reload financial records"
           >
-            <RefreshCw size={14} className={loading ? 'sa-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'sa-pulse-bullet' : ''} />
             <span>Refresh</span>
           </button>
 
           <button
             type="button"
-            className="sa-coral-pill-btn"
+            className="sa-action-btn sa-btn-primary"
             onClick={openRecordModal}
             id="sa-record-payment-btn"
           >
@@ -160,215 +159,174 @@ export default function PaymentManagement() {
       </div>
 
       {/* ──── METRICS CARDS ──── */}
-      <div className="sa-kpi-grid">
+      <div className="sa-stats-grid">
         {/* Active MRR */}
-        <div className="sa-kpi-card">
-          <div className="sa-kpi-top">
-            <span className="sa-kpi-label">Active Platform MRR</span>
-            <div className="sa-kpi-icon-bubble sa-kpi-icon-mint">
+        <div className="sa-stat-card">
+          <div className="sa-stat-top">
+            <span className="sa-stat-label">Active Platform MRR</span>
+            <div className="sa-stat-icon-wrap" style={{ background: 'var(--sa-emerald-light)', color: 'var(--sa-emerald)' }}>
               <CreditCard size={18} />
             </div>
           </div>
-          <div className="sa-kpi-value" style={{ color: 'var(--sa-mint)' }}>
-            ₹{(metrics.activeRevenue || 0).toLocaleString('en-IN')}
+          <div className="sa-stat-value" style={{ color: 'var(--sa-emerald)' }}>
+            ₹{metrics.activeRevenue.toLocaleString('en-IN')}
           </div>
-          <div className="sa-kpi-footer">
-            <span className="sa-kpi-badge sa-badge-active">RECURRING</span>
-            <span>Active university contracts</span>
+          <div className="sa-stat-footer">
+            <span className="sa-badge sa-badge-active" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+              RECURRING
+            </span>
+            <span>Across active university contracts</span>
           </div>
         </div>
 
         {/* All-Time Volume */}
-        <div className="sa-kpi-card">
-          <div className="sa-kpi-top">
-            <span className="sa-kpi-label">All-Time Billed Volume</span>
-            <div className="sa-kpi-icon-bubble sa-kpi-icon-coral">
+        <div className="sa-stat-card">
+          <div className="sa-stat-top">
+            <span className="sa-stat-label">All-Time Billed Volume</span>
+            <div className="sa-stat-icon-wrap" style={{ background: 'var(--sa-primary-light)', color: 'var(--sa-primary)' }}>
               <ArrowUpRight size={18} />
             </div>
           </div>
-          <div className="sa-kpi-value">
-            ₹{(metrics.totalVolume || 0).toLocaleString('en-IN')}
+          <div className="sa-stat-value">
+            ₹{metrics.totalVolume.toLocaleString('en-IN')}
           </div>
-          <div className="sa-kpi-footer">
-            <span className="sa-kpi-badge sa-badge-pending">CUMULATIVE</span>
-            <span>Gross processed volume</span>
+          <div className="sa-stat-footer">
+            <span>Cumulative gross revenue</span>
           </div>
         </div>
 
         {/* Active Subscriptions */}
-        <div className="sa-kpi-card">
-          <div className="sa-kpi-top">
-            <span className="sa-kpi-label">Active Licenses</span>
-            <div className="sa-kpi-icon-bubble sa-kpi-icon-forest">
+        <div className="sa-stat-card">
+          <div className="sa-stat-top">
+            <span className="sa-stat-label">Active Licenses</span>
+            <div className="sa-stat-icon-wrap" style={{ background: 'var(--sa-purple-light)', color: 'var(--sa-purple)' }}>
               <Building2 size={18} />
             </div>
           </div>
-          <div className="sa-kpi-value">
-            {metrics.activeCount || 0}
+          <div className="sa-stat-value">
+            {metrics.activeCount}
           </div>
-          <div className="sa-kpi-footer">
-            <span className="sa-kpi-badge sa-badge-active">ACTIVE SEATS</span>
-            <span>Institutions on active tiers</span>
+          <div className="sa-stat-footer">
+            <span>Active subscription seats</span>
           </div>
         </div>
 
         {/* Total Transactions */}
-        <div className="sa-kpi-card">
-          <div className="sa-kpi-top">
-            <span className="sa-kpi-label">Total Transactions</span>
-            <div className="sa-kpi-icon-bubble sa-kpi-icon-amber">
+        <div className="sa-stat-card">
+          <div className="sa-stat-top">
+            <span className="sa-stat-label">Total Transactions</span>
+            <div className="sa-stat-icon-wrap" style={{ background: 'var(--sa-amber-light)', color: 'var(--sa-amber)' }}>
               <Receipt size={18} />
             </div>
           </div>
-          <div className="sa-kpi-value">
-            {metrics.totalTransactions || 0}
+          <div className="sa-stat-value">
+            {metrics.totalTransactions}
           </div>
-          <div className="sa-kpi-footer">
-            <span className="sa-kpi-badge sa-badge-pending">INVOICES</span>
-            <span>Invoices &amp; gateway events</span>
+          <div className="sa-stat-footer">
+            <span>Invoices &amp; Gateway events</span>
           </div>
         </div>
       </div>
 
       {/* ──── SEARCH AND FILTER CONTROLS ──── */}
-      <div className="sa-toolbar-card">
-        <div className="sa-search-box">
-          <Search className="sa-search-icon" size={16} />
-          <input
-            type="text"
-            className="sa-search-input"
-            placeholder="Search by reference ID, institution name, or billing email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="sa-card" style={{ padding: '20px' }}>
+        <div className="sa-table-controls">
+          <div className="sa-search-wrap">
+            <Search className="sa-search-icon" size={17} />
+            <input
+              type="text"
+              className="sa-search-input"
+              placeholder="Search by reference ID, institution name, or billing email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="sa-filter-pills">
+            <button
+              type="button"
+              className={`sa-filter-pill ${statusFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('all')}
+            >
+              All Status
+            </button>
+            <button
+              type="button"
+              className={`sa-filter-pill ${statusFilter === 'active' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('active')}
+            >
+              Active ({metrics.activeCount})
+            </button>
+            <button
+              type="button"
+              className={`sa-filter-pill ${statusFilter === 'expired' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('expired')}
+            >
+              Expired ({metrics.expiredCount})
+            </button>
+          </div>
         </div>
 
-        <div className="sa-filter-tabs">
-          <button
-            type="button"
-            className={`sa-filter-tab ${statusFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('all')}
-          >
-            <span>All Status</span>
-          </button>
-          <button
-            type="button"
-            className={`sa-filter-tab ${statusFilter === 'active' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('active')}
-          >
-            <span>Active</span>
-          </button>
-          <button
-            type="button"
-            className={`sa-filter-tab ${statusFilter === 'expired' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('expired')}
-          >
-            <span>Expired</span>
-          </button>
-
-          <span style={{ width: '1px', height: '18px', background: 'var(--sa-card-border)', margin: '0 4px' }} />
-
-          <button
-            type="button"
-            className={`sa-filter-tab ${planFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setPlanFilter('all')}
-          >
-            <span>All Tiers</span>
-          </button>
-          <button
-            type="button"
-            className={`sa-filter-tab ${planFilter === 'basic' ? 'active' : ''}`}
-            onClick={() => setPlanFilter('basic')}
-          >
-            <span>Basic</span>
-          </button>
-          <button
-            type="button"
-            className={`sa-filter-tab ${planFilter === 'standard' ? 'active' : ''}`}
-            onClick={() => setPlanFilter('standard')}
-          >
-            <span>Standard</span>
-          </button>
-          <button
-            type="button"
-            className={`sa-filter-tab ${planFilter === 'premium' ? 'active' : ''}`}
-            onClick={() => setPlanFilter('premium')}
-          >
-            <span>Premium</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ──── FINANCIAL LEDGER TABLE ──── */}
-      <div className="sa-table-card">
-        <div className="sa-table-scroll">
+        {/* ──── DATA TABLE ──── */}
+        <div className="sa-table-wrapper">
           <table className="sa-table">
             <thead>
               <tr>
-                <th>Reference ID</th>
+                <th>Payment Ref &amp; Gateway</th>
                 <th>Institution</th>
-                <th>Plan Tier</th>
+                <th>Tier</th>
                 <th>Amount Billed</th>
-                <th>Gateway / Mode</th>
-                <th>Payment Date (IST)</th>
-                <th>License Validity</th>
+                <th>Validity Window</th>
                 <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Recorded On</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8}>
-                    <div className="sa-table-empty">
-                      <div className="sa-table-empty-icon sa-spin">
-                        <RefreshCw size={22} />
-                      </div>
-                      <p style={{ margin: 0, fontWeight: 600 }}>Streaming transaction records...</p>
-                    </div>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                    Loading financial ledger records...
                   </td>
                 </tr>
               ) : payments.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
-                    <div className="sa-table-empty">
-                      <div className="sa-table-empty-icon">
-                        <CreditCard size={24} />
-                      </div>
-                      <p style={{ margin: '0 0 6px', fontWeight: 700, color: 'var(--sa-forest)' }}>
-                        No financial records found
-                      </p>
-                      <p style={{ margin: 0, fontSize: '13px' }}>
-                        No transactions match your current search filters or date range.
-                      </p>
-                    </div>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                    No payment records matched your search parameters.
                   </td>
                 </tr>
               ) : (
-                payments.map((p, idx) => {
-                  const isExpired = p.end_date && new Date(p.end_date) < new Date();
+                payments.map((p) => {
+                  const isActive = p.status === 'active';
+                  const amount = parseFloat(p.amount) || 0;
+
                   return (
-                    <tr key={p.id || idx}>
-                      {/* Ref ID */}
+                    <tr key={p.id}>
+                      {/* Ref & Gateway */}
                       <td>
-                        <span style={{ fontFamily: 'Space Grotesk, monospace', fontSize: '12.5px', fontWeight: 700, color: 'var(--sa-forest)' }}>
-                          {p.payment_id || `TXN-${p.id?.slice(0, 8)}`}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--sa-text)', fontSize: '0.86rem' }}>
+                            {p.payment_id || p.id.substring(0, 13)}
+                          </span>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', textTransform: 'uppercase' }}>
+                            {p.payment_gateway || 'Manual'}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Institution */}
                       <td>
-                        <div className="sa-tenant-cell">
-                          <div className={`sa-tenant-avatar-circle sa-avatar-bg-${idx % 4}`}>
-                            {(p.college_name || 'U').charAt(0).toUpperCase()}
+                        <div className="sa-college-cell">
+                          <div className="sa-college-avatar">
+                            {p.college_name ? p.college_name.charAt(0).toUpperCase() : 'C'}
                           </div>
                           <div>
-                            <div className="sa-tenant-name">{p.college_name || 'University Tenant'}</div>
-                            <div className="sa-tenant-subline">{p.college_email || '—'}</div>
+                            <div className="sa-college-name">{p.college_name || 'Direct Tenant'}</div>
+                            <div className="sa-college-email">{p.college_email}</div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Plan */}
+                      {/* Plan Tier */}
                       <td>
                         <span className={`sa-badge sa-plan-${p.plan || 'basic'}`}>
                           {(p.plan || 'basic').toUpperCase()}
@@ -377,37 +335,33 @@ export default function PaymentManagement() {
 
                       {/* Amount */}
                       <td>
-                        <span style={{ fontFamily: 'Space Grotesk', fontSize: '15px', fontWeight: 800, color: 'var(--sa-forest)' }}>
-                          ₹{Number(p.amount || 0).toLocaleString('en-IN')}
-                        </span>
+                        <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: '0.98rem', color: 'var(--sa-text)' }}>
+                          ₹{amount.toLocaleString('en-IN')}
+                        </div>
                       </td>
 
-                      {/* Gateway */}
+                      {/* Validity Period */}
                       <td>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--sa-text-muted)', textTransform: 'capitalize' }}>
-                          {(p.payment_gateway || 'bank_transfer').replace(/_/g, ' ')}
-                        </span>
-                      </td>
-
-                      {/* Date */}
-                      <td>
-                        <span style={{ fontSize: '12px', color: 'var(--sa-text-muted)' }}>
-                          {p.created_at ? formatIST(p.created_at, 'dateTime') : '—'}
-                        </span>
-                      </td>
-
-                      {/* Validity */}
-                      <td>
-                        <span style={{ fontSize: '12px', color: isExpired ? 'var(--sa-rose)' : 'var(--sa-text)' }}>
-                          {p.end_date ? formatIST(p.end_date, 'dateOnly') : 'Permanent'}
-                        </span>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span>
+                            From: {p.start_date ? formatIST(p.start_date, 'dateOnly') : '—'}
+                          </span>
+                          <span style={{ color: isActive ? 'var(--sa-emerald)' : 'var(--sa-rose)', fontWeight: 600 }}>
+                            To: {p.end_date ? formatIST(p.end_date, 'dateOnly') : '—'}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Status */}
                       <td>
-                        <span className={`sa-badge ${!isExpired ? 'sa-badge-active' : 'sa-badge-suspended'}`}>
-                          {!isExpired ? 'PAID / ACTIVE' : 'EXPIRED'}
+                        <span className={`sa-badge ${isActive ? 'sa-badge-active' : 'sa-badge-suspended'}`}>
+                          {p.status ? p.status.toUpperCase() : 'ACTIVE'}
                         </span>
+                      </td>
+
+                      {/* Created On */}
+                      <td style={{ textAlign: 'right', fontSize: '0.8rem', color: '#64748b' }}>
+                        {p.created_at ? formatIST(p.created_at, 'dateTime') : '—'}
                       </td>
                     </tr>
                   );
@@ -419,23 +373,23 @@ export default function PaymentManagement() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════
-          MODAL: RECORD OFFLINE TRANSACTION
+          MODAL: RECORD OFFLINE PAYMENT
           ═══════════════════════════════════════════════════════════ */}
       {showRecordModal && (
         <div className="sa-modal-backdrop" onClick={() => setShowRecordModal(false)}>
-          <div className="sa-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="sa-modal sa-modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="sa-modal-header">
               <div>
                 <h3 className="sa-modal-title">
-                  <CreditCard size={20} style={{ color: 'var(--sa-mint)' }} />
-                  Record Offline Transaction
+                  <Receipt size={20} style={{ color: 'var(--sa-primary)' }} />
+                  Record Manual / Offline Transaction
                 </h3>
                 <p className="sa-modal-subtitle">
-                  Manually register bank transfers, cheques, or enterprise PO billing.
+                  Manually register bank wires, university purchase orders, or direct corporate payments.
                 </p>
               </div>
               <button type="button" className="sa-modal-close" onClick={() => setShowRecordModal(false)}>
-                ✕
+                <X size={18} />
               </button>
             </div>
 
@@ -450,7 +404,6 @@ export default function PaymentManagement() {
                       value={recordData.college_id}
                       onChange={(e) => setRecordData({ ...recordData, college_id: e.target.value })}
                     >
-                      <option value="">Select an enrolled institution...</option>
                       {colleges.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name} ({c.email})
@@ -460,20 +413,28 @@ export default function PaymentManagement() {
                   </div>
 
                   <div className="sa-form-group">
-                    <label className="sa-form-label">Subscription Tier *</label>
+                    <label className="sa-form-label">Plan Tier *</label>
                     <select
                       className="sa-form-select"
                       value={recordData.plan}
-                      onChange={(e) => setRecordData({ ...recordData, plan: e.target.value })}
+                      onChange={(e) => {
+                        const newPlan = e.target.value;
+                        const prices = { basic: '999', standard: '2999', premium: '7999' };
+                        setRecordData({
+                          ...recordData,
+                          plan: newPlan,
+                          amount: prices[newPlan] || '2999',
+                        });
+                      }}
                     >
                       <option value="basic">Basic Tier (₹999)</option>
-                      <option value="standard">Standard Growth (₹2,999)</option>
+                      <option value="standard">Standard Tier (₹2,999)</option>
                       <option value="premium">Premium Enterprise (₹7,999)</option>
                     </select>
                   </div>
 
                   <div className="sa-form-group">
-                    <label className="sa-form-label">Amount Received (₹) *</label>
+                    <label className="sa-form-label">Amount Received (₹ INR) *</label>
                     <input
                       type="number"
                       required
@@ -484,25 +445,26 @@ export default function PaymentManagement() {
                   </div>
 
                   <div className="sa-form-group">
-                    <label className="sa-form-label">Payment Channel *</label>
+                    <label className="sa-form-label">Payment Channel / Gateway *</label>
                     <select
                       className="sa-form-select"
                       value={recordData.payment_gateway}
                       onChange={(e) => setRecordData({ ...recordData, payment_gateway: e.target.value })}
                     >
-                      <option value="bank_transfer">Direct Bank / NEFT / RTGS</option>
-                      <option value="cheque">Institutional Cheque / DD</option>
-                      <option value="razorpay">Razorpay Manual Hook</option>
-                      <option value="stripe">Stripe Global Invoicing</option>
-                      <option value="cash">Direct Cash / Counter Receipt</option>
+                      <option value="bank_transfer">Bank Wire / NEFT / RTGS</option>
+                      <option value="cheque">Demand Draft / Cheque</option>
+                      <option value="invoice">University Purchase Order / Invoice</option>
+                      <option value="cash">Cash / Offline Cash Receipt</option>
+                      <option value="razorpay">Razorpay Manual Entry</option>
                     </select>
                   </div>
 
                   <div className="sa-form-group">
-                    <label className="sa-form-label">Transaction / UTR Reference *</label>
+                    <label className="sa-form-label">UTR / Transaction Reference ID *</label>
                     <input
                       type="text"
                       required
+                      placeholder="e.g. UTR-98218491823"
                       className="sa-form-input"
                       value={recordData.payment_id}
                       onChange={(e) => setRecordData({ ...recordData, payment_id: e.target.value })}
@@ -511,20 +473,23 @@ export default function PaymentManagement() {
 
                   <div className="sa-form-group">
                     <label className="sa-form-label">License Duration (Days)</label>
-                    <input
-                      type="number"
-                      className="sa-form-input"
+                    <select
+                      className="sa-form-select"
                       value={recordData.duration_days}
                       onChange={(e) => setRecordData({ ...recordData, duration_days: e.target.value })}
-                    />
+                    >
+                      <option value="30">30 Days (1 Month)</option>
+                      <option value="90">90 Days (Quarterly)</option>
+                      <option value="180">180 Days (Semester)</option>
+                      <option value="365">365 Days (1 Year)</option>
+                    </select>
                   </div>
 
                   <div className="sa-form-group sa-form-grid-full">
-                    <label className="sa-form-label">Audit Notes &amp; Remittance Reference</label>
-                    <input
-                      type="text"
-                      className="sa-form-input"
-                      placeholder="e.g. Approved purchase order PO-2026-993"
+                    <label className="sa-form-label">Administrative Ledger Notes</label>
+                    <textarea
+                      placeholder="e.g. Received via State Bank of India account, authorized by Finance Officer"
+                      className="sa-form-textarea"
                       value={recordData.notes}
                       onChange={(e) => setRecordData({ ...recordData, notes: e.target.value })}
                     />
@@ -535,23 +500,23 @@ export default function PaymentManagement() {
               <div className="sa-modal-footer">
                 <button
                   type="button"
-                  className="sa-btn-secondary"
+                  className="sa-action-btn sa-btn-secondary"
                   onClick={() => setShowRecordModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="sa-coral-pill-btn"
+                  className="sa-action-btn sa-btn-primary"
                   disabled={submitting}
                 >
-                  {submitting ? 'Recording...' : 'Register Transaction'}
+                  {submitting ? 'Recording...' : 'Record Transaction'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

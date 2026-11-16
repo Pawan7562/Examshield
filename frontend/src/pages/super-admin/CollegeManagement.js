@@ -26,7 +26,6 @@ import {
   Mail,
   Sparkles,
   Clock,
-  ArrowRight,
 } from 'lucide-react';
 import { superAdminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -37,7 +36,7 @@ export default function CollegeManagement() {
   const [colleges, setColleges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'active', 'suspended', 'rejected'
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'suspended'
   const [togglingId, setTogglingId] = useState(null);
 
   // Modals state
@@ -313,7 +312,7 @@ export default function CollegeManagement() {
     }
   };
 
-  // Filter colleges
+  // Filter colleges in client
   const filteredColleges = colleges.filter((c) => {
     if (statusFilter === 'pending') return c.status === 'pending';
     if (statusFilter === 'rejected') return c.status === 'rejected';
@@ -328,20 +327,22 @@ export default function CollegeManagement() {
   const suspendedCount = totalCount - activeCount - pendingCount;
 
   return (
-    <div className="sa-page-shell">
+    <>
       {/* ──── PAGE HEADER ──── */}
-      <div className="sa-page-header">
-        <div className="sa-page-title-stack">
-          <h1 className="sa-page-title">Multi-Tenant Institutional Directory</h1>
-          <p className="sa-page-subtitle">
-            Inspect verified university tenants, supervise autonomous AI proctoring licenses, manage approvals, and enforce institutional governance.
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: '1.55rem', fontWeight: 800, color: 'var(--sa-text)', margin: '0 0 4px' }}>
+            Multi-Tenant College Directory
+          </h1>
+          <p style={{ color: 'var(--sa-text-muted)', fontSize: '0.9rem', margin: 0 }}>
+            Inspect accredited institutions, onboard new university tenants, manage licensing tiers, and oversee permissions.
           </p>
         </div>
 
-        <div className="sa-page-actions">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
             type="button"
-            className="sa-btn-secondary"
+            className="sa-action-btn sa-btn-secondary"
             onClick={fetchColleges}
             disabled={loading}
             title="Reload directory"
@@ -352,7 +353,7 @@ export default function CollegeManagement() {
 
           <button
             type="button"
-            className="sa-coral-pill-btn"
+            className="sa-action-btn sa-btn-primary"
             onClick={openOnboard}
             id="sa-onboard-college-btn"
           >
@@ -362,156 +363,105 @@ export default function CollegeManagement() {
         </div>
       </div>
 
-      {/* ──── DIRECTORY KPI CARDS ──── */}
-      <div className="sa-kpi-grid">
-        <div className="sa-kpi-card">
-          <div className="sa-kpi-top">
-            <span className="sa-kpi-label">Total Institutions</span>
-            <div className="sa-kpi-icon-bubble sa-kpi-icon-forest">
-              <Building2 size={18} />
-            </div>
+      {/* ──── DIRECTORY STATS RIBBON ──── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+        <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-sm)' }}>
+          <div>
+            <span style={{ fontSize: '0.74rem', color: 'var(--sa-text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Total Colleges</span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--sa-text)', fontFamily: 'Space Grotesk' }}>{totalCount}</div>
           </div>
-          <div className="sa-kpi-value">{totalCount}</div>
-          <div className="sa-kpi-footer">
-            <span className="sa-kpi-badge sa-badge-active">REGISTERED</span>
-            <span>Accredited university tenants</span>
-          </div>
+          <Building2 size={24} style={{ color: 'var(--sa-blue)', opacity: 0.85 }} />
         </div>
 
         <div
-          className={`sa-kpi-card interactive ${pendingCount > 0 ? 'highlight-amber' : ''}`}
           onClick={() => setStatusFilter('pending')}
-          title="Click to view pending requests"
+          style={{
+            background: pendingCount > 0 ? 'rgba(245, 158, 11, 0.08)' : 'var(--sa-card-bg)',
+            border: pendingCount > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--sa-border)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: 'var(--sa-shadow-sm)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+          title="Click to view pending approval requests"
         >
-          <div className="sa-kpi-top">
-            <span className="sa-kpi-label">Pending Approval</span>
-            <div className="sa-kpi-icon-bubble sa-kpi-icon-amber">
-              <Clock size={18} />
-            </div>
+          <div>
+            <span style={{ fontSize: '0.74rem', color: pendingCount > 0 ? '#d97706' : 'var(--sa-text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Pending Approval</span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: pendingCount > 0 ? '#d97706' : 'var(--sa-text)', fontFamily: 'Space Grotesk' }}>{pendingCount}</div>
           </div>
-          <div className="sa-kpi-value" style={pendingCount > 0 ? { color: '#d97706' } : {}}>
-            {pendingCount}
-          </div>
-          <div className="sa-kpi-footer">
-            <span className={`sa-kpi-badge ${pendingCount > 0 ? 'sa-badge-pending' : ''}`}>
-              {pendingCount > 0 ? 'ACTION REQUIRED' : 'UP TO DATE'}
-            </span>
-            <span>Awaiting root verification</span>
-          </div>
+          <Clock size={24} style={{ color: '#f59e0b', opacity: 0.95 }} />
         </div>
 
-        <div className="sa-kpi-card">
-          <div className="sa-kpi-top">
-            <span className="sa-kpi-label">Active Campuses</span>
-            <div className="sa-kpi-icon-bubble sa-kpi-icon-mint">
-              <CheckCircle2 size={18} />
-            </div>
+        <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-sm)' }}>
+          <div>
+            <span style={{ fontSize: '0.74rem', color: 'var(--sa-text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Active Licenses</span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--sa-emerald)', fontFamily: 'Space Grotesk' }}>{activeCount}</div>
           </div>
-          <div className="sa-kpi-value" style={{ color: 'var(--sa-mint)' }}>
-            {activeCount}
-          </div>
-          <div className="sa-kpi-footer">
-            <span className="sa-kpi-badge sa-badge-active">OPERATIONAL</span>
-            <span>Live invigilation enabled</span>
-          </div>
+          <CheckCircle2 size={24} style={{ color: 'var(--sa-emerald)', opacity: 0.85 }} />
         </div>
 
-        <div className="sa-kpi-card">
-          <div className="sa-kpi-top">
-            <span className="sa-kpi-label">Suspended / Paused</span>
-            <div className="sa-kpi-icon-bubble sa-kpi-icon-rose">
-              <XCircle size={18} />
-            </div>
+        <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-sm)' }}>
+          <div>
+            <span style={{ fontSize: '0.74rem', color: 'var(--sa-text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Suspended / Inactive</span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--sa-rose)', fontFamily: 'Space Grotesk' }}>{suspendedCount}</div>
           </div>
-          <div className="sa-kpi-value" style={{ color: 'var(--sa-rose)' }}>
-            {suspendedCount}
-          </div>
-          <div className="sa-kpi-footer">
-            <span className="sa-kpi-badge sa-badge-suspended">RESTRICTED</span>
-            <span>Access blocked or expired</span>
-          </div>
+          <XCircle size={24} style={{ color: 'var(--sa-rose)', opacity: 0.85 }} />
         </div>
       </div>
 
-      {/* ──── PENDING APPROVAL ALERT BANNER (If any pending) ──── */}
-      {pendingCount > 0 && statusFilter !== 'pending' && (
-        <div className="sa-pending-alert-card">
-          <div className="sa-pending-alert-left">
-            <div className="sa-pending-icon-ring">
-              <Clock size={22} />
-            </div>
-            <div>
-              <h3 className="sa-pending-alert-title">
-                {pendingCount} Institution Registration{pendingCount > 1 ? 's' : ''} Awaiting Super Admin Review
-              </h3>
-              <p className="sa-pending-alert-desc">
-                College administrators are waiting for your approval before their campus dashboards and exams can be unlocked.
-              </p>
-            </div>
+      {/* ──── SEARCH AND FILTER CONTROLS ──── */}
+      <div className="sa-card" style={{ padding: '20px' }}>
+        <div className="sa-table-controls">
+          <div className="sa-search-wrap">
+            <Search className="sa-search-icon" size={17} />
+            <input
+              type="text"
+              className="sa-search-input"
+              placeholder="Search by institution name, admin email, or address..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-          <button
-            type="button"
-            className="sa-pending-review-btn"
-            onClick={() => setStatusFilter('pending')}
-          >
-            <span>Review Applications</span>
-            <ArrowRight size={14} />
-          </button>
-        </div>
-      )}
 
-      {/* ──── TOOLBAR & FILTER CONTROLS ──── */}
-      <div className="sa-toolbar-card">
-        <div className="sa-search-box">
-          <Search className="sa-search-icon" size={16} />
-          <input
-            type="text"
-            className="sa-search-input"
-            placeholder="Search by university name, administrator email, or campus address..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className="sa-filter-pills">
+            <button
+              type="button"
+              className={`sa-filter-pill ${statusFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('all')}
+            >
+              All Tenants ({totalCount})
+            </button>
+            <button
+              type="button"
+              className={`sa-filter-pill ${statusFilter === 'pending' ? 'active' : ''}`}
+              style={pendingCount > 0 ? { borderColor: '#f59e0b', color: statusFilter === 'pending' ? '#fff' : '#d97706' } : {}}
+              onClick={() => setStatusFilter('pending')}
+            >
+              ⏳ Pending Approval ({pendingCount})
+            </button>
+            <button
+              type="button"
+              className={`sa-filter-pill ${statusFilter === 'active' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('active')}
+            >
+              Active ({activeCount})
+            </button>
+            <button
+              type="button"
+              className={`sa-filter-pill ${statusFilter === 'suspended' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('suspended')}
+            >
+              Suspended ({suspendedCount})
+            </button>
+          </div>
         </div>
 
-        <div className="sa-filter-tabs">
-          <button
-            type="button"
-            className={`sa-filter-tab ${statusFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('all')}
-          >
-            <span>All Tenants</span>
-            <span className="sa-tab-counter">{totalCount}</span>
-          </button>
-          <button
-            type="button"
-            className={`sa-filter-tab tab-amber ${statusFilter === 'pending' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('pending')}
-          >
-            <span>Pending Review</span>
-            <span className="sa-tab-counter">{pendingCount}</span>
-          </button>
-          <button
-            type="button"
-            className={`sa-filter-tab ${statusFilter === 'active' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('active')}
-          >
-            <span>Active</span>
-            <span className="sa-tab-counter">{activeCount}</span>
-          </button>
-          <button
-            type="button"
-            className={`sa-filter-tab ${statusFilter === 'suspended' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('suspended')}
-          >
-            <span>Suspended</span>
-            <span className="sa-tab-counter">{suspendedCount}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ──── INSTITUTIONS TABLE ──── */}
-      <div className="sa-table-card">
-        <div className="sa-table-scroll">
+        {/* ──── DATA TABLE ──── */}
+        <div className="sa-table-wrapper">
           <table className="sa-table">
             <thead>
               <tr>
@@ -520,57 +470,41 @@ export default function CollegeManagement() {
                 <th>Plan Tier &amp; Expiry</th>
                 <th>Candidate Pool</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Governance Actions</th>
+                <th style={{ textAlign: 'right' }}>Admin Governance</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6}>
-                    <div className="sa-table-empty">
-                      <div className="sa-table-empty-icon sa-spin">
-                        <RefreshCw size={22} />
-                      </div>
-                      <p style={{ margin: 0, fontWeight: 600 }}>Loading tenant records from database...</p>
-                    </div>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                    Loading college records from database...
                   </td>
                 </tr>
               ) : filteredColleges.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>
-                    <div className="sa-table-empty">
-                      <div className="sa-table-empty-icon">
-                        <Building2 size={24} />
-                      </div>
-                      <p style={{ margin: '0 0 6px', fontWeight: 700, color: 'var(--sa-forest)' }}>
-                        No institutions match the selected filter
-                      </p>
-                      <p style={{ margin: 0, fontSize: '13px' }}>
-                        Try clearing search terms or switching tabs to view other institutional tiers.
-                      </p>
-                    </div>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                    No institutions matched your current search filters.
                   </td>
                 </tr>
               ) : (
-                filteredColleges.map((c, idx) => {
+                filteredColleges.map((c) => {
                   const studentCount =
                     c.student_count ?? (c.students?.[0]?.count ?? (Array.isArray(c.students) ? c.students.length : 0));
                   const isSuspended = c.is_active === false;
-                  const isPending = c.status === 'pending';
 
                   return (
                     <tr key={c.id}>
-                      {/* Name & Avatar */}
+                      {/* Name & Initial Avatar */}
                       <td>
-                        <div className="sa-tenant-cell">
-                          <div className={`sa-tenant-avatar-circle sa-avatar-bg-${idx % 4}`}>
+                        <div className="sa-college-cell">
+                          <div className="sa-college-avatar">
                             {c.name ? c.name.charAt(0).toUpperCase() : 'C'}
                           </div>
                           <div>
-                            <div className="sa-tenant-name">{c.name}</div>
+                            <div className="sa-college-name">{c.name}</div>
                             {c.address && (
-                              <div className="sa-tenant-subline">
-                                <MapPin size={11} /> {c.address}
+                              <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                                {c.address}
                               </div>
                             )}
                           </div>
@@ -580,12 +514,10 @@ export default function CollegeManagement() {
                       {/* Contact & Website */}
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <span style={{ color: 'var(--sa-forest)', fontSize: '13px', fontWeight: 600 }}>
-                            {c.email}
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: 'var(--sa-text-subtle)' }}>
+                          <span style={{ color: 'var(--sa-text)', fontSize: '0.84rem', fontWeight: 600 }}>{c.email}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.76rem', color: '#64748b' }}>
                             {c.phone && (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                 <Phone size={11} /> {c.phone}
                               </span>
                             )}
@@ -594,7 +526,7 @@ export default function CollegeManagement() {
                                 href={c.website.startsWith('http') ? c.website : `https://${c.website}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                style={{ color: 'var(--sa-coral)', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontWeight: 600 }}
+                                style={{ color: 'var(--sa-blue)', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
                               >
                                 <Globe size={11} /> Visit <ExternalLink size={10} />
                               </a>
@@ -611,7 +543,7 @@ export default function CollegeManagement() {
                               {(c.subscription_plan || 'basic').toUpperCase()}
                             </span>
                           </div>
-                          <span style={{ fontSize: '11.5px', color: 'var(--sa-text-subtle)' }}>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
                             Expires: {c.subscription_expiry ? formatIST(c.subscription_expiry, 'dateOnly') : 'No Expiry'}
                           </span>
                         </div>
@@ -619,21 +551,40 @@ export default function CollegeManagement() {
 
                       {/* Enrolled Candidates */}
                       <td>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--sa-forest)', fontWeight: 700, fontFamily: 'Space Grotesk' }}>
-                          <Users size={14} style={{ color: 'var(--sa-text-subtle)' }} />
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--sa-text)', fontWeight: 600 }}>
+                          <Users size={14} style={{ color: '#94a3b8' }} />
                           <span>{studentCount} Students</span>
                         </div>
                       </td>
 
                       {/* Status */}
                       <td>
-                        {isPending ? (
-                          <span className="sa-badge sa-badge-pending">
+                        {c.status === 'pending' ? (
+                          <span
+                            className="sa-badge"
+                            style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#d97706',
+                              border: '1px solid rgba(245, 158, 11, 0.35)',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
                             <Clock size={11} />
-                            PENDING APPROVAL
+                            PENDING
                           </span>
                         ) : c.status === 'rejected' ? (
-                          <span className="sa-badge sa-badge-rejected">
+                          <span
+                            className="sa-badge"
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#ef4444',
+                              border: '1px solid rgba(239, 68, 68, 0.35)',
+                              fontWeight: 700
+                            }}
+                          >
                             REJECTED
                           </span>
                         ) : (
@@ -645,27 +596,54 @@ export default function CollegeManagement() {
 
                       {/* Action Group */}
                       <td style={{ textAlign: 'right' }}>
-                        {isPending ? (
+                        {c.status === 'pending' ? (
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                             <button
                               type="button"
-                              className="sa-btn-success"
+                              className="sa-action-btn"
+                              style={{
+                                background: '#10b981',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '6px 14px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)'
+                              }}
                               onClick={() => handleApproveCollege(c.id, c.name)}
                               disabled={approvingId === c.id}
                               title="Approve registration request"
                             >
-                              <CheckCircle2 size={13} />
+                              <CheckCircle2 size={14} />
                               <span>{approvingId === c.id ? 'Approving...' : 'Approve'}</span>
                             </button>
 
                             <button
                               type="button"
-                              className="sa-btn-danger"
+                              className="sa-action-btn"
+                              style={{
+                                background: '#ef4444',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                              }}
                               onClick={() => openReject(c)}
                               title="Decline registration request"
                             >
-                              <XCircle size={13} />
-                              <span>Decline</span>
+                              <XCircle size={14} />
+                              <span>Reject</span>
                             </button>
 
                             <button
@@ -683,17 +661,17 @@ export default function CollegeManagement() {
                             <button
                               type="button"
                               className="sa-icon-btn"
-                              title="Manage Plan & Licensing Tier"
+                              title="Manage Plan & Licensing"
                               onClick={() => openPlan(c)}
                             >
-                              <Award size={15} style={{ color: 'var(--sa-amber)' }} />
+                              <Award size={14} style={{ color: 'var(--sa-amber)' }} />
                             </button>
 
                             {/* Edit Metadata */}
                             <button
                               type="button"
                               className="sa-icon-btn"
-                              title="Edit Institution Profile"
+                              title="Edit Institution Details"
                               onClick={() => openEdit(c)}
                             >
                               <Edit2 size={14} />
@@ -760,7 +738,7 @@ export default function CollegeManagement() {
             <div className="sa-modal-header">
               <div>
                 <h3 className="sa-modal-title">
-                  <Building2 size={20} style={{ color: 'var(--sa-mint)' }} />
+                  <Building2 size={20} style={{ color: 'var(--sa-blue)' }} />
                   Direct Institution Onboarding
                 </h3>
                 <p className="sa-modal-subtitle">
@@ -768,7 +746,7 @@ export default function CollegeManagement() {
                 </p>
               </div>
               <button type="button" className="sa-modal-close" onClick={() => setShowOnboardModal(false)}>
-                ✕
+                <X size={18} />
               </button>
             </div>
 
@@ -811,7 +789,7 @@ export default function CollegeManagement() {
                       />
                       <button
                         type="button"
-                        className="sa-btn-secondary"
+                        className="sa-action-btn sa-btn-secondary"
                         onClick={() =>
                           setOnboardData({
                             ...onboardData,
@@ -891,7 +869,7 @@ export default function CollegeManagement() {
                     </div>
                   </div>
 
-                  <div className="sa-form-group sa-form-grid-full">
+                  <div className="sa-form-group">
                     <label className="sa-form-label">Initial Duration</label>
                     <select
                       className="sa-form-select"
@@ -910,14 +888,14 @@ export default function CollegeManagement() {
               <div className="sa-modal-footer">
                 <button
                   type="button"
-                  className="sa-btn-secondary"
+                  className="sa-action-btn sa-btn-secondary"
                   onClick={() => setShowOnboardModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="sa-coral-pill-btn"
+                  className="sa-action-btn sa-btn-primary"
                   disabled={submitting}
                 >
                   {submitting ? 'Provisioning...' : 'Provision Institution'}
@@ -937,13 +915,13 @@ export default function CollegeManagement() {
             <div className="sa-modal-header">
               <div>
                 <h3 className="sa-modal-title">
-                  <Edit2 size={18} style={{ color: 'var(--sa-mint)' }} />
+                  <Edit2 size={18} style={{ color: 'var(--sa-blue)' }} />
                   Edit Institution Details
                 </h3>
                 <p className="sa-modal-subtitle">Modify contact and profile details for {activeCollege.name}</p>
               </div>
               <button type="button" className="sa-modal-close" onClick={() => setShowEditModal(false)}>
-                ✕
+                <X size={18} />
               </button>
             </div>
 
@@ -1005,14 +983,14 @@ export default function CollegeManagement() {
               <div className="sa-modal-footer">
                 <button
                   type="button"
-                  className="sa-btn-secondary"
+                  className="sa-action-btn sa-btn-secondary"
                   onClick={() => setShowEditModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="sa-btn-primary"
+                  className="sa-action-btn sa-btn-primary"
                   disabled={submitting}
                 >
                   {submitting ? 'Saving...' : 'Save Changes'}
@@ -1038,7 +1016,7 @@ export default function CollegeManagement() {
                 <p className="sa-modal-subtitle">Configure plan tier and validity for {activeCollege.name}</p>
               </div>
               <button type="button" className="sa-modal-close" onClick={() => setShowPlanModal(false)}>
-                ✕
+                <X size={18} />
               </button>
             </div>
 
@@ -1081,21 +1059,21 @@ export default function CollegeManagement() {
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                       type="button"
-                      className={`sa-filter-tab ${planData.extend_days === '30' && !planData.custom_expiry ? 'active' : ''}`}
+                      className={`sa-filter-pill ${planData.extend_days === '30' && !planData.custom_expiry ? 'active' : ''}`}
                       onClick={() => setPlanData({ ...planData, extend_days: '30', custom_expiry: '' })}
                     >
                       +30 Days
                     </button>
                     <button
                       type="button"
-                      className={`sa-filter-tab ${planData.extend_days === '90' && !planData.custom_expiry ? 'active' : ''}`}
+                      className={`sa-filter-pill ${planData.extend_days === '90' && !planData.custom_expiry ? 'active' : ''}`}
                       onClick={() => setPlanData({ ...planData, extend_days: '90', custom_expiry: '' })}
                     >
                       +90 Days
                     </button>
                     <button
                       type="button"
-                      className={`sa-filter-tab ${planData.extend_days === '365' && !planData.custom_expiry ? 'active' : ''}`}
+                      className={`sa-filter-pill ${planData.extend_days === '365' && !planData.custom_expiry ? 'active' : ''}`}
                       onClick={() => setPlanData({ ...planData, extend_days: '365', custom_expiry: '' })}
                     >
                       +1 Year (365d)
@@ -1128,14 +1106,14 @@ export default function CollegeManagement() {
               <div className="sa-modal-footer">
                 <button
                   type="button"
-                  className="sa-btn-secondary"
+                  className="sa-action-btn sa-btn-secondary"
                   onClick={() => setShowPlanModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="sa-btn-primary"
+                  className="sa-action-btn sa-btn-primary"
                   disabled={submitting}
                 >
                   {submitting ? 'Updating...' : 'Update License'}
@@ -1155,13 +1133,13 @@ export default function CollegeManagement() {
             <div className="sa-modal-header">
               <div>
                 <h3 className="sa-modal-title">
-                  <KeyRound size={20} style={{ color: 'var(--sa-mint)' }} />
+                  <KeyRound size={20} style={{ color: 'var(--sa-blue)' }} />
                   Reset Administrator Password
                 </h3>
                 <p className="sa-modal-subtitle">Override credentials for {activeCollege.name}</p>
               </div>
               <button type="button" className="sa-modal-close" onClick={() => setShowResetPasswordModal(false)}>
-                ✕
+                <X size={18} />
               </button>
             </div>
 
@@ -1179,7 +1157,7 @@ export default function CollegeManagement() {
                     />
                     <button
                       type="button"
-                      className="sa-btn-secondary"
+                      className="sa-action-btn sa-btn-secondary"
                       onClick={() =>
                         setNewPassword('Pass@' + Math.floor(100000 + Math.random() * 900000))
                       }
@@ -1194,14 +1172,14 @@ export default function CollegeManagement() {
               <div className="sa-modal-footer">
                 <button
                   type="button"
-                  className="sa-btn-secondary"
+                  className="sa-action-btn sa-btn-secondary"
                   onClick={() => setShowResetPasswordModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="sa-btn-primary"
+                  className="sa-action-btn sa-btn-primary"
                   disabled={submitting}
                 >
                   {submitting ? 'Resetting...' : 'Set Password'}
@@ -1227,12 +1205,12 @@ export default function CollegeManagement() {
                 <p className="sa-modal-subtitle">This action is irreversible and terminates all student &amp; exam data.</p>
               </div>
               <button type="button" className="sa-modal-close" onClick={() => setShowDeleteModal(false)}>
-                ✕
+                <X size={18} />
               </button>
             </div>
 
             <div className="sa-modal-body">
-              <p style={{ margin: 0, color: 'var(--sa-forest)', fontSize: '14px', lineHeight: 1.5 }}>
+              <p style={{ margin: 0, color: 'var(--sa-text)', fontSize: '0.92rem', lineHeight: 1.5 }}>
                 Are you sure you want to permanently delete <strong>"{activeCollege.name}"</strong> ({activeCollege.email})?
               </p>
             </div>
@@ -1240,14 +1218,15 @@ export default function CollegeManagement() {
             <div className="sa-modal-footer">
               <button
                 type="button"
-                className="sa-btn-secondary"
+                className="sa-action-btn sa-btn-secondary"
                 onClick={() => setShowDeleteModal(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="sa-btn-danger"
+                className="sa-action-btn"
+                style={{ background: 'var(--sa-rose)', color: '#ffffff', border: 'none' }}
                 onClick={handleDeleteSubmit}
                 disabled={submitting}
               >
@@ -1275,27 +1254,27 @@ export default function CollegeManagement() {
                 </p>
               </div>
               <button type="button" className="sa-modal-close" onClick={() => setShowRejectModal(false)}>
-                ✕
+                <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleRejectSubmit}>
               <div className="sa-modal-body">
-                <p style={{ margin: '0 0 16px', color: 'var(--sa-forest)', fontSize: '14px', lineHeight: 1.5 }}>
+                <p style={{ margin: '0 0 16px', color: 'var(--sa-text)', fontSize: '0.92rem', lineHeight: 1.5 }}>
                   Are you sure you want to decline this institution registration? The college administrator will be barred from logging in or accessing platform features.
                 </p>
 
                 <div className="sa-form-group">
                   <label className="sa-form-label">Rejection Reason (Optional)</label>
                   <textarea
-                    className="sa-form-textarea"
+                    className="sa-form-input"
                     rows={3}
                     placeholder="e.g. Unverified institutional domain, incomplete contact details, duplicate application..."
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
                     style={{ resize: 'vertical' }}
                   />
-                  <span style={{ fontSize: '11.5px', color: 'var(--sa-text-subtle)', marginTop: '4px', display: 'block' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
                     This reason will be recorded and shown if the administrator attempts to sign in.
                   </span>
                 </div>
@@ -1304,14 +1283,15 @@ export default function CollegeManagement() {
               <div className="sa-modal-footer">
                 <button
                   type="button"
-                  className="sa-btn-secondary"
+                  className="sa-action-btn sa-btn-secondary"
                   onClick={() => setShowRejectModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="sa-btn-danger"
+                  className="sa-action-btn"
+                  style={{ background: 'var(--sa-rose)', color: '#ffffff', border: 'none' }}
                   disabled={submitting}
                 >
                   {submitting ? 'Rejecting...' : 'Confirm Rejection'}
@@ -1321,6 +1301,6 @@ export default function CollegeManagement() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
