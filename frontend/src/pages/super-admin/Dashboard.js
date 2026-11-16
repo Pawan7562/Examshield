@@ -15,30 +15,32 @@ import {
   Database,
   Cpu,
   Zap,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   Clock,
   ExternalLink,
   Check,
   TrendingUp,
+  XCircle,
+  Eye,
+  KeyRound,
 } from 'lucide-react';
 import { superAdminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
+import { formatIST } from '../../utils/timezone';
 import './SuperAdmin.css';
 
 export default function SuperAdminDashboard() {
   const [data, setData] = useState(null);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [pendingColleges, setPendingColleges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeframe, setTimeframe] = useState('monthly');
-  const [activeTab, setActiveTab] = useState('overview');
-  const [selectedDay, setSelectedDay] = useState(0);
+  const [auditFilter, setAuditFilter] = useState('all'); // 'all', 'tenants', 'security'
 
   // Quick Onboard Modal state
   const [showQuickOnboard, setShowQuickOnboard] = useState(false);
   const [onboardSubmitting, setOnboardSubmitting] = useState(false);
+  const [approvingId, setApprovingId] = useState(null);
   const [onboardForm, setOnboardForm] = useState({
     name: '',
     email: '',
@@ -52,9 +54,10 @@ export default function SuperAdminDashboard() {
     else setLoading(true);
 
     try {
-      const [dashRes, logsRes] = await Promise.allSettled([
+      const [dashRes, logsRes, collegesRes] = await Promise.allSettled([
         superAdminAPI.getDashboard(),
         superAdminAPI.getAuditLogs({ limit: 8 }),
+        superAdminAPI.getColleges({ status: 'pending' }),
       ]);
 
       if (dashRes.status === 'fulfilled') {
@@ -70,7 +73,15 @@ export default function SuperAdminDashboard() {
         setAuditLogs(Array.isArray(logsPayload) ? logsPayload : []);
       }
 
-      if (isRefresh) toast.success('Telemetry synchronized');
+      if (collegesRes.status === 'fulfilled') {
+        const pendingList =
+          collegesRes.value?.colleges ||
+          collegesRes.value?.data?.colleges ||
+          [];
+        setPendingColleges(Array.isArray(pendingList) ? pendingList.filter((c) => c.status === 'pending') : []);
+      }
+
+      if (isRefresh) toast.success('Telemetry synchronized successfully');
     } catch (err) {
       console.error('Failed to load super admin telemetry:', err);
     } finally {
@@ -83,6 +94,7 @@ export default function SuperAdminDashboard() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  // Handle Quick Onboard
   const handleQuickOnboardSubmit = async (e) => {
     e.preventDefault();
     if (!onboardForm.name || !onboardForm.email || !onboardForm.password) {
@@ -91,7 +103,7 @@ export default function SuperAdminDashboard() {
     setOnboardSubmitting(true);
     try {
       const res = await superAdminAPI.onboardCollege(onboardForm);
-      toast.success(res?.message || res?.data?.message || 'College onboarded successfully!');
+      toast.success(res?.message || res?.data?.message || 'Institution onboarded successfully!');
       setShowQuickOnboard(false);
       setOnboardForm({ name: '', email: '', password: '', subscription_plan: 'basic', duration_months: 1 });
       fetchDashboardData(true);
@@ -103,6 +115,21 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  // Quick Approve College from Dashboard
+  const handleQuickApprove = async (id, name) => {
+    setApprovingId(id);
+    try {
+      const res = await superAdminAPI.approveCollege(id);
+      toast.success(res?.message || res?.data?.message || `${name} approved successfully!`);
+      fetchDashboardData(true);
+    } catch (err) {
+      console.error('Approval failed:', err);
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to approve institution');
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
   // Safe data extraction
   const stats = data?.stats || {};
   const recentColleges = Array.isArray(data?.recentColleges) ? data.recentColleges : [];
@@ -110,11 +137,13 @@ export default function SuperAdminDashboard() {
 
   const totalColleges = Number(stats.totalColleges) || 0;
   const activeColleges = Number(stats.activeColleges) || 0;
+  const suspendedColleges = totalColleges - activeColleges;
   const totalStudents = Number(stats.totalStudents) || 0;
   const totalExams = Number(stats.totalExams) || 0;
   const totalRevenue = Number(stats.totalRevenue) || 0;
+  const allTimeRevenue = Number(stats.allTimeRevenue) || 0;
 
-  // Plan distribution
+  // Plan distribution percentages
   const basicCount = Number(planDistribution.basic) || 0;
   const standardCount = Number(planDistribution.standard) || 0;
   const premiumCount = Number(planDistribution.premium) || 0;
@@ -124,490 +153,483 @@ export default function SuperAdminDashboard() {
   const standardPct = Math.round((standardCount / totalPlans) * 100);
   const premiumPct = Math.round((premiumCount / totalPlans) * 100);
 
-  // Calendar
-  const calendarDays = [
-    { day: 'Mon', num: 16 },
-    { day: 'Tue', num: 17 },
-    { day: 'Wed', num: 18 },
-    { day: 'Thu', num: 19 },
-    { day: 'Fri', num: 20 },
-    { day: 'Sat', num: 21 },
-    { day: 'Sun', num: 22 },
-  ];
-
-  // Filtered logs
+  // Filtered audit stream
   const safeAuditLogs = Array.isArray(auditLogs) ? auditLogs : [];
   const filteredLogs = safeAuditLogs.filter((log) => {
     const action = String(log.action || '');
-    if (activeTab === 'colleges') return action.includes('COLLEGE') || action.includes('SUBSCRIPTION');
-    if (activeTab === 'security') return action.includes('AUTH') || action.includes('SUSPEND') || action.includes('SECURITY');
+    if (auditFilter === 'tenants') return action.includes('COLLEGE') || action.includes('SUBSCRIPTION');
+    if (auditFilter === 'security') return action.includes('AUTH') || action.includes('SUSPEND') || action.includes('SECURITY') || action.includes('PASSWORD');
     return true;
   });
 
-  // Format numbers
-  const fmtColleges = String(totalColleges).padStart(2, '0');
-  const fmtExams = String(totalExams).padStart(2, '0');
-
   if (loading) {
     return (
-      <div className="sa-bento-viewport" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-          <div style={{
-            width: '40px', height: '40px',
-            border: '3px solid rgba(11,41,35,0.1)',
-            borderTopColor: '#0b2923',
-            borderRadius: '50%',
-            animation: 'sa-spin 0.7s linear infinite'
-          }} />
-          <span style={{ color: 'var(--sa-text-muted)', fontSize: '14px', fontWeight: 500 }}>Loading platform metrics…</span>
-        </div>
+      <div className="sa-loading-container">
+        <div className="sa-spinner" />
+        <span className="sa-loading-text">Synchronizing cluster telemetry &amp; tenancy records...</span>
       </div>
     );
   }
 
   return (
-    <div className="sa-bento-viewport">
+    <div className="sa-page-shell">
+      {/* ──── 1. EXECUTIVE COMMAND HEADER ──── */}
+      <div className="sa-page-header">
+        <div className="sa-page-title-stack">
+          <h1 className="sa-page-title">Executive Command Overview</h1>
+          <p className="sa-page-subtitle">
+            Autonomous multi-tenant oversight, neural AI invigilation metrics, and infrastructure health across all availability zones.
+          </p>
+        </div>
 
-      {/* ── 1. HERO BENTO BANNER ── */}
-      <section className="sa-bento-hero">
-        <div className="sa-bento-hero-left">
-          <div className="sa-bento-hero-header">
-            <h1 className="sa-bento-hero-title">
-              Platform governance is always{' '}
-              <span className="sa-hero-serif-accent">better</span> together
-            </h1>
-            <p className="sa-bento-hero-subtitle">
-              Supervise institutional tenants, review real-time AI invigilation
-              telemetry, and maintain zero-dispute assessment integrity across all campuses.
-            </p>
+        <div className="sa-page-actions">
+          <button
+            type="button"
+            className="sa-btn-secondary"
+            onClick={() => fetchDashboardData(true)}
+            disabled={refreshing}
+            title="Synchronize live cluster metrics"
+          >
+            <RefreshCw size={14} className={refreshing ? 'sa-spin' : ''} />
+            <span>{refreshing ? 'Syncing...' : 'Sync Telemetry'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="sa-coral-pill-btn"
+            onClick={() => {
+              setOnboardForm({
+                name: '',
+                email: '',
+                password: 'Exam@' + Math.floor(100000 + Math.random() * 900000),
+                subscription_plan: 'basic',
+                duration_months: 1,
+              });
+              setShowQuickOnboard(true);
+            }}
+          >
+            <Plus size={16} />
+            <span>Onboard Institution</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ──── 2. HIGH-DENSITY KPI METRIC GRID ──── */}
+      <div className="sa-kpi-grid">
+        {/* Total Institutions */}
+        <div className="sa-kpi-card">
+          <div className="sa-kpi-top">
+            <span className="sa-kpi-label">Institutional Tenants</span>
+            <div className="sa-kpi-icon-bubble sa-kpi-icon-forest">
+              <Building2 size={18} />
+            </div>
           </div>
-
-          <div className="sa-bento-hero-cta-row">
-            <button
-              type="button"
-              className="sa-coral-pill-btn"
-              onClick={() => {
-                setOnboardForm({
-                  name: '',
-                  email: '',
-                  password: 'Exam@' + Math.floor(100000 + Math.random() * 900000),
-                  subscription_plan: 'basic',
-                  duration_months: 1,
-                });
-                setShowQuickOnboard(true);
-              }}
-            >
-              <span className="sa-coral-icon-bubble"><Plus size={16} /></span>
-              <span>Onboard College</span>
-            </button>
-
-            <button
-              type="button"
-              className="sa-hero-sync-btn"
-              onClick={() => fetchDashboardData(true)}
-              disabled={refreshing}
-            >
-              <RefreshCw size={14} className={refreshing ? 'sa-spin-fast' : ''} />
-              <span>{refreshing ? 'Syncing…' : 'Sync Telemetry'}</span>
-            </button>
+          <div className="sa-kpi-value">{totalColleges}</div>
+          <div className="sa-kpi-footer">
+            <span className="sa-kpi-badge sa-badge-active">{activeColleges} ACTIVE</span>
+            <span>{suspendedColleges > 0 ? `${suspendedColleges} suspended` : 'Zero suspensions'}</span>
           </div>
         </div>
 
-        {/* Right Hero Stack */}
-        <div className="sa-bento-hero-right">
-          <div className="sa-hero-avatar-stack">
-            <div className="sa-avatar-bubble sa-avatar-1" title="Root Lead">PK</div>
-            <div className="sa-avatar-bubble sa-avatar-2" title="AI Mesh">AI</div>
-            <div className="sa-avatar-bubble sa-avatar-3" title="Lakebase">DB</div>
-            <div className="sa-avatar-bubble sa-avatar-count">+3</div>
-          </div>
-          <div className="sa-hero-nodes-pill">
-            <span className="sa-pulse-dot" />
-            <span>6 nodes active now</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 2. MAIN BENTO GRID ── */}
-      <div className="sa-bento-split-grid">
-
-        {/* ── LEFT MAIN COLUMN ── */}
-        <div className="sa-bento-main-col">
-
-          {/* Sub-Row 1: Tri-card row */}
-          <div className="sa-bento-tri-row">
-
-            {/* Card A: Institutions */}
-            <div className="sa-card-organic">
-              <div className="sa-card-organic-header">
-                <div className="sa-tenants-title-stack">
-                  <h3 className="sa-organic-title">Institutions</h3>
-                  <span className="sa-organic-badge">
-                    <span className="sa-badge-star">★</span> {activeColleges} Active
-                  </span>
-                </div>
-                <Link to="/super-admin/colleges" className="sa-organic-arrow-btn" title="View Directory">
-                  <ArrowRight size={14} />
-                </Link>
-              </div>
-
-              <div className="sa-tenants-avatar-grid">
-                {recentColleges.slice(0, 4).map((col, idx) => (
-                  <div key={col.id || idx} className="sa-tenant-chip" title={col.name}>
-                    <div className={`sa-tenant-avatar sa-avatar-bg-${idx % 4}`}>
-                      {col.name ? col.name.slice(0, 2).toUpperCase() : 'UN'}
-                    </div>
-                    <div className="sa-tenant-name">{col.name || 'Unknown'}</div>
-                  </div>
-                ))}
-                {recentColleges.length === 0 && (
-                  <div className="sa-tenant-chip">
-                    <div className="sa-tenant-avatar sa-avatar-bg-0">EX</div>
-                    <div className="sa-tenant-name">ExamShield</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Card B: Live Telemetry */}
-            <div className="sa-card-organic">
-              <div className="sa-card-organic-header">
-                <span className="sa-organic-sublabel">Data &amp; Latency</span>
-                <Link to="/super-admin/settings" className="sa-organic-arrow-btn">
-                  <ArrowRight size={14} />
-                </Link>
-              </div>
-
-              <div className="sa-telemetry-num-row">
-                <div className="sa-telemetry-big-num">
-                  99<span className="sa-telemetry-comma">,</span>98
-                  <span className="sa-telemetry-unit">%</span>
-                </div>
-                <span className="sa-telemetry-tag">UPTIME</span>
-              </div>
-
-              <div className="sa-dual-meter-stack">
-                <div className="sa-meter-track">
-                  <div className="sa-meter-bar sa-meter-mint" style={{ width: '92%' }} />
-                </div>
-                <div className="sa-meter-chips-row">
-                  <span className="sa-meter-chip">
-                    <span className="sa-chip-dot sa-dot-mint" /> 92% Nodes
-                  </span>
-                  <span className="sa-meter-chip">
-                    <span className="sa-chip-dot sa-dot-peach" /> 22ms DB
-                  </span>
-                  <span className="sa-meter-chip">
-                    <span className="sa-chip-dot sa-dot-sand" /> 12k TPS
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Card C: Impact Pill Chart */}
-            <div className="sa-card-organic">
-              <div className="sa-card-organic-header">
-                <span className="sa-impact-label active">Impact</span>
-                <span className="sa-impact-label">Load</span>
-              </div>
-              <div className="sa-impact-pill-chart">
-                <div className="sa-vertical-pill-col">
-                  <div className="sa-vertical-pill-bar sa-vbar-sand" style={{ height: '52%' }} />
-                </div>
-                <div className="sa-vertical-pill-col">
-                  <div className="sa-vertical-pill-bar sa-vbar-mint" style={{ height: '88%' }} />
-                </div>
-                <div className="sa-vertical-pill-col">
-                  <div className="sa-vertical-pill-bar sa-vbar-peach" style={{ height: '64%' }} />
-                </div>
-              </div>
+        {/* Pending Approvals */}
+        <Link
+          to="/super-admin/colleges"
+          className={`sa-kpi-card interactive ${pendingColleges.length > 0 ? 'highlight-amber' : ''}`}
+          style={{ textDecoration: 'none' }}
+        >
+          <div className="sa-kpi-top">
+            <span className="sa-kpi-label">Pending Approvals</span>
+            <div className="sa-kpi-icon-bubble sa-kpi-icon-amber">
+              <Clock size={18} />
             </div>
           </div>
+          <div className="sa-kpi-value" style={pendingColleges.length > 0 ? { color: '#d97706' } : {}}>
+            {pendingColleges.length}
+          </div>
+          <div className="sa-kpi-footer">
+            <span className={`sa-kpi-badge ${pendingColleges.length > 0 ? 'sa-badge-pending' : 'sa-badge-active'}`}>
+              {pendingColleges.length > 0 ? 'ACTION REQUIRED' : 'ALL CLEAR'}
+            </span>
+            <span>{pendingColleges.length > 0 ? 'Awaiting verification' : 'Zero pending reviews'}</span>
+          </div>
+        </Link>
 
-          {/* Sub-Row 2: Statistics + right stack */}
-          <div className="sa-bento-dual-row">
-
-            {/* Card D: Statistics */}
-            <div className="sa-card-organic sa-card-stats-full">
-              <div className="sa-card-organic-header">
-                <h3 className="sa-organic-title">Platform Performance</h3>
-                <div className="sa-timeframe-pill-toggle">
-                  <button
-                    type="button"
-                    className={`sa-toggle-pill ${timeframe === 'weekly' ? 'active' : ''}`}
-                    onClick={() => setTimeframe('weekly')}
-                  >Weekly</button>
-                  <button
-                    type="button"
-                    className={`sa-toggle-pill ${timeframe === 'monthly' ? 'active' : ''}`}
-                    onClick={() => setTimeframe('monthly')}
-                  >Monthly</button>
-                </div>
-              </div>
-
-              <div className="sa-digital-stats-grid">
-                <div className="sa-digital-stat-item">
-                  <div className="sa-digital-digits">
-                    <span className="sa-digit-box">{fmtColleges[0]}</span>
-                    <span className="sa-digit-box">{fmtColleges[1]}</span>
-                  </div>
-                  <span className="sa-digital-label">Colleges Onboarded</span>
-                </div>
-
-                <div className="sa-digital-stat-item">
-                  <div className="sa-digital-digits">
-                    <span className="sa-digit-box">{totalStudents >= 1000 ? Math.floor(totalStudents / 1000) : totalStudents}</span>
-                    <span className="sa-digit-box">{totalStudents >= 1000 ? 'k+' : ''}</span>
-                  </div>
-                  <span className="sa-digital-label">Enrolled Students</span>
-                </div>
-
-                <div className="sa-digital-stat-item">
-                  <div className="sa-digital-digits">
-                    <span className="sa-digit-box">{fmtExams[0]}</span>
-                    <span className="sa-digit-box">{fmtExams[1]}</span>
-                  </div>
-                  <span className="sa-digital-label">Monitored Exams</span>
-                </div>
-
-                <div className="sa-digital-stat-item">
-                  <div className="sa-digital-digits">
-                    <span className="sa-digit-box">₹</span>
-                    <span className="sa-digit-box">
-                      {totalRevenue >= 1000 ? `${Math.round(totalRevenue / 1000)}k` : String(totalRevenue)}
-                    </span>
-                  </div>
-                  <span className="sa-digital-label">Subscription MRR</span>
-                </div>
-              </div>
-
-              <div className="sa-dotted-progress-strip">
-                <div className="sa-dotted-track">
-                  {Array.from({ length: 28 }).map((_, i) => (
-                    <span key={i} className={`sa-dot-segment ${i < 19 ? 'filled' : ''}`} />
-                  ))}
-                </div>
-                <div className="sa-dotted-legend">
-                  <span>99.98% System Health Reliability</span>
-                  <span>Zero Security Disputes</span>
-                </div>
-              </div>
+        {/* Enrolled Candidate Pool */}
+        <div className="sa-kpi-card">
+          <div className="sa-kpi-top">
+            <span className="sa-kpi-label">Enrolled Candidate Pool</span>
+            <div className="sa-kpi-icon-bubble sa-kpi-icon-mint">
+              <Users size={18} />
             </div>
-
-            {/* Right sub-stack */}
-            <div className="sa-card-right-stack">
-              {/* Card E: Security Pill */}
-              <div className="sa-card-dark-pill">
-                <div className="sa-dark-pill-left">
-                  <div className="sa-dark-pill-glow-dot">
-                    <ShieldCheck size={16} />
-                  </div>
-                  <div className="sa-dark-pill-text">
-                    <span className="sa-dark-pill-title">Active Security Mesh</span>
-                    <span className="sa-dark-pill-time">All 6 Nodes Operational</span>
-                  </div>
-                </div>
-                <div className="sa-dark-pill-action">
-                  <CheckCircle2 size={16} />
-                </div>
-              </div>
-
-              {/* Card F: Enterprise Quota */}
-              <div className="sa-card-organic sa-card-pro-quota">
-                <div className="sa-pro-content-left">
-                  <div className="sa-pro-icon-chip">
-                    <Zap size={18} />
-                  </div>
-                  <div className="sa-pro-info">
-                    <h4 className="sa-pro-tier-title">Enterprise Tier</h4>
-                    <ul className="sa-pro-features-list">
-                      <li><Check size={12} /> Unlimited seat allocation</li>
-                      <li><Check size={12} /> 1080p deep facial mesh</li>
-                      <li><Check size={12} /> Multi-campus ledger</li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="sa-pro-action-col">
-                  <h4 className="sa-pro-headline">Enterprise Quotas</h4>
-                  <p className="sa-pro-subtext">Automated scale-to-zero capacity</p>
-                  <Link to="/super-admin/payments" className="sa-pro-upgrade-btn">
-                    <span>Manage Plans</span>
-                    <ArrowRight size={13} />
-                  </Link>
-                </div>
-              </div>
-            </div>
+          </div>
+          <div className="sa-kpi-value">
+            {totalStudents.toLocaleString('en-IN')}
+          </div>
+          <div className="sa-kpi-footer">
+            <span className="sa-kpi-badge sa-badge-active">REGISTERED</span>
+            <span>Across all institutional rosters</span>
           </div>
         </div>
 
-        {/* ── RIGHT SIDE COLUMN ── */}
-        <div className="sa-bento-side-col">
-
-          {/* Card G: Calendar */}
-          <div className="sa-card-organic sa-card-calendar">
-            <div className="sa-card-organic-header">
-              <h3 className="sa-organic-title">November, 2026</h3>
-              <div className="sa-cal-nav-buttons">
-                <button type="button" className="sa-cal-nav-btn" aria-label="Previous week">
-                  <ChevronLeft size={14} />
-                </button>
-                <button type="button" className="sa-cal-nav-btn" aria-label="Next week">
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-            <div className="sa-calendar-day-strip">
-              {calendarDays.map((item, idx) => (
-                <button
-                  key={item.day}
-                  type="button"
-                  className={`sa-cal-day-pill ${selectedDay === idx ? 'active' : ''}`}
-                  onClick={() => setSelectedDay(idx)}
-                >
-                  <span className="sa-cal-day-name">{item.day}</span>
-                  <span className="sa-cal-day-num">{item.num}</span>
-                  {selectedDay === idx && <span className="sa-cal-active-pip" />}
-                </button>
-              ))}
+        {/* Active Invigilated Exams */}
+        <div className="sa-kpi-card">
+          <div className="sa-kpi-top">
+            <span className="sa-kpi-label">Invigilated Assessments</span>
+            <div className="sa-kpi-icon-bubble sa-kpi-icon-coral">
+              <FileText size={18} />
             </div>
           </div>
+          <div className="sa-kpi-value">{totalExams}</div>
+          <div className="sa-kpi-footer">
+            <span className="sa-kpi-badge sa-badge-pending">SCHEDULED</span>
+            <span>AI biometric lockdown active</span>
+          </div>
+        </div>
 
-          {/* Card H: Recent Colleges */}
-          <div className="sa-card-organic sa-card-recent-colleges">
-            <div className="sa-card-organic-header">
-              <h3 className="sa-organic-title">Institutional Tenants</h3>
-              <Link to="/super-admin/colleges" className="sa-organic-sublink">
-                View all ({totalColleges})
-              </Link>
-            </div>
-            <div className="sa-recent-cards-rail">
-              {recentColleges.slice(0, 3).map((col, idx) => (
-                <div key={col.id || idx} className="sa-recent-card-item">
-                  <div className={`sa-recent-thumb sa-thumb-theme-${idx % 3}`}>
-                    <Building2 size={24} />
-                    <span className="sa-recent-plan-chip">
-                      {String(col.subscription_plan || 'basic').toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="sa-recent-info-block">
-                    <h5 className="sa-recent-col-name">{col.name || 'Institution'}</h5>
-                    <div className="sa-recent-col-meta">
-                      <span>{col.email || ''}</span>
-                      {col.email && <span>•</span>}
-                      <span className={col.is_active ? 'sa-meta-active' : 'sa-meta-suspended'}>
-                        {col.is_active ? 'Active' : 'Suspended'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {recentColleges.length === 0 && (
-                <div className="sa-empty-state-card">
-                  <Building2 size={24} style={{ color: '#94a3b8' }} />
-                  <p>No institutions registered yet.</p>
-                </div>
-              )}
+        {/* Platform MRR */}
+        <div className="sa-kpi-card">
+          <div className="sa-kpi-top">
+            <span className="sa-kpi-label">Monthly Run-Rate (MRR)</span>
+            <div className="sa-kpi-icon-bubble sa-kpi-icon-mint">
+              <IndianRupee size={18} />
             </div>
           </div>
-
-          {/* Card I: Audit Stream */}
-          <div className="sa-card-organic sa-card-notifications">
-            <div className="sa-card-organic-header">
-              <h3 className="sa-organic-title">Audit Stream</h3>
-              <div className="sa-notif-filter-tabs">
-                {['overview', 'colleges', 'security'].map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    className={`sa-notif-tab ${activeTab === tab ? 'active' : ''}`}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    {tab === 'overview' ? 'Overview' : tab === 'colleges' ? 'Tenants' : 'Security'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="sa-notif-list">
-              {filteredLogs.slice(0, 4).map((log, idx) => (
-                <div key={log.id || idx} className="sa-notif-item">
-                  <div className="sa-notif-avatar">
-                    {String(log.user_name || log.actor || 'SA').slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="sa-notif-body">
-                    <p className="sa-notif-text">
-                      <strong className="sa-notif-actor">{log.user_name || log.actor || 'Super Admin'}</strong>{' '}
-                      {String(log.action || 'performed operation').toLowerCase().replace(/_/g, ' ')}
-                      {log.details ? `: ${log.details}` : ''}
-                    </p>
-                    <span className="sa-notif-time">
-                      {log.created_at
-                        ? new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : 'Recent'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              {filteredLogs.length === 0 && (
-                <div className="sa-notif-item">
-                  <div className="sa-notif-avatar">SA</div>
-                  <div className="sa-notif-body">
-                    <p className="sa-notif-text">
-                      <strong className="sa-notif-actor">System Health Monitor</strong>{' '}
-                      verified 6 backend instances and PostgreSQL connection pool.
-                    </p>
-                    <span className="sa-notif-time">Just now</span>
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="sa-kpi-value" style={{ color: 'var(--sa-mint)' }}>
+            ₹{totalRevenue.toLocaleString('en-IN')}
+          </div>
+          <div className="sa-kpi-footer">
+            <span className="sa-kpi-badge sa-badge-active">RECURRING</span>
+            <span>₹{allTimeRevenue.toLocaleString('en-IN')} lifetime gross</span>
           </div>
         </div>
       </div>
 
-      {/* ── PLAN DISTRIBUTION SECTION ── */}
-      <div className="sa-plan-dist-section">
-        <div className="sa-card-organic" style={{ marginTop: '0' }}>
-          <div className="sa-card-organic-header">
-            <h3 className="sa-organic-title">Subscription Plan Distribution</h3>
-            <Link to="/super-admin/payments" className="sa-organic-arrow-btn">
-              <ArrowRight size={14} />
+      {/* ──── 3. PENDING REGISTRATION ALERT BAR (If Any Pending) ──── */}
+      {pendingColleges.length > 0 && (
+        <div className="sa-pending-alert-card">
+          <div className="sa-pending-alert-left">
+            <div className="sa-pending-icon-ring">
+              <Clock size={22} />
+            </div>
+            <div>
+              <h3 className="sa-pending-alert-title">
+                {pendingColleges.length} University Registration{pendingColleges.length > 1 ? 's' : ''} Awaiting Root Approval
+              </h3>
+              <p className="sa-pending-alert-desc">
+                Applicants cannot access campus workspaces or student portals until approved.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              className="sa-btn-success"
+              onClick={() => handleQuickApprove(pendingColleges[0].id, pendingColleges[0].name)}
+              disabled={approvingId === pendingColleges[0].id}
+            >
+              <CheckCircle2 size={14} />
+              <span>{approvingId === pendingColleges[0].id ? 'Approving...' : `Quick Approve: ${pendingColleges[0].name.slice(0, 18)}`}</span>
+            </button>
+
+            <Link to="/super-admin/colleges" className="sa-btn-secondary" style={{ textDecoration: 'none' }}>
+              <span>View Directory</span>
+              <ArrowRight size={13} />
             </Link>
           </div>
-          <div className="sa-plan-dist-bars">
-            <div className="sa-plan-bar-item">
-              <span className="sa-plan-label">Basic</span>
-              <div className="sa-plan-track">
-                <div className="sa-plan-fill sa-plan-basic" style={{ width: `${basicPct}%` }} />
+        </div>
+      )}
+
+      {/* ──── 4. MAIN TWO-COLUMN SPLIT GRID ──── */}
+      <div className="sa-split-grid">
+        {/* ── LEFT COLUMN (65%): Plans & Recent Tenants ── */}
+        <div className="sa-col-main">
+          {/* Card A: License & Subscription Distribution */}
+          <div className="sa-card">
+            <div className="sa-card-header">
+              <div>
+                <h3 className="sa-card-title">Licensing &amp; Tier Allocation</h3>
+                <p className="sa-card-desc">Active seat distribution across institutional quota packages</p>
               </div>
-              <span className="sa-plan-pct">{basicCount}</span>
+              <Link to="/super-admin/payments" className="sa-card-link">
+                <span>Financial Ledger</span>
+                <ArrowRight size={13} />
+              </Link>
             </div>
-            <div className="sa-plan-bar-item">
-              <span className="sa-plan-label">Standard</span>
-              <div className="sa-plan-track">
-                <div className="sa-plan-fill sa-plan-standard" style={{ width: `${standardPct}%` }} />
+
+            <div className="sa-tier-distribution-grid">
+              {/* Basic Tier */}
+              <div className="sa-tier-stat-item">
+                <div className="sa-tier-stat-top">
+                  <span className="sa-tier-name">Basic Plan</span>
+                  <span className="sa-tier-price">₹999/mo</span>
+                </div>
+                <div className="sa-tier-bar-track">
+                  <div className="sa-tier-bar-fill fill-basic" style={{ width: `${basicPct}%` }} />
+                </div>
+                <div className="sa-tier-stat-footer">
+                  <span className="sa-tier-count">{basicCount} Campuses</span>
+                  <span className="sa-tier-pct">{basicPct}%</span>
+                </div>
               </div>
-              <span className="sa-plan-pct">{standardCount}</span>
+
+              {/* Standard Tier */}
+              <div className="sa-tier-stat-item">
+                <div className="sa-tier-stat-top">
+                  <span className="sa-tier-name">Standard Growth</span>
+                  <span className="sa-tier-price">₹2,999/mo</span>
+                </div>
+                <div className="sa-tier-bar-track">
+                  <div className="sa-tier-bar-fill fill-standard" style={{ width: `${standardPct}%` }} />
+                </div>
+                <div className="sa-tier-stat-footer">
+                  <span className="sa-tier-count">{standardCount} Campuses</span>
+                  <span className="sa-tier-pct">{standardPct}%</span>
+                </div>
+              </div>
+
+              {/* Premium Tier */}
+              <div className="sa-tier-stat-item">
+                <div className="sa-tier-stat-top">
+                  <span className="sa-tier-name">Premium Enterprise</span>
+                  <span className="sa-tier-price">₹7,999/mo</span>
+                </div>
+                <div className="sa-tier-bar-track">
+                  <div className="sa-tier-bar-fill fill-premium" style={{ width: `${premiumPct}%` }} />
+                </div>
+                <div className="sa-tier-stat-footer">
+                  <span className="sa-tier-count">{premiumCount} Campuses</span>
+                  <span className="sa-tier-pct">{premiumPct}%</span>
+                </div>
+              </div>
             </div>
-            <div className="sa-plan-bar-item">
-              <span className="sa-plan-label">Premium</span>
-              <div className="sa-plan-track">
-                <div className="sa-plan-fill sa-plan-premium" style={{ width: `${premiumPct}%` }} />
+          </div>
+
+          {/* Card B: Recent Institutional Onboardings */}
+          <div className="sa-card">
+            <div className="sa-card-header">
+              <div>
+                <h3 className="sa-card-title">Recent Institutional Onboardings</h3>
+                <p className="sa-card-desc">Latest university tenancies provisioned in the cluster</p>
               </div>
-              <span className="sa-plan-pct">{premiumCount}</span>
+              <Link to="/super-admin/colleges" className="sa-card-link">
+                <span>Manage Directory ({totalColleges})</span>
+                <ArrowRight size={13} />
+              </Link>
+            </div>
+
+            <div className="sa-table-scroll">
+              <table className="sa-table">
+                <thead>
+                  <tr>
+                    <th>Institution</th>
+                    <th>Official Admin</th>
+                    <th>Tier</th>
+                    <th>Status</th>
+                    <th>Provisioned</th>
+                    <th style={{ textAlign: 'right' }}>Manage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentColleges.slice(0, 5).map((col, idx) => (
+                    <tr key={col.id || idx}>
+                      <td>
+                        <div className="sa-tenant-cell">
+                          <div className={`sa-tenant-avatar-circle sa-avatar-bg-${idx % 4}`}>
+                            {(col.name || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="sa-tenant-name">{col.name}</div>
+                            <div className="sa-tenant-subline">{col.id?.slice(0, 8)}...</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '13px', color: 'var(--sa-forest)', fontWeight: 600 }}>
+                          {col.email}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`sa-badge sa-plan-${col.subscription_plan || 'basic'}`}>
+                          {(col.subscription_plan || 'basic').toUpperCase()}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`sa-badge ${col.is_active ? 'sa-badge-active' : 'sa-badge-suspended'}`}>
+                          {col.is_active ? 'ACTIVE' : 'SUSPENDED'}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '12px', color: 'var(--sa-text-muted)' }}>
+                          {col.created_at ? formatIST(col.created_at, 'dateOnly') : '—'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <Link
+                          to="/super-admin/colleges"
+                          className="sa-icon-btn"
+                          title="Inspect in directory"
+                        >
+                          <Eye size={14} />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {recentColleges.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--sa-text-subtle)' }}>
+                        No institutions onboarded yet. Click "Onboard Institution" to register your first campus.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* ── RIGHT COLUMN (35%): Cluster Telemetry & Real-Time Audit ── */}
+        <div className="sa-col-side">
+          {/* Card C: Infrastructure Health & Cluster Nodes */}
+          <div className="sa-card">
+            <div className="sa-card-header">
+              <div>
+                <h3 className="sa-card-title">Cluster Infrastructure</h3>
+                <p className="sa-card-desc">High-availability backend mesh and database telemetry</p>
+              </div>
+              <span className="sa-badge sa-badge-active">99.98% UPTIME</span>
+            </div>
+
+            {/* 6 KVM Nodes Minimalist Grid */}
+            <div className="sa-cluster-mini-grid">
+              {[1, 2, 3, 4, 5, 6].map((node) => (
+                <div key={node} className="sa-node-chip">
+                  <div className="sa-node-chip-header">
+                    <span className="sa-pulse-indicator" />
+                    <span className="sa-node-num">Node {node}</span>
+                  </div>
+                  <span className="sa-node-latency">{(16 + node * 2)}ms</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Services telemetry list */}
+            <div className="sa-service-telemetry-list">
+              <div className="sa-service-item">
+                <div className="sa-service-left">
+                  <Database size={15} style={{ color: 'var(--sa-mint)' }} />
+                  <div>
+                    <div className="sa-service-name">Neon Lakebase PostgreSQL</div>
+                    <div className="sa-service-sub">Connection Pool • Autoscaling Active</div>
+                  </div>
+                </div>
+                <span className="sa-service-status active">22ms</span>
+              </div>
+
+              <div className="sa-service-item">
+                <div className="sa-service-left">
+                  <Cpu size={15} style={{ color: 'var(--sa-coral)' }} />
+                  <div>
+                    <div className="sa-service-name">Neural Biometric AI Mesh</div>
+                    <div className="sa-service-sub">1080p Facial Anti-Spoofing Engine</div>
+                  </div>
+                </div>
+                <span className="sa-service-status active">Operational</span>
+              </div>
+
+              <div className="sa-service-item">
+                <div className="sa-service-left">
+                  <Server size={15} style={{ color: 'var(--sa-forest)' }} />
+                  <div>
+                    <div className="sa-service-name">NGINX High-Concurrency Load Balancer</div>
+                    <div className="sa-service-sub">SSL Termination • Zero Dropped Packets</div>
+                  </div>
+                </div>
+                <span className="sa-service-status active">100% OK</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card D: Real-Time Audit & Security Stream */}
+          <div className="sa-card">
+            <div className="sa-card-header">
+              <div>
+                <h3 className="sa-card-title">Live Audit Stream</h3>
+                <p className="sa-card-desc">Immutable administrative security events</p>
+              </div>
+              <div className="sa-filter-tabs">
+                <button
+                  type="button"
+                  className={`sa-filter-tab ${auditFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setAuditFilter('all')}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={`sa-filter-tab ${auditFilter === 'tenants' ? 'active' : ''}`}
+                  onClick={() => setAuditFilter('tenants')}
+                >
+                  Tenants
+                </button>
+                <button
+                  type="button"
+                  className={`sa-filter-tab ${auditFilter === 'security' ? 'active' : ''}`}
+                  onClick={() => setAuditFilter('security')}
+                >
+                  Security
+                </button>
+              </div>
+            </div>
+
+            <div className="sa-audit-stream-list">
+              {filteredLogs.slice(0, 5).map((log, idx) => (
+                <div key={log.id || idx} className="sa-audit-stream-item">
+                  <div className="sa-audit-avatar">
+                    {(log.user_name || log.actor || 'SA').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="sa-audit-body">
+                    <p className="sa-audit-text">
+                      <strong>{log.user_name || log.actor || 'Super Admin'}</strong>{' '}
+                      {String(log.action || 'performed operation').toLowerCase().replace(/_/g, ' ')}
+                    </p>
+                    <span className="sa-audit-timestamp">
+                      {log.created_at ? formatIST(log.created_at, 'timeOnly') : 'Recent'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {filteredLogs.length === 0 && (
+                <div className="sa-audit-stream-empty">
+                  <ShieldCheck size={20} style={{ color: 'var(--sa-text-subtle)' }} />
+                  <span>No security events recorded for this category</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--sa-card-border)' }}>
+              <Link to="/super-admin/audit-logs" className="sa-card-link" style={{ justifyContent: 'center' }}>
+                <span>View Full Audit Dossier</span>
+                <ArrowRight size={13} />
+              </Link>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── QUICK ONBOARD MODAL ── */}
+      {/* ──── QUICK ONBOARD MODAL ──── */}
       {showQuickOnboard && (
         <div className="sa-modal-backdrop" onClick={() => setShowQuickOnboard(false)}>
-          <div className="sa-modal sa-modal-bento" onClick={(e) => e.stopPropagation()}>
+          <div className="sa-modal" onClick={(e) => e.stopPropagation()}>
             <div className="sa-modal-header">
               <div>
-                <h3 className="sa-modal-title">Instant College Onboarding</h3>
-                <p className="sa-modal-subtitle">Provision tenant database quotas &amp; super-admin credentials</p>
+                <h3 className="sa-modal-title">
+                  <Building2 size={18} style={{ color: 'var(--sa-mint)' }} />
+                  Direct Institution Provisioning
+                </h3>
+                <p className="sa-modal-subtitle">Provision college workspace and administrator credentials</p>
               </div>
               <button type="button" className="sa-modal-close" onClick={() => setShowQuickOnboard(false)}>
                 ✕
@@ -617,19 +639,20 @@ export default function SuperAdminDashboard() {
             <form onSubmit={handleQuickOnboardSubmit}>
               <div className="sa-modal-body">
                 <div className="sa-form-grid">
-                  <div className="sa-form-group">
-                    <label className="sa-form-label">College / University Name *</label>
+                  <div className="sa-form-group sa-form-grid-full">
+                    <label className="sa-form-label">University / College Name *</label>
                     <input
                       type="text"
                       className="sa-form-input"
                       required
-                      placeholder="e.g. Stanford Technical Institute"
+                      placeholder="e.g. Stanford University"
                       value={onboardForm.name}
                       onChange={(e) => setOnboardForm({ ...onboardForm, name: e.target.value })}
                     />
                   </div>
+
                   <div className="sa-form-group">
-                    <label className="sa-form-label">Official Admin Email *</label>
+                    <label className="sa-form-label">Official Administrator Email *</label>
                     <input
                       type="email"
                       className="sa-form-input"
@@ -639,8 +662,9 @@ export default function SuperAdminDashboard() {
                       onChange={(e) => setOnboardForm({ ...onboardForm, email: e.target.value })}
                     />
                   </div>
+
                   <div className="sa-form-group">
-                    <label className="sa-form-label">Admin Temporary Password *</label>
+                    <label className="sa-form-label">Temporary Password *</label>
                     <input
                       type="text"
                       className="sa-form-input"
@@ -649,16 +673,17 @@ export default function SuperAdminDashboard() {
                       onChange={(e) => setOnboardForm({ ...onboardForm, password: e.target.value })}
                     />
                   </div>
-                  <div className="sa-form-group">
-                    <label className="sa-form-label">Subscription Tier</label>
+
+                  <div className="sa-form-group sa-form-grid-full">
+                    <label className="sa-form-label">Subscription Tier Assignment</label>
                     <select
                       className="sa-form-select"
                       value={onboardForm.subscription_plan}
                       onChange={(e) => setOnboardForm({ ...onboardForm, subscription_plan: e.target.value })}
                     >
-                      <option value="basic">Basic (50 Candidates, 10 Exams)</option>
-                      <option value="standard">Standard Growth (200 Candidates, 50 Exams)</option>
-                      <option value="premium">Premium Enterprise (Unlimited Seats)</option>
+                      <option value="basic">Basic Plan (50 Candidates, 10 Exams) — ₹999/mo</option>
+                      <option value="standard">Standard Growth (200 Candidates, 50 Exams) — ₹2,999/mo</option>
+                      <option value="premium">Premium Enterprise (Unlimited Seats) — ₹7,999/mo</option>
                     </select>
                   </div>
                 </div>
@@ -669,7 +694,7 @@ export default function SuperAdminDashboard() {
                   Cancel
                 </button>
                 <button type="submit" className="sa-coral-pill-btn" disabled={onboardSubmitting}>
-                  {onboardSubmitting ? 'Provisioning…' : 'Provision Institution'}
+                  {onboardSubmitting ? 'Provisioning...' : 'Provision Institution'}
                 </button>
               </div>
             </form>

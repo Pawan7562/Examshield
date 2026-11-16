@@ -12,15 +12,14 @@ import {
   ExternalLink,
   Activity,
   Server,
-  Database,
   ChevronRight,
   ShieldAlert,
   Sparkles,
   Zap,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import logoImg from '../../assets/logo-mark.png';
 import '../../pages/super-admin/SuperAdmin.css';
 
 export default function SuperAdminLayout() {
@@ -36,56 +35,68 @@ export default function SuperAdminLayout() {
   };
 
   const getPageTitle = () => {
-    if (location.pathname.includes('/colleges')) return 'Multi-Tenant Directory & Onboarding';
-    if (location.pathname.includes('/payments')) return 'Payments, MRR & Financial Ledger';
-    if (location.pathname.includes('/audit-logs')) return 'Security Audit & Compliance Logs';
+    if (location.pathname.includes('/colleges')) return 'Institutional Tenants';
+    if (location.pathname.includes('/payments')) return 'Financial Ledger & Subscriptions';
+    if (location.pathname.includes('/audit-logs')) return 'Security Audit & Compliance';
     if (location.pathname.includes('/settings')) return 'Platform Governance & Policies';
-    return 'Executive Overview & Command';
+    return 'Executive Overview';
   };
 
-  const navLinks = [
+  const navGroups = [
     {
-      to: '/super-admin/dashboard',
-      icon: LayoutDashboard,
-      label: 'Executive Overview',
-      short: 'Dashboard',
-      badge: 'Live',
+      group: 'Overview',
+      items: [
+        {
+          to: '/super-admin/dashboard',
+          icon: LayoutDashboard,
+          label: 'Executive Command',
+          badge: 'Live',
+        },
+      ],
     },
     {
-      to: '/super-admin/colleges',
-      icon: Building2,
-      label: 'Tenants & Onboarding',
-      short: 'Tenants',
-      badge: null,
+      group: 'Tenancy Management',
+      items: [
+        {
+          to: '/super-admin/colleges',
+          icon: Building2,
+          label: 'Institutional Tenants',
+          badge: null,
+        },
+      ],
     },
     {
-      to: '/super-admin/payments',
-      icon: CreditCard,
-      label: 'Payments & Revenue',
-      short: 'Ledger',
-      badge: 'Ledger',
+      group: 'Financials & Billing',
+      items: [
+        {
+          to: '/super-admin/payments',
+          icon: CreditCard,
+          label: 'Revenue & Ledger',
+          badge: null,
+        },
+      ],
     },
     {
-      to: '/super-admin/audit-logs',
-      icon: ShieldCheck,
-      label: 'Audit & Compliance',
-      short: 'Audit',
-      badge: null,
-    },
-    {
-      to: '/super-admin/settings',
-      icon: Sliders,
-      label: 'Platform Governance',
-      short: 'Settings',
-      badge: null,
+      group: 'Platform & Security',
+      items: [
+        {
+          to: '/super-admin/audit-logs',
+          icon: ShieldCheck,
+          label: 'Audit & Compliance',
+          badge: null,
+        },
+        {
+          to: '/super-admin/settings',
+          icon: Sliders,
+          label: 'Platform Settings',
+          badge: null,
+        },
+      ],
     },
   ];
 
   return (
     <div className="sa-layout">
-      {/* Background ambient gradient glow */}
-      <div className="sa-ambient-bg" aria-hidden="true" />
-
       {/* Mobile Drawer Backdrop */}
       {mobileOpen && (
         <div
@@ -95,102 +106,117 @@ export default function SuperAdminLayout() {
         />
       )}
 
-      {/* ──── ULTRA-SLEEK VERTICAL DOCK RAIL (Reference: Left rail in photo) ──── */}
-      <aside className={`sa-dock-rail ${mobileOpen ? 'mobile-open' : ''}`}>
-        {/* Brand Monogram Header */}
-        <Link
-          to="/super-admin/dashboard"
-          className="sa-rail-brand"
-          title="Nexify Examina — Root Admin Console"
-          onClick={() => setMobileOpen(false)}
-        >
-          <div className="sa-rail-logo-ring">
-            <span className="sa-rail-glyph">⚡</span>
-          </div>
-          <span className="sa-mobile-brand-title">Nexify Examina</span>
-        </Link>
+      {/* ──── ENTERPRISE SIDEBAR (Width 240px) ──── */}
+      <aside className={`sa-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
+        {/* Brand Header */}
+        <div className="sa-sidebar-header">
+          <Link
+            to="/super-admin/dashboard"
+            className="sa-sidebar-brand"
+            onClick={() => setMobileOpen(false)}
+          >
+            <div className="sa-brand-icon">
+              <ShieldCheck size={20} className="sa-brand-icon-svg" />
+            </div>
+            <div className="sa-brand-text">
+              <span className="sa-brand-name">Nexify Examina</span>
+              <span className="sa-brand-tier">Root Control Console</span>
+            </div>
+          </Link>
+        </div>
 
-        {/* Navigation Rail Icons */}
-        <nav className="sa-rail-nav">
-          {navLinks.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => `sa-rail-item ${isActive ? 'active' : ''}`}
-                onClick={() => setMobileOpen(false)}
-                title={item.label}
-              >
-                <div className="sa-rail-icon-wrapper">
-                  <Icon size={20} strokeWidth={2.2} />
-                  {item.badge && <span className="sa-rail-pip" />}
-                </div>
-                <span className="sa-rail-tooltip">{item.label}</span>
-                <span className="sa-mobile-nav-label">{item.label}</span>
-              </NavLink>
-            );
-          })}
+        {/* Navigation Groups */}
+        <nav className="sa-sidebar-nav">
+          {navGroups.map((group) => (
+            <div key={group.group} className="sa-nav-group">
+              <div className="sa-nav-group-title">{group.group}</div>
+              <div className="sa-nav-group-items">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <Icon size={18} className="sa-nav-icon" />
+                      <span className="sa-nav-label">{item.label}</span>
+                      {item.badge && <span className="sa-nav-badge">{item.badge}</span>}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        {/* Rail Footer (Cluster status & Logout) */}
-        <div className="sa-rail-footer">
-          <div className="sa-cluster-pill-chip" title="Cluster: 6 KVM Nodes Synchronized">
-            <span className="sa-pulse-radar" />
-            <span className="sa-mobile-cluster-text">6 Nodes Sync</span>
+        {/* Cluster Status Chip */}
+        <div className="sa-sidebar-cluster">
+          <div className="sa-cluster-status-box">
+            <div className="sa-cluster-header">
+              <span className="sa-pulse-indicator" />
+              <span className="sa-cluster-title">Mesh Cluster</span>
+            </div>
+            <div className="sa-cluster-desc">6 KVM Nodes Operational</div>
           </div>
+        </div>
 
-          <div
-            className="sa-rail-user-avatar"
-            title={`Super Admin: ${user?.name || user?.email || 'Master Admin'}`}
-          >
-            {user?.name ? user.name.slice(0, 2).toUpperCase() : 'SA'}
+        {/* User Profile & Sign Out Footer */}
+        <div className="sa-sidebar-footer">
+          <div className="sa-user-card">
+            <div className="sa-user-avatar">
+              {user?.name ? user.name.slice(0, 2).toUpperCase() : 'SA'}
+            </div>
+            <div className="sa-user-info">
+              <div className="sa-user-name">{user?.name || 'Administrator'}</div>
+              <div className="sa-user-email">{user?.email || 'superadmin@nexifyforge.in'}</div>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="sa-logout-btn"
+              title="Sign Out of Root Console"
+              aria-label="Sign Out"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="sa-rail-logout-btn"
-            title="Safely Sign Out of Console"
-          >
-            <LogOut size={18} />
-            <span className="sa-mobile-logout-text">Sign Out</span>
-          </button>
         </div>
       </aside>
 
-      {/* ──── MAIN DASHBOARD VIEWPORT ──── */}
+      {/* ──── MAIN VIEWPORT ──── */}
       <div className="sa-main-viewport">
-        {/* Minimalist Topbar */}
+        {/* Topbar */}
         <header className="sa-topbar">
           <div className="sa-topbar-left">
             <button
               type="button"
               className="sa-mobile-toggle"
               onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Toggle navigation"
+              aria-label="Toggle Navigation"
             >
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
             <div className="sa-breadcrumbs">
-              <span className="sa-breadcrumb-root">Nexify Platform</span>
+              <span className="sa-breadcrumb-root">Super Admin</span>
               <ChevronRight size={13} className="sa-breadcrumb-sep" />
               <span className="sa-breadcrumb-current">{getPageTitle()}</span>
             </div>
           </div>
 
           <div className="sa-topbar-right">
-            <div className="sa-cluster-badge">
-              <span className="sa-live-indicator" />
-              <span>Mesh Cluster: 100% Operational</span>
+            <div className="sa-live-status-pill">
+              <span className="sa-live-dot" />
+              <span>Cluster Synced</span>
             </div>
 
             <Link
               to="/"
               target="_blank"
               rel="noreferrer"
-              className="sa-landing-link"
+              className="sa-portal-link"
               title="Open Public Candidate Portal"
             >
               <span>Candidate Portal</span>
@@ -199,7 +225,7 @@ export default function SuperAdminLayout() {
           </div>
         </header>
 
-        {/* Page Content Canvas */}
+        {/* Main Canvas */}
         <main className="sa-canvas">
           <Outlet />
         </main>
