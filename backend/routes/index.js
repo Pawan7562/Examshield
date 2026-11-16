@@ -260,6 +260,8 @@ superAdmin.get('/colleges', subscriptionController.getAllColleges);
 superAdmin.post('/colleges', subscriptionController.createCollegeByAdmin);
 superAdmin.put('/colleges/:id', subscriptionController.updateCollegeByAdmin);
 superAdmin.patch('/colleges/:id/toggle', subscriptionController.toggleCollegeStatus);
+superAdmin.patch('/colleges/:id/approve', subscriptionController.approveCollege);
+superAdmin.patch('/colleges/:id/reject', subscriptionController.rejectCollege);
 superAdmin.patch('/colleges/:id/plan', subscriptionController.updateCollegePlan);
 superAdmin.post('/colleges/:id/reset-password', subscriptionController.resetCollegePassword);
 superAdmin.delete('/colleges/:id', subscriptionController.deleteCollegeByAdmin);

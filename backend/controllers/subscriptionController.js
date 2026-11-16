@@ -648,9 +648,15 @@ exports.getAllColleges = async (req, res) => {
     }
 
     if (status === 'active') {
-      conditions.push('c.is_active = true');
+      conditions.push("(c.is_active = true AND (c.status = 'approved' OR c.status IS NULL))");
     } else if (status === 'suspended') {
       conditions.push('c.is_active = false');
+    } else if (status === 'pending') {
+      conditions.push("c.status = 'pending'");
+    } else if (status === 'approved') {
+      conditions.push("c.status = 'approved'");
+    } else if (status === 'rejected') {
+      conditions.push("c.status = 'rejected'");
     }
 
     if (conditions.length > 0) {
@@ -663,6 +669,8 @@ exports.getAllColleges = async (req, res) => {
 
     res.json({
       success: true,
+      colleges: rows,
+      total: rows.length,
       data: {
         colleges: rows,
         total: rows.length,
@@ -714,8 +722,8 @@ exports.createCollegeByAdmin = async (req, res) => {
     endDate.setDate(endDate.getDate() + months * 30);
 
     const insertResult = await pool.query(
-      `INSERT INTO colleges (name, email, password, phone, address, website, subscription_plan, subscription_expiry, is_active, is_email_verified, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, NOW(), NOW())
+      `INSERT INTO colleges (name, email, password, phone, address, website, subscription_plan, subscription_expiry, status, is_active, is_email_verified, approved_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'approved', $9, true, NOW(), NOW(), NOW())
        RETURNING id, name, email, phone, address, website, subscription_plan, subscription_expiry, is_active, created_at`,
       [
         name.trim(),
@@ -1238,5 +1246,98 @@ exports.updatePlatformSettings = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update platform settings', error: error.message });
+  }
+};
+
+/**
+ * PATCH /api/super-admin/colleges/:id/approve
+ * Super Admin approves a registered college tenant
+ */
+exports.approveCollege = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const check = await pool.query('SELECT id, name, email, status, is_active FROM colleges WHERE id = $1', [id]);
+    if (check.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'College not found.' });
+    }
+
+    const updateResult = await pool.query(
+      `UPDATE colleges 
+       SET status = 'approved', is_active = true, approved_at = NOW(), approved_by = $1, rejection_reason = NULL, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, name, email, status, is_active, approved_at`,
+      [req.user?.id || null, id]
+    );
+
+    const approvedCollege = updateResult.rows[0];
+    console.log(`[SUPER-ADMIN] College approved: "${approvedCollege.email}" (${approvedCollege.name}) by admin ID: ${req.user?.id}`);
+
+    await logAudit({
+      actor_id: req.user?.id,
+      action: 'COLLEGE_APPROVED',
+      resource_type: 'college',
+      resource_id: id,
+      details: { name: approvedCollege.name, email: approvedCollege.email, status: 'approved' },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    });
+
+    res.json({
+      success: true,
+      message: `Institution "${approvedCollege.name}" has been approved! The college admin can now log in and access the dashboard.`,
+      data: { college: approvedCollege }
+    });
+  } catch (error) {
+    console.error('Approve college error:', error);
+    res.status(500).json({ success: false, message: 'Failed to approve college', error: error.message });
+  }
+};
+
+/**
+ * PATCH /api/super-admin/colleges/:id/reject
+ * Super Admin rejects a college registration request
+ */
+exports.rejectCollege = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+
+    const check = await pool.query('SELECT id, name, email FROM colleges WHERE id = $1', [id]);
+    if (check.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'College not found.' });
+    }
+
+    const rejectionReason = (reason || 'Registration declined by administrator.').trim();
+
+    const updateResult = await pool.query(
+      `UPDATE colleges 
+       SET status = 'rejected', is_active = false, rejection_reason = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, name, email, status, is_active, rejection_reason`,
+      [rejectionReason, id]
+    );
+
+    const rejectedCollege = updateResult.rows[0];
+    console.log(`[SUPER-ADMIN] College rejected: "${rejectedCollege.email}" (${rejectedCollege.name}). Reason: ${rejectionReason}`);
+
+    await logAudit({
+      actor_id: req.user?.id,
+      action: 'COLLEGE_REJECTED',
+      resource_type: 'college',
+      resource_id: id,
+      details: { name: rejectedCollege.name, email: rejectedCollege.email, reason: rejectionReason },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    });
+
+    res.json({
+      success: true,
+      message: `Registration for "${rejectedCollege.name}" was declined.`,
+      data: { college: rejectedCollege }
+    });
+  } catch (error) {
+    console.error('Reject college error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reject college', error: error.message });
   }
 };

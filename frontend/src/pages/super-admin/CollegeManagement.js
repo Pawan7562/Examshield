@@ -25,6 +25,7 @@ import {
   Lock,
   Mail,
   Sparkles,
+  Clock,
 } from 'lucide-react';
 import { superAdminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -44,6 +45,9 @@ export default function CollegeManagement() {
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [approvingId, setApprovingId] = useState(null);
 
   // Selected item state
   const [activeCollege, setActiveCollege] = useState(null);
@@ -267,16 +271,59 @@ export default function CollegeManagement() {
     }
   };
 
+  // Handle Approve College
+  const handleApproveCollege = async (id, name) => {
+    setApprovingId(id);
+    try {
+      const res = await superAdminAPI.approveCollege(id);
+      toast.success(res.data?.message || `${name} approved successfully!`);
+      fetchColleges();
+    } catch (err) {
+      console.error('Approval error:', err);
+      toast.error(err.response?.data?.message || 'Failed to approve college');
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  // Open Reject Modal
+  const openReject = (college) => {
+    setActiveCollege(college);
+    setRejectReason('');
+    setShowRejectModal(true);
+  };
+
+  // Submit Reject
+  const handleRejectSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!activeCollege) return;
+    setSubmitting(true);
+    try {
+      const res = await superAdminAPI.rejectCollege(activeCollege.id, { reason: rejectReason });
+      toast.success(res.data?.message || `${activeCollege.name} registration rejected.`);
+      setShowRejectModal(false);
+      fetchColleges();
+    } catch (err) {
+      console.error('Rejection error:', err);
+      toast.error(err.response?.data?.message || 'Failed to reject college');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Filter colleges in client
   const filteredColleges = colleges.filter((c) => {
-    if (statusFilter === 'active') return c.is_active === true;
-    if (statusFilter === 'suspended') return c.is_active === false;
+    if (statusFilter === 'pending') return c.status === 'pending';
+    if (statusFilter === 'rejected') return c.status === 'rejected';
+    if (statusFilter === 'active') return c.is_active === true && c.status !== 'pending';
+    if (statusFilter === 'suspended') return c.is_active === false && c.status !== 'pending';
     return true;
   });
 
   const totalCount = colleges.length;
-  const activeCount = colleges.filter((c) => c.is_active).length;
-  const suspendedCount = totalCount - activeCount;
+  const pendingCount = colleges.filter((c) => c.status === 'pending').length;
+  const activeCount = colleges.filter((c) => c.is_active && c.status !== 'pending').length;
+  const suspendedCount = totalCount - activeCount - pendingCount;
 
   return (
     <>
@@ -316,13 +363,36 @@ export default function CollegeManagement() {
       </div>
 
       {/* ──── DIRECTORY STATS RIBBON ──── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
         <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-sm)' }}>
           <div>
             <span style={{ fontSize: '0.74rem', color: 'var(--sa-text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Total Colleges</span>
             <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--sa-text)', fontFamily: 'Space Grotesk' }}>{totalCount}</div>
           </div>
           <Building2 size={24} style={{ color: 'var(--sa-blue)', opacity: 0.85 }} />
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('pending')}
+          style={{
+            background: pendingCount > 0 ? 'rgba(245, 158, 11, 0.08)' : 'var(--sa-card-bg)',
+            border: pendingCount > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--sa-border)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: 'var(--sa-shadow-sm)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+          title="Click to view pending approval requests"
+        >
+          <div>
+            <span style={{ fontSize: '0.74rem', color: pendingCount > 0 ? '#d97706' : 'var(--sa-text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>Pending Approval</span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: pendingCount > 0 ? '#d97706' : 'var(--sa-text)', fontFamily: 'Space Grotesk' }}>{pendingCount}</div>
+          </div>
+          <Clock size={24} style={{ color: '#f59e0b', opacity: 0.95 }} />
         </div>
 
         <div style={{ background: 'var(--sa-card-bg)', border: '1px solid var(--sa-border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--sa-shadow-sm)' }}>
@@ -363,6 +433,14 @@ export default function CollegeManagement() {
               onClick={() => setStatusFilter('all')}
             >
               All Tenants ({totalCount})
+            </button>
+            <button
+              type="button"
+              className={`sa-filter-pill ${statusFilter === 'pending' ? 'active' : ''}`}
+              style={pendingCount > 0 ? { borderColor: '#f59e0b', color: statusFilter === 'pending' ? '#fff' : '#d97706' } : {}}
+              onClick={() => setStatusFilter('pending')}
+            >
+              ⏳ Pending Approval ({pendingCount})
             </button>
             <button
               type="button"
@@ -480,75 +558,166 @@ export default function CollegeManagement() {
 
                       {/* Status */}
                       <td>
-                        <span className={`sa-badge ${!isSuspended ? 'sa-badge-active' : 'sa-badge-suspended'}`}>
-                          {!isSuspended ? 'ACTIVE' : 'SUSPENDED'}
-                        </span>
+                        {c.status === 'pending' ? (
+                          <span
+                            className="sa-badge"
+                            style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#d97706',
+                              border: '1px solid rgba(245, 158, 11, 0.35)',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <Clock size={11} />
+                            PENDING
+                          </span>
+                        ) : c.status === 'rejected' ? (
+                          <span
+                            className="sa-badge"
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#ef4444',
+                              border: '1px solid rgba(239, 68, 68, 0.35)',
+                              fontWeight: 700
+                            }}
+                          >
+                            REJECTED
+                          </span>
+                        ) : (
+                          <span className={`sa-badge ${!isSuspended ? 'sa-badge-active' : 'sa-badge-suspended'}`}>
+                            {!isSuspended ? 'ACTIVE' : 'SUSPENDED'}
+                          </span>
+                        )}
                       </td>
 
                       {/* Action Group */}
                       <td style={{ textAlign: 'right' }}>
-                        <div className="sa-action-btn-group">
-                          {/* Plan Override */}
-                          <button
-                            type="button"
-                            className="sa-icon-btn"
-                            title="Manage Plan & Licensing"
-                            onClick={() => openPlan(c)}
-                          >
-                            <Award size={14} style={{ color: 'var(--sa-amber)' }} />
-                          </button>
+                        {c.status === 'pending' ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className="sa-action-btn"
+                              style={{
+                                background: '#10b981',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '6px 14px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)'
+                              }}
+                              onClick={() => handleApproveCollege(c.id, c.name)}
+                              disabled={approvingId === c.id}
+                              title="Approve registration request"
+                            >
+                              <CheckCircle2 size={14} />
+                              <span>{approvingId === c.id ? 'Approving...' : 'Approve'}</span>
+                            </button>
 
-                          {/* Edit Metadata */}
-                          <button
-                            type="button"
-                            className="sa-icon-btn"
-                            title="Edit Institution Details"
-                            onClick={() => openEdit(c)}
-                          >
-                            <Edit2 size={14} />
-                          </button>
+                            <button
+                              type="button"
+                              className="sa-action-btn"
+                              style={{
+                                background: '#ef4444',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                              }}
+                              onClick={() => openReject(c)}
+                              title="Decline registration request"
+                            >
+                              <XCircle size={14} />
+                              <span>Reject</span>
+                            </button>
 
-                          {/* Reset Password */}
-                          <button
-                            type="button"
-                            className="sa-icon-btn"
-                            title="Reset Administrator Password"
-                            onClick={() => openResetPassword(c)}
-                          >
-                            <KeyRound size={14} />
-                          </button>
+                            <button
+                              type="button"
+                              className="sa-icon-btn sa-icon-btn-danger"
+                              title="Remove Record"
+                              onClick={() => openDelete(c)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="sa-action-btn-group">
+                            {/* Plan Override */}
+                            <button
+                              type="button"
+                              className="sa-icon-btn"
+                              title="Manage Plan & Licensing"
+                              onClick={() => openPlan(c)}
+                            >
+                              <Award size={14} style={{ color: 'var(--sa-amber)' }} />
+                            </button>
 
-                          {/* Toggle Active/Suspend */}
-                          <button
-                            type="button"
-                            className={`sa-btn-toggle ${!isSuspended ? 'sa-btn-suspend' : 'sa-btn-activate'}`}
-                            onClick={() => toggleCollege(c.id, c.name, c.is_active)}
-                            disabled={togglingId === c.id}
-                            title={!isSuspended ? 'Suspend tenant access' : 'Activate tenant access'}
-                          >
-                            {!isSuspended ? (
-                              <>
-                                <XCircle size={13} />
-                                <span>{togglingId === c.id ? '...' : 'Suspend'}</span>
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 size={13} />
-                                <span>{togglingId === c.id ? '...' : 'Activate'}</span>
-                              </>
-                            )}
-                          </button>
+                            {/* Edit Metadata */}
+                            <button
+                              type="button"
+                              className="sa-icon-btn"
+                              title="Edit Institution Details"
+                              onClick={() => openEdit(c)}
+                            >
+                              <Edit2 size={14} />
+                            </button>
 
-                          {/* Delete */}
-                          <button
-                            type="button"
-                            className="sa-icon-btn sa-icon-btn-danger"
-                            title="Remove Institution"
-                            onClick={() => openDelete(c)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                            {/* Reset Password */}
+                            <button
+                              type="button"
+                              className="sa-icon-btn"
+                              title="Reset Administrator Password"
+                              onClick={() => openResetPassword(c)}
+                            >
+                              <KeyRound size={14} />
+                            </button>
+
+                            {/* Toggle Active/Suspend */}
+                            <button
+                              type="button"
+                              className={`sa-btn-toggle ${!isSuspended ? 'sa-btn-suspend' : 'sa-btn-activate'}`}
+                              onClick={() => toggleCollege(c.id, c.name, c.is_active)}
+                              disabled={togglingId === c.id}
+                              title={!isSuspended ? 'Suspend tenant access' : 'Activate tenant access'}
+                            >
+                              {!isSuspended ? (
+                                <>
+                                  <XCircle size={13} />
+                                  <span>{togglingId === c.id ? '...' : 'Suspend'}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={13} />
+                                  <span>{togglingId === c.id ? '...' : 'Activate'}</span>
+                                </>
+                              )}
+                            </button>
+
+                            {/* Delete */}
+                            <button
+                              type="button"
+                              className="sa-icon-btn sa-icon-btn-danger"
+                              title="Remove Institution"
+                              onClick={() => openDelete(c)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -1063,6 +1232,71 @@ export default function CollegeManagement() {
                 {submitting ? 'Deleting...' : 'Confirm Deletion'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          MODAL 6: REJECT REGISTRATION REQUEST
+          ═══════════════════════════════════════════════════════════ */}
+      {showRejectModal && activeCollege && (
+        <div className="sa-modal-backdrop" onClick={() => setShowRejectModal(false)}>
+          <div className="sa-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sa-modal-header">
+              <div>
+                <h3 className="sa-modal-title" style={{ color: 'var(--sa-rose)' }}>
+                  <XCircle size={20} />
+                  Reject Registration Request
+                </h3>
+                <p className="sa-modal-subtitle">
+                  Decline onboarding for "{activeCollege.name}" ({activeCollege.email})
+                </p>
+              </div>
+              <button type="button" className="sa-modal-close" onClick={() => setShowRejectModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleRejectSubmit}>
+              <div className="sa-modal-body">
+                <p style={{ margin: '0 0 16px', color: 'var(--sa-text)', fontSize: '0.92rem', lineHeight: 1.5 }}>
+                  Are you sure you want to decline this institution registration? The college administrator will be barred from logging in or accessing platform features.
+                </p>
+
+                <div className="sa-form-group">
+                  <label className="sa-form-label">Rejection Reason (Optional)</label>
+                  <textarea
+                    className="sa-form-input"
+                    rows={3}
+                    placeholder="e.g. Unverified institutional domain, incomplete contact details, duplicate application..."
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    style={{ resize: 'vertical' }}
+                  />
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    This reason will be recorded and shown if the administrator attempts to sign in.
+                  </span>
+                </div>
+              </div>
+
+              <div className="sa-modal-footer">
+                <button
+                  type="button"
+                  className="sa-action-btn sa-btn-secondary"
+                  onClick={() => setShowRejectModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="sa-action-btn"
+                  style={{ background: 'var(--sa-rose)', color: '#ffffff', border: 'none' }}
+                  disabled={submitting}
+                >
+                  {submitting ? 'Rejecting...' : 'Confirm Rejection'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

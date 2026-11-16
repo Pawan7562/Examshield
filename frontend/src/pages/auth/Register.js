@@ -21,7 +21,8 @@ import {
   Video,
   FileCheck,
   LockKeyhole,
-  GraduationCap
+  GraduationCap,
+  Clock
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { authAPI } from '../../services/api';
@@ -45,6 +46,8 @@ export default function Register() {
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [submittedCollege, setSubmittedCollege] = useState(null);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -116,15 +119,13 @@ export default function Register() {
     setLoading(true);
     try {
       const res = await authAPI.collegeRegister(form);
-      const tokenPayload = {
-        accessToken: res.data?.accessToken || res.data?.data?.accessToken,
-        refreshToken: res.data?.refreshToken || res.data?.data?.refreshToken,
-      };
-      const userPayload = res.data?.user || res.data?.data?.user;
-
-      login(userPayload, tokenPayload);
-      toast.success('🎉 College registered! 14-day trial activated.');
-      navigate('/admin/dashboard');
+      setSubmittedCollege({
+        collegeName: form.collegeName,
+        name: form.name,
+        email: form.email,
+      });
+      setSubmittedSuccess(true);
+      toast.success(res.data?.message || 'Registration submitted for Super Admin approval!');
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Registration failed. Please try again.';
       setErrorMessage(msg);
@@ -222,8 +223,92 @@ export default function Register() {
 
             {/* Right Column: Registration Card */}
             <div className="register-card">
-              {/* Stepper Tabs */}
-              <div className="register-stepper" role="navigation" aria-label="Registration steps">
+              {submittedSuccess ? (
+                <div style={{ padding: '24px 16px', textAlign: 'center' }}>
+                  <div style={{
+                    width: '68px',
+                    height: '68px',
+                    borderRadius: '50%',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    color: '#f59e0b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px',
+                    border: '1px solid rgba(245, 158, 11, 0.25)'
+                  }}>
+                    <Clock size={34} />
+                  </div>
+
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#d97706',
+                    padding: '6px 14px',
+                    borderRadius: '999px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    marginBottom: '16px'
+                  }}>
+                    <Clock size={13} />
+                    Pending Super Admin Approval
+                  </span>
+
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: '0 0 10px' }}>
+                    Registration Submitted!
+                  </h2>
+
+                  <p style={{ color: '#64748b', fontSize: '0.92rem', lineHeight: 1.6, margin: '0 0 24px' }}>
+                    Thank you for registering <strong>{submittedCollege?.collegeName}</strong>. To maintain the highest standard of security and academic integrity, every new institution account must be reviewed and approved by the Super Admin before platform access is granted.
+                  </p>
+
+                  {/* Summary Details Box */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '16px 20px',
+                    textAlign: 'left',
+                    marginBottom: '24px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e2e8f0', fontSize: '0.88rem' }}>
+                      <span style={{ color: '#64748b' }}>Institution:</span>
+                      <strong style={{ color: '#0f172a' }}>{submittedCollege?.collegeName}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e2e8f0', fontSize: '0.88rem' }}>
+                      <span style={{ color: '#64748b' }}>Administrator:</span>
+                      <strong style={{ color: '#0f172a' }}>{submittedCollege?.name}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '0.88rem' }}>
+                      <span style={{ color: '#64748b' }}>Institutional Email:</span>
+                      <strong style={{ color: '#0f172a' }}>{submittedCollege?.email}</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 16px', textAlign: 'left', marginBottom: '24px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <ShieldCheck size={18} style={{ color: '#2563eb', flexShrink: 0, marginTop: '2px' }} />
+                    <p style={{ margin: 0, fontSize: '0.84rem', color: '#1e40af', lineHeight: 1.5 }}>
+                      Once approved by the Super Admin, you will be able to log in with your institutional credentials and immediately manage exams, candidate keys, and AI proctoring sessions.
+                    </p>
+                  </div>
+
+                  <Link
+                    to="/admin/login"
+                    className="register-submit-btn"
+                    style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }}
+                  >
+                    <span>Proceed to College Sign In</span>
+                    <ArrowRight size={18} />
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {/* Stepper Tabs */}
+                  <div className="register-stepper" role="navigation" aria-label="Registration steps">
                 <button
                   type="button"
                   className={`register-step-item ${step === 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}
@@ -522,6 +607,8 @@ export default function Register() {
                   </Link>
                 </div>
               </div>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -177,6 +177,7 @@ exports.superAdminLogin = async (req, res) => {
 // COLLEGE ADMIN AUTH
 // =====================================================
 
+
 /**
  * POST /api/auth/college/register
  */
@@ -185,74 +186,71 @@ exports.collegeRegister = async (req, res) => {
     console.log('Registration request received:', req.body);
     const { name, email, password, phone, address, website, collegeName } = req.body;
 
-    if (!name || !email || !password || !collegeName) {
-      return res.status(400).json({ success: false, message: 'All required fields must be filled.' });
+    const institutionName = (collegeName || name || '').trim();
+    if (!institutionName || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Institution name, email, and password are required.' });
     }
 
     const normalizedEmail = normalizeEmail(email);
 
-    console.log('Checking if email already exists...');
     // Check if email already exists
-    const { data: existingCollege } = await supabase
-      .from('colleges')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .limit(1);
-
-    if (existingCollege && existingCollege.length > 0) {
-      return res.status(409).json({ success: false, message: 'Email already registered.' });
+    const existing = await pool.query('SELECT id FROM colleges WHERE LOWER(email) = LOWER($1) LIMIT 1', [normalizedEmail]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ success: false, message: 'An institution with this email address is already registered.' });
     }
 
-    console.log('Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 12);
     
-    // Create college with 14-day trial
+    // Trial 14 days calculated
     const trialExpiry = new Date();
     trialExpiry.setDate(trialExpiry.getDate() + 14);
     
-    console.log('Creating college record...');
-    const { data: college, error } = await supabase
-      .from('colleges')
-      .insert([{
-        name: collegeName,
-        email: normalizedEmail,
-        password: hashedPassword,
-        phone: phone || null,
-        address: address || null,
-        website: website || null,
-        subscription_plan: 'basic',
-        subscription_expiry: trialExpiry.toISOString(),
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }])
-      .select()
-      .single();
+    // Create college with status: 'pending' and is_active: false (Requires Super Admin Approval)
+    const insertResult = await pool.query(
+      `INSERT INTO colleges (
+        name,
+        email,
+        password,
+        phone,
+        address,
+        website,
+        subscription_plan,
+        subscription_expiry,
+        status,
+        is_active,
+        is_email_verified,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, 'basic', $7, 'pending', false, false, NOW(), NOW())
+      RETURNING id, name, email, phone, website, status, is_active, created_at`,
+      [
+        institutionName,
+        normalizedEmail,
+        hashedPassword,
+        phone ? phone.trim() : null,
+        address ? address.trim() : null,
+        website ? website.trim() : null,
+        trialExpiry.toISOString()
+      ]
+    );
 
-    if (error) {
-      console.error('College creation error:', error);
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Failed to create college account',
-        error: error.message 
-      });
-    }
+    const college = insertResult.rows[0];
+    console.log(`[AUTH] College registered (PENDING APPROVAL): "${college.email}" (${college.name}) ID: ${college.id}`);
 
-    console.log('College created:', college);
-    
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens({ id: college.id, role: 'college_admin' });
-    
-    res.status(201).json({
+    // Return pending approval response - NO TOKENS ISSUED
+    return res.status(201).json({
       success: true,
-      message: 'College registered successfully! 14-day trial activated.',
+      status: 'pending',
+      message: 'Registration submitted successfully! Your account is currently pending approval by the Super Admin. You will receive access once approved.',
       data: {
-        user: { id: college.id, name: college.name, email: college.email, role: 'college_admin' },
-        accessToken,
-        refreshToken
+        id: college.id,
+        name: college.name,
+        email: college.email,
+        status: 'pending',
+        is_active: false,
+        requiresApproval: true
       }
     });
-    
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ 
@@ -320,8 +318,30 @@ exports.collegeLogin = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
 
+    // CHECK SUPER ADMIN APPROVAL STATUS
+    if (college.status === 'pending') {
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_PENDING_APPROVAL',
+        message: 'Your registration request is pending approval by the Super Admin. You will be able to log in once your account has been reviewed and approved.',
+      });
+    }
+
+    if (college.status === 'rejected') {
+      const reason = college.rejection_reason ? ` Reason: ${college.rejection_reason}` : '';
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_REJECTED',
+        message: `Your registration request was declined.${reason} Please contact support for assistance.`,
+      });
+    }
+
     if (college.is_active === false) {
-      return res.status(403).json({ success: false, message: 'Your account has been suspended.' });
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'Your college account has been suspended. Please contact platform support.',
+      });
     }
 
     const tokens = generateTokens({ id: college.id, role: 'college_admin' });

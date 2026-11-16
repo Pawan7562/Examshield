@@ -75,13 +75,16 @@ const authenticate = async (req, res, next) => {
     } else if (decoded.role === 'college_admin') {
       const { data } = await supabase
         .from('colleges')
-        .select('id, name, email, subscription_plan, subscription_expiry, is_active')
+        .select('id, name, email, subscription_plan, subscription_expiry, is_active, status')
         .eq('id', decoded.id)
         .limit(1);
       user = data?.[0];
-      if (user && user.is_active === false) {
+      if (user && (user.is_active === false || user.status === 'pending' || user.status === 'rejected')) {
         userCache.delete(cacheKey);
-        return res.status(403).json({ success: false, message: 'Account has been deactivated.' });
+        const msg = user.status === 'pending'
+          ? 'Your registration request is pending approval by the Super Admin. You will be able to access the dashboard once approved.'
+          : (user.status === 'rejected' ? 'Your registration request was declined. Please contact support.' : 'Account has been deactivated.');
+        return res.status(403).json({ success: false, message: msg });
       }
     } else if (decoded.role === 'student') {
       const { data } = await supabase
