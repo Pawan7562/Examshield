@@ -121,6 +121,8 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/admin/register" element={<Register />} />
           <Route path="/student/login" element={<Login role="student" />} />
+          <Route path="/track-status" element={<Navigate to="/admin/login?track=true" replace />} />
+          <Route path="/college/status" element={<Navigate to="/admin/login?track=true" replace />} />
           <Route path="/college/reset-password" element={<AdminResetPassword />} />
           <Route path="/admin/reset-password" element={<AdminResetPassword />} />
           <Route path="/student/password-reset" element={<Navigate to="/student/login" replace />} />

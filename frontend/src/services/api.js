@@ -236,6 +236,7 @@ api.delete = async (...args) => {
 export const authAPI = {
   superAdminLogin: (data) => api.post('/auth/super-admin/login', data),
   collegeRegister: (data) => api.post('/auth/college/register', data),
+  checkApplicationStatus: (params) => api.get('/auth/college/application-status', { params }),
   collegeLogin: (data) => api.post('/auth/college/login', data),
   collegeForgotPassword: (data) => api.post('/auth/college/forgot-password', data),
   collegeResetPassword: (data) => api.post('/auth/college/reset-password', data),

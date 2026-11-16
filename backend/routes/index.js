@@ -92,6 +92,8 @@ const passwordRecoveryLimiter = rateLimit({
 const auth = express.Router();
 auth.post('/super-admin/login', authController.superAdminLogin);
 auth.post('/college/register', authController.collegeRegister);
+auth.get('/college/application-status', authController.getCollegeApplicationStatus);
+auth.post('/college/application-status', authController.getCollegeApplicationStatus);
 auth.post('/college/login', authController.collegeLogin);
 auth.post('/college/forgot-password', passwordRecoveryLimiter, authController.collegeForgotPassword);
 auth.post('/college/reset-password', passwordRecoveryLimiter, authController.collegeResetPassword);

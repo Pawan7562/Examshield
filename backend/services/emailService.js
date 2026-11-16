@@ -1453,6 +1453,99 @@ const sendCollegeWelcome = async ({ name, email, collegeName }) => {
 };
 
 /**
+ * Send College Registration Approval Email
+ * Triggered automatically when Super Admin approves a registered college tenant
+ */
+const sendCollegeApprovalEmail = async ({ name, email, collegeName }) => {
+  const adminLoginUrl = `${resolvePortalBaseUrl()}/admin/login`;
+  const safeAdminHref = adminLoginUrl.replace(/&/g, '&amp;');
+
+  const content = `
+    <div style="display: inline-block; padding: 4px 12px; border-radius: 4px; background-color: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 16px;">
+      REGISTRATION APPROVED &bull; ACCOUNT ACTIVE
+    </div>
+
+    <h2 style="margin: 0 0 10px; font-size: 22px; font-weight: 800; color: #0f2744;">
+      Congratulations! Your College Account is Approved
+    </h2>
+
+    <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.65; color: #334155;">
+      Hello <strong>${name || 'Administrator'}</strong>,<br/><br/>
+      We are pleased to inform you that your registration request for <strong>${collegeName || name}</strong> has been officially reviewed and <strong>approved</strong> by the Super Admin. Your institution has been granted full access to the <strong>Nexify Examina</strong> platform.
+    </p>
+
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+      <h3 style="margin: 0 0 12px; font-size: 15px; color: #166534;">Verified Institutional Account Details</h3>
+      <ul style="margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.8; color: #15803d;">
+        <li><strong>Institution:</strong> ${collegeName || name}</li>
+        <li><strong>Registered Email:</strong> ${email}</li>
+        <li><strong>Account Status:</strong> <span style="background-color: #dcfce7; padding: 2px 8px; border-radius: 4px; color: #15803d; font-weight: 700;">APPROVED &amp; ACTIVE</span></li>
+        <li><strong>Access Granted:</strong> Full Institution Dashboard, AI Proctoring &amp; Student Exam Management</li>
+      </ul>
+    </div>
+
+    <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.65; color: #334155;">
+      You can now log in to the College Admin Portal using the email address and password you configured during registration.
+    </p>
+
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 28px 0 20px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center" style="border-radius: 6px; background-color: #10b981;">
+                <a href="${safeAdminHref}" target="_blank" style="background-color: #10b981; border: 1px solid #10b981; border-radius: 6px; color: #ffffff; display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; line-height: 1.2; padding: 14px 36px; text-decoration: none; text-align: center; -webkit-text-size-adjust: none;">
+                  Log In to College Dashboard &rarr;
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-top: 24px;">
+      <h4 style="margin: 0 0 8px; font-size: 13px; color: #0f2744;">Next Steps to Get Started:</h4>
+      <ol style="margin: 0; padding-left: 20px; font-size: 12.5px; line-height: 1.7; color: #475569;">
+        <li>Log in to your admin dashboard at <a href="${safeAdminHref}" style="color: #2563eb;">${adminLoginUrl}</a></li>
+        <li>Create exam categories and import student rosters</li>
+        <li>Schedule AI proctored exams and generate student exam access keys</li>
+      </ol>
+    </div>
+  `;
+
+  const subjectLine = `[Nexify Examina] Registration Approved — Welcome ${collegeName || name}!`;
+  const plainText = [
+    `REGISTRATION APPROVED`,
+    `Institution: ${collegeName || name}`,
+    `Administrator: ${name || 'Administrator'}`,
+    `Email: ${email}`,
+    `Your college admin account is now approved and active.`,
+    `Log in here: ${adminLoginUrl}`,
+    `Nexify Examina is developed and powered by Nexify Forge (https://nexifyforge.in)`
+  ].join('\n');
+
+  try {
+    await sendWithRetry({
+      to: email,
+      subject: subjectLine,
+      text: plainText,
+      html: baseTemplate(content, {
+        title: subjectLine,
+        collegeName: collegeName || name,
+        badgeText: 'REGISTRATION APPROVED',
+        preheader: `Your registration for ${collegeName || name} on Nexify Examina has been approved!`
+      }),
+    });
+    console.log(`[EMAIL] Approval notification email dispatched to ${email}`);
+    return { success: true };
+  } catch (err) {
+    console.error(`[EMAIL ERROR] Failed to send approval email to ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * Send College Admin Password Reset Email
  */
 const sendCollegeAdminPasswordReset = async ({ name, email, collegeName, resetUrl, resetCode, resetToken }) => {
@@ -1606,6 +1699,7 @@ module.exports = {
   sendExamReminder,
   sendResultNotification,
   sendCollegeWelcome,
+  sendCollegeApprovalEmail,
   sendCollegeAdminPasswordReset,
   sendPasswordChangedAlert,
   resolveStudentLoginUrl,

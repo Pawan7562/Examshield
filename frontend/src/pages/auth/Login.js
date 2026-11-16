@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authAPI, studentAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import PublicLayout from '../../components/public/PublicLayout';
+import ApplicationStatusModal from '../../components/auth/ApplicationStatusModal';
 import './Login.css';
 
 const REMEMBER_KEY = 'examshield_saved_identifier';
@@ -65,6 +66,10 @@ const Login = ({ role }) => {
   const [studentHelpNotes, setStudentHelpNotes] = useState('');
   const [studentHelpLoading, setStudentHelpLoading] = useState(false);
   const [studentHelpSuccess, setStudentHelpSuccess] = useState(null);
+
+  // College Application Status Tracking Modal
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusTrackingEmail, setStatusTrackingEmail] = useState('');
 
   const handleAdminForgotSubmit = async (e) => {
     e.preventDefault();
@@ -200,6 +205,13 @@ const Login = ({ role }) => {
         setRememberMe(false);
       }
     }
+
+    if (searchParams.get('track') === 'true' || searchParams.get('status') === 'true') {
+      const trackEmail = searchParams.get('email') || emailParam || '';
+      if (trackEmail) setStatusTrackingEmail(trackEmail.trim());
+      setShowStatusModal(true);
+    }
+
     setErrorMessage('');
   }, [activeRole, location.search]);
 
@@ -260,6 +272,7 @@ const Login = ({ role }) => {
       navigate(isStudent ? '/student/dashboard' : '/admin/dashboard');
     } catch (err) {
       console.error('Login error details:', err);
+      const resCode = err?.response?.data?.code || err?.data?.code;
       const displayMsg =
         err?.response?.data?.message ||
         err?.data?.message ||
@@ -268,6 +281,12 @@ const Login = ({ role }) => {
 
       setErrorMessage(displayMsg);
       toast.error(displayMsg);
+
+      // If college account is pending approval or rejected, auto-open status tracker!
+      if (resCode === 'ACCOUNT_PENDING_APPROVAL' || resCode === 'ACCOUNT_REJECTED') {
+        setStatusTrackingEmail(cleanIdentifier);
+        setShowStatusModal(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -502,10 +521,35 @@ const Login = ({ role }) => {
           {/* Bottom Navigation */}
           <div className="login-meta-nav">
             {!isStudent && (
-              <p className="login-meta-text">
-                Looking to deploy Nexify Examina for your institution?{' '}
-                <Link to="/admin/register">Register your college (14-day free trial)</Link>
-              </p>
+              <>
+                <p className="login-meta-text">
+                  Looking to deploy Nexify Examina for your institution?{' '}
+                  <Link to="/admin/register">Register your college (14-day free trial)</Link>
+                </p>
+                <p className="login-meta-text" style={{ marginTop: '8px' }}>
+                  Submitted a registration request?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatusTrackingEmail(identifier.trim());
+                      setShowStatusModal(true);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#10b981',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      padding: 0,
+                      textDecoration: 'underline',
+                      fontSize: 'inherit',
+                      fontFamily: 'inherit'
+                    }}
+                  >
+                    Track Application Status &rarr;
+                  </button>
+                </p>
+              </>
             )}
 
             {isStudent && (
@@ -886,6 +930,19 @@ const Login = ({ role }) => {
           </div>
         </div>
       )}
+
+      {/* College Registration Application Status Modal */}
+      <ApplicationStatusModal
+        isOpen={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        initialEmail={statusTrackingEmail}
+        onProceedLogin={(approvedEmail) => {
+          setActiveRole('admin');
+          setIdentifier(approvedEmail);
+          setShowStatusModal(false);
+          toast.success('Your account is approved! Enter your password to sign in.');
+        }}
+      />
     </PublicLayout>
   );
 };

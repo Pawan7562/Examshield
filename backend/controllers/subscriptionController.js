@@ -1301,6 +1301,20 @@ exports.approveCollege = async (req, res) => {
       user_agent: req.headers['user-agent'],
     });
 
+    // Send automatic approval notification email to the college's registered email
+    try {
+      const { sendCollegeApprovalEmail } = require('../services/emailService');
+      if (sendCollegeApprovalEmail) {
+        sendCollegeApprovalEmail({
+          name: approvedCollege.name,
+          email: approvedCollege.email,
+          collegeName: approvedCollege.name,
+        }).catch(err => console.error('[EMAIL] Async approval email dispatch error:', err.message));
+      }
+    } catch (emailErr) {
+      console.error('[EMAIL] Failed to trigger approval email:', emailErr.message);
+    }
+
     res.json({
       success: true,
       message: `Institution "${approvedCollege.name}" has been approved! The college admin can now log in and access the dashboard.`,

@@ -28,6 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import PublicLayout from '../../components/public/PublicLayout';
+import ApplicationStatusModal from '../../components/auth/ApplicationStatusModal';
 import './Register.css';
 
 export default function Register() {
@@ -48,6 +49,7 @@ export default function Register() {
   const [errorMessage, setErrorMessage] = useState('');
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [submittedCollege, setSubmittedCollege] = useState(null);
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -289,12 +291,37 @@ export default function Register() {
                     </div>
                   </div>
 
-                  <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 16px', textAlign: 'left', marginBottom: '24px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 16px', textAlign: 'left', marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                     <ShieldCheck size={18} style={{ color: '#2563eb', flexShrink: 0, marginTop: '2px' }} />
                     <p style={{ margin: 0, fontSize: '0.84rem', color: '#1e40af', lineHeight: 1.5 }}>
                       Once approved by the Super Admin, you will be able to log in with your institutional credentials and immediately manage exams, candidate keys, and AI proctoring sessions.
                     </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowStatusModal(true)}
+                    style={{
+                      background: '#0f172a',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '12px 20px',
+                      fontSize: '0.92rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      marginBottom: '10px',
+                      boxShadow: '0 2px 6px rgba(15, 23, 42, 0.25)'
+                    }}
+                  >
+                    <Clock size={16} color="#f59e0b" />
+                    <span>Track Live Application Status</span>
+                  </button>
 
                   <Link
                     to="/admin/login"
@@ -613,6 +640,16 @@ export default function Register() {
           </div>
         </div>
       </section>
+
+      {/* College Registration Application Status Modal */}
+      <ApplicationStatusModal
+        isOpen={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        initialEmail={submittedCollege?.email || form.email}
+        onProceedLogin={(approvedEmail) => {
+          navigate(`/admin/login?email=${encodeURIComponent(approvedEmail)}`);
+        }}
+      />
     </PublicLayout>
   );
 }

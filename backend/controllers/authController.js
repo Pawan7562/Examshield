@@ -794,3 +794,55 @@ exports.collegeResetPassword = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to reset administrator password', error: error.message });
   }
 };
+
+
+/**
+ * GET or POST /api/auth/college/application-status
+ * Check registration application status by email
+ */
+exports.getCollegeApplicationStatus = async (req, res) => {
+  try {
+    const email = (req.query.email || req.body.email || '').trim();
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Institutional email is required.' });
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    const result = await pool.query(
+      `SELECT id, name, email, phone, website, status, is_active, rejection_reason, created_at, approved_at 
+       FROM colleges 
+       WHERE LOWER(email) = LOWER($1) 
+       LIMIT 1`,
+      [normalizedEmail]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No registration application found for this email address. Please verify your email or submit a new registration.'
+      });
+    }
+
+    const college = result.rows[0];
+    const status = college.status || (college.is_active ? 'approved' : 'pending');
+
+    return res.json({
+      success: true,
+      data: {
+        id: college.id,
+        name: college.name,
+        email: college.email,
+        phone: college.phone,
+        website: college.website,
+        status, // 'pending' | 'approved' | 'rejected'
+        isActive: college.is_active,
+        rejectionReason: status === 'rejected' ? (college.rejection_reason || 'Application declined by administrator.') : null,
+        submittedAt: college.created_at,
+        approvedAt: college.approved_at,
+      }
+    });
+  } catch (error) {
+    console.error('Application status check error:', error);
+    res.status(500).json({ success: false, message: 'Server error checking application status', error: error.message });
+  }
+};
