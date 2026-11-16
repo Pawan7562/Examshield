@@ -77,7 +77,16 @@ export default function CollegeAdminDashboard() {
   // Active / Upcoming exam
   const currentExam = useMemo(() => {
     if (data?.upcomingExams && data.upcomingExams.length > 0) {
-      return data.upcomingExams[0];
+      const ex = data.upcomingExams[0];
+      return {
+        id: ex.id || 'live-exam',
+        name: ex.title || ex.name || 'Active Examination Session',
+        time: ex.date_time ? formatIST(ex.date_time, 'timeOnly') : '08:00 PM',
+        date: ex.date_time ? formatIST(ex.date_time, 'dateOnly') : '16 Nov 2026',
+        totalCandidates: ex.total_students || 526,
+        activeCandidates: ex.active_students || 482,
+        activePct: 92,
+      };
     }
     return {
       id: 'live-aiml-sem3',
@@ -216,12 +225,7 @@ export default function CollegeAdminDashboard() {
             <Clock size={14} className="welcome-clock-icon" />
             <span>
               Last Updated: {formatIST(currentTime, 'dateOnly')} •{' '}
-              {currentTime.toLocaleTimeString('en-IN', {
-                timeZone: 'Asia/Kolkata',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true,
-              })}
+              {formatIST(currentTime, 'timeOnly')}
             </span>
           </div>
         </div>
