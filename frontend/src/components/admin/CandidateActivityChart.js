@@ -32,7 +32,14 @@ const curve = (pts) =>
 
 export default function CandidateActivityChart() {
   const [range, setRange] = useState(7);
-  const [tipState, setTipState] = useState({ visible: false, text: '', left: 0, top: 0 });
+  const [tipState, setTipState] = useState({
+    visible: false,
+    title: '',
+    valA: 0,
+    valB: 0,
+    left: 0,
+    top: 0
+  });
   const [cursorState, setCursorState] = useState({ visible: false, x: 0, y1: 0, y2: 0 });
   const [pathKey, setPathKey] = useState(0);
 
@@ -50,7 +57,7 @@ export default function CandidateActivityChart() {
 
   useEffect(() => {
     setPathKey((k) => k + 1);
-    setTipState({ visible: false, text: '', left: 0, top: 0 });
+    setTipState({ visible: false, title: '', valA: 0, valB: 0, left: 0, top: 0 });
     setCursorState({ visible: false, x: 0, y1: 0, y2: 0 });
   }, [range]);
 
@@ -70,9 +77,7 @@ export default function CandidateActivityChart() {
     const yValA = getY(data[idx][0]);
     const yValB = getY(data[idx][1]);
 
-    const labelText =
-      range === 7 ? LABELS[idx] : `Day ${idx + 1}`;
-    const text = `${labelText}: ${data[idx][0]} enrolled, ${data[idx][1]} submitted`;
+    const title = range === 7 ? LABELS[idx] : `Day ${idx + 1}`;
 
     setCursorState({
       visible: true,
@@ -83,9 +88,11 @@ export default function CandidateActivityChart() {
 
     setTipState({
       visible: true,
-      text,
+      title,
+      valA: data[idx][0],
+      valB: data[idx][1],
       left: (xVal / W) * rc.width,
-      top: (yValA / H) * rc.height
+      top: (Math.min(yValA, yValB) / H) * rc.height
     });
   };
 
@@ -101,13 +108,14 @@ export default function CandidateActivityChart() {
   const pathA = curve(ptsA);
   const pathB = curve(ptsB);
   const areaA = `${pathA} L${ptsA[ptsA.length - 1][0]} ${baseY} L${ptsA[0][0]} ${baseY}Z`;
+  const areaB = `${pathB} L${ptsB[ptsB.length - 1][0]} ${baseY} L${ptsB[0][0]} ${baseY}Z`;
 
   return (
     <article className="card pad rise" style={{ '--d': 2 }}>
       <div className="ph">
         <div>
           <h2>Candidate activity</h2>
-          <p>Enrollments and submissions over time</p>
+          <p>Enrollments and exam submissions over time</p>
         </div>
         <div className="seg" id="seg">
           <button
@@ -154,12 +162,18 @@ export default function CandidateActivityChart() {
         >
           <defs>
             <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="var(--c1)" stopOpacity="0.16" />
-              <stop offset="1" stopColor="var(--c1)" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--c1)" stopOpacity="0.22" />
+              <stop offset="60%" stopColor="var(--c1)" stopOpacity="0.06" />
+              <stop offset="100%" stopColor="var(--c1)" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="gb" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--gold)" stopOpacity="0.16" />
+              <stop offset="70%" stopColor="var(--gold)" stopOpacity="0.04" />
+              <stop offset="100%" stopColor="var(--gold)" stopOpacity="0" />
             </linearGradient>
           </defs>
 
-          {/* Grid lines and y labels */}
+          {/* Grid lines and horizontal values */}
           {[0, 40, 80, 120].map((v) => (
             <g key={v}>
               <line
@@ -168,13 +182,15 @@ export default function CandidateActivityChart() {
                 y1={getY(v)}
                 y2={getY(v)}
                 stroke="var(--bd)"
+                strokeDasharray={v === 0 ? 'none' : '3 4'}
+                strokeWidth={v === 0 ? '1.2' : '1'}
               />
               <text
                 x="0"
                 y={getY(v) + 4}
                 fill="var(--mu)"
                 fontSize="11"
-                fontFamily="IBM Plex Sans, sans-serif"
+                fontWeight="500"
               >
                 {v}
               </text>
@@ -183,115 +199,136 @@ export default function CandidateActivityChart() {
 
           {/* X axis labels */}
           {data.map((_, i) => {
-            const showLabel = data.length <= 7 || i % Math.ceil(data.length / 6) === 0;
-            if (!showLabel) return null;
-            return (
-              <text
-                key={i}
-                x={getX(i)}
-                y={H - 6}
-                fill="var(--mu)"
-                fontSize="11"
-                textAnchor="middle"
-                fontFamily="IBM Plex Sans, sans-serif"
-              >
-                {range === 7 ? LABELS[i] : i + 1}
-              </text>
-            );
+            if (data.length <= 7 || i % Math.ceil(data.length / 6) === 0) {
+              const label = range === 7 ? LABELS[i] : i + 1;
+              return (
+                <text
+                  key={i}
+                  x={getX(i)}
+                  y={H - 6}
+                  fill="var(--mu)"
+                  fontSize="11"
+                  textAnchor="middle"
+                  fontWeight="500"
+                >
+                  {label}
+                </text>
+              );
+            }
+            return null;
           })}
 
-          {/* Area under curve A */}
+          {/* Area Gradients */}
           <path
-            key={`area-${pathKey}`}
-            id="ar"
+            key={`area-a-${pathKey}`}
             d={areaA}
             fill="url(#ga)"
             style={{
-              opacity: 1,
-              transition: 'opacity 1s cubic-bezier(0.22, 0.61, 0.36, 1)'
+              animation: 'rise 0.8s ease forwards'
             }}
           />
-
-          {/* Path A (Enrollments - Blue/c1) */}
           <path
-            key={`lineA-${pathKey}`}
-            id="la"
-            d={pathA}
-            fill="none"
-            stroke="var(--c1)"
-            strokeWidth="2.4"
-            strokeLinecap="round"
+            key={`area-b-${pathKey}`}
+            d={areaB}
+            fill="url(#gb)"
             style={{
-              strokeDasharray: 2000,
-              strokeDashoffset: 0,
-              animation: 'draw 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards'
+              animation: 'rise 0.9s ease forwards'
             }}
           />
 
-          {/* Path B (Submissions - Gold) */}
+          {/* Submissions (Gold Curve) */}
           <path
-            key={`lineB-${pathKey}`}
-            id="lb"
+            key={`path-b-${pathKey}`}
             d={pathB}
             fill="none"
             stroke="var(--gold)"
             strokeWidth="2.4"
             strokeLinecap="round"
+            pathLength="1"
+            strokeDasharray="1"
+            strokeDashoffset="1"
             style={{
-              strokeDasharray: 2000,
-              strokeDashoffset: 0,
               animation: 'draw 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards'
             }}
           />
 
-          {/* Dynamic interactive cursor and tracking points */}
+          {/* Enrollments (Blue Curve) */}
+          <path
+            key={`path-a-${pathKey}`}
+            d={pathA}
+            fill="none"
+            stroke="var(--c1)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            pathLength="1"
+            strokeDasharray="1"
+            strokeDashoffset="1"
+            style={{
+              animation: 'draw 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards'
+            }}
+          />
+
+          {/* Interactive cursor line */}
           <line
-            id="cur"
-            x1={cursorState.x}
-            x2={cursorState.x}
             y1={T}
             y2={H - B}
+            x1={cursorState.x}
+            x2={cursorState.x}
             stroke="var(--mu)"
             strokeDasharray="3 4"
-            opacity={cursorState.visible ? 1 : 0}
-            style={{ transition: 'opacity 0.15s' }}
+            strokeWidth="1.2"
+            opacity={cursorState.visible ? 0.9 : 0}
+            style={{ transition: 'opacity 0.15s ease' }}
           />
 
+          {/* Data point dot for Enrollments (A) */}
           <circle
-            id="da"
             cx={cursorState.x}
             cy={cursorState.y1}
-            r="5"
+            r="5.5"
             fill="var(--sf)"
             stroke="var(--c1)"
-            strokeWidth="2.4"
+            strokeWidth="2.6"
             opacity={cursorState.visible ? 1 : 0}
-            style={{ transition: 'opacity 0.15s' }}
+            style={{ transition: 'opacity 0.15s ease' }}
           />
 
+          {/* Data point dot for Submissions (B) */}
           <circle
-            id="db"
             cx={cursorState.x}
             cy={cursorState.y2}
             r="5"
             fill="var(--sf)"
             stroke="var(--gold)"
-            strokeWidth="2.4"
+            strokeWidth="2.6"
             opacity={cursorState.visible ? 1 : 0}
-            style={{ transition: 'opacity 0.15s' }}
+            style={{ transition: 'opacity 0.15s ease' }}
           />
         </svg>
 
+        {/* Enhanced Glass Tooltip */}
         <div
           className="tip"
           id="tip"
           style={{
             left: `${tipState.left}px`,
             top: `${tipState.top}px`,
-            opacity: tipState.visible ? 1 : 0
+            opacity: tipState.visible ? 1 : 0,
+            transform: tipState.visible ? 'translate(-50%, -120%) scale(1)' : 'translate(-50%, -110%) scale(0.95)',
+            pointerEvents: 'none'
           }}
         >
-          {tipState.text}
+          <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: 'var(--tx)' }}>
+            {tipState.title}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'var(--c1)', marginBottom: '2px' }}>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--c1)', display: 'inline-block' }}></span>
+            <span><strong>{tipState.valA}</strong> Enrolled candidates</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'var(--gold)' }}>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--gold)', display: 'inline-block' }}></span>
+            <span><strong>{tipState.valB}</strong> Exam submissions</span>
+          </div>
         </div>
       </div>
     </article>

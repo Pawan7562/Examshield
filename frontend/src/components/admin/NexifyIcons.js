@@ -38,3 +38,4 @@ export const NexifyIcon = ({ name, className = '', size = 18, style = {}, ...pro
     />
   );
 };
+

@@ -1,5 +1,5 @@
 // src/components/admin/AdminLayout.js — Nexify Examina · College Admin Layout Shell
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import AdminSidebar from './AdminSidebar';
@@ -15,6 +15,7 @@ export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef(null);
 
   // ── Theme State Management ──────────────────────────────────
   const [isDark, setIsDark] = useState(() => {
@@ -48,10 +49,18 @@ export default function AdminLayout() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // ── Escape Key Listener for Mobile Drawer ───────────────────
+  // ── Keyboard Shortcuts: Escape to close drawer, Ctrl/Cmd+K to search ──
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') setMobileOpen(false);
+      if (e.key === 'Escape') {
+        setMobileOpen(false);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -113,7 +122,9 @@ export default function AdminLayout() {
             </button>
 
             <div className="crumb">
-              {breadcrumb.group} / <b>{breadcrumb.page}</b>
+              <span>{breadcrumb.group}</span>
+              <span style={{ opacity: 0.45, margin: '0 3px' }}>/</span>
+              <b>{breadcrumb.page}</b>
             </div>
 
             <div className="sp"></div>
@@ -122,11 +133,13 @@ export default function AdminLayout() {
               <label className="search">
                 <NexifyIcon name="search" />
                 <input 
+                  ref={searchInputRef}
                   placeholder="Search candidates or exams" 
                   aria-label="Search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                <kbd className="search-kbd">⌘K</kbd>
               </label>
             </form>
 
@@ -145,8 +158,21 @@ export default function AdminLayout() {
               aria-label="Notifications"
               onClick={() => navigate('/admin/monitoring')}
               title="Notifications & Alerts"
+              style={{ position: 'relative' }}
             >
               <NexifyIcon name="bell" />
+              <span 
+                style={{ 
+                  position: 'absolute', 
+                  top: '9px', 
+                  right: '9px', 
+                  width: '7px', 
+                  height: '7px', 
+                  borderRadius: '50%', 
+                  background: 'var(--c1)',
+                  boxShadow: '0 0 6px var(--c1)'
+                }} 
+              />
             </button>
 
             <div 
