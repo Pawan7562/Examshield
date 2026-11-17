@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PROOF_METRICS, TRUSTED_INSTITUTIONS } from '../../../content/landingContent';
 import { Building2, Award, ShieldCheck } from 'lucide-react';
+import AnimatedNumber from '../../common/AnimatedNumber';
 
 export default function StatsProofBand() {
   const [hasAnimated, setHasAnimated] = useState(false);
@@ -32,7 +33,17 @@ export default function StatsProofBand() {
           {PROOF_METRICS.map((metric, idx) => (
             <div key={metric.label} className="es-metric-card" role="listitem">
               <div className="es-metric-value-wrap">
-                <span className="es-metric-value">{metric.value}</span>
+                <span className="es-metric-value">
+                  {hasAnimated && metric.numericValue != null ? (
+                    <>
+                      {metric.prefix || ''}
+                      <AnimatedNumber value={metric.numericValue} />
+                      {metric.suffix || ''}
+                    </>
+                  ) : (
+                    metric.value
+                  )}
+                </span>
               </div>
               <h3 className="es-metric-label">{metric.label}</h3>
               <p className="es-metric-caption">{metric.caption}</p>
