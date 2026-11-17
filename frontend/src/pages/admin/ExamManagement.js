@@ -5,40 +5,39 @@ import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
 import { formatIST, isExamEnded, parseToIST, toDateTimeLocalValue, toISTISOString } from '../../utils/timezone';
 import toast from 'react-hot-toast';
-import {
-  Plus,
-  Filter,
-  Calendar,
-  Clock,
-  FileText,
-  Users,
-  Trophy,
-  Edit3,
-  CheckCircle,
+import { 
+  Plus, 
+  Filter, 
+  Calendar, 
+  Clock, 
+  FileText, 
+  Users, 
+  Trophy, 
+  Edit3, 
+  CheckCircle, 
   CheckCircle2,
-  Search,
-  Monitor,
-  X,
-  Save,
-  BookOpen,
-  Shield,
-  Eye,
-  Mic,
-  Layers,
-  Maximize,
+  Search, 
+  Monitor, 
+  X, 
+  Save, 
+  BookOpen, 
+  Shield, 
+  Eye, 
+  Mic, 
+  Layers, 
+  Maximize, 
   Camera,
   Activity,
   Radio,
   RotateCcw
 } from 'lucide-react';
 import './ExamCenter.css';
-import AnimatedNumber from '../../components/common/AnimatedNumber';
 
 /* ── Status Badge Helper ───────────────────────────────────────────────────── */
 const StatusBadge = ({ exam, status }) => {
   const currentStatus = (exam && isExamEnded(exam)) ? 'completed' : (status || exam?.status || 'draft');
   const normalized = String(currentStatus).toLowerCase();
-
+  
   const labels = {
     draft: 'Draft',
     published: 'Published',
@@ -99,16 +98,16 @@ export default function ExamManagement() {
   const fetchExams = (isBackground = false) => {
     if (!collegeId) return;
     if (!isBackground) setLoading(true);
-    adminAPI.getExams({
-      status: filter === 'all' ? undefined : filter,
+    adminAPI.getExams({ 
+      status: filter === 'all' ? undefined : filter, 
       search: search || undefined,
-      limit: 50
+      limit: 50 
     })
       .then(r => {
         const data = r.data?.exams || r.data?.data?.exams || [];
         setExams(data);
         if (storageKey) {
-          try { sessionStorage.setItem(storageKey, JSON.stringify(data)); } catch (_) { }
+          try { sessionStorage.setItem(storageKey, JSON.stringify(data)); } catch (_) {}
         }
       })
       .catch(() => toast.error('Failed to load examinations'))
@@ -136,13 +135,13 @@ export default function ExamManagement() {
   }, [search]);
 
   const publishExam = async (id, name) => {
-    try {
-      await adminAPI.publishExam(id);
-      toast.success(`${name || 'Exam'} published to student dashboards!`);
-      fetchExams(true);
+    try { 
+      await adminAPI.publishExam(id); 
+      toast.success(`${name || 'Exam'} published to student dashboards!`); 
+      fetchExams(true); 
     }
-    catch (err) {
-      toast.error(err.response?.data?.message || err.message || 'Failed to publish examination');
+    catch (err) { 
+      toast.error(err.response?.data?.message || err.message || 'Failed to publish examination'); 
     }
   };
 
@@ -269,8 +268,8 @@ export default function ExamManagement() {
         </div>
 
         <div className="ec-header-actions">
-          <button
-            type="button"
+          <button 
+            type="button" 
             className="ec-btn primary"
             onClick={() => navigate('/admin/exams/create')}
           >
@@ -288,7 +287,7 @@ export default function ExamManagement() {
           </div>
           <div className="ec-metric-content">
             <span className="ec-metric-label">Total Examinations</span>
-            <span className="ec-metric-value"><AnimatedNumber value={exams.length} /></span>
+            <span className="ec-metric-value">{exams.length}</span>
           </div>
         </div>
 
@@ -298,7 +297,7 @@ export default function ExamManagement() {
           </div>
           <div className="ec-metric-content">
             <span className="ec-metric-label">Live &amp; Active Now</span>
-            <span className="ec-metric-value"><AnimatedNumber value={activeExamsCount} /></span>
+            <span className="ec-metric-value">{activeExamsCount}</span>
           </div>
         </div>
 
@@ -308,7 +307,7 @@ export default function ExamManagement() {
           </div>
           <div className="ec-metric-content">
             <span className="ec-metric-label">Published / Scheduled</span>
-            <span className="ec-metric-value"><AnimatedNumber value={publishedExamsCount} /></span>
+            <span className="ec-metric-value">{publishedExamsCount}</span>
           </div>
         </div>
 
@@ -318,7 +317,7 @@ export default function ExamManagement() {
           </div>
           <div className="ec-metric-content">
             <span className="ec-metric-label">Drafts in Progress</span>
-            <span className="ec-metric-value"><AnimatedNumber value={draftExamsCount} /></span>
+            <span className="ec-metric-value">{draftExamsCount}</span>
           </div>
         </div>
       </div>
@@ -359,8 +358,8 @@ export default function ExamManagement() {
             </button>
           ))}
 
-          <button
-            type="button"
+          <button 
+            type="button" 
             className="ec-action-btn"
             onClick={() => fetchExams(false)}
             title="Refresh examination list"
@@ -405,8 +404,8 @@ export default function ExamManagement() {
             {search ? `No examinations matching "${search}"` : 'Create your first proctored examination to orchestrate questions and enroll candidates.'}
           </p>
           {!search && (
-            <button
-              type="button"
+            <button 
+              type="button" 
               className="ec-btn primary"
               onClick={() => navigate('/admin/exams/create')}
             >
@@ -548,8 +547,8 @@ export default function ExamManagement() {
 
       {/* ── EDIT EXAM MODAL ────────────────────────────────────────────────── */}
       {editModal.open && editModal.exam && (
-        <div
-          className="ec-modal-overlay"
+        <div 
+          className="ec-modal-overlay" 
           onClick={() => !editModal.saving && setEditModal(prev => ({ ...prev, open: false }))}
         >
           <div className="ec-modal" onClick={e => e.stopPropagation()}>
@@ -558,8 +557,8 @@ export default function ExamManagement() {
                 <BookOpen size={20} color="var(--c1, #2563eb)" />
                 <span>Edit Examination &amp; AI Policy</span>
               </h3>
-              <button
-                onClick={() => !editModal.saving && setEditModal(prev => ({ ...prev, open: false }))}
+              <button 
+                onClick={() => !editModal.saving && setEditModal(prev => ({ ...prev, open: false }))} 
                 className="ec-modal-close"
                 disabled={editModal.saving}
               >
@@ -574,8 +573,8 @@ export default function ExamManagement() {
                   <label className="ec-form-label">
                     Examination Title *
                   </label>
-                  <input
-                    type="text"
+                  <input 
+                    type="text" 
                     value={editModal.title}
                     onChange={e => setEditModal(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="e.g. End-Term Full Stack & Algorithms Assessment"
@@ -590,7 +589,7 @@ export default function ExamManagement() {
                   <label className="ec-form-label">
                     Examination Instructions &amp; Description
                   </label>
-                  <textarea
+                  <textarea 
                     value={editModal.description}
                     onChange={e => setEditModal(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Instructions shown to candidates prior to launching the exam room..."
@@ -612,7 +611,7 @@ export default function ExamManagement() {
                       </span>
                     )}
                   </div>
-                  <input
+                  <input 
                     type="datetime-local"
                     value={editModal.dateTime || ''}
                     onChange={e => setEditModal(prev => ({ ...prev, dateTime: e.target.value }))}
@@ -631,9 +630,9 @@ export default function ExamManagement() {
                       <Clock size={14} color="var(--mu, #667085)" />
                       <span>Duration (Minutes)</span>
                     </label>
-                    <input
-                      type="number"
-                      min="5"
+                    <input 
+                      type="number" 
+                      min="5" 
                       max="600"
                       value={editModal.duration}
                       onChange={e => setEditModal(prev => ({ ...prev, duration: e.target.value }))}
@@ -645,7 +644,7 @@ export default function ExamManagement() {
                     <label className="ec-form-label">
                       <span>Assessment Type</span>
                     </label>
-                    <select
+                    <select 
                       value={editModal.type}
                       onChange={e => setEditModal(prev => ({ ...prev, type: e.target.value }))}
                       className="ec-form-select"
@@ -665,9 +664,9 @@ export default function ExamManagement() {
                       <Trophy size={14} color="var(--mu, #667085)" />
                       <span>Total Marks</span>
                     </label>
-                    <input
-                      type="number"
-                      min="1"
+                    <input 
+                      type="number" 
+                      min="1" 
                       max="1000"
                       value={editModal.total_marks}
                       onChange={e => setEditModal(prev => ({ ...prev, total_marks: e.target.value }))}
@@ -679,9 +678,9 @@ export default function ExamManagement() {
                     <label className="ec-form-label">
                       <span>Passing Marks</span>
                     </label>
-                    <input
-                      type="number"
-                      min="1"
+                    <input 
+                      type="number" 
+                      min="1" 
                       max={editModal.total_marks || 1000}
                       value={editModal.passing_marks}
                       onChange={e => setEditModal(prev => ({ ...prev, passing_marks: e.target.value }))}
@@ -696,7 +695,7 @@ export default function ExamManagement() {
                   <label className="ec-form-label">
                     Lifecycle Status
                   </label>
-                  <select
+                  <select 
                     value={editModal.status}
                     onChange={e => setEditModal(prev => ({ ...prev, status: e.target.value }))}
                     className="ec-form-select"
@@ -719,7 +718,7 @@ export default function ExamManagement() {
                       </span>
                     </div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
-                      <input
+                      <input 
                         type="checkbox"
                         checked={editModal.is_proctored}
                         onChange={e => setEditModal(prev => ({ ...prev, is_proctored: e.target.checked }))}
@@ -741,7 +740,7 @@ export default function ExamManagement() {
                         const active = editModal.monitoringConfig?.[item.key] !== false;
                         const Icon = item.icon;
                         return (
-                          <div
+                          <div 
                             key={item.key}
                             className={`ec-monitoring-tile ${active ? 'active' : ''}`}
                             onClick={() => toggleEditMonitoringOption(item.key)}
@@ -753,7 +752,7 @@ export default function ExamManagement() {
                                 <div className="ec-monitoring-tile-desc">{item.desc}</div>
                               </div>
                             </div>
-                            <input
+                            <input 
                               type="checkbox"
                               checked={active}
                               onChange={() => toggleEditMonitoringOption(item.key)}
@@ -769,16 +768,16 @@ export default function ExamManagement() {
               </div>
 
               <div className="ec-modal-footer">
-                <button
-                  type="button"
+                <button 
+                  type="button" 
                   className="ec-btn secondary"
                   disabled={editModal.saving}
                   onClick={() => setEditModal(prev => ({ ...prev, open: false }))}
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
+                <button 
+                  type="submit" 
                   className="ec-btn primary"
                   disabled={editModal.saving}
                 >

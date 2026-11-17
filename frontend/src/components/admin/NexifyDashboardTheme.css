@@ -3,8 +3,6 @@
    Ultra-Refined Multi-Palette Design System (v6)
    ═══════════════════════════════════════════════════════════ */
 
-@import './NexifyAnimations.css';
-
 :root {
   --bg: #f5f6f9;
   --sf: #ffffff;
@@ -369,6 +367,15 @@
   align-items: center;
   padding: 2px 8px 20px;
   cursor: pointer;
+}
+
+.admin-brand-logo-img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  flex: none;
+  border-radius: 10px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.12));
 }
 
 .mark {

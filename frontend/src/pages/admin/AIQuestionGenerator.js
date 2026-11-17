@@ -16,22 +16,21 @@ import {
   ArrowRight
 } from 'lucide-react';
 import './AIQuestionStudio.css';
-import AnimatedNumber from '../../components/common/AnimatedNumber';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 const SOURCES = [
-  { id: 'leetcode', name: 'LeetCode', icon: Database, color: '#ffa116', description: 'Function signature & interview benchmarks' },
-  { id: 'codeforces', name: 'Codeforces', icon: Cpu, color: '#1f8e3f', description: 'Competitive programming with standard I/O' },
-  { id: 'geeksforgeeks', name: 'GeeksforGeeks', icon: Globe, color: '#2f8d46', description: 'Educational DSA with theoretical foundation' },
-  { id: 'hackerrank', name: 'HackerRank', icon: Target, color: '#00a86b', description: 'Structured challenges with test cases' },
+  { id: 'leetcode',      name: 'LeetCode',      icon: Database, color: '#ffa116', description: 'Function signature & interview benchmarks' },
+  { id: 'codeforces',   name: 'Codeforces',    icon: Cpu,      color: '#1f8e3f', description: 'Competitive programming with standard I/O' },
+  { id: 'geeksforgeeks',name: 'GeeksforGeeks', icon: Globe,    color: '#2f8d46', description: 'Educational DSA with theoretical foundation' },
+  { id: 'hackerrank',   name: 'HackerRank',    icon: Target,   color: '#00a86b', description: 'Structured challenges with test cases' },
 ];
 
 const DIFFICULTIES = [
-  { value: 'easy', label: 'Easy', color: 'var(--good, #0f8a68)', icon: '🟢', description: 'Single DS / algorithm' },
+  { value: 'easy',   label: 'Easy',   color: 'var(--good, #0f8a68)', icon: '🟢', description: 'Single DS / algorithm' },
   { value: 'medium', label: 'Medium', color: 'var(--gold, #a9863f)', icon: '🟡', description: '2–3 combined techniques' },
-  { value: 'hard', label: 'Hard', color: 'var(--bad, #c2410c)', icon: '🔴', description: 'Complex algorithms & graphs' },
+  { value: 'hard',   label: 'Hard',   color: 'var(--bad, #c2410c)',  icon: '🔴', description: 'Complex algorithms & graphs' },
 ];
 
 const SUGGESTED_TOPICS = [
@@ -114,8 +113,8 @@ const QuestionCard = ({ question, selected, onToggle, onPreview, mode }) => {
           </div>
         </div>
 
-        <button
-          type="button"
+        <button 
+          type="button" 
           onClick={onPreview}
           className="qs-btn secondary"
           style={{ padding: '6px 12px', fontSize: '0.8rem' }}
@@ -160,11 +159,11 @@ const PreviewModal = ({ question, onClose, showFull }) => {
   if (!question) return null;
 
   const tabs = [
-    { id: 'problem', label: 'Problem Statement', icon: FileText },
-    { id: 'hints', label: 'Hints & Clues', icon: Lightbulb },
-    { id: 'approach', label: 'Solution Approach', icon: Target },
-    ...(showFull && question.editorial ? [{ id: 'editorial', label: 'Editorial Theory', icon: BookOpen }] : []),
-    ...(showFull && question.solutionCode ? [{ id: 'code', label: 'Reference Code', icon: Code }] : []),
+    { id: 'problem',   label: 'Problem Statement', icon: FileText },
+    { id: 'hints',     label: 'Hints & Clues',     icon: Lightbulb },
+    { id: 'approach',  label: 'Solution Approach', icon: Target },
+    ...(showFull && question.editorial    ? [{ id: 'editorial', label: 'Editorial Theory', icon: BookOpen }] : []),
+    ...(showFull && question.solutionCode ? [{ id: 'code',      label: 'Reference Code',  icon: Code }] : []),
   ];
 
   return (
@@ -251,27 +250,27 @@ const PreviewModal = ({ question, onClose, showFull }) => {
 // Main AI Question Studio Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AIQuestionGenerator() {
-  const [mode, setMode] = useState('partial');
-  const [topic, setTopic] = useState('Dynamic Programming');
-  const [difficulty, setDifficulty] = useState('medium');
-  const [questionCount, setQuestionCount] = useState(5);
-  const [selectedSources, setSelectedSources] = useState(['leetcode', 'codeforces']);
+  const [mode, setMode]                             = useState('partial');
+  const [topic, setTopic]                           = useState('Dynamic Programming');
+  const [difficulty, setDifficulty]                 = useState('medium');
+  const [questionCount, setQuestionCount]           = useState(5);
+  const [selectedSources, setSelectedSources]       = useState(['leetcode', 'codeforces']);
 
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenerating, setIsGenerating]             = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState([]);
-  const [selectedQuestions, setSelectedQuestions] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterDifficulty, setFilterDifficulty] = useState('all');
-  const [filterSource, setFilterSource] = useState('all');
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewQuestion, setPreviewQuestion] = useState(null);
-  const [generationStats, setGenerationStats] = useState(null);
-  const [savedCollections, setSavedCollections] = useState([]);
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [collectionName, setCollectionName] = useState('');
-  const [expandedConfig, setExpandedConfig] = useState(true);
+  const [selectedQuestions, setSelectedQuestions]   = useState([]);
+  const [searchTerm, setSearchTerm]                 = useState('');
+  const [filterDifficulty, setFilterDifficulty]     = useState('all');
+  const [filterSource, setFilterSource]             = useState('all');
+  const [showPreview, setShowPreview]               = useState(false);
+  const [previewQuestion, setPreviewQuestion]       = useState(null);
+  const [generationStats, setGenerationStats]       = useState(null);
+  const [savedCollections, setSavedCollections]     = useState([]);
+  const [showSaveModal, setShowSaveModal]           = useState(false);
+  const [collectionName, setCollectionName]         = useState('');
+  const [expandedConfig, setExpandedConfig]         = useState(true);
 
-  const [apiStatus, setApiStatus] = useState(null);
+  const [apiStatus, setApiStatus]                   = useState(null);
 
   // Full mode exam config
   const [examConfig, setExamConfig] = useState({
@@ -279,9 +278,9 @@ export default function AIQuestionGenerator() {
     passingMarks: 40, totalMarks: 100, isProctored: true,
     maxViolations: 3, instructions: '',
   });
-  const [allStudents, setAllStudents] = useState([]);
-  const [selectedStudents, setSelectedStudents] = useState([]);
-  const [isCreatingExam, setIsCreatingExam] = useState(false);
+  const [allStudents, setAllStudents]               = useState([]);
+  const [selectedStudents, setSelectedStudents]     = useState([]);
+  const [isCreatingExam, setIsCreatingExam]         = useState(false);
 
   const currentGenerationRef = useRef(null);
   const navigate = useNavigate();
@@ -289,14 +288,14 @@ export default function AIQuestionGenerator() {
   useEffect(() => {
     adminAPI.getStudents({ limit: 'all' })
       .then(res => setAllStudents(res?.data?.students || res?.students || []))
-      .catch(() => { });
+      .catch(() => {});
 
     adminAPI.getAIStatus()
       .then(res => {
         const s = res?.data || res;
         if (s && typeof s.configured !== 'undefined') setApiStatus(s);
       })
-      .catch(() => { });
+      .catch(() => {});
   }, []);
 
   const toggleSource = useCallback((id) => {
@@ -395,8 +394,8 @@ export default function AIQuestionGenerator() {
     const matchSearch = !searchTerm ||
       q.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (q.problemStatement || q.description || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchDiff = filterDifficulty === 'all' || q.difficulty === filterDifficulty;
-    const matchSrc = filterSource === 'all' || q.platform === filterSource;
+    const matchDiff   = filterDifficulty === 'all' || q.difficulty === filterDifficulty;
+    const matchSrc    = filterSource === 'all' || q.platform === filterSource;
     return matchSearch && matchDiff && matchSrc;
   });
 
@@ -418,8 +417,8 @@ export default function AIQuestionGenerator() {
   const exportQuestions = () => {
     if (!selectedQuestions.length) { toast.error('Select questions to export'); return; }
     const blob = new Blob([JSON.stringify({ questions: selectedQuestions, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
     a.href = url; a.download = `ai-problems-${Date.now()}.json`;
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
@@ -498,8 +497,8 @@ export default function AIQuestionGenerator() {
         </div>
 
         <div className="qs-header-actions">
-          <button
-            type="button"
+          <button 
+            type="button" 
             className="qs-btn secondary"
             onClick={() => navigate('/admin/exams')}
           >
@@ -517,7 +516,7 @@ export default function AIQuestionGenerator() {
           </div>
           <div className="qs-metric-content">
             <span className="qs-metric-label">Synthesized Problems</span>
-            <span className="qs-metric-value"><AnimatedNumber value={generatedQuestions.length} /></span>
+            <span className="qs-metric-value">{generatedQuestions.length}</span>
           </div>
         </div>
 
@@ -527,7 +526,7 @@ export default function AIQuestionGenerator() {
           </div>
           <div className="qs-metric-content">
             <span className="qs-metric-label">Benchmark Platforms</span>
-            <span className="qs-metric-value"><AnimatedNumber value={selectedSources.length} /></span>
+            <span className="qs-metric-value">{selectedSources.length}</span>
           </div>
         </div>
 
@@ -537,7 +536,7 @@ export default function AIQuestionGenerator() {
           </div>
           <div className="qs-metric-content">
             <span className="qs-metric-label">Selected for Roster</span>
-            <span className="qs-metric-value"><AnimatedNumber value={selectedQuestions.length} /></span>
+            <span className="qs-metric-value">{selectedQuestions.length}</span>
           </div>
         </div>
 
@@ -563,7 +562,7 @@ export default function AIQuestionGenerator() {
         <div className="qs-modes-grid">
           {[
             { id: 'partial', icon: Layers, title: 'Partial Studio Mode', desc: 'Inspect, preview, and selectively curate problems into customized question banks.' },
-            { id: 'full', icon: Zap, title: 'Full Assessment Mode', desc: 'Synthesize problems and directly instantiate an active examination with enrolled candidates.' },
+            { id: 'full',    icon: Zap,    title: 'Full Assessment Mode',   desc: 'Synthesize problems and directly instantiate an active examination with enrolled candidates.' },
           ].map(({ id, icon: Icon, title, desc }) => (
             <div
               key={id}

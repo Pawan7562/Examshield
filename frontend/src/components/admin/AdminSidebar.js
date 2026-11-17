@@ -3,6 +3,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { NexifyIcon } from './NexifyIcons';
+import logoImg from '../../assets/logo-mark.png';
 import './NexifyDashboardTheme.css';
 
 export default function AdminSidebar({ mobileOpen, setMobileOpen }) {
@@ -80,7 +81,7 @@ export default function AdminSidebar({ mobileOpen, setMobileOpen }) {
       <aside className={`side ${mobileOpen ? 'open' : ''}`} id="side" aria-label="Main navigation">
         {/* Brand */}
         <div className="brand" onClick={() => handleNav('/admin/dashboard')}>
-          <div className="mark">N</div>
+          <img src={logoImg} alt="Nexify Examina" className="admin-brand-logo-img" />
           <div>
             <b>Nexify Examina</b>
             <small>College admin</small>
