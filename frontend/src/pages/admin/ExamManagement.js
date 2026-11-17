@@ -14,67 +14,42 @@ import {
   Users, 
   Trophy, 
   Edit3, 
-  CheckCircle,
-  Search,
-  MoreVertical,
-  BarChart3,
-  Monitor,
-  X,
-  Save,
-  BookOpen,
-  Shield,
-  Eye,
-  Mic,
-  Layers,
-  Maximize,
-  Camera
+  CheckCircle, 
+  CheckCircle2,
+  Search, 
+  Monitor, 
+  X, 
+  Save, 
+  BookOpen, 
+  Shield, 
+  Eye, 
+  Mic, 
+  Layers, 
+  Maximize, 
+  Camera,
+  Activity,
+  Radio,
+  RotateCcw
 } from 'lucide-react';
-import '../../components/admin/AdminSidebar.css';
+import './ExamCenter.css';
 
-const statusConfig = {
-  draft: { color: '#64748b', bg: 'rgba(100, 116, 139, 0.12)', label: 'Draft' },
-  published: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)', label: 'Published' },
-  active: { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.12)', label: 'Active' },
-  completed: { color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)', label: 'Completed' },
-  cancelled: { color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)', label: 'Cancelled' }
-};
-
-const Button = ({ children, variant = 'primary', size = 'md', icon: Icon, loading, ...props }) => {
-  return (
-    <button 
-      {...props} 
-      className={`admin-btn admin-btn-${variant} admin-btn-${size} ${loading ? 'loading' : ''}`}
-      disabled={loading || props.disabled}
-    >
-      {loading ? (
-        <div className="admin-btn-spinner"></div>
-      ) : (
-        <>
-          {Icon && <Icon size={16} />}
-          {children}
-        </>
-      )}
-    </button>
-  );
-};
-
+/* ── Status Badge Helper ───────────────────────────────────────────────────── */
 const StatusBadge = ({ exam, status }) => {
   const currentStatus = (exam && isExamEnded(exam)) ? 'completed' : (status || exam?.status || 'draft');
   const normalized = String(currentStatus).toLowerCase();
-  const config = statusConfig[normalized] || statusConfig.draft;
+  
+  const labels = {
+    draft: 'Draft',
+    published: 'Published',
+    active: 'Active Window',
+    completed: 'Completed',
+    cancelled: 'Cancelled'
+  };
+
   return (
-    <span className="admin-exam-status-badge" style={{ 
-      background: config.bg, 
-      color: config.color,
-      border: `1px solid ${config.color}30`,
-      fontWeight: 700,
-      padding: '4px 10px',
-      borderRadius: '6px',
-      fontSize: '0.75rem',
-      textTransform: 'uppercase',
-      letterSpacing: '0.04em'
-    }}>
-      {config.label}
+    <span className={`ec-badge ${normalized}`}>
+      <span className="ec-badge-dot" />
+      <span>{labels[normalized] || normalized.toUpperCase()}</span>
     </span>
   );
 };
@@ -135,7 +110,7 @@ export default function ExamManagement() {
           try { sessionStorage.setItem(storageKey, JSON.stringify(data)); } catch (_) {}
         }
       })
-      .catch(() => toast.error('Failed to load exams'))
+      .catch(() => toast.error('Failed to load examinations'))
       .finally(() => setLoading(false));
   };
 
@@ -152,7 +127,7 @@ export default function ExamManagement() {
     fetchExams(false);
   }, [collegeId, filter]);
 
-  // Debounced only for search keystrokes
+  // Debounced search
   useEffect(() => {
     if (!search) return;
     const timeout = setTimeout(() => fetchExams(false), 250);
@@ -162,11 +137,11 @@ export default function ExamManagement() {
   const publishExam = async (id, name) => {
     try { 
       await adminAPI.publishExam(id); 
-      toast.success(`${name || 'Exam'} published successfully!`); 
-      fetchExams(); 
+      toast.success(`${name || 'Exam'} published to student dashboards!`); 
+      fetchExams(true); 
     }
     catch (err) { 
-      toast.error(err.response?.data?.message || err.message || 'Failed to publish'); 
+      toast.error(err.response?.data?.message || err.message || 'Failed to publish examination'); 
     }
   };
 
@@ -238,7 +213,6 @@ export default function ExamManagement() {
         payload.date_time = toISTISOString(editModal.dateTime);
         payload.dateTime = payload.date_time;
 
-        // If rescheduled to a future or live window, ensure status does not remain stuck as 'completed'
         const parsedStart = parseToIST(payload.date_time);
         if (parsedStart) {
           const effectiveDuration = parseInt(editModal.duration) || 60;
@@ -252,7 +226,6 @@ export default function ExamManagement() {
       const res = await adminAPI.updateExam(editModal.exam.id, payload);
       const updatedExam = res?.data?.exam || {};
 
-      // Update in state immediately
       setExams(prev => prev.map(item => {
         if (item.id === editModal.exam.id) {
           return {
@@ -265,43 +238,8 @@ export default function ExamManagement() {
         return item;
       }));
 
-      // Update cache
-      try {
-        const cached = sessionStorage.getItem('cached_admin_exams');
-        if (cached) {
-          const list = JSON.parse(cached);
-          const updated = list.map(item => item.id === editModal.exam.id ? { 
-            ...item, 
-            ...payload,
-            ...(updatedExam.date_time ? { date_time: updatedExam.date_time } : {}),
-            ...(updatedExam.status ? { status: updatedExam.status } : {})
-          } : item);
-          sessionStorage.setItem('cached_admin_exams', JSON.stringify(updated));
-        }
-      } catch (_) {}
-
       toast.success('Exam schedule and settings updated successfully');
-      setEditModal({ 
-        open: false, 
-        exam: null, 
-        title: '', 
-        description: '', 
-        dateTime: '',
-        duration: 60, 
-        total_marks: 100, 
-        passing_marks: 40, 
-        type: 'coding', 
-        status: 'draft', 
-        is_proctored: true,
-        monitoringConfig: {
-          face_detection: true,
-          voice_detection: true,
-          tab_switch: true,
-          fullscreen: true,
-          device_camera: true
-        },
-        saving: false 
-      });
+      setEditModal(prev => ({ ...prev, open: false, saving: false }));
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || err.message || 'Failed to update exam');
@@ -309,300 +247,366 @@ export default function ExamManagement() {
     }
   };
 
-  const getExamActions = (exam) => {
-    const actions = [];
-    const examTitle = exam.title || exam.name || 'Exam';
-    
-    // Always offer Edit & Questions
-    actions.push({
-      label: 'Edit',
-      icon: Edit3,
-      variant: 'secondary',
-      onClick: () => handleOpenEdit(exam)
-    });
-
-    actions.push({
-      label: 'Questions',
-      icon: FileText,
-      variant: 'secondary',
-      onClick: () => navigate(`/admin/exams/${exam.id}/questions`)
-    });
-
-    if (exam.status === 'draft') {
-      actions.push({
-        label: 'Publish',
-        icon: CheckCircle,
-        variant: 'success',
-        onClick: () => publishExam(exam.id, examTitle)
-      });
-    } else if (exam.status === 'published' || exam.status === 'active') {
-      actions.push({
-        label: 'Monitor',
-        icon: Monitor,
-        variant: 'success',
-        onClick: () => navigate(`/admin/exams/${exam.id}/monitor`)
-      });
-    } else if (exam.status === 'completed') {
-      actions.push({
-        label: 'Results',
-        icon: Trophy,
-        variant: 'secondary',
-        onClick: () => navigate(`/admin/results`)
-      });
-      actions.push({
-        label: 'Analytics',
-        icon: BarChart3,
-        variant: 'secondary',
-        onClick: () => navigate(`/admin/dashboard`)
-      });
-    }
-    
-    return actions;
-  };
+  // KPIs
+  const activeExamsCount = exams.filter(e => e.status === 'active' || (!isExamEnded(e) && e.status === 'published')).length;
+  const publishedExamsCount = exams.filter(e => e.status === 'published').length;
+  const draftExamsCount = exams.filter(e => e.status === 'draft').length;
 
   return (
-    <div className="admin-pages-container">
-      {/* Header */}
-      <div className="admin-page-header">
-        <div className="admin-header-content">
-          <h1 className="admin-page-title">Exam Management</h1>
-          <p className="admin-page-subtitle">
-            {exams.length} {exams.length === 1 ? 'exam' : 'exams'} total
+    <div className="ec-container">
+      {/* ── Top Header ──────────────────────────────────────────────────────── */}
+      <div className="ec-header">
+        <div className="ec-header-left">
+          <div className="ec-eyebrow">
+            <span className="ec-eyebrow-dot" />
+            <span>Academic Operations • Examination Lifecycle &amp; Integrity</span>
+          </div>
+          <h1 className="ec-title">Examinations Center &amp; Orchestration</h1>
+          <p className="ec-subtitle">
+            <span>Configure examination schedules, question banks, AI proctoring shields, and live candidate deployments.</span>
           </p>
         </div>
-        <div className="admin-header-actions">
-          <Button icon={Plus} onClick={() => navigate('/admin/exams/create')}>
-            Create Exam
-          </Button>
+
+        <div className="ec-header-actions">
+          <button 
+            type="button" 
+            className="ec-btn primary"
+            onClick={() => navigate('/admin/exams/create')}
+          >
+            <Plus size={16} />
+            <span>Create Examination</span>
+          </button>
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="admin-content-card">
-        <div className="admin-search-section">
-          <div className="admin-search-input">
-            <Search size={20} />
-            <input
-              value={search} 
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by exam name, type, or status..."
-            />
+      {/* ── Executive Metric KPI Cards ──────────────────────────────────────── */}
+      <div className="ec-metrics-grid">
+        <div className="ec-metric-card">
+          <div className="ec-metric-icon">
+            <BookOpen size={22} />
           </div>
-          <Button variant="secondary" icon={Filter} onClick={() => fetchExams(false)}>
-            Filters
-          </Button>
+          <div className="ec-metric-content">
+            <span className="ec-metric-label">Total Examinations</span>
+            <span className="ec-metric-value">{exams.length}</span>
+          </div>
         </div>
 
-        {/* Status Filters */}
-        <div className="admin-filters-section">
-          <div className="admin-filter-label">Status:</div>
-          <div className="admin-filter-pills">
-            {['all', 'draft', 'published', 'active', 'completed'].map(status => (
-              <button
-                key={status}
-                onClick={() => setFilter(status)}
-                className={`admin-filter-pill ${filter === status ? 'active' : ''}`}
-              >
-                {status === 'all' ? 'All' : statusConfig[status]?.label || status}
-              </button>
-            ))}
+        <div className="ec-metric-card">
+          <div className="ec-metric-icon good">
+            <Radio size={22} />
+          </div>
+          <div className="ec-metric-content">
+            <span className="ec-metric-label">Live &amp; Active Now</span>
+            <span className="ec-metric-value">{activeExamsCount}</span>
+          </div>
+        </div>
+
+        <div className="ec-metric-card">
+          <div className="ec-metric-icon gold">
+            <Calendar size={22} />
+          </div>
+          <div className="ec-metric-content">
+            <span className="ec-metric-label">Published / Scheduled</span>
+            <span className="ec-metric-value">{publishedExamsCount}</span>
+          </div>
+        </div>
+
+        <div className="ec-metric-card">
+          <div className="ec-metric-icon bad">
+            <FileText size={22} />
+          </div>
+          <div className="ec-metric-content">
+            <span className="ec-metric-label">Drafts in Progress</span>
+            <span className="ec-metric-value">{draftExamsCount}</span>
           </div>
         </div>
       </div>
 
-      {/* Exams List */}
-      <div className="admin-content-card">
-        <div className="admin-exams-list">
-          {loading ? (
-            <div className="admin-table-loading">
-              <div className="admin-loading-spinner"></div>
-              Loading exams...
-            </div>
-          ) : exams.length === 0 ? (
-            <div className="admin-empty-state">
-              <FileText size={48} />
-              <h3>No exams found</h3>
-              <p>
-                {search ? `No exams found for "${search}"` : 'No exams yet. Create your first exam to get started.'}
-              </p>
-              {!search && (
-                <Button icon={Plus} onClick={() => navigate('/admin/exams/create')}>
-                  Create First Exam
-                </Button>
-              )}
-            </div>
-          ) : (
-            exams.map(exam => {
-              const examTitle = exam.title || exam.name || 'Untitled Exam';
-              return (
-                <div key={exam.id} className="admin-exam-card">
-                  <div className="admin-exam-header">
-                    <div className="admin-exam-title-section">
-                      <h3 className="admin-exam-title">{examTitle}</h3>
-                      <StatusBadge exam={exam} status={exam.status} />
-                    </div>
-                    <div className="admin-exam-actions">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        icon={MoreVertical}
-                        className="admin-exam-menu-btn"
-                        onClick={() => handleOpenEdit(exam)}
-                      >
-                        More
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="admin-exam-details">
-                    <div className="admin-exam-meta">
-                      <div className="admin-exam-meta-item">
-                        <Calendar size={14} />
-                        {exam.date_time ? formatIST(exam.date_time, 'dateTime') : 'Scheduled anytime'}
-                      </div>
-                      <div className="admin-exam-meta-item">
-                        <Clock size={14} />
-                        {exam.duration || 60} minutes
-                      </div>
-                      <div className="admin-exam-meta-item">
-                        <Trophy size={14} />
-                        {exam.total_marks || 100} marks
-                      </div>
-                      <div className="admin-exam-meta-item">
-                        <FileText size={14} />
-                        {exam.question_count || 0} questions
-                      </div>
-                      <div className="admin-exam-meta-item">
-                        <Users size={14} />
-                        {exam.student_count || 0} students
-                      </div>
-                    </div>
-                    <div className="admin-exam-type">
-                      {(exam.type || 'coding').toUpperCase()}
-                    </div>
-                  </div>
-
-                  <div className="admin-exam-footer">
-                    <div className="admin-exam-description">
-                      {exam.description || 'No description provided'}
-                    </div>
-                    <div className="admin-exam-action-buttons">
-                      {getExamActions(exam).map((action, index) => (
-                        <Button
-                          key={index}
-                          variant={action.variant}
-                          size="sm"
-                          icon={action.icon}
-                          onClick={action.onClick}
-                          className="admin-exam-action-btn"
-                        >
-                          {action.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+      {/* ── Filter & Search Bar ─────────────────────────────────────────────── */}
+      <div className="ec-filter-card">
+        <div className="ec-search-box">
+          <Search size={18} className="ec-search-icon" />
+          <input
+            type="text"
+            className="ec-search-input"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search examinations by title, code, or description..."
+          />
+          {search && (
+            <button type="button" className="ec-search-clear" onClick={() => setSearch('')}>
+              <X size={15} />
+            </button>
           )}
         </div>
+
+        <div className="ec-status-pills">
+          {[
+            { id: 'all', label: 'All Lifecycle' },
+            { id: 'active', label: 'Active' },
+            { id: 'published', label: 'Published' },
+            { id: 'draft', label: 'Draft' },
+            { id: 'completed', label: 'Completed' }
+          ].map(p => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setFilter(p.id)}
+              className={`ec-status-pill ${filter === p.id ? 'active' : ''}`}
+            >
+              {p.label}
+            </button>
+          ))}
+
+          <button 
+            type="button" 
+            className="ec-action-btn"
+            onClick={() => fetchExams(false)}
+            title="Refresh examination list"
+            style={{ marginLeft: 6 }}
+          >
+            <RotateCcw size={14} />
+          </button>
+        </div>
       </div>
 
-      {/* EDIT EXAM MODAL */}
-      {editModal.open && editModal.exam && (
-        <div className="admin-modal-overlay" onClick={() => !editModal.saving && setEditModal(prev => ({ ...prev, open: false }))}>
-          <div 
-            className="admin-modal" 
-            style={{ 
-              maxWidth: 600, 
-              width: '100%', 
-              maxHeight: '90vh', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              borderRadius: 16, 
-              overflow: 'hidden',
-              boxShadow: '0 25px 60px -15px rgba(0,0,0,0.3)'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="admin-modal-header" style={{ flexShrink: 0, background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(10, 116, 218, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0a74da' }}>
-                  <BookOpen size={18} />
-                </div>
+      {/* ── Examination Cards Grid ──────────────────────────────────────────── */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--mu, #667085)' }}>
+          <RotateCcw size={28} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 12px', display: 'block' }} />
+          <p style={{ margin: 0, fontSize: '0.95rem' }}>Loading examination centers...</p>
+        </div>
+      ) : exams.length === 0 ? (
+        <div style={{
+          background: 'var(--sf, #ffffff)',
+          border: '1px solid var(--bd, #e6e9f0)',
+          borderRadius: '16px',
+          padding: '60px 20px',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '16px',
+            background: 'var(--wash, rgba(37, 99, 235, 0.08))',
+            color: 'var(--c1, #2563eb)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px'
+          }}>
+            <FileText size={28} />
+          </div>
+          <h3 style={{ margin: '0 0 6px', fontSize: '1.15rem', fontWeight: 600, color: 'var(--tx, #101828)' }}>
+            No examinations found
+          </h3>
+          <p style={{ margin: '0 0 20px', fontSize: '0.86rem', color: 'var(--mu, #667085)' }}>
+            {search ? `No examinations matching "${search}"` : 'Create your first proctored examination to orchestrate questions and enroll candidates.'}
+          </p>
+          {!search && (
+            <button 
+              type="button" 
+              className="ec-btn primary"
+              onClick={() => navigate('/admin/exams/create')}
+            >
+              <Plus size={16} />
+              <span>Create First Examination</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="ec-exams-grid">
+          {exams.map(exam => {
+            const examTitle = exam.title || exam.name || 'Untitled Exam';
+            const isEnded = isExamEnded(exam);
+            const currentStatus = isEnded ? 'completed' : (exam.status || 'draft');
+            const monConfig = typeof exam.monitoring_config === 'string' ? JSON.parse(exam.monitoring_config || '{}') : (exam.monitoring_config || {});
+
+            return (
+              <div key={exam.id} className="ec-exam-card">
                 <div>
-                  <h3 className="admin-modal-title" style={{ fontSize: '1.15rem' }}>Edit Exam Details</h3>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>Update exam title, duration, marks, and settings</p>
+                  {/* Card Top */}
+                  <div className="ec-exam-top">
+                    <div className="ec-exam-title-box">
+                      <span className="ec-exam-type-badge">
+                        {(exam.type || 'coding').replace('_', ' ')} Assessment
+                      </span>
+                      <h3 className="ec-exam-title">{examTitle}</h3>
+                    </div>
+                    <StatusBadge exam={exam} status={exam.status} />
+                  </div>
+
+                  {/* Description */}
+                  <div className="ec-exam-desc">
+                    {exam.description || 'Proctored examination orchestrating automated telemetry, candidate verification, and secure scoring.'}
+                  </div>
+
+                  {/* Specs Grid */}
+                  <div className="ec-specs-grid">
+                    <div className="ec-spec-item">
+                      <Calendar size={14} />
+                      <span>{exam.date_time ? formatIST(exam.date_time, 'dateTime') : 'Scheduled anytime'}</span>
+                    </div>
+                    <div className="ec-spec-item">
+                      <Clock size={14} />
+                      <span>{exam.duration || 60} mins duration</span>
+                    </div>
+                    <div className="ec-spec-item">
+                      <Trophy size={14} />
+                      <span>{exam.total_marks || 100} marks (Pass: {exam.passing_marks || 40})</span>
+                    </div>
+                    <div className="ec-spec-item">
+                      <FileText size={14} />
+                      <span>{exam.question_count || 0} questions</span>
+                    </div>
+                    <div className="ec-spec-item">
+                      <Users size={14} />
+                      <span>{exam.student_count || 0} candidates</span>
+                    </div>
+                    <div className="ec-spec-item">
+                      <Shield size={14} />
+                      <span>{exam.is_proctored !== false ? 'AI Shield Active' : 'Unproctored'}</span>
+                    </div>
+                  </div>
+
+                  {/* Proctoring Pill */}
+                  {exam.is_proctored !== false && (
+                    <div className="ec-proctoring-pill">
+                      <span style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--mu, #667085)' }}>
+                        Telemetry Shields:
+                      </span>
+                      <div className="ec-proctoring-icons">
+                        {monConfig.face_detection !== false && <Eye size={14} title="Face Detection Active" />}
+                        {monConfig.voice_detection !== false && <Mic size={14} title="Voice Anomaly Detection Active" />}
+                        {monConfig.tab_switch !== false && <Layers size={14} title="Tab-Switch Interception Active" />}
+                        {monConfig.fullscreen !== false && <Maximize size={14} title="Full Screen Enforcement Active" />}
+                        {monConfig.device_camera !== false && <Camera size={14} title="Webcam HUD Feed Active" />}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Actions Footer */}
+                <div className="ec-card-actions">
+                  <button
+                    type="button"
+                    className="ec-action-btn primary"
+                    onClick={() => navigate(`/admin/exams/${exam.id}/questions`)}
+                  >
+                    <FileText size={13} />
+                    <span>Questions ({exam.question_count || 0})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="ec-action-btn"
+                    onClick={() => handleOpenEdit(exam)}
+                  >
+                    <Edit3 size={13} />
+                    <span>Edit &amp; Settings</span>
+                  </button>
+
+                  {currentStatus === 'draft' && (
+                    <button
+                      type="button"
+                      className="ec-action-btn success"
+                      onClick={() => publishExam(exam.id, examTitle)}
+                    >
+                      <CheckCircle size={13} />
+                      <span>Publish</span>
+                    </button>
+                  )}
+
+                  {(currentStatus === 'published' || currentStatus === 'active') && (
+                    <button
+                      type="button"
+                      className="ec-action-btn success"
+                      onClick={() => navigate(`/admin/exams/${exam.id}/monitor`)}
+                    >
+                      <Monitor size={13} />
+                      <span>Live Cockpit</span>
+                    </button>
+                  )}
+
+                  {currentStatus === 'completed' && (
+                    <button
+                      type="button"
+                      className="ec-action-btn"
+                      onClick={() => navigate(`/admin/results`)}
+                    >
+                      <Trophy size={13} />
+                      <span>Gradebook</span>
+                    </button>
+                  )}
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── EDIT EXAM MODAL ────────────────────────────────────────────────── */}
+      {editModal.open && editModal.exam && (
+        <div 
+          className="ec-modal-overlay" 
+          onClick={() => !editModal.saving && setEditModal(prev => ({ ...prev, open: false }))}
+        >
+          <div className="ec-modal" onClick={e => e.stopPropagation()}>
+            <div className="ec-modal-header">
+              <h3 className="ec-modal-title">
+                <BookOpen size={20} color="var(--c1, #2563eb)" />
+                <span>Edit Examination &amp; AI Policy</span>
+              </h3>
               <button 
                 onClick={() => !editModal.saving && setEditModal(prev => ({ ...prev, open: false }))} 
-                className="admin-modal-close"
+                className="ec-modal-close"
                 disabled={editModal.saving}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form 
-              onSubmit={handleSaveExam}
-              style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                flex: 1, 
-                minHeight: 0, 
-                overflow: 'hidden' 
-              }}
-            >
-              <div 
-                className="admin-modal-content" 
-                style={{ 
-                  flex: 1, 
-                  overflowY: 'auto', 
-                  padding: '24px 28px',
-                  minHeight: 0 
-                }}
-              >
+            <form onSubmit={handleSaveExam} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <div className="ec-modal-body">
                 {/* Title */}
-                <div style={{ marginBottom: 18 }}>
-                  <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: 6 }}>
-                    Exam Title *
+                <div className="ec-form-group">
+                  <label className="ec-form-label">
+                    Examination Title *
                   </label>
                   <input 
                     type="text" 
                     value={editModal.title}
                     onChange={e => setEditModal(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="e.g. Full Stack & Cybersecurity Examination"
+                    placeholder="e.g. End-Term Full Stack & Algorithms Assessment"
                     required
-                    className="admin-form-input"
+                    className="ec-form-input"
                     style={{ fontWeight: 600 }}
                   />
                 </div>
 
                 {/* Description */}
-                <div style={{ marginBottom: 18 }}>
-                  <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: 6 }}>
-                    Description
+                <div className="ec-form-group">
+                  <label className="ec-form-label">
+                    Examination Instructions &amp; Description
                   </label>
                   <textarea 
                     value={editModal.description}
                     onChange={e => setEditModal(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Brief description or instructions for the exam..."
-                    rows={3}
-                    className="admin-form-input"
-                    style={{ resize: 'vertical' }}
+                    placeholder="Instructions shown to candidates prior to launching the exam room..."
+                    rows={2}
+                    className="ec-form-textarea"
                   />
                 </div>
 
-                {/* Scheduled Date & Time (IST) */}
-                <div style={{ marginBottom: 18, background: '#f8fafc', padding: '14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>
-                      <Calendar size={15} color="#0a74da" />
-                      <span>Scheduled Date & Time (IST)</span>
+                {/* Date & Time */}
+                <div style={{ background: 'var(--s2, #f8f9fc)', padding: '14px 16px', borderRadius: '12px', border: '1px solid var(--bd, #e6e9f0)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                    <label className="ec-form-label" style={{ margin: 0 }}>
+                      <Calendar size={15} color="var(--c1, #2563eb)" />
+                      <span>Scheduled Date &amp; Window (IST)</span>
                     </label>
                     {editModal.exam?.date_time && (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: 6 }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--c1, #2563eb)' }}>
                         Current: {formatIST(editModal.exam.date_time, 'dateTime')}
                       </span>
                     )}
@@ -611,19 +615,20 @@ export default function ExamManagement() {
                     type="datetime-local"
                     value={editModal.dateTime || ''}
                     onChange={e => setEditModal(prev => ({ ...prev, dateTime: e.target.value }))}
-                    className="admin-form-input"
-                    style={{ fontWeight: 600, background: '#ffffff' }}
+                    className="ec-form-input"
+                    style={{ background: 'var(--sf, #ffffff)' }}
                   />
-                  <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>
-                    💡 You can edit this schedule anytime (even after publishing). The new schedule reflects immediately on all student dashboards without affecting question banks, candidate answers, or existing submissions.
+                  <p style={{ margin: '6px 0 0', fontSize: '0.74rem', color: 'var(--mu, #667085)', lineHeight: 1.4 }}>
+                    💡 Updating the schedule reflects instantly on all candidate dashboards without resetting question responses.
                   </p>
                 </div>
 
                 {/* Duration & Type row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: 6 }}>
-                      Duration (Minutes)
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="ec-form-group">
+                    <label className="ec-form-label">
+                      <Clock size={14} color="var(--mu, #667085)" />
+                      <span>Duration (Minutes)</span>
                     </label>
                     <input 
                       type="number" 
@@ -631,19 +636,18 @@ export default function ExamManagement() {
                       max="600"
                       value={editModal.duration}
                       onChange={e => setEditModal(prev => ({ ...prev, duration: e.target.value }))}
-                      className="admin-form-input"
+                      className="ec-form-input"
                       required
                     />
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: 6 }}>
-                      Exam Type
+                  <div className="ec-form-group">
+                    <label className="ec-form-label">
+                      <span>Assessment Type</span>
                     </label>
                     <select 
                       value={editModal.type}
                       onChange={e => setEditModal(prev => ({ ...prev, type: e.target.value }))}
-                      className="admin-form-input"
-                      style={{ fontWeight: 600 }}
+                      className="ec-form-select"
                     >
                       <option value="coding">Coding Assessment</option>
                       <option value="mcq">Multiple Choice (MCQ)</option>
@@ -654,10 +658,11 @@ export default function ExamManagement() {
                 </div>
 
                 {/* Marks row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: 6 }}>
-                      Total Marks
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="ec-form-group">
+                    <label className="ec-form-label">
+                      <Trophy size={14} color="var(--mu, #667085)" />
+                      <span>Total Marks</span>
                     </label>
                     <input 
                       type="number" 
@@ -665,13 +670,13 @@ export default function ExamManagement() {
                       max="1000"
                       value={editModal.total_marks}
                       onChange={e => setEditModal(prev => ({ ...prev, total_marks: e.target.value }))}
-                      className="admin-form-input"
+                      className="ec-form-input"
                       required
                     />
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: 6 }}>
-                      Passing Marks
+                  <div className="ec-form-group">
+                    <label className="ec-form-label">
+                      <span>Passing Marks</span>
                     </label>
                     <input 
                       type="number" 
@@ -679,88 +684,72 @@ export default function ExamManagement() {
                       max={editModal.total_marks || 1000}
                       value={editModal.passing_marks}
                       onChange={e => setEditModal(prev => ({ ...prev, passing_marks: e.target.value }))}
-                      className="admin-form-input"
+                      className="ec-form-input"
                       required
                     />
                   </div>
                 </div>
 
                 {/* Status */}
-                <div style={{ marginBottom: 10 }}>
-                  <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: 6 }}>
-                    Exam Lifecycle Status
+                <div className="ec-form-group">
+                  <label className="ec-form-label">
+                    Lifecycle Status
                   </label>
                   <select 
                     value={editModal.status}
                     onChange={e => setEditModal(prev => ({ ...prev, status: e.target.value }))}
-                    className="admin-form-input"
-                    style={{ fontWeight: 600 }}
+                    className="ec-form-select"
                   >
                     <option value="draft">Draft (Not yet visible to candidates)</option>
-                    <option value="published">Published (Ready for students)</option>
+                    <option value="published">Published (Ready on candidate portal)</option>
                     <option value="active">Active (Ongoing exam window)</option>
                     <option value="completed">Completed (Evaluation ready)</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
 
-                {/* Proctoring & Monitoring Policy */}
-                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Shield size={18} color="#0a74da" />
-                      <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>
-                        AI Proctoring & Monitoring Controls
+                {/* AI Proctoring Policies */}
+                <div style={{ marginTop: '10px', paddingTop: '14px', borderTop: '1px solid var(--bd, #e6e9f0)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Shield size={18} color="var(--c1, #2563eb)" />
+                      <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--tx, #101828)' }}>
+                        AI Proctoring &amp; Monitoring Controls
                       </span>
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                       <input 
                         type="checkbox"
                         checked={editModal.is_proctored}
                         onChange={e => setEditModal(prev => ({ ...prev, is_proctored: e.target.checked }))}
-                        style={{ width: 16, height: 16, accentColor: '#0a74da' }}
+                        style={{ width: '15px', height: '15px', accentColor: 'var(--c1, #2563eb)' }}
                       />
                       <span>Enable Proctoring</span>
                     </label>
                   </div>
 
-                  {editModal.is_proctored ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10, background: '#f8fafc', padding: 14, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                  {editModal.is_proctored && (
+                    <div className="ec-monitoring-grid">
                       {[
-                        { key: 'face_detection', label: 'Face & Person Detection', icon: Eye, desc: 'Alerts if face is missing or multiple faces appear' },
-                        { key: 'voice_detection', label: 'Voice & Speech Detection', icon: Mic, desc: 'Detects candidate talking or background speech' },
-                        { key: 'tab_switch', label: 'Tab-Switch Detection', icon: Layers, desc: 'Detects leaving or blurring exam window' },
-                        { key: 'fullscreen', label: 'Full-Screen Enforcement', icon: Maximize, desc: 'Enforces full-screen mode during exam' },
-                        { key: 'device_camera', label: 'Live Camera HUD & Cockpit Feed', icon: Camera, desc: 'Captures candidate webcam frames' },
+                        { key: 'face_detection', label: 'Face & Person Detection', icon: Eye, desc: 'Detects absent face or multiple persons' },
+                        { key: 'voice_detection', label: 'Voice & Speech Detection', icon: Mic, desc: 'Detects speech or audio anomalies' },
+                        { key: 'tab_switch', label: 'Tab-Switch Interception', icon: Layers, desc: 'Flags window blur and tab switching' },
+                        { key: 'fullscreen', label: 'Full-Screen Enforcement', icon: Maximize, desc: 'Locks assessment in fullscreen mode' },
+                        { key: 'device_camera', label: 'Live Camera HUD Stream', icon: Camera, desc: 'Captures candidate webcam snapshots' },
                       ].map(item => {
                         const active = editModal.monitoringConfig?.[item.key] !== false;
                         const Icon = item.icon;
                         return (
                           <div 
                             key={item.key}
+                            className={`ec-monitoring-tile ${active ? 'active' : ''}`}
                             onClick={() => toggleEditMonitoringOption(item.key)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '10px 12px',
-                              background: active ? '#ffffff' : '#f1f5f9',
-                              border: `1.5px solid ${active ? '#0a74da' : '#cbd5e1'}`,
-                              borderRadius: 8,
-                              cursor: 'pointer',
-                              boxShadow: active ? '0 2px 6px rgba(10, 116, 218, 0.08)' : 'none',
-                              userSelect: 'none'
-                            }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <Icon size={16} color={active ? '#0a74da' : '#94a3b8'} />
+                            <div className="ec-monitoring-tile-left">
+                              <Icon size={16} color={active ? 'var(--c1, #2563eb)' : 'var(--mu, #667085)'} />
                               <div>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: active ? '#0f172a' : '#64748b' }}>
-                                  {item.label}
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: '#94a3b8', lineHeight: 1.2 }}>
-                                  {item.desc}
-                                </div>
+                                <div className="ec-monitoring-tile-title">{item.label}</div>
+                                <div className="ec-monitoring-tile-desc">{item.desc}</div>
                               </div>
                             </div>
                             <input 
@@ -768,49 +757,33 @@ export default function ExamManagement() {
                               checked={active}
                               onChange={() => toggleEditMonitoringOption(item.key)}
                               onClick={e => e.stopPropagation()}
-                              style={{ width: 16, height: 16, accentColor: '#0a74da', marginLeft: 8 }}
+                              style={{ accentColor: 'var(--c1, #2563eb)' }}
                             />
                           </div>
                         );
                       })}
                     </div>
-                  ) : (
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', background: '#f1f5f9', padding: '10px 14px', borderRadius: 8 }}>
-                      Proctoring is disabled. No camera, audio, or tab monitoring will be enforced for this exam.
-                    </div>
                   )}
                 </div>
               </div>
 
-              <div style={{ 
-                flexShrink: 0,
-                padding: '16px 28px', 
-                background: '#f8fafc', 
-                borderTop: '1px solid #e2e8f0', 
-                display: 'flex', 
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                gap: 12
-              }}>
-                <Button 
-                  type="button"
-                  variant="ghost" 
-                  size="md" 
+              <div className="ec-modal-footer">
+                <button 
+                  type="button" 
+                  className="ec-btn secondary"
                   disabled={editModal.saving}
                   onClick={() => setEditModal(prev => ({ ...prev, open: false }))}
                 >
                   Cancel
-                </Button>
-                <Button 
-                  type="submit"
-                  variant="primary" 
-                  size="md" 
-                  icon={Save}
-                  loading={editModal.saving}
-                  style={{ minWidth: 170, fontWeight: 700 }}
+                </button>
+                <button 
+                  type="submit" 
+                  className="ec-btn primary"
+                  disabled={editModal.saving}
                 >
-                  Save Exam Changes
-                </Button>
+                  <Save size={15} />
+                  <span>{editModal.saving ? 'Saving...' : 'Save Exam Changes'}</span>
+                </button>
               </div>
             </form>
           </div>
