@@ -2,9 +2,8 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-// Use direct backend URL for both development and production
-const developmentApiBaseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 // Priority: env var > hardcoded production URL
+const developmentApiBaseURL = process.env.REACT_APP_API_URL || 'https://exam.nexifyforge.in/api';
 const productionApiBaseURL = process.env.REACT_APP_API_URL || 'https://exam.nexifyforge.in/api';
 
 const API_BASE_URL =
