@@ -1229,20 +1229,6 @@ export default function LiveMonitor() {
                         type="button"
                         onClick={() => setSelectedScreenIndex(screenIdx)}
                         className={`screen-target-btn ${isTarget ? 'target-active' : ''}`}
-                        style={{
-                          background: isTarget ? '#0284c7' : '#1e293b',
-                          color: '#fff',
-                          border: isTarget ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.12)',
-                          borderRadius: 6,
-                          padding: '4px 10px',
-                          fontSize: '0.74rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 5,
-                          transition: 'all 0.15s ease',
-                        }}
                         title={`Select Screen ${screenIdx + 1} as next replacement target`}
                       >
                         <span
@@ -2049,20 +2035,21 @@ export default function LiveMonitor() {
                   width: 48,
                   height: 48,
                   borderRadius: 12,
-                  background: '#1e293b',
-                  color: '#38bdf8',
+                  background: 'var(--prs, rgba(37, 99, 235, 0.12))',
+                  color: 'var(--c1, #2563eb)',
                   fontSize: '1.2rem',
                   fontWeight: 800,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  border: '1px solid var(--bd)'
                 }}
               >
                 {inspectModal.student.name?.charAt(0)?.toUpperCase()}
               </div>
               <div>
-                <h4 style={{ margin: 0, color: '#fff', fontSize: '1rem' }}>{inspectModal.student.name}</h4>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                <h4 style={{ margin: 0, color: 'var(--tx)', fontSize: '1rem', fontWeight: 700 }}>{inspectModal.student.name}</h4>
+                <div style={{ fontSize: '0.78rem', color: 'var(--mu)' }}>
                   Roll No: {inspectModal.student.studentId} • {inspectModal.student.email}
                 </div>
               </div>
@@ -2075,7 +2062,7 @@ export default function LiveMonitor() {
               borderRadius: 10,
               overflow: 'hidden',
               marginBottom: 16,
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              border: '1px solid var(--bd)',
               background: '#030712'
             }}>
               <div className="surveillance-frame-wrap" style={{ width: '100%', height: '100%' }}>
@@ -2088,21 +2075,21 @@ export default function LiveMonitor() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
-              <div style={{ background: '#090d16', padding: '10px 12px', borderRadius: 8 }}>
-                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>TOTAL VIOLATIONS</div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f87171' }}>
+              <div style={{ background: 'var(--s2)', border: '1px solid var(--bd)', padding: '10px 12px', borderRadius: 8 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--mu)', fontWeight: 600 }}>TOTAL VIOLATIONS</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--bad)' }}>
                   {inspectModal.student.violation_count || 0}
                 </div>
               </div>
-              <div style={{ background: '#090d16', padding: '10px 12px', borderRadius: 8 }}>
-                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>OFFICIAL STRIKES</div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fbbf24' }}>
+              <div style={{ background: 'var(--s2)', border: '1px solid var(--bd)', padding: '10px 12px', borderRadius: 8 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--mu)', fontWeight: 600 }}>OFFICIAL STRIKES</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f59e0b' }}>
                   {inspectModal.student.warning_count || 0}/3
                 </div>
               </div>
-              <div style={{ background: '#090d16', padding: '10px 12px', borderRadius: 8 }}>
-                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>STATUS</div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#34d399', textTransform: 'capitalize' }}>
+              <div style={{ background: 'var(--s2)', border: '1px solid var(--bd)', padding: '10px 12px', borderRadius: 8 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--mu)', fontWeight: 600 }}>STATUS</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--good)', textTransform: 'capitalize' }}>
                   {inspectModal.student.status}
                 </div>
               </div>
@@ -2237,8 +2224,8 @@ export default function LiveMonitor() {
                     <div
                       key={`assign-cand-${cand.id}`}
                       style={{
-                        background: '#0d1322',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: 'var(--s2)',
+                        border: '1px solid var(--bd)',
                         borderRadius: 8,
                         padding: '10px 12px',
                         display: 'flex',
@@ -2253,29 +2240,30 @@ export default function LiveMonitor() {
                             width: 34,
                             height: 34,
                             borderRadius: '50%',
-                            background: '#1e293b',
-                            color: '#38bdf8',
+                            background: 'var(--prs, rgba(37, 99, 235, 0.12))',
+                            color: 'var(--c1, #2563eb)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontWeight: 800,
                             fontSize: '0.9rem',
+                            border: '1px solid var(--bd)'
                           }}
                         >
                           {cand.name?.charAt(0)?.toUpperCase()}
                         </div>
                         <div>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#f8fafc' }}>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--tx)' }}>
                             {cand.name}
                           </div>
-                          <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--mu)' }}>
                             ID: {cand.studentId} • {cand.violation_count > 0 ? `${cand.violation_count} flags` : 'Clean'}
                           </div>
                         </div>
                       </div>
 
                       {isAlreadyStreaming ? (
-                        <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontWeight: 700 }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--c1)', fontWeight: 700 }}>
                           Active on Screen {currentSlotNum}
                         </span>
                       ) : (
