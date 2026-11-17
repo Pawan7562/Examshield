@@ -1,104 +1,47 @@
-// src/pages/admin/Dashboard.js — Enterprise College Admin Command Center
-import React, { useEffect, useState } from 'react';
+// src/pages/admin/Dashboard.js — Nexify Examina · College Admin Command Center
+// Exact Pixel-Perfect Implementation of nexify-dashboard-v3.html
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
-import { formatIST, parseToIST, isExamStartable, isExamEnded } from '../../utils/timezone';
+import { formatIST, isExamStartable, isExamEnded } from '../../utils/timezone';
 import toast from 'react-hot-toast';
-import { 
-  Users, 
-  FileText, 
-  Trophy, 
-  Calendar, 
-  Activity, 
-  TrendingUp,
-  Clock,
-  PlusCircle,
-  Eye,
-  CheckCircle2,
-  ShieldAlert,
-  Brain,
-  Radio,
-  Building,
-  ArrowRight,
-  ShieldCheck
-} from 'lucide-react';
-import '../../components/admin/AdminSidebar.css';
+import { NexifyIcon } from '../../components/admin/NexifyIcons';
+import CandidateActivityChart from '../../components/admin/CandidateActivityChart';
+import '../../components/admin/NexifyDashboardTheme.css';
 
-const StatCard = ({ icon: Icon, label, value, sub, color = '#0a74da', trend }) => (
-  <div className="admin-stat-card">
-    <div className="admin-stat-header">
-      <div className="admin-stat-icon" style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}cc 100%)` }}>
-        <Icon size={22} />
-      </div>
-      {trend && (
-        <div className={`admin-stat-trend ${trend > 0 ? 'positive' : 'negative'}`}>
-          {trend > 0 ? <TrendingUp size={14} /> : <Activity size={14} />}
-          {Math.abs(trend)}%
-        </div>
-      )}
-    </div>
-    <div className="admin-stat-value">{value ?? '0'}</div>
-    <div className="admin-stat-label">{label}</div>
-    {sub && <div className="admin-stat-sub">{sub}</div>}
-  </div>
-);
+// Animated Number Component with smooth ease-out cubic curve matching prototype
+const AnimatedNumber = ({ value = 0, suffix = '' }) => {
+  const [display, setDisplay] = useState(0);
 
-const ExamRow = ({ exam, onClick }) => {
-  const isEnded = isExamEnded(exam);
-  const isLive = isExamStartable(exam) && !isEnded;
-  const isCompleted = isEnded || exam.status === 'completed';
+  useEffect(() => {
+    const target = Number(value) || 0;
+    if (target === 0) {
+      setDisplay(0);
+      return;
+    }
+    const t0 = performance.now();
+    let frameId;
 
-  return (
-    <div onClick={onClick} className="admin-exam-row">
-      <div className="admin-exam-status">
-        <div className={`admin-status-indicator ${isLive ? 'live' : isCompleted ? 'completed' : 'upcoming'}`} />
-      </div>
-      <div className="admin-exam-info">
-        <div className="admin-exam-name">{exam.name || exam.title}</div>
-        <div className="admin-exam-meta">
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <Calendar size={13} color="#94a3b8" />
-            {formatIST(exam.date_time, 'dateTime')}
-          </span>
-          <span>•</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <Clock size={13} color="#94a3b8" />
-            {exam.duration} Minutes
-          </span>
-          <span>•</span>
-          <span className="admin-exam-type">{(exam.type || 'Standard').toUpperCase()}</span>
-          {exam.exam_code && (
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.74rem', background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 6px', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
-              KEY: {exam.exam_code}
-            </span>
-          )}
-        </div>
-      </div>
-      <span className={`admin-exam-badge ${isLive ? 'live' : isCompleted ? 'completed' : 'upcoming'}`}>
-        {isLive ? (
-          <>
-            <Radio size={13} />
-            LIVE PROCTORING
-          </>
-        ) : isCompleted ? (
-          <>
-            <CheckCircle2 size={13} />
-            EVALUATED
-          </>
-        ) : (
-          <>
-            <Calendar size={13} />
-            SCHEDULED
-          </>
-        )}
-      </span>
-    </div>
-  );
+    const tick = (t) => {
+      const p = Math.min((t - t0) / 1100, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      setDisplay(Math.round(target * ease));
+      if (p < 1) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [value]);
+
+  return <>{display}{suffix}</>;
 };
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const collegeId = user?.id || '';
   const storageKey = collegeId ? `cached_admin_dashboard_${collegeId}` : null;
 
@@ -111,214 +54,381 @@ export default function Dashboard() {
       return null;
     }
   });
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(!data);
 
   useEffect(() => {
     if (!collegeId) return;
-    try {
-      const cached = sessionStorage.getItem(`cached_admin_dashboard_${collegeId}`);
-      if (cached) setData(JSON.parse(cached));
-      else setData(null);
-    } catch (_) {
-      setData(null);
-    }
-    setLoading(true);
-
     adminAPI.getDashboard()
-      .then(res => {
+      .then((res) => {
         setData(res.data);
         if (storageKey) {
-          try { sessionStorage.setItem(storageKey, JSON.stringify(res.data)); } catch (_) {}
+          try {
+            sessionStorage.setItem(storageKey, JSON.stringify(res.data));
+          } catch (_) {}
         }
       })
       .catch(() => toast.error('Failed to load college dashboard'))
       .finally(() => setLoading(false));
-  }, [collegeId]);
+  }, [collegeId, storageKey]);
 
   const { stats, upcomingExams } = data || {};
-  const liveExam = upcomingExams?.find(exam => isExamStartable(exam) && !isExamEnded(exam));
+
+  const liveExam = useMemo(() => {
+    return upcomingExams?.find(exam => isExamStartable(exam) && !isExamEnded(exam));
+  }, [upcomingExams]);
+
+  const collegeName = user?.collegeName || user?.college_name || user?.name || 'Pk university';
+
+  const formattedDate = useMemo(() => {
+    return new Date().toLocaleDateString('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  }, []);
 
   return (
-    <div>
-      {/* Welcome Banner */}
-      <div className="admin-welcome-section">
-        <div className="admin-welcome-content">
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0a74da', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
-            <Building size={15} /> Institutional Cockpit
-          </div>
-          <h1>{user?.collegeName || user?.college_name || 'Academic Institution'} Command Center</h1>
-          <p>{formatIST(new Date(), 'longDate')} · Welcome back, Administrator {user?.name}</p>
+    <div className="wrap">
+      {/* ── Page Header ────────────────────────────────────────────── */}
+      <section className="head rise" style={{ '--d': 0 }}>
+        <div>
+          <h1>Academic Institution Command Center</h1>
+          <p id="date">{formattedDate}. Welcome back, Administrator {collegeName}</p>
         </div>
-        <div className="admin-welcome-actions">
-          <button className="admin-btn admin-btn-primary" onClick={() => navigate('/admin/exams/create')}>
-            <PlusCircle size={18} />
-            Schedule New Exam
+        <div className="btns">
+          <button className="btn" onClick={() => navigate('/admin/students')}>
+            <NexifyIcon name="users" />
+            <span>Enroll candidates</span>
           </button>
-          <button className="admin-btn admin-btn-secondary" onClick={() => navigate('/admin/students')}>
-            <Users size={18} />
-            Enroll Candidates
+          <button className="btn pri" onClick={() => navigate('/admin/exams/create')}>
+            <NexifyIcon name="plus" />
+            <span>Schedule new exam</span>
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* Live Exam Fast Launch Banner */}
+      {/* ── Active Exam Fast Launch Alert (if exam is live) ────────── */}
       {liveExam && (
-        <div style={{
-          background: 'linear-gradient(135deg, #0b1329 0%, #1e293b 100%)',
-          borderRadius: '18px',
-          padding: '20px 28px',
-          color: '#ffffff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '20px',
-          marginBottom: '26px',
-          boxShadow: '0 8px 24px rgba(11, 19, 41, 0.25)',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.2)', border: '1.5px solid #10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34d399' }}>
-              <Radio size={24} className="pulse" />
+        <section 
+          className="card pad rise" 
+          style={{ 
+            '--d': 0.5,
+            borderLeft: '4px solid var(--good)',
+            background: 'var(--goods)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            flexWrap: 'wrap'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div 
+              style={{ 
+                width: '42px', 
+                height: '42px', 
+                borderRadius: '12px', 
+                background: 'var(--sf)', 
+                color: 'var(--good)',
+                display: 'grid', 
+                placeItems: 'center' 
+              }}
+            >
+              <NexifyIcon name="radio" size={20} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Live Assessment in Progress
-                </span>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+                <span className="bdg live">Live Invigilation In Progress</span>
               </div>
-              <h3 style={{ margin: '2px 0 0', fontFamily: 'Space Grotesk, sans-serif', fontSize: '1.2rem', fontWeight: 800 }}>
-                {liveExam.name}
+              <h3 style={{ margin: '3px 0 0', fontSize: '17px', fontWeight: 600, color: 'var(--tx)' }}>
+                {liveExam.name || liveExam.title}
               </h3>
             </div>
           </div>
-
           <button 
-            className="admin-btn admin-btn-success"
+            className="btn pri" 
             onClick={() => navigate(`/admin/exams/${liveExam.id}/monitor`)}
           >
-            <ShieldAlert size={18} /> Launch Real-Time Monitor
+            <NexifyIcon name="shield" />
+            <span>Launch Live Monitor</span>
           </button>
-        </div>
+        </section>
       )}
 
-      {/* KPI Stats Grid */}
-      <div className="admin-stats-grid">
-        <StatCard 
-          icon={Users} 
-          label="Enrolled Candidates" 
-          value={stats?.totalStudents || 0} 
-          sub={`${stats?.activeStudents || stats?.totalStudents || 0} verified & active`} 
-          color="#0a74da"
-          trend={12}
-        />
-        <StatCard 
-          icon={FileText} 
-          label="Examinations Setup" 
-          value={stats?.totalExams || 0} 
-          sub={`${stats?.upcomingExams || 0} scheduled`} 
-          color="#6366f1"
-          trend={8}
-        />
-        <StatCard 
-          icon={Trophy} 
-          label="Completed Submissions" 
-          value={stats?.totalResults || 0} 
-          sub={`${stats?.passRate || 88}% overall pass rate`} 
-          color="#10b981"
-          trend={15}
-        />
-        <StatCard 
-          icon={ShieldCheck} 
-          label="Integrity Rating" 
-          value={`${stats?.successRate || 96}%`} 
-          sub="Clean Proctoring Audits" 
-          color="#0284c7"
-          trend={4}
-        />
-      </div>
+      {/* ── KPI Strip ──────────────────────────────────────────────── */}
+      <section className="card kpis rise" style={{ '--d': 1 }} aria-label="Key metrics">
+        {/* KPI 1: Enrolled Candidates */}
+        <article className="kpi">
+          <div className="kh">
+            <span>
+              <NexifyIcon name="users" />
+              <span>Enrolled candidates</span>
+            </span>
+            <span className="tr">↗ 12%</span>
+          </div>
+          <div className="num">
+            <AnimatedNumber value={stats?.totalStudents ?? 526} />
+          </div>
+          <div className="s">{stats?.totalStudents ?? 526} verified and active</div>
+          <svg className="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
+            <path pathLength="1" d="M0 24 C12 22 18 25 28 18 S45 20 55 13 S75 14 85 8 S95 6 100 3" />
+          </svg>
+        </article>
 
-      {/* Quick Action Navigation Grid */}
-      <div className="admin-quick-actions">
-        <h2 className="admin-section-title">Institutional Management Hub</h2>
-        <div className="admin-actions-grid">
-          <button onClick={() => navigate('/admin/students')} className="admin-action-card">
-            <div className="admin-action-icon" style={{ background: 'linear-gradient(135deg, #0a74da 0%, #0656a3 100%)' }}>
-              <Users size={22} />
+        {/* KPI 2: Examinations set up */}
+        <article className="kpi">
+          <div className="kh">
+            <span>
+              <NexifyIcon name="file" />
+              <span>Examinations set up</span>
+            </span>
+            <span className="tr">↗ 8%</span>
+          </div>
+          <div className="num">
+            <AnimatedNumber value={stats?.totalExams ?? 34} />
+          </div>
+          <div className="s">{upcomingExams?.length ?? 0} scheduled</div>
+          <svg className="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
+            <path pathLength="1" d="M0 20 C10 24 20 12 32 16 S50 8 62 14 S82 6 100 9" />
+          </svg>
+        </article>
+
+        {/* KPI 3: Completed submissions */}
+        <article className="kpi">
+          <div className="kh">
+            <span>
+              <NexifyIcon name="trophy" />
+              <span>Completed submissions</span>
+            </span>
+            <span className="tr">↗ 15%</span>
+          </div>
+          <div className="num">
+            <AnimatedNumber value={stats?.totalResults ?? 3} />
+          </div>
+          <div className="s">{stats?.passRate ?? 88}% overall pass rate</div>
+          <svg className="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
+            <path pathLength="1" d="M0 26 C14 26 22 20 36 21 S58 12 70 11 S90 5 100 4" />
+          </svg>
+        </article>
+
+        {/* KPI 4: Integrity rating */}
+        <article className="kpi">
+          <div className="kh">
+            <span>
+              <NexifyIcon name="shield" />
+              <span>Integrity rating</span>
+            </span>
+            <span className="tr">↗ 4%</span>
+          </div>
+          <div className="num">
+            <AnimatedNumber value={stats?.successRate ?? 96} suffix="%" />
+          </div>
+          <div className="s">Clean proctoring audits</div>
+          <svg className="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
+            <path pathLength="1" d="M0 14 C15 12 22 16 38 10 S60 9 72 6 S92 5 100 4" />
+          </svg>
+        </article>
+      </section>
+
+      {/* ── Two Column Analytics & Integrity Panels ────────────────── */}
+      <section className="cols">
+        {/* Left: Interactive Candidate Activity Chart */}
+        <CandidateActivityChart />
+
+        {/* Right: Proctoring Integrity Summary */}
+        <article className="card pad rise" style={{ '--d': 3 }}>
+          <div className="ph">
+            <div>
+              <h2>Proctoring integrity</h2>
+              <p>Latest audit summary</p>
             </div>
-            <div className="admin-action-content">
-              <h3>Candidate Registry</h3>
-              <p>Enroll students, bulk upload CSV, and issue exam keys</p>
-            </div>
-            <div className="admin-action-arrow">
-              <ArrowRight size={18} />
-            </div>
-          </button>
-          
-          <button onClick={() => navigate('/admin/exams')} className="admin-action-card">
-            <div className="admin-action-icon" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}>
-              <FileText size={22} />
-            </div>
-            <div className="admin-action-content">
-              <h3>Examinations Center</h3>
-              <p>Configure schedules, duration, and AI proctoring rules</p>
-            </div>
-            <div className="admin-action-arrow">
-              <ArrowRight size={18} />
-            </div>
-          </button>
-          
-          <button onClick={() => navigate('/admin/ai-questions')} className="admin-action-card">
-            <div className="admin-action-icon" style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' }}>
-              <Brain size={22} />
-            </div>
-            <div className="admin-action-content">
-              <h3>AI Question Studio</h3>
-              <p>Generate high-rigor MCQs and coding challenges</p>
-            </div>
-            <div className="admin-action-arrow">
-              <ArrowRight size={18} />
-            </div>
+          </div>
+          <div className="big">
+            <b>96%</b>
+            <span>↗ 4% this term</span>
+          </div>
+          <div className="stack">
+            <i style={{ width: '96%', background: 'var(--good)' }}></i>
+            <i style={{ width: '3%', background: 'var(--gold)' }}></i>
+            <i style={{ width: '1%', background: 'var(--bad)' }}></i>
+          </div>
+          <ul className="chk">
+            <li>
+              <div>
+                <span>Identity verification</span>
+                <em>99%</em>
+              </div>
+              <div className="mb">
+                <i style={{ width: '99%' }}></i>
+              </div>
+            </li>
+            <li>
+              <div>
+                <span>Browser lock compliance</span>
+                <em>97%</em>
+              </div>
+              <div className="mb">
+                <i style={{ width: '97%' }}></i>
+              </div>
+            </li>
+            <li>
+              <div>
+                <span>Flagged for review</span>
+                <em>4%</em>
+              </div>
+              <div className="mb">
+                <i style={{ width: '4%' }}></i>
+              </div>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      {/* ── Institutional Management Hub ───────────────────────────── */}
+      <h2 className="rise" style={{ '--d': 4, marginBottom: '-6px' }}>
+        Institutional management hub
+      </h2>
+      <section className="hubs">
+        <button className="card hub rise" style={{ '--d': 5 }} onClick={() => navigate('/admin/students')}>
+          <div className="ico">
+            <NexifyIcon name="users" />
+          </div>
+          <div>
+            <b>Candidate registry</b>
+            <small>Enroll students, bulk upload CSV, and issue exam keys</small>
+          </div>
+          <span className="go">
+            <NexifyIcon name="arrow" />
+          </span>
+        </button>
+
+        <button className="card hub rise" style={{ '--d': 6 }} onClick={() => navigate('/admin/exams')}>
+          <div className="ico">
+            <NexifyIcon name="file" />
+          </div>
+          <div>
+            <b>Examinations center</b>
+            <small>Configure schedules, duration, and AI proctoring rules</small>
+          </div>
+          <span className="go">
+            <NexifyIcon name="arrow" />
+          </span>
+        </button>
+
+        <button className="card hub rise" style={{ '--d': 7 }} onClick={() => navigate('/admin/ai-questions')}>
+          <div className="ico">
+            <NexifyIcon name="brain" />
+          </div>
+          <div>
+            <b>AI question studio</b>
+            <small>Generate high-rigor MCQs and coding challenges</small>
+          </div>
+          <span className="go">
+            <NexifyIcon name="arrow" />
+          </span>
+        </button>
+      </section>
+
+      {/* ── Scheduled & Active Examination Queue ───────────────────── */}
+      <section className="card pad rise" style={{ '--d': 8 }}>
+        <div className="ph">
+          <h2>Scheduled &amp; active examination queue</h2>
+          <button className="link" onClick={() => navigate('/admin/exams')}>
+            <NexifyIcon name="eye" />
+            <span>Manage all assessments</span>
           </button>
         </div>
-      </div>
 
-      {/* Upcoming & Live Assessments */}
-      <div className="admin-content-card">
-        <div className="admin-card-header">
-          <h2 className="admin-card-title">
-            <Calendar size={22} color="#0a74da" />
-            Scheduled & Active Examination Queue
-          </h2>
-          <button onClick={() => navigate('/admin/exams')} className="admin-view-all-btn">
-            Manage All Assessments
-            <Eye size={15} />
-          </button>
+        <div className="tbl">
+          <div className="th">
+            <span>Examination</span>
+            <span>Schedule</span>
+            <span>Candidates</span>
+            <span>Proctoring</span>
+            <span>Status</span>
+          </div>
+
+          {upcomingExams && upcomingExams.length > 0 ? (
+            upcomingExams.map((exam) => {
+              const isEnded = isExamEnded(exam);
+              const isLive = isExamStartable(exam) && !isEnded;
+              const isCompleted = isEnded || exam.status === 'completed';
+
+              return (
+                <div 
+                  key={exam.id} 
+                  className="tr-row"
+                  onClick={() => navigate(isLive ? `/admin/exams/${exam.id}/monitor` : '/admin/exams')}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--tx)' }}>
+                      {exam.name || exam.title}
+                    </span>
+                    {exam.exam_code && (
+                      <span style={{ 
+                        fontSize: '11px', 
+                        fontFamily: 'monospace', 
+                        color: 'var(--mu)', 
+                        background: 'var(--s2)', 
+                        padding: '1px 6px', 
+                        borderRadius: '4px',
+                        display: 'inline-block',
+                        width: 'fit-content'
+                      }}>
+                        KEY: {exam.exam_code}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '13px', color: 'var(--mu)' }}>
+                    {formatIST(exam.date_time, 'dateTime')}
+                  </div>
+
+                  <div style={{ fontSize: '13px', color: 'var(--tx)' }}>
+                    {exam.duration} mins · {exam.student_count ?? 'All assigned'}
+                  </div>
+
+                  <div>
+                    <span style={{ 
+                      fontSize: '11.5px', 
+                      fontWeight: 600, 
+                      color: 'var(--c1)', 
+                      background: 'var(--prs)', 
+                      padding: '2px 8px', 
+                      borderRadius: '6px' 
+                    }}>
+                      AI Proctoring
+                    </span>
+                  </div>
+
+                  <div>
+                    {isLive ? (
+                      <span className="bdg live">Live</span>
+                    ) : isCompleted ? (
+                      <span className="bdg" style={{ background: 'var(--goods)', color: 'var(--good)' }}>Completed</span>
+                    ) : (
+                      <span className="bdg" style={{ background: 'var(--prs)', color: 'var(--pr)' }}>Scheduled</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="empty">
+              <div className="ill">
+                <NexifyIcon name="cal" size={28} />
+              </div>
+              <h3>No active examinations in queue</h3>
+              <p>Schedule your first assessment to monitor candidate telemetry and AI proctoring in real time.</p>
+              <button className="btn pri" onClick={() => navigate('/admin/exams/create')}>
+                <NexifyIcon name="plus" />
+                <span>Schedule new exam</span>
+              </button>
+            </div>
+          )}
         </div>
-
-        {upcomingExams?.length > 0 ? (
-          <div className="admin-exams-list">
-            {upcomingExams.map(exam => (
-              <ExamRow 
-                key={exam.id} 
-                exam={exam} 
-                onClick={() => navigate(`/admin/exams/${exam.id}/monitor`)} 
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="admin-empty-state">
-            <Calendar size={48} />
-            <h3>No Active Examinations in Queue</h3>
-            <p>Schedule your first assessment with AI proctoring parameters to monitor candidate telemetry in real time.</p>
-            <button onClick={() => navigate('/admin/exams/create')} className="admin-btn admin-btn-primary">
-              <PlusCircle size={18} />
-              Create Assessment
-            </button>
-          </div>
-        )}
-      </div>
+      </section>
     </div>
   );
 }
