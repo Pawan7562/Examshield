@@ -16,10 +16,26 @@ export default function AdminLayout() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // ── Palette State Management ────────────────────────────────
+  const [palette, setPalette] = useState(() => {
+    try {
+      return localStorage.getItem('nx-pal') || 'blue';
+    } catch (_) {
+      return 'blue';
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.dataset.palette = palette;
+    try {
+      localStorage.setItem('nx-pal', palette);
+    } catch (_) {}
+  }, [palette]);
+
   // ── Theme State Management ──────────────────────────────────
   const [isDark, setIsDark] = useState(() => {
     try {
-      const saved = localStorage.getItem('nx-theme3');
+      const saved = localStorage.getItem('nx-theme6') || localStorage.getItem('nx-theme3');
       if (saved) return saved === 'dark';
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     } catch (_) {
@@ -31,7 +47,7 @@ export default function AdminLayout() {
     const root = document.documentElement;
     root.dataset.theme = isDark ? 'dark' : 'light';
     try {
-      localStorage.setItem('nx-theme3', isDark ? 'dark' : 'light');
+      localStorage.setItem('nx-theme6', isDark ? 'dark' : 'light');
     } catch (_) {}
   }, [isDark]);
 
@@ -130,6 +146,47 @@ export default function AdminLayout() {
               </label>
             </form>
 
+            {/* 4 Multi-Palette Switcher */}
+            <div className="pals" role="group" aria-label="Color palette">
+              <button 
+                className="pal" 
+                data-p="blue" 
+                aria-pressed={palette === 'blue'} 
+                aria-label="Royal blue palette" 
+                title="Royal blue" 
+                style={{ background: 'linear-gradient(135deg, #2563eb 50%, #17306b 50%)' }}
+                onClick={() => setPalette('blue')}
+              />
+              <button 
+                className="pal" 
+                data-p="indigo" 
+                aria-pressed={palette === 'indigo'} 
+                aria-label="Indigo palette" 
+                title="Indigo" 
+                style={{ background: 'linear-gradient(135deg, #6d4ae0 50%, #d946a8 50%)' }}
+                onClick={() => setPalette('indigo')}
+              />
+              <button 
+                className="pal" 
+                data-p="gold" 
+                aria-pressed={palette === 'gold'} 
+                aria-label="Obsidian gold palette" 
+                title="Obsidian gold" 
+                style={{ background: 'linear-gradient(135deg, #b8892b 50%, #15161a 50%)' }}
+                onClick={() => setPalette('gold')}
+              />
+              <button 
+                className="pal" 
+                data-p="coral" 
+                aria-pressed={palette === 'coral'} 
+                aria-label="Coral palette" 
+                title="Coral" 
+                style={{ background: 'linear-gradient(135deg, #d1432b 50%, #2f7f9e 50%)' }}
+                onClick={() => setPalette('coral')}
+              />
+            </div>
+
+            {/* Dark / Light Mode Toggle */}
             <button 
               className="ib" 
               id="theme" 

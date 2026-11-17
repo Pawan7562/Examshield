@@ -167,6 +167,7 @@ export default function CandidateActivityChart() {
                 y1={getY(v)}
                 y2={getY(v)}
                 stroke="var(--bd)"
+                strokeDasharray="2 5"
               />
               <text
                 x="0"
