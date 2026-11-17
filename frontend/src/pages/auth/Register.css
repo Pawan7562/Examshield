@@ -50,12 +50,12 @@
 }
 
 .register-page-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(2.1rem, 3.8vw, 2.8rem);
-  font-weight: 800;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: clamp(2.2rem, 3.8vw, 3rem);
+  font-weight: 600;
   color: var(--landing-text, #1f2430);
   line-height: 1.15;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   margin: 0 0 12px;
 }
 
@@ -127,9 +127,9 @@
 }
 
 .register-value-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.4rem;
-  font-weight: 800;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 1.55rem;
+  font-weight: 600;
   color: #1e293b;
   line-height: 1.25;
   margin: 0 0 10px;

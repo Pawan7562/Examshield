@@ -9,44 +9,49 @@ import {
   Edit2, 
   Trash2, 
   UserPlus, 
-  Download,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  Mail,
-  Phone,
-  Users,
-  GraduationCap,
-  Building,
-  Calendar,
-  CheckCircle,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Key,
-  RefreshCw,
-  Copy,
-  Clock,
-  Send,
-  FileSpreadsheet,
-  FileText
+  Download, 
+  ChevronLeft, 
+  ChevronRight, 
+  X, 
+  Mail, 
+  Phone, 
+  Users, 
+  GraduationCap, 
+  Building, 
+  Calendar, 
+  CheckCircle, 
+  CheckCircle2, 
+  AlertCircle, 
+  Key, 
+  RefreshCw, 
+  Copy, 
+  Send, 
+  FileSpreadsheet, 
+  FileText,
+  ShieldCheck,
+  Sparkles,
+  ChevronDown,
+  UserCheck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import '../../components/admin/AdminSidebar.css';
+import './CandidateRegistry.css';
 
-const Modal = ({ open, onClose, title, children }) => {
+/* ── Modern Executive Modal ────────────────────────────────────────────────── */
+const Modal = ({ open, onClose, title, icon: Icon, children }) => {
   if (!open) return null;
   return (
-    <div className="admin-modal-overlay">
-      <div className="admin-modal">
-        <div className="admin-modal-header">
-          <h3 className="admin-modal-title">{title}</h3>
-          <button onClick={onClose} className="admin-modal-close">
-            <X size={20} />
+    <div className="cr-modal-overlay" onClick={onClose}>
+      <div className="cr-modal" onClick={e => e.stopPropagation()}>
+        <div className="cr-modal-header">
+          <h3 className="cr-modal-title">
+            {Icon && <Icon size={20} color="var(--c1, #2563eb)" />}
+            <span>{title}</span>
+          </h3>
+          <button onClick={onClose} className="cr-modal-close" aria-label="Close modal">
+            <X size={18} />
           </button>
         </div>
-        <div className="admin-modal-content">
+        <div className="cr-modal-body">
           {children}
         </div>
       </div>
@@ -54,51 +59,27 @@ const Modal = ({ open, onClose, title, children }) => {
   );
 };
 
-const Input = ({ label, icon: Icon, error, ...props }) => (
-  <div className="admin-form-group">
-    <label className="admin-form-label">
-      {Icon && <Icon size={16} />}
-      {label}
-    </label>
-    <input {...props} className={`admin-form-input ${error ? 'error' : ''}`} />
-    {error && <span className="admin-form-error">{error}</span>}
+/* ── Form Input Helper ─────────────────────────────────────────────────────── */
+const FormInput = ({ label, icon: Icon, error, hint, ...props }) => (
+  <div className="cr-form-group">
+    {label && (
+      <label className="cr-form-label">
+        {Icon && <Icon size={14} color="var(--mu, #667085)" />}
+        <span>{label}</span>
+      </label>
+    )}
+    <input {...props} className={`cr-form-input ${error ? 'error' : ''}`} />
+    {error && <span className="cr-form-error">{error}</span>}
+    {hint && !error && <span className="cr-form-hint">{hint}</span>}
   </div>
 );
 
-const Button = ({ children, variant = 'primary', size = 'md', icon: Icon, loading, ...props }) => {
-  return (
-    <button 
-      {...props} 
-      className={`admin-btn admin-btn-${variant} admin-btn-${size} ${loading ? 'loading' : ''}`}
-      disabled={loading || props.disabled}
-    >
-      {loading ? (
-        <div className="admin-btn-spinner"></div>
-      ) : (
-        <>
-          {Icon && <Icon size={16} />}
-          {children}
-        </>
-      )}
-    </button>
-  );
+/* ── Candidate Initials Helper ─────────────────────────────────────────────── */
+const getInitials = (name = '') => {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return (name.substring(0, 2) || 'ST').toUpperCase();
 };
-
-const StatusBadge = ({ isActive }) => (
-  <span className={`admin-status-badge ${isActive ? 'active' : 'inactive'}`}>
-    {isActive ? (
-      <>
-        <CheckCircle size={12} />
-        ACTIVE
-      </>
-    ) : (
-      <>
-        <XCircle size={12} />
-        INACTIVE
-      </>
-    )}
-  </span>
-);
 
 export default function StudentManagement() {
   const { user } = useAuth();
@@ -117,6 +98,7 @@ export default function StudentManagement() {
       return [];
     }
   });
+
   const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -186,7 +168,7 @@ export default function StudentManagement() {
     }
     setResetForm(f => ({ ...f, newPassword: pwd }));
     navigator.clipboard?.writeText(pwd);
-    toast.success('Generated password: ' + pwd);
+    toast.success('Generated & copied password: ' + pwd);
   };
 
   const openResetModal = (student, linkedRequestId = null) => {
@@ -195,7 +177,7 @@ export default function StudentManagement() {
     setResetForm({
       newPassword: initialPwd,
       notifyEmail: true,
-      adminNotes: linkedRequestId ? 'Password reset processed via assistance request' : '',
+      adminNotes: linkedRequestId ? 'Password reset processed via candidate assistance request' : '',
       linkedRequestId
     });
     setResetSuccessData(null);
@@ -219,7 +201,7 @@ export default function StudentManagement() {
 
       const isSuccess = res?.success || res?.data?.success;
       if (isSuccess) {
-        toast.success(res?.message || res?.data?.message || 'Student password updated successfully');
+        toast.success(res?.message || res?.data?.message || 'Candidate password updated successfully');
         setResetSuccessData({
           student: targetStudentForReset,
           newPassword: resetForm.newPassword,
@@ -229,7 +211,7 @@ export default function StudentManagement() {
         fetchPasswordRequests();
         fetchStudents(pagination.page, true);
       } else {
-        toast.error(res?.message || res?.data?.message || 'Failed to reset student password');
+        toast.error(res?.message || res?.data?.message || 'Failed to reset candidate password');
       }
     } catch (err) {
       const msg = err?.message || err?.response?.data?.message || (typeof err === 'string' ? err : 'Failed to reset password');
@@ -248,7 +230,7 @@ export default function StudentManagement() {
       });
       toast.success('Request dismissed');
       fetchPasswordRequests();
-    } catch (err) {
+    } catch {
       toast.error('Failed to dismiss request');
     }
   };
@@ -282,7 +264,7 @@ export default function StudentManagement() {
         pages: Math.max(1, totalPages)
       });
     } catch {
-      toast.error('Failed to load students');
+      toast.error('Failed to load candidate registry');
     } finally {
       setLoading(false);
     }
@@ -305,7 +287,7 @@ export default function StudentManagement() {
     fetchPasswordRequests();
   }, [collegeId]);
 
-  // Debounce only when actively searching
+  // Debounce search
   useEffect(() => {
     if (!search) return;
     const t = setTimeout(() => fetchStudents(1, false), 250);
@@ -335,7 +317,6 @@ export default function StudentManagement() {
     });
     setEditStudent(null);
     setFormErrors({});
-    // Load published & upcoming exams so admin can select one
     adminAPI.getExams({ page: 1, limit: 50 })
       .then(res => setExams(res.data?.exams || []))
       .catch(() => {});
@@ -360,10 +341,10 @@ export default function StudentManagement() {
 
   const validateForm = () => {
     const errors = {};
-    if (!form.name.trim()) errors.name = 'Name is required';
-    if (!form.email.trim()) errors.email = 'Email is required';
+    if (!form.name.trim()) errors.name = 'Candidate full name is required';
+    if (!form.email.trim()) errors.email = 'Candidate institutional email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Invalid email format';
-    if (!form.rollNo.trim()) errors.rollNo = 'Roll number is required';
+    if (!form.rollNo.trim()) errors.rollNo = 'University / College roll number is required';
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -375,17 +356,16 @@ export default function StudentManagement() {
     try {
       if (editStudent) {
         await adminAPI.updateStudent(editStudent.id, form);
-        toast.success('Student updated successfully');
+        toast.success('Candidate updated successfully');
       } else {
         const response = await adminAPI.addStudent(form);
         const data = response.data?.data || response.data;
-        // Always display generated credentials so admin can review and copy them
         setCredentialFallback(data);
-        const keyMsg = data?.exam_key ? ` Exam Key: ${data.exam_key}` : '';
+        const keyMsg = data?.exam_key ? ` • Exam Key: ${data.exam_key}` : '';
         if (data?.emailSent) {
-          toast.success(`Student added! Credentials &${keyMsg} sent to ${data.email}`);
+          toast.success(`Candidate enrolled! Credentials${keyMsg} sent to ${data.email}`);
         } else {
-          toast('Student added! Credentials generated below (email delivery pending).');
+          toast('Candidate enrolled! Credentials generated below (email delivery pending).');
         }
       }
       setAddModal(false);
@@ -427,7 +407,7 @@ export default function StudentManagement() {
   };
 
   const deleteStudent = async (id, name) => {
-    if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete candidate ${name}? This will remove them from all active examinations.`)) return;
 
     const purgeFromLocal = () => {
       setStudents(prev => prev.filter(s => s.id !== id && s.student_id !== id));
@@ -443,13 +423,13 @@ export default function StudentManagement() {
     try {
       const res = await adminAPI.deleteStudent(id);
       purgeFromLocal();
-      toast.success(res?.message || 'Student deleted successfully');
+      toast.success(res?.message || 'Candidate removed from registry');
       fetchStudents(pagination.page || 1, true);
     } catch (err) {
       purgeFromLocal();
       const status = err?.response?.status;
       if (status === 404) {
-        toast('Student already removed from registry');
+        toast('Candidate already removed from registry');
       } else {
         toast.error(err?.response?.data?.message || err?.message || 'Delete failed');
       }
@@ -496,9 +476,9 @@ export default function StudentManagement() {
         { wch: 12 }
       ];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Students_Roster');
-      XLSX.writeFile(wb, 'nexify_examina_students_template.xlsx');
-      toast.success('Excel template downloaded');
+      XLSX.utils.book_append_sheet(wb, ws, 'Candidates_Roster');
+      XLSX.writeFile(wb, 'nexify_examina_candidates_template.xlsx');
+      toast.success('Excel candidate template downloaded');
     } catch (err) {
       toast.error('Failed to create Excel template: ' + err.message);
     }
@@ -512,12 +492,12 @@ export default function StudentManagement() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'nexify_examina_students_template.csv');
+    link.setAttribute('download', 'nexify_examina_candidates_template.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    toast.success('CSV template downloaded');
+    toast.success('CSV candidate template downloaded');
   };
 
   const handleBulkUpload = async () => {
@@ -536,9 +516,9 @@ export default function StudentManagement() {
       const failedCount = payload.failed ?? payload.errors?.length ?? 0;
 
       if (createdCount > 0) {
-        toast.success(`🎉 ${createdCount} student(s) added! ${emailsCount} credentials email(s) sent.`);
+        toast.success(`🎉 ${createdCount} candidate(s) enrolled! ${emailsCount} credentials email(s) dispatched.`);
       } else {
-        toast.error(res.data?.message || 'No new students were added.');
+        toast.error(res.data?.message || 'No new candidates were added.');
       }
 
       if (failedCount > 0 && Array.isArray(payload.errors) && payload.errors.length > 0) {
@@ -558,42 +538,97 @@ export default function StudentManagement() {
       setBulkExamId('');
       fetchStudents(1, true);
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || 'Bulk upload failed');
+      toast.error(err.response?.data?.message || err.message || 'Bulk candidate upload failed');
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Metrics computation
+  const activeCount = students.filter(s => s.is_active).length;
+
   return (
-    <div className="admin-pages-container">
-      {/* Header */}
-      <div className="admin-page-header">
-        <div className="admin-header-content">
-          <h1 className="admin-page-title">Student Management</h1>
-          <p className="admin-page-subtitle">
-            {pagination.total} {pagination.total === 1 ? 'student' : 'students'} total
+    <div className="cr-container">
+      {/* ── Top Header ──────────────────────────────────────────────────────── */}
+      <div className="cr-header">
+        <div className="cr-header-left">
+          <div className="cr-eyebrow">
+            <span className="cr-eyebrow-dot" />
+            <span>Institutional Candidate Roster &amp; Key Provisioning</span>
+          </div>
+          <h1 className="cr-title">Candidate Registry &amp; Enrollment</h1>
+          <p className="cr-subtitle">
+            <span>Manage registered student identities, secure exam access keys, and credential dispatch.</span>
           </p>
         </div>
-        <div className="admin-header-actions">
-          <Button variant="secondary" icon={Upload} onClick={openBulkUpload}>
-            Bulk Upload
-          </Button>
-          <Button icon={UserPlus} onClick={openAdd}>
-            Add Student
-          </Button>
+
+        <div className="cr-header-actions">
+          <button type="button" className="cr-btn secondary" onClick={openBulkUpload}>
+            <Upload size={16} />
+            <span>Bulk Upload Roster</span>
+          </button>
+          <button type="button" className="cr-btn primary" onClick={openAdd}>
+            <UserPlus size={16} />
+            <span>Enroll Candidate</span>
+          </button>
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
+      {/* ── Executive Metric KPI Cards ──────────────────────────────────────── */}
+      <div className="cr-metrics-grid">
+        <div className="cr-metric-card">
+          <div className="cr-metric-icon">
+            <Users size={22} />
+          </div>
+          <div className="cr-metric-content">
+            <span className="cr-metric-label">Total Enrolled</span>
+            <span className="cr-metric-value">{pagination.total.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div className="cr-metric-card">
+          <div className="cr-metric-icon good">
+            <UserCheck size={22} />
+          </div>
+          <div className="cr-metric-content">
+            <span className="cr-metric-label">Active on Roster</span>
+            <span className="cr-metric-value">{activeCount}</span>
+          </div>
+        </div>
+
+        <div className="cr-metric-card">
+          <div className="cr-metric-icon gold">
+            <Building size={22} />
+          </div>
+          <div className="cr-metric-content">
+            <span className="cr-metric-label">Departments</span>
+            <span className="cr-metric-value">{departmentsList.length || '—'}</span>
+          </div>
+        </div>
+
+        <div className="cr-metric-card" style={{ cursor: 'pointer' }} onClick={() => { setActiveTab('requests'); fetchPasswordRequests(); }}>
+          <div className={`cr-metric-icon ${pendingRequestsCount > 0 ? 'bad' : ''}`}>
+            <Key size={22} />
+          </div>
+          <div className="cr-metric-content">
+            <span className="cr-metric-label">Password Queue</span>
+            <span className="cr-metric-value" style={{ color: pendingRequestsCount > 0 ? 'var(--bad, #c2410c)' : 'inherit' }}>
+              {pendingRequestsCount}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Navigation Tabs ─────────────────────────────────────────────────── */}
+      <div className="cr-tabs-bar">
         <button
           type="button"
           onClick={() => setActiveTab('students')}
-          className={`admin-btn ${activeTab === 'students' ? 'admin-btn-primary' : 'admin-btn-secondary'}`}
-          style={{ borderRadius: '10px', padding: '10px 18px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          className={`cr-tab-btn ${activeTab === 'students' ? 'active' : ''}`}
         >
           <Users size={16} />
-          <span>Enrolled Students ({pagination.total})</span>
+          <span>Enrolled Candidates</span>
+          <span className="cr-tab-badge">{pagination.total}</span>
         </button>
 
         <button
@@ -602,424 +637,473 @@ export default function StudentManagement() {
             setActiveTab('requests');
             fetchPasswordRequests();
           }}
-          className={`admin-btn ${activeTab === 'requests' ? 'admin-btn-primary' : 'admin-btn-secondary'}`}
-          style={{ borderRadius: '10px', padding: '10px 18px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          className={`cr-tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
         >
           <Key size={16} />
-          <span>Student Password Requests</span>
-          {pendingRequestsCount > 0 && (
-            <span style={{
-              background: '#ef4444',
-              color: '#ffffff',
-              fontSize: '0.74rem',
-              fontWeight: 800,
-              padding: '2px 8px',
-              borderRadius: '999px',
-              marginLeft: '4px'
-            }}>
-              {pendingRequestsCount} Pending
-            </span>
-          )}
+          <span>Candidate Password Requests</span>
+          <span className={`cr-tab-badge ${pendingRequestsCount > 0 ? 'alert' : ''}`}>
+            {pendingRequestsCount > 0 ? `${pendingRequestsCount} Pending` : '0'}
+          </span>
         </button>
       </div>
 
+      {/* ── TAB 1: Enrolled Candidates Roster ──────────────────────────────── */}
       {activeTab === 'students' && (
         <>
-          {/* Search and Filters */}
-          <div className="admin-content-card">
-            <div className="admin-search-section">
-              <div className="admin-search-input">
-                <Search size={20} />
-                <input
-                  value={search} 
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search by name, email, roll number, or student ID..."
-                />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '200px' }}>
-                <Building size={16} color="#64748b" />
+          {/* Search & Filter Bar */}
+          <div className="cr-filter-card">
+            <div className="cr-search-box">
+              <Search size={18} className="cr-search-icon" />
+              <input
+                type="text"
+                className="cr-search-input"
+                placeholder="Search candidates by name, email, roll number, or student ID..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              {search && (
+                <button type="button" className="cr-search-clear" onClick={() => setSearch('')}>
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+
+            <div className="cr-filter-group">
+              <div className="cr-select-wrapper">
+                <Building size={15} className="cr-select-icon" />
                 <select
                   value={selectedDeptFilter}
                   onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                  aria-label="Filter students by department"
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #cbd5e1',
-                    fontSize: '0.86rem',
-                    fontWeight: 600,
-                    color: '#0f172a',
-                    background: '#ffffff',
-                    cursor: 'pointer',
-                    width: '100%'
-                  }}
+                  className="cr-select"
+                  aria-label="Filter candidates by department"
                 >
-                  <option value="all">All Departments</option>
+                  <option value="all">All Academic Departments</option>
                   {departmentsList.map(dept => (
                     <option key={dept} value={dept}>{dept}</option>
                   ))}
                   <option value="unassigned">Unassigned</option>
                 </select>
+                <ChevronDown size={14} className="cr-select-arrow" />
               </div>
+
+              {(search || selectedDeptFilter !== 'all') && (
+                <button
+                  type="button"
+                  className="cr-action-btn"
+                  onClick={() => {
+                    setSearch('');
+                    setSelectedDeptFilter('all');
+                  }}
+                >
+                  <RefreshCw size={13} />
+                  <span>Reset Filters</span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Students Table */}
-          <div className="admin-content-card">
-            <div className="admin-table-container">
-              <table className="admin-table">
+          {/* Table Card */}
+          <div className="cr-table-card">
+            <div className="cr-table-wrapper">
+              <table className="cr-table">
                 <thead>
-              <tr>
-                <th>Student ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Roll No</th>
-                <th>Department</th>
-                <th>Semester</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="admin-table-loading">
-                    <div className="admin-loading-spinner"></div>
-                    Loading students...
-                  </td>
-                </tr>
-              ) : students.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="admin-table-empty">
-                    <Users size={48} />
-                    <h3>No students found</h3>
-                    <p>
-                      {search ? `No students found for "${search}"` : 'No students yet. Add one to get started.'}
-                    </p>
-                    {!search && (
-                      <Button icon={UserPlus} onClick={openAdd}>
-                        Add First Student
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ) : students.map((student) => (
-                <tr key={student.id}>
-                  <td className="admin-student-id">{student.student_id}</td>
-                  <td className="admin-student-name">
-                    <div className="admin-student-info">
-                      <span>{student.name}</span>
-                    </div>
-                  </td>
-                  <td className="admin-student-email">
-                    <Mail size={14} />
-                    {student.email}
-                  </td>
-                  <td className="admin-student-roll">{student.roll_no}</td>
-                  <td className="admin-student-department">
-                    <Building size={14} />
-                    {student.department || '—'}
-                  </td>
-                  <td className="admin-student-semester">
-                    <GraduationCap size={14} />
-                    {student.semester || '—'}
-                  </td>
-                  <td>
-                    <StatusBadge isActive={student.is_active} />
-                  </td>
-                  <td>
-                    <div className="admin-table-actions">
-                      <Button variant="ghost" size="sm" icon={Edit2} onClick={() => openEdit(student)}>
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={Key}
-                        onClick={() => openResetModal(student)}
-                        title="Reset Student Password"
-                        style={{ color: '#0a74da' }}
-                      >
-                        Reset Pwd
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={Send}
-                        onClick={() => handleResendCredentials(student)}
-                        title="Resend Login Credentials Email"
-                        style={{ color: '#059669' }}
-                      >
-                        Resend Email
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => toggleStatus(student.id, student.name, student.is_active)}
-                        className={student.is_active ? 'warning' : 'success'}
-                      >
-                        {student.is_active ? 'Disable' : 'Enable'}
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        icon={Trash2} 
-                        onClick={() => deleteStudent(student.id, student.name)}
-                        className="danger"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>Student ID</th>
+                    <th>Roll Number</th>
+                    <th>Department</th>
+                    <th>Semester &amp; Batch</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--mu, #667085)' }}>
+                        <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 10px', display: 'block' }} />
+                        <span>Loading candidate registry...</span>
+                      </td>
+                    </tr>
+                  ) : students.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '56px 20px' }}>
+                        <div style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '16px',
+                          background: 'var(--wash, rgba(37, 99, 235, 0.08))',
+                          color: 'var(--c1, #2563eb)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto 16px'
+                        }}>
+                          <Users size={28} />
+                        </div>
+                        <h3 style={{ margin: '0 0 6px', fontSize: '1.1rem', fontWeight: 600, color: 'var(--tx, #101828)' }}>
+                          No candidates found
+                        </h3>
+                        <p style={{ margin: '0 0 18px', fontSize: '0.86rem', color: 'var(--mu, #667085)' }}>
+                          {search ? `No results matching "${search}"` : 'Your candidate roster is empty. Enroll candidates to get started.'}
+                        </p>
+                        {!search && (
+                          <button type="button" className="cr-btn primary" onClick={openAdd}>
+                            <UserPlus size={16} />
+                            <span>Enroll First Candidate</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    students.map((student) => (
+                      <tr key={student.id}>
+                        <td>
+                          <div className="cr-candidate-cell">
+                            <div className="cr-candidate-avatar">
+                              {getInitials(student.name)}
+                            </div>
+                            <div className="cr-candidate-meta">
+                              <span className="cr-candidate-name">{student.name}</span>
+                              <span className="cr-candidate-sub">
+                                <Mail size={12} />
+                                {student.email}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="cr-id-pill">{student.student_id}</span>
+                        </td>
+                        <td>
+                          <span className="cr-roll-badge">{student.roll_no}</span>
+                        </td>
+                        <td>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.86rem', color: 'var(--tx, #101828)' }}>
+                            <Building size={14} color="var(--mu, #667085)" />
+                            {student.department || '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', color: 'var(--mu, #667085)' }}>
+                            <GraduationCap size={14} />
+                            {[student.semester, student.batch].filter(Boolean).join(' • ') || '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`cr-chip ${student.is_active ? 'active' : 'inactive'}`}>
+                            <span className="cr-chip-dot" />
+                            {student.is_active ? 'ACTIVE' : 'INACTIVE'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="cr-action-group">
+                            <button
+                              type="button"
+                              className="cr-action-btn primary"
+                              onClick={() => openResetModal(student)}
+                              title="Reset candidate password & credentials"
+                            >
+                              <Key size={13} />
+                              <span>Reset Key</span>
+                            </button>
 
-        {/* Pagination */}
-        {pagination.pages > 1 && (
-          <div className="admin-pagination">
-            <button 
-              onClick={() => fetchStudents(pagination.page - 1)}
-              disabled={pagination.page === 1}
-              className="admin-pagination-btn"
-            >
-              <ChevronLeft size={16} />
-              Previous
-            </button>
-            
-            <div className="admin-pagination-numbers">
-              {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => fetchStudents(pageNum)}
-                    className={`admin-pagination-number ${pageNum === pagination.page ? 'active' : ''}`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+                            <button
+                              type="button"
+                              className="cr-action-btn"
+                              onClick={() => handleResendCredentials(student)}
+                              title="Resend email credentials"
+                            >
+                              <Send size={13} />
+                              <span>Resend</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className="cr-action-btn"
+                              onClick={() => openEdit(student)}
+                              title="Edit candidate profile"
+                            >
+                              <Edit2 size={13} />
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className="cr-action-btn"
+                              onClick={() => toggleStatus(student.id, student.name, student.is_active)}
+                              title={student.is_active ? 'Deactivate candidate' : 'Activate candidate'}
+                            >
+                              {student.is_active ? 'Disable' : 'Enable'}
+                            </button>
+
+                            <button
+                              type="button"
+                              className="cr-action-btn danger"
+                              onClick={() => deleteStudent(student.id, student.name)}
+                              title="Remove candidate from registry"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-            
-            <button 
-              onClick={() => fetchStudents(pagination.page + 1)}
-              disabled={pagination.page === pagination.pages}
-              className="admin-pagination-btn"
-            >
-              Next
-              <ChevronRight size={16} />
+
+            {/* Pagination */}
+            {pagination.pages > 1 && (
+              <div className="cr-pagination-bar">
+                <span className="cr-pagination-info">
+                  Showing page {pagination.page} of {pagination.pages} ({pagination.total} candidates total)
+                </span>
+
+                <div className="cr-pagination-controls">
+                  <button
+                    type="button"
+                    onClick={() => fetchStudents(pagination.page - 1)}
+                    disabled={pagination.page === 1}
+                    className="cr-page-btn"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => fetchStudents(pageNum)}
+                        className={`cr-page-btn ${pageNum === pagination.page ? 'active' : ''}`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => fetchStudents(pagination.page + 1)}
+                    disabled={pagination.page === pagination.pages}
+                    className="cr-page-btn"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── TAB 2: Candidate Password Requests Queue ───────────────────────── */}
+      {activeTab === 'requests' && (
+        <div className="cr-table-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid var(--bd, #e6e9f0)', flexWrap: 'wrap', gap: '14px' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--tx, #101828)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Key size={18} color="var(--c1, #2563eb)" />
+                <span>Candidate Password &amp; Credential Assistance Queue</span>
+              </h3>
+              <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: 'var(--mu, #667085)' }}>
+                Review locked-out candidates and securely dispatch reset credentials to their registered email.
+              </p>
+            </div>
+            <button type="button" className="cr-btn secondary" onClick={fetchPasswordRequests} disabled={requestsLoading}>
+              <RefreshCw size={14} className={requestsLoading ? 'spin' : ''} />
+              <span>Refresh Queue</span>
             </button>
           </div>
-        )}
-      </div>
-    </>
-  )}
 
-  {activeTab === 'requests' && (
-    <div className="admin-content-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid #f1f5f9' }}>
-        <div>
-          <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Key size={18} color="#0a74da" />
-            Student Password Assistance Queue
-          </h3>
-          <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748b' }}>
-            Review and securely reset credentials for students requesting assistance.
-          </p>
-        </div>
-        <Button variant="secondary" icon={RefreshCw} onClick={fetchPasswordRequests} loading={requestsLoading}>
-          Refresh Queue
-        </Button>
-      </div>
-
-      <div className="admin-table-container">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Student Info</th>
-              <th>Roll No</th>
-              <th>Submitted At</th>
-              <th>Requested From</th>
-              <th>Reason &amp; Candidate Notes</th>
-              <th>Status</th>
-              <th>Admin Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {requestsLoading ? (
-              <tr>
-                <td colSpan={7} className="admin-table-loading">
-                  <div className="admin-loading-spinner" />
-                  Loading assistance queue...
-                </td>
-              </tr>
-            ) : passwordRequests.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="admin-table-empty">
-                  <CheckCircle size={44} color="#10b981" />
-                  <h3>No Password Assistance Requests</h3>
-                  <p>All student password reset requests are resolved and up to date.</p>
-                </td>
-              </tr>
-            ) : (
-              passwordRequests.map(req => (
-                <tr key={req.id}>
-                  <td>
-                    <div className="admin-student-info">
-                      <span style={{ fontWeight: 700 }}>{req.student_name}</span>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{req.student_email}</span>
-                      <span style={{ fontSize: '0.74rem', color: '#0a74da', fontFamily: 'monospace' }}>{req.student_id}</span>
-                    </div>
-                  </td>
-                  <td className="admin-student-roll">{req.roll_no || '—'}</td>
-                  <td>
-                    <div style={{ fontSize: '0.82rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Clock size={13} color="#64748b" />
-                      <span>{new Date(req.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                      {new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </td>
-                  <td>
-                    <span style={{ fontSize: '0.8rem', padding: '3px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#475569', textTransform: 'capitalize' }}>
-                      {req.requested_from || 'Dashboard'}
-                    </span>
-                  </td>
-                  <td style={{ maxWidth: '280px' }}>
-                    <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#1e293b' }}>
-                      {req.reason}
-                    </div>
-                    {req.admin_notes && (
-                      <div style={{ fontSize: '0.78rem', color: '#059669', background: '#ecfdf5', padding: '3px 6px', borderRadius: '4px', marginTop: '4px' }}>
-                        <strong>Admin:</strong> {req.admin_notes}
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`admin-status-badge ${req.status === 'resolved' ? 'active' : 'inactive'}`} style={{
-                      background: req.status === 'resolved' ? '#ecfdf5' : req.status === 'pending' ? '#fef3c7' : '#f1f5f9',
-                      color: req.status === 'resolved' ? '#059669' : req.status === 'pending' ? '#d97706' : '#64748b'
-                    }}>
-                      {req.status === 'resolved' ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
-                      {req.status.toUpperCase()}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="admin-table-actions">
-                      {req.status === 'pending' ? (
-                        <>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            icon={Key}
-                            onClick={() => openResetModal({
-                              id: req.student_uuid || req.student_id,
-                              name: req.student_name,
-                              email: req.student_email,
-                              student_id: req.student_id,
-                              roll_no: req.roll_no
-                            }, req.id)}
-                          >
-                            Reset &amp; Resolve
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDismissRequest(req.id)}
-                            className="danger"
-                          >
-                            Dismiss
-                          </Button>
-                        </>
-                      ) : (
-                        <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
-                          ✓ Resolved
-                        </span>
-                      )}
-                    </div>
-                  </td>
+          <div className="cr-table-wrapper">
+            <table className="cr-table">
+              <thead>
+                <tr>
+                  <th>Candidate Info</th>
+                  <th>Roll Number</th>
+                  <th>Submitted At</th>
+                  <th>Requested From</th>
+                  <th>Reason &amp; Notes</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Admin Actions</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )}
+              </thead>
+              <tbody>
+                {requestsLoading ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--mu, #667085)' }}>
+                      <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 8px', display: 'block' }} />
+                      Loading assistance queue...
+                    </td>
+                  </tr>
+                ) : passwordRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--mu, #667085)' }}>
+                      <CheckCircle2 size={32} color="var(--good, #0f8a68)" style={{ margin: '0 auto 10px', display: 'block' }} />
+                      <h4 style={{ margin: '0 0 4px', fontSize: '1rem', color: 'var(--tx, #101828)' }}>Queue is clear</h4>
+                      <p style={{ margin: 0, fontSize: '0.84rem' }}>No pending password assistance requests from candidates.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  passwordRequests.map((req) => (
+                    <tr key={req.id}>
+                      <td>
+                        <div className="cr-candidate-meta">
+                          <span style={{ fontWeight: 600, color: 'var(--tx, #101828)' }}>{req.student_name}</span>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--mu, #667085)' }}>{req.student_email}</span>
+                          {req.student_id && (
+                            <span className="cr-id-pill" style={{ marginTop: '2px', display: 'inline-block' }}>{req.student_id}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="cr-roll-badge">{req.roll_no || '—'}</span>
+                      </td>
+                      <td style={{ fontSize: '0.82rem', color: 'var(--mu, #667085)' }}>
+                        {req.created_at ? new Date(req.created_at).toLocaleString() : 'Recent'}
+                      </td>
+                      <td style={{ fontSize: '0.82rem', color: 'var(--mu, #667085)' }}>
+                        {req.ip_address || 'Exam Portal'}
+                      </td>
+                      <td>
+                        <div style={{ maxWidth: '240px', fontSize: '0.82rem', color: 'var(--tx, #101828)', lineHeight: 1.4 }}>
+                          {req.reason || 'Locked out of exam portal'}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`cr-chip ${req.status === 'resolved' ? 'active' : 'inactive'}`} style={{
+                          background: req.status === 'resolved' ? 'var(--goods, #e1f4ec)' : 'var(--bads, #fdebe1)',
+                          color: req.status === 'resolved' ? 'var(--good, #0f8a68)' : 'var(--bad, #c2410c)'
+                        }}>
+                          <span className="cr-chip-dot" />
+                          {req.status?.toUpperCase() || 'PENDING'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="cr-action-group">
+                          {req.status === 'pending' ? (
+                            <>
+                              <button
+                                type="button"
+                                className="cr-action-btn primary"
+                                onClick={() => openResetModal({
+                                  id: req.student_uuid || req.student_id,
+                                  name: req.student_name,
+                                  email: req.student_email,
+                                  student_id: req.student_id,
+                                  roll_no: req.roll_no
+                                }, req.id)}
+                              >
+                                <Key size={13} />
+                                <span>Reset &amp; Resolve</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="cr-action-btn danger"
+                                onClick={() => handleDismissRequest(req.id)}
+                              >
+                                Dismiss
+                              </button>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--good, #0f8a68)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <CheckCircle size={14} /> Resolved
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-      {/* Add/Edit Modal */}
-      <Modal open={addModal} onClose={() => setAddModal(false)} title={editStudent ? 'Edit Student' : 'Add New Student'}>
-        <div className="admin-form-grid">
-          <Input 
-            label="Full Name *" 
+      {/* ── MODAL 1: Enroll / Edit Candidate Modal ─────────────────────────── */}
+      <Modal
+        open={addModal}
+        onClose={() => setAddModal(false)}
+        title={editStudent ? 'Edit Candidate Profile' : 'Enroll New Candidate'}
+        icon={editStudent ? Edit2 : UserPlus}
+      >
+        <div className="cr-form-grid">
+          <FormInput 
+            label="Candidate Full Name *" 
             icon={Users}
             value={form.name} 
             onChange={setFormField('name')} 
-            placeholder="Student Full Name"
+            placeholder="e.g. Aarav Sharma"
             error={formErrors.name}
           />
-          <Input 
-            label="Email *" 
+
+          <FormInput 
+            label="Institutional Email *" 
             type="email" 
             icon={Mail}
             value={form.email} 
             onChange={setFormField('email')} 
-            placeholder="student@email.com" 
+            placeholder="candidate@university.edu" 
             disabled={!!editStudent}
             error={formErrors.email}
           />
-          <Input 
-            label="Roll Number *" 
+
+          <FormInput 
+            label="University / College Roll No *" 
             icon={GraduationCap}
             value={form.rollNo} 
             onChange={setFormField('rollNo')} 
-            placeholder="CS-2024-001"
+            placeholder="e.g. CS2026-042"
             error={formErrors.rollNo}
           />
-          <Input 
-            label="Department" 
+
+          <FormInput 
+            label="Academic Department" 
             icon={Building}
             value={form.department} 
             onChange={setFormField('department')} 
-            placeholder="Computer Science" 
-          />
-          <div className="admin-form-row">
-            <Input 
-              label="Semester" 
-              icon={Calendar}
-              value={form.semester} 
-              onChange={setFormField('semester')} 
-              placeholder="5th" 
-            />
-            <Input 
-              label="Batch" 
-              icon={Calendar}
-              value={form.batch} 
-              onChange={setFormField('batch')} 
-              placeholder="2022-26" 
-            />
-          </div>
-          <Input 
-            label="Phone" 
-            icon={Phone}
-            value={form.phone} 
-            onChange={setFormField('phone')} 
-            placeholder="+91 9876543210" 
+            placeholder="e.g. Computer Science" 
           />
 
+          <FormInput 
+            label="Current Semester" 
+            icon={Calendar}
+            value={form.semester} 
+            onChange={setFormField('semester')} 
+            placeholder="e.g. 6th Semester" 
+          />
+
+          <FormInput 
+            label="Academic Batch" 
+            icon={Calendar}
+            value={form.batch} 
+            onChange={setFormField('batch')} 
+            placeholder="e.g. 2022-2026" 
+          />
+
+          <div className="cr-form-group full">
+            <FormInput 
+              label="Contact Phone (Optional)" 
+              icon={Phone}
+              value={form.phone} 
+              onChange={setFormField('phone')} 
+              placeholder="+91 98765 43210" 
+            />
+          </div>
+
           {!editStudent && (
-            <div className="admin-form-group" style={{ gridColumn: 'span 2' }}>
-              <label className="admin-form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                <Key size={14} style={{ color: '#10b981' }} />
-                <span>Assign to Examination &amp; Issue Exam Key</span>
+            <div className="cr-form-group full">
+              <label className="cr-form-label">
+                <Key size={14} color="var(--c1, #2563eb)" />
+                <span>Assign to Examination &amp; Issue Access Key (Optional)</span>
               </label>
               <select
-                className="admin-form-input"
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', fontSize: '0.88rem', color: '#1f2937' }}
+                className="cr-form-select"
                 value={form.examId || ''}
                 onChange={setFormField('examId')}
               >
@@ -1030,74 +1114,73 @@ export default function StudentManagement() {
                   </option>
                 ))}
               </select>
-              <span style={{ fontSize: '0.76rem', color: '#6b7280', marginTop: '4px', display: 'block' }}>
-                The student will receive their <strong>Student ID</strong>, <strong>Temporary Password</strong>, and <strong>Exam Access Key</strong> directly via email.
+              <span className="cr-form-hint">
+                The candidate will automatically receive their <strong>Student ID</strong>, <strong>Temporary Password</strong>, and <strong>Exam Access Key</strong> directly via official email.
               </span>
             </div>
           )}
         </div>
-        
+
         {!editStudent && (
-          <div className="admin-form-note">
-            <AlertCircle size={16} />
-            Student ID, password, and exam key will be dispatched instantly to the student's email.
+          <div className="cr-info-banner">
+            <Sparkles size={18} color="var(--c1, #2563eb)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>Instant Identity Provisioning:</strong> Nexify Examina creates an immutable candidate record, generates cryptographic credentials, and sends an official induction email.
+            </div>
           </div>
         )}
-        
-        <div className="admin-form-actions">
-          <Button variant="secondary" onClick={() => setAddModal(false)}>
+
+        <div className="cr-modal-footer">
+          <button type="button" className="cr-btn secondary" onClick={() => setAddModal(false)}>
             Cancel
-          </Button>
-          <Button onClick={handleSubmit} loading={submitting}>
-            {submitting ? 'Saving...' : editStudent ? 'Update Student' : 'Add Student'}
-          </Button>
+          </button>
+          <button type="button" className="cr-btn primary" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? 'Enrolling Candidate...' : editStudent ? 'Update Profile' : 'Enroll Candidate'}
+          </button>
         </div>
       </Modal>
 
+      {/* ── MODAL 2: Fallback Credentials & Exam Access Key ────────────────── */}
       <Modal
         open={!!credentialFallback}
         onClose={() => setCredentialFallback(null)}
-        title="Student Credentials & Exam Access"
+        title="Candidate Credentials &amp; Exam Key"
+        icon={Key}
       >
-        <div className="admin-form-note" style={{ background: '#ecfdf5', borderColor: '#10b981', color: '#065f46' }}>
-          <CheckCircle size={16} style={{ color: '#10b981' }} />
-          Student created successfully! Copy and share these credentials with the student:
+        <div className="cr-info-banner success">
+          <CheckCircle2 size={18} color="var(--good, #0f8a68)" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            Candidate enrolled successfully! Official credentials generated. Share or copy these details:
+          </div>
         </div>
-        <div className="admin-form-grid">
-          <Input label="Student ID" value={credentialFallback?.student_id || ''} readOnly />
-          <Input label="Email" value={credentialFallback?.email || ''} readOnly />
-          <Input label="Temporary Password" value={credentialFallback?.password || ''} readOnly />
+
+        <div className="cr-form-grid" style={{ marginTop: '12px' }}>
+          <FormInput label="Student ID" value={credentialFallback?.student_id || ''} readOnly />
+          <FormInput label="Email Address" value={credentialFallback?.email || ''} readOnly />
+          <div className="cr-form-group full">
+            <FormInput label="Temporary Password" value={credentialFallback?.password || ''} readOnly />
+          </div>
+
           {credentialFallback?.exam_key && (
-            <div className="admin-form-group" style={{ gridColumn: 'span 2' }}>
-              <label className="admin-form-label" style={{ fontWeight: 800, color: '#047857' }}>
+            <div className="cr-form-group full">
+              <label className="cr-form-label" style={{ color: 'var(--good, #0f8a68)', fontWeight: 700 }}>
                 🔑 Exam Access Key ({credentialFallback?.exam_name || 'Scheduled Exam'})
               </label>
-              <input
-                className="admin-form-input"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  border: '2px dashed #10b981',
-                  background: '#f0fdf4',
-                  fontWeight: 800,
-                  fontSize: '1.1rem',
-                  fontFamily: 'monospace',
-                  color: '#065f46',
-                  letterSpacing: '2px'
-                }}
-                value={credentialFallback?.exam_key || ''}
-                readOnly
-              />
+              <div className="cr-key-box">
+                {credentialFallback?.exam_key}
+              </div>
             </div>
           )}
         </div>
-        <div style={{ marginTop: '16px', padding: '12px 14px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.84rem', color: '#334155' }}>
-          💡 <strong>Delivery Note:</strong> Credentials were sent to <strong>{credentialFallback?.email}</strong>. If not visible in the Primary Inbox, please ask the student to check their <strong>Spam / Junk</strong> folder, or copy and send the details below directly.
+
+        <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--s2, #f8f9fc)', border: '1px solid var(--bd, #e6e9f0)', fontSize: '0.82rem', color: 'var(--mu, #667085)', lineHeight: 1.5 }}>
+          💡 <strong>Delivery Note:</strong> Credentials were dispatched to <strong>{credentialFallback?.email}</strong>. If not visible in the Primary Inbox, advise the candidate to check Spam or deliver directly.
         </div>
-        <div className="admin-form-actions">
-          <Button
-            variant="secondary"
+
+        <div className="cr-modal-footer">
+          <button
+            type="button"
+            className="cr-btn secondary"
             onClick={() => {
               const text = [
                 `Student ID: ${credentialFallback?.student_id || ''}`,
@@ -1107,113 +1190,90 @@ export default function StudentManagement() {
                 `Login URL: ${window.location.origin}/student/login`
               ].filter(Boolean).join('\n');
               navigator.clipboard.writeText(text)
-                .then(() => toast.success('All credentials & Exam Key copied!'))
+                .then(() => toast.success('All credentials & Exam Key copied to clipboard!'))
                 .catch(() => toast.error('Could not copy credentials'));
             }}
           >
-            Copy All Credentials &amp; Key
-          </Button>
-          <Button onClick={() => setCredentialFallback(null)}>Done</Button>
+            <Copy size={15} />
+            <span>Copy All Details</span>
+          </button>
+          <button type="button" className="cr-btn primary" onClick={() => setCredentialFallback(null)}>
+            Done
+          </button>
         </div>
       </Modal>
 
-      {/* Bulk Upload Modal (CSV & Excel) */}
-      <Modal open={bulkModal} onClose={() => setBulkModal(false)} title="Bulk Upload Students (CSV &amp; Excel)">
-        <div className="admin-bulk-upload" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          
-          {/* Information banner */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f2744', fontWeight: 700, fontSize: '0.95rem', marginBottom: '6px' }}>
-              <Users size={18} color="#2563eb" />
-              <span>Automated Candidate Provisioning &amp; Email Delivery</span>
-            </div>
-            <p style={{ margin: 0, fontSize: '0.84rem', color: '#475569', lineHeight: 1.55 }}>
-              Upload your candidate roster using a <strong>CSV</strong> or <strong>Excel (.xlsx, .xls)</strong> file. Every newly registered student will automatically receive an official <strong>Nexify Examina</strong> email with their temporary credentials and portal login link.
-            </p>
-
-            <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Supported Columns:</span>
-              {['Name', 'Email', 'Roll Number', 'Department', 'Batch', 'Semester'].map((col) => (
-                <span key={col} style={{ background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', borderRadius: '4px', fontSize: '0.74rem', padding: '2px 8px', fontWeight: 600 }}>
-                  {col}
-                </span>
-              ))}
+      {/* ── MODAL 3: Bulk Upload Roster (CSV & Excel) ──────────────────────── */}
+      <Modal
+        open={bulkModal}
+        onClose={() => setBulkModal(false)}
+        title="Bulk Upload Candidate Roster"
+        icon={Upload}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="cr-info-banner">
+            <Users size={18} color="var(--c1, #2563eb)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>Automated Batch Provisioning:</strong> Upload your candidate roster via CSV or Excel (.xlsx, .xls). Every registered student will receive their official credentials automatically.
             </div>
           </div>
 
-          {/* Optional: Link to an upcoming exam */}
+          {/* Exam Selection */}
           {exams && exams.length > 0 && (
-            <div>
-              <label className="admin-form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
-                <Key size={14} color="#0a74da" />
-                Assign to Scheduled Exam (Optional)
+            <div className="cr-form-group">
+              <label className="cr-form-label">
+                <Key size={14} color="var(--c1, #2563eb)" />
+                <span>Assign to Scheduled Exam (Optional)</span>
               </label>
               <select
-                className="admin-form-input"
+                className="cr-form-select"
                 value={bulkExamId}
                 onChange={(e) => setBulkExamId(e.target.value)}
-                style={{ fontSize: '0.86rem', padding: '8px 12px' }}
               >
-                <option value="">-- No specific exam (General Account Invitation) --</option>
+                <option value="">-- General Account Invitation (No specific exam) --</option>
                 {exams.map((ex) => (
                   <option key={ex.id} value={ex.id}>
                     {ex.title || ex.name} ({ex.exam_key || ex.exam_code || 'Auto-Key'})
                   </option>
                 ))}
               </select>
-              <span style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                If selected, candidates will be registered and their access key will be included in the email.
-              </span>
             </div>
           )}
 
-          {/* Interactive File Dropzone */}
+          {/* Interactive Dropzone */}
           <div 
-            className={`admin-file-upload ${csvFile ? 'has-file' : ''}`}
+            className={`cr-dropzone ${csvFile ? 'has-file' : ''}`}
             onClick={() => fileRef.current.click()}
-            style={{
-              border: csvFile ? '2px solid #2563eb' : '2px dashed #cbd5e1',
-              borderRadius: '12px',
-              padding: '24px 16px',
-              textAlign: 'center',
-              backgroundColor: csvFile ? '#f0f7ff' : '#f8fafc',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
           >
+            <div className="cr-dropzone-icon">
+              {csvFile ? (
+                csvFile.name.endsWith('.xlsx') || csvFile.name.endsWith('.xls') ? (
+                  <FileSpreadsheet size={28} />
+                ) : (
+                  <FileText size={28} />
+                )
+              ) : (
+                <Upload size={28} />
+              )}
+            </div>
+
             {csvFile ? (
               <>
-                {csvFile.name.endsWith('.xlsx') || csvFile.name.endsWith('.xls') ? (
-                  <FileSpreadsheet size={40} color="#107c41" />
-                ) : (
-                  <FileText size={40} color="#2563eb" />
-                )}
-                <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f2744', wordBreak: 'break-all' }}>
-                  {csvFile.name}
+                <div className="cr-dropzone-title">{csvFile.name}</div>
+                <div className="cr-dropzone-sub">
+                  {(csvFile.size / 1024).toFixed(1)} KB • Click to choose a different roster file
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  {(csvFile.size / 1024).toFixed(1)} KB • Click to choose a different file
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#16a34a', fontSize: '0.8rem', fontWeight: 600, marginTop: '2px' }}>
-                  <CheckCircle2 size={14} /> Ready for upload &amp; email dispatch
-                </div>
+                <span style={{ color: 'var(--good, #0f8a68)', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <CheckCircle2 size={14} /> Ready for batch enrollment
+                </span>
               </>
             ) : (
               <>
-                <Upload size={36} color="#64748b" />
-                <p style={{ margin: 0, fontWeight: 700, fontSize: '0.92rem', color: '#1e293b' }}>
-                  Click to select CSV or Excel file
-                </p>
-                <span className="admin-file-hint" style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  Supported formats: <strong>.xlsx</strong>, <strong>.xls</strong>, <strong>.csv</strong> (Max 10MB)
-                </span>
+                <div className="cr-dropzone-title">Click to select CSV or Excel roster</div>
+                <div className="cr-dropzone-sub">Supports .xlsx, .xls, and .csv files up to 10MB</div>
               </>
             )}
+
             <input 
               ref={fileRef} 
               type="file" 
@@ -1227,99 +1287,65 @@ export default function StudentManagement() {
             />
           </div>
 
-          {/* Download Sample Templates */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Download Starter Templates:</span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={downloadExcelTemplate}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  color: '#15803d',
-                  borderRadius: '8px',
-                  padding: '9px 12px',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'background 0.2s ease'
-                }}
-              >
-                <FileSpreadsheet size={16} />
-                Excel Template (.xlsx)
+          {/* Download Starter Templates */}
+          <div>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--mu, #667085)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Download Standard Roster Templates:
+            </span>
+            <div className="cr-template-pills">
+              <button type="button" className="cr-template-pill" onClick={downloadExcelTemplate}>
+                <FileSpreadsheet size={15} color="#107c41" />
+                <span>Excel Template (.xlsx)</span>
               </button>
-
-              <button
-                type="button"
-                onClick={downloadCsvTemplate}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  background: '#f8fafc',
-                  border: '1px solid #cbd5e1',
-                  color: '#334155',
-                  borderRadius: '8px',
-                  padding: '9px 12px',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'background 0.2s ease'
-                }}
-              >
-                <Download size={16} />
-                CSV Template (.csv)
+              <button type="button" className="cr-template-pill" onClick={downloadCsvTemplate}>
+                <Download size={15} color="var(--c1, #2563eb)" />
+                <span>CSV Template (.csv)</span>
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Form Actions */}
-          <div className="admin-form-actions" style={{ marginTop: '8px' }}>
-            <Button variant="secondary" onClick={() => setBulkModal(false)} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleBulkUpload} 
-              disabled={!csvFile || submitting}
-              loading={submitting}
-              icon={Send}
-            >
-              {submitting ? 'Uploading & Emailing...' : 'Upload & Send Emails'}
-            </Button>
-          </div>
+        <div className="cr-modal-footer">
+          <button type="button" className="cr-btn secondary" onClick={() => setBulkModal(false)} disabled={submitting}>
+            Cancel
+          </button>
+          <button 
+            type="button" 
+            className="cr-btn primary" 
+            onClick={handleBulkUpload} 
+            disabled={!csvFile || submitting}
+          >
+            <Send size={15} />
+            <span>{submitting ? 'Uploading & Dispathing...' : 'Upload & Enroll Roster'}</span>
+          </button>
         </div>
       </Modal>
 
-      {/* Reset Student Password Modal */}
+      {/* ── MODAL 4: Secure Password Reset ─────────────────────────────────── */}
       <Modal
         open={resetModal}
         onClose={() => setResetModal(false)}
-        title="Secure Student Password Reset"
+        title="Secure Candidate Password Reset"
+        icon={Key}
       >
         {targetStudentForReset && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>
+            <div style={{ background: 'var(--s2, #f8f9fc)', padding: '14px 18px', borderRadius: '12px', border: '1px solid var(--bd, #e6e9f0)' }}>
+              <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--tx, #101828)' }}>
                 {targetStudentForReset.name}
               </div>
-              <div style={{ fontSize: '0.84rem', color: '#64748b', marginTop: '3px' }}>
-                Roll No: <strong>{targetStudentForReset.roll_no}</strong> • Student ID: <strong>{targetStudentForReset.student_id}</strong>
+              <div style={{ fontSize: '0.84rem', color: 'var(--mu, #667085)', marginTop: '4px' }}>
+                Roll No: <strong style={{ color: 'var(--tx, #101828)' }}>{targetStudentForReset.roll_no}</strong> • Student ID: <strong style={{ color: 'var(--tx, #101828)' }}>{targetStudentForReset.student_id}</strong>
               </div>
-              <div style={{ fontSize: '0.84rem', color: '#0a74da', marginTop: '2px' }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--c1, #2563eb)', marginTop: '2px' }}>
                 {targetStudentForReset.email}
               </div>
             </div>
 
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label className="admin-form-label" style={{ margin: 0, fontWeight: 700 }}>
-                  New Student Password *
+            <div className="cr-form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label className="cr-form-label" style={{ margin: 0 }}>
+                  New Password *
                 </label>
                 <button
                   type="button"
@@ -1327,8 +1353,8 @@ export default function StudentManagement() {
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#0a74da',
-                    fontSize: '0.82rem',
+                    color: 'var(--c1, #2563eb)',
+                    fontSize: '0.8rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
@@ -1336,97 +1362,87 @@ export default function StudentManagement() {
                     gap: '4px'
                   }}
                 >
-                  <RefreshCw size={13} />
-                  Auto-Generate Strong Password
+                  <RefreshCw size={12} />
+                  Auto-Generate Password
                 </button>
               </div>
               <input
                 type="text"
-                className="admin-form-input"
+                className="cr-form-input"
                 placeholder="Enter new password (min 6 chars)"
                 value={resetForm.newPassword}
                 onChange={(e) => setResetForm(f => ({ ...f, newPassword: e.target.value }))}
               />
             </div>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.86rem', color: '#334155', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.86rem', color: 'var(--tx, #101828)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={resetForm.notifyEmail}
                 onChange={(e) => setResetForm(f => ({ ...f, notifyEmail: e.target.checked }))}
               />
-              <span>Send new login credentials to student's email</span>
+              <span>Send updated credentials email to candidate</span>
             </label>
 
-            <div>
-              <label className="admin-form-label" style={{ fontWeight: 700 }}>
-                Resolution / Administrative Notes (Optional)
+            <div className="cr-form-group">
+              <label className="cr-form-label">
+                Resolution Notes (Optional)
               </label>
               <textarea
-                className="admin-form-input"
+                className="cr-form-textarea"
                 rows={2}
-                placeholder="e.g. Identity verified via student roll number and updated credentials issued"
+                placeholder="e.g. Identity verified via university roll number and updated credentials issued"
                 value={resetForm.adminNotes}
                 onChange={(e) => setResetForm(f => ({ ...f, adminNotes: e.target.value }))}
-                style={{ padding: '8px 12px' }}
               />
             </div>
 
-            <div className="admin-form-actions">
-              <Button variant="secondary" onClick={() => setResetModal(false)}>
+            <div className="cr-modal-footer">
+              <button type="button" className="cr-btn secondary" onClick={() => setResetModal(false)}>
                 Cancel
-              </Button>
-              <Button onClick={handleResetSubmit} loading={resetSubmitting}>
-                Confirm &amp; Reset Password
-              </Button>
+              </button>
+              <button type="button" className="cr-btn primary" onClick={handleResetSubmit} disabled={resetSubmitting}>
+                {resetSubmitting ? 'Resetting Password...' : 'Confirm & Reset Password'}
+              </button>
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Reset Success Modal */}
+      {/* ── MODAL 5: Reset Success Confirmation ────────────────────────────── */}
       <Modal
         open={!!resetSuccessData}
         onClose={() => setResetSuccessData(null)}
-        title="Student Password Reset Complete"
+        title="Candidate Password Updated"
+        icon={CheckCircle2}
       >
-        <div className="admin-form-note" style={{ background: '#ecfdf5', borderColor: '#10b981', color: '#065f46' }}>
-          <CheckCircle size={16} style={{ color: '#10b981' }} />
-          Password has been updated in the database {resetSuccessData?.emailSent ? 'and emailed to student' : ''}!
-        </div>
-
-        <div className="admin-form-grid" style={{ marginTop: '14px' }}>
-          <Input label="Student Name" value={resetSuccessData?.student?.name || ''} readOnly />
-          <Input label="Student Email" value={resetSuccessData?.student?.email || ''} readOnly />
-          <div className="admin-form-group" style={{ gridColumn: 'span 2' }}>
-            <label className="admin-form-label" style={{ fontWeight: 800, color: '#047857' }}>
-              🔑 New Account Password
-            </label>
-            <input
-              className="admin-form-input"
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                border: '2px dashed #10b981',
-                background: '#f0fdf4',
-                fontWeight: 800,
-                fontSize: '1.1rem',
-                fontFamily: 'monospace',
-                color: '#065f46'
-              }}
-              value={resetSuccessData?.newPassword || ''}
-              readOnly
-            />
+        <div className="cr-info-banner success">
+          <CheckCircle2 size={18} color="var(--good, #0f8a68)" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            Password updated in database {resetSuccessData?.emailSent ? 'and emailed to candidate' : ''}!
           </div>
         </div>
 
-        <div className="admin-form-actions" style={{ marginTop: '20px' }}>
-          <Button
-            variant="secondary"
+        <div className="cr-form-grid" style={{ marginTop: '14px' }}>
+          <FormInput label="Candidate Name" value={resetSuccessData?.student?.name || ''} readOnly />
+          <FormInput label="Email Address" value={resetSuccessData?.student?.email || ''} readOnly />
+          <div className="cr-form-group full">
+            <label className="cr-form-label" style={{ color: 'var(--good, #0f8a68)', fontWeight: 700 }}>
+              🔑 New Account Password
+            </label>
+            <div className="cr-key-box">
+              {resetSuccessData?.newPassword}
+            </div>
+          </div>
+        </div>
+
+        <div className="cr-modal-footer">
+          <button
+            type="button"
+            className="cr-btn secondary"
             onClick={() => {
               const text = [
-                `Student: ${resetSuccessData?.student?.name || ''}`,
+                `Candidate: ${resetSuccessData?.student?.name || ''}`,
                 `Student ID: ${resetSuccessData?.student?.student_id || ''}`,
                 `Email: ${resetSuccessData?.student?.email || ''}`,
                 `New Password: ${resetSuccessData?.newPassword || ''}`,
@@ -1436,10 +1452,12 @@ export default function StudentManagement() {
               toast.success('Credentials copied to clipboard!');
             }}
           >
-            <Copy size={16} />
-            Copy Credentials
-          </Button>
-          <Button onClick={() => setResetSuccessData(null)}>Done</Button>
+            <Copy size={15} />
+            <span>Copy Credentials</span>
+          </button>
+          <button type="button" className="cr-btn primary" onClick={() => setResetSuccessData(null)}>
+            Done
+          </button>
         </div>
       </Modal>
     </div>
