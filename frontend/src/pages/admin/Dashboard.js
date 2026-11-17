@@ -236,75 +236,68 @@ export default function Dashboard() {
         {/* Left: Interactive Candidate Activity Chart */}
         <CandidateActivityChart />
 
-        {/* Right: Proctoring Health & Audit Breakdown */}
-        <article className="card pad rise proctoring-health-card" style={{ '--d': 3 }}>
-          <div className="ph" style={{ marginBottom: '16px' }}>
-            <div>
-              <h2 className="ph-title">Proctoring health</h2>
-              <p className="ph-subtitle">Based on the latest audits</p>
-            </div>
+        {/* Right: Proctoring Integrity & Audit Breakdown (v6 Editorial Design) */}
+        <article className="card pad rise proctoring-integrity-card" style={{ '--d': 3 }}>
+          <div className="pi-header">
+            <h2 className="pi-title">Proctoring integrity</h2>
+            <p className="pi-subtitle">Latest audit summary</p>
           </div>
 
-          <div className="proctoring-health-body">
-            {/* Left: Donut Gauge Ring */}
-            <div className="proctoring-donut-wrap">
-              <svg className="proctoring-donut-svg" viewBox="0 0 120 120">
-                <circle
-                  className="proctoring-donut-track"
-                  cx="60"
-                  cy="60"
-                  r="48"
-                  fill="none"
-                  strokeWidth="12"
-                />
-                <circle
-                  className="proctoring-donut-val"
-                  cx="60"
-                  cy="60"
-                  r="48"
-                  fill="none"
-                  strokeWidth="12"
-                  strokeLinecap="round"
-                  strokeDasharray={301.6}
-                  strokeDashoffset={301.6 * (1 - (stats?.successRate ?? 96) / 100)}
-                />
-              </svg>
-              <div className="proctoring-donut-center">
-                <span className="proctoring-donut-num">{stats?.successRate ?? 96}%</span>
-                <span className="proctoring-donut-label">Clean audits</span>
+          <div className="pi-hero-stat">
+            <span className="pi-hero-num">{stats?.successRate ?? 96}%</span>
+            <span className="pi-hero-trend">
+              <span className="pi-trend-arrow">↗</span> 4% this term
+            </span>
+          </div>
+
+          {/* Segmented multi-color audit breakdown bar */}
+          <div className="pi-segmented-bar" role="progressbar" aria-label="Audit summary distribution">
+            <div
+              className="pi-seg pi-seg-emerald"
+              style={{ width: `${stats?.successRate ?? 96}%` }}
+              title={`Clean audits: ${stats?.successRate ?? 96}%`}
+            />
+            <div
+              className="pi-seg pi-seg-ocean"
+              style={{ width: '2.5%' }}
+              title="Minor anomalies resolved: 2.5%"
+            />
+            <div
+              className="pi-seg pi-seg-coral"
+              style={{ width: `${Math.max(1.5, 100 - (stats?.successRate ?? 96) - 2.5)}%` }}
+              title={`Flagged for review: ${100 - (stats?.successRate ?? 96)}%`}
+            />
+          </div>
+
+          {/* Detailed Metric Line Indicators */}
+          <div className="pi-metrics-list">
+            <div className="pi-metric-item">
+              <div className="pi-metric-header">
+                <span className="pi-metric-label">Identity verification</span>
+                <span className="pi-metric-val">99%</span>
+              </div>
+              <div className="pi-metric-track">
+                <div className="pi-metric-fill" style={{ width: '99%' }} />
               </div>
             </div>
 
-            {/* Right: Colored Metric Bars */}
-            <div className="proctoring-health-bars">
-              <div className="ph-metric-row">
-                <div className="ph-metric-info">
-                  <span className="ph-metric-name">Identity verified</span>
-                  <span className="ph-metric-pct">100%</span>
-                </div>
-                <div className="ph-metric-track">
-                  <div className="ph-metric-bar blue" style={{ width: '100%' }}></div>
-                </div>
+            <div className="pi-metric-item">
+              <div className="pi-metric-header">
+                <span className="pi-metric-label">Browser lock compliance</span>
+                <span className="pi-metric-val">97%</span>
               </div>
-
-              <div className="ph-metric-row">
-                <div className="ph-metric-info">
-                  <span className="ph-metric-name">Browser lockdown</span>
-                  <span className="ph-metric-pct">97%</span>
-                </div>
-                <div className="ph-metric-track">
-                  <div className="ph-metric-bar teal" style={{ width: '97%' }}></div>
-                </div>
+              <div className="pi-metric-track">
+                <div className="pi-metric-fill" style={{ width: '97%' }} />
               </div>
+            </div>
 
-              <div className="ph-metric-row">
-                <div className="ph-metric-info">
-                  <span className="ph-metric-name">Behavior flags cleared</span>
-                  <span className="ph-metric-pct">92%</span>
-                </div>
-                <div className="ph-metric-track">
-                  <div className="ph-metric-bar purple" style={{ width: '92%' }}></div>
-                </div>
+            <div className="pi-metric-item">
+              <div className="pi-metric-header">
+                <span className="pi-metric-label">Flagged for review</span>
+                <span className="pi-metric-val">4%</span>
+              </div>
+              <div className="pi-metric-track">
+                <div className="pi-metric-fill" style={{ width: '4%' }} />
               </div>
             </div>
           </div>

@@ -28,7 +28,7 @@ class WebSocketService {
 
         // Connect to backend WebSocket server with professional configuration
         const wsUrl = process.env.REACT_APP_WS_URL ||
-          (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : 'https://exam.nexifyforge.in');
+          (process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace(/\/api\/?$/, '') : 'https://exam.nexifyforge.in');
 
         this.socket = io(wsUrl, {
           auth: {

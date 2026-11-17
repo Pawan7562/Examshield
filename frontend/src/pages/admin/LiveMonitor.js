@@ -108,16 +108,15 @@ const normalizeImageUri = (data) => {
 // Dynamic WebSocket URL resolver (preserves localhost, local network IP, and production reverse proxy)
 const resolveWsUrl = () => {
   if (process.env.REACT_APP_WS_URL) return process.env.REACT_APP_WS_URL;
+  if (process.env.REACT_APP_API_URL) return process.env.REACT_APP_API_URL.replace(/\/api\/?$/, '');
   if (typeof window !== 'undefined') {
     const { protocol, hostname, port } = window.location;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:5000';
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      const wsProto = protocol === 'https:' ? 'https:' : 'http:';
+      return `${wsProto}//${hostname}${port ? ':' + port : ''}`;
     }
-    // Behind reverse proxy (Nginx / ALB / Domain):
-    const wsProto = protocol === 'https:' ? 'https:' : 'http:';
-    return `${wsProto}//${hostname}${port ? ':' + port : ''}`;
   }
-  return 'http://localhost:5000';
+  return 'https://exam.nexifyforge.in';
 };
 
 // Ultra-smooth robust video renderer (Double-Buffered Hardware Canvas + Fallback Image via High-Speed WebSocket)

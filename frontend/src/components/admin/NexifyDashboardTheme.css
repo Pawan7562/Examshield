@@ -1114,178 +1114,181 @@ h2 {
   justify-content: space-between;
 }
 
-.proctoring-health-card .ph-title {
-  font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-  font-size: 19px !important;
-  font-weight: 700 !important;
-  color: var(--tx) !important;
-  margin: 0 0 4px 0 !important;
-  letter-spacing: -0.01em !important;
+/* ── PROCTORING INTEGRITY EXECUTIVE AUDIT WIDGET (v6 Editorial Design) ── */
+.proctoring-integrity-card {
+  padding: 24px 28px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
 }
 
-.proctoring-health-card .ph-subtitle {
+.proctoring-integrity-card .pi-header {
+  margin-bottom: 12px;
+}
+
+.proctoring-integrity-card .pi-title {
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-size: 26px !important;
+  font-weight: 500 !important;
+  color: var(--tx, #0f172a) !important;
+  margin: 0 0 4px 0 !important;
+  letter-spacing: -0.015em !important;
+  line-height: 1.2 !important;
+}
+
+.proctoring-integrity-card .pi-subtitle {
   font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   font-size: 13.5px !important;
   font-weight: 400 !important;
-  color: var(--mu) !important;
+  color: var(--mu, #64748b) !important;
   margin: 0 !important;
 }
 
-.proctoring-health-body {
+.pi-hero-stat {
   display: flex;
-  align-items: center;
-  gap: 28px;
-  flex: 1;
-  padding: 6px 0 10px;
+  align-items: baseline;
+  gap: 12px;
+  margin: 10px 0 16px 0;
 }
 
-.proctoring-donut-wrap {
-  position: relative;
-  width: 136px;
-  height: 136px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-}
-
-.proctoring-donut-svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-
-.proctoring-donut-track {
-  stroke: var(--s2, #f1f5f9);
-}
-
-[data-theme="dark"] .proctoring-donut-track {
-  stroke: rgba(255, 255, 255, 0.08);
-}
-
-.proctoring-donut-val {
-  stroke: #0d9488;
-  transition: stroke-dashoffset 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
-}
-
-[data-theme="dark"] .proctoring-donut-val {
-  stroke: #14b8a6;
-}
-
-.proctoring-donut-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  pointer-events: none;
-}
-
-.proctoring-donut-num {
-  font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 28px;
-  font-weight: 800;
+.pi-hero-num {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 52px;
+  font-weight: 400;
   line-height: 1;
-  color: var(--tx);
-  letter-spacing: -0.02em;
+  color: var(--tx, #0f172a);
+  letter-spacing: -0.025em;
 }
 
-.proctoring-donut-label {
+.pi-hero-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--mu);
-  margin-top: 5px;
-  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f766e;
+  letter-spacing: -0.01em;
 }
 
-.proctoring-health-bars {
-  flex: 1;
+[data-theme="dark"] .pi-hero-trend {
+  color: #14b8a6;
+}
+
+.pi-trend-arrow {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Multi-segment audit breakdown bar */
+.pi-segmented-bar {
+  display: flex;
+  height: 8px;
+  width: 100%;
+  gap: 2.5px;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  background: transparent;
+}
+
+.pi-seg {
+  height: 100%;
+  transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+}
+
+.pi-seg:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.pi-seg:last-child {
+  border-radius: 0 999px 999px 0;
+}
+
+.pi-seg-emerald {
+  background: #0f766e;
+}
+
+.pi-seg-ocean {
+  background: #0284c7;
+}
+
+.pi-seg-coral {
+  background: #c2410c;
+}
+
+[data-theme="dark"] .pi-seg-emerald {
+  background: #0d9488;
+}
+
+[data-theme="dark"] .pi-seg-ocean {
+  background: #38bdf8;
+}
+
+[data-theme="dark"] .pi-seg-coral {
+  background: #ea580c;
+}
+
+/* Metrics List with Terracotta Line Indicators */
+.pi-metrics-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-width: 0;
+  gap: 18px;
 }
 
-.ph-metric-row {
+.pi-metric-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.ph-metric-info {
+.pi-metric-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.ph-metric-name {
-  font-size: 14px;
+.pi-metric-label {
+  font-size: 14.5px;
   font-weight: 500;
-  color: var(--tx);
+  color: var(--tx, #0f172a);
+  letter-spacing: -0.005em;
 }
 
-.ph-metric-pct {
-  font-size: 14px;
+.pi-metric-val {
+  font-size: 14.5px;
   font-weight: 700;
-  color: var(--tx);
+  color: var(--tx, #0f172a);
   font-variant-numeric: tabular-nums;
 }
 
-.ph-metric-track {
+.pi-metric-track {
   width: 100%;
-  height: 5.5px;
-  border-radius: 99px;
-  background: var(--s2, #f1f5f9);
+  height: 4.5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
 
-[data-theme="dark"] .ph-metric-track {
+[data-theme="dark"] .pi-metric-track {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.ph-metric-bar {
+.pi-metric-fill {
   height: 100%;
-  border-radius: 99px;
-  transition: width 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+  border-radius: 999px;
+  background: #a84335;
+  transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
 }
 
-.ph-metric-bar.blue {
-  background: #2563eb;
-}
-
-.ph-metric-bar.teal {
-  background: #0d9488;
-}
-
-.ph-metric-bar.purple {
-  background: #6366f1;
-}
-
-[data-theme="dark"] .ph-metric-bar.blue {
-  background: #3b82f6;
-}
-
-[data-theme="dark"] .ph-metric-bar.teal {
-  background: #14b8a6;
-}
-
-[data-theme="dark"] .ph-metric-bar.purple {
-  background: #818cf8;
+[data-theme="dark"] .pi-metric-fill {
+  background: #d96b5c;
 }
 
 @media (max-width: 640px) {
-  .proctoring-health-body {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 20px;
-  }
-  .proctoring-donut-wrap {
-    margin: 0 auto;
+  .proctoring-integrity-card {
+    padding: 20px !important;
   }
 }
 

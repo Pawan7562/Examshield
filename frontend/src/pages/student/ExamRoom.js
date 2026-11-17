@@ -993,9 +993,10 @@ export default function ExamRoom() {
 
     const token = localStorage.getItem('accessToken');
     const wsUrl = process.env.REACT_APP_WS_URL ||
-      (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://localhost:5000'
-        : (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host}` : 'http://localhost:5000'));
+      (process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace(/\/api\/?$/, '') :
+        (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+          ? `${window.location.protocol}//${window.location.host}`
+          : 'https://exam.nexifyforge.in'));
     const socket = io(wsUrl, { auth: { token }, reconnectionAttempts: 8, timeout: 10000 });
     socketRef.current = socket;
     setActiveSocket(socket);
