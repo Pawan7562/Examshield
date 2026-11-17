@@ -31,6 +31,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import './Gradebook.css';
+import AnimatedNumber from '../../components/common/AnimatedNumber';
 
 /* ── Modern Grade Badge ────────────────────────────────────────────────────── */
 const GradeBadge = ({ grade }) => {
@@ -508,7 +509,7 @@ export default function Results() {
             </div>
             <div className="gb-metric-content">
               <span className="gb-metric-label">Evaluated Candidates</span>
-              <span className="gb-metric-value">{stats.total.toLocaleString()}</span>
+              <span className="gb-metric-value"><AnimatedNumber value={stats.total} /></span>
             </div>
           </div>
 
@@ -518,7 +519,7 @@ export default function Results() {
             </div>
             <div className="gb-metric-content">
               <span className="gb-metric-label">Certified Passed</span>
-              <span className="gb-metric-value">{stats.passed}</span>
+              <span className="gb-metric-value"><AnimatedNumber value={stats.passed} /></span>
             </div>
           </div>
 
@@ -528,7 +529,7 @@ export default function Results() {
             </div>
             <div className="gb-metric-content">
               <span className="gb-metric-label">Review / Failed</span>
-              <span className="gb-metric-value">{stats.failed}</span>
+              <span className="gb-metric-value"><AnimatedNumber value={stats.failed} /></span>
             </div>
           </div>
 
@@ -538,7 +539,7 @@ export default function Results() {
             </div>
             <div className="gb-metric-content">
               <span className="gb-metric-label">Roster Pass Rate</span>
-              <span className="gb-metric-value">{stats.passRate}%</span>
+              <span className="gb-metric-value"><AnimatedNumber value={stats.passRate} suffix="%" /></span>
             </div>
           </div>
         </div>

@@ -24,6 +24,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import './SupportHelpdesk.css';
+import AnimatedNumber from '../../components/common/AnimatedNumber';
 
 export default function Support() {
   const [activeTab, setActiveTab] = useState('tickets');
@@ -220,7 +221,7 @@ export default function Support() {
             <span className="sh-metric-label">Total Tickets</span>
             <MessageSquare size={16} color="#0a74da" />
           </div>
-          <div className="sh-metric-val">{stats.total || tickets.length}</div>
+          <div className="sh-metric-val"><AnimatedNumber value={stats.total || tickets.length} /></div>
           <div className="sh-metric-desc">Lifetime institutional inquiries</div>
         </div>
 
@@ -229,7 +230,7 @@ export default function Support() {
             <span className="sh-metric-label" style={{ color: '#2563eb' }}>Open Queues</span>
             <Clock size={16} color="#2563eb" />
           </div>
-          <div className="sh-metric-val" style={{ color: '#2563eb' }}>{stats.open || 0}</div>
+          <div className="sh-metric-val" style={{ color: '#2563eb' }}><AnimatedNumber value={stats.open || 0} /></div>
           <div className="sh-metric-desc">Awaiting engineering response</div>
         </div>
 
@@ -238,7 +239,7 @@ export default function Support() {
             <span className="sh-metric-label" style={{ color: '#d97706' }}>In Progress</span>
             <Activity size={16} color="#d97706" />
           </div>
-          <div className="sh-metric-val" style={{ color: '#d97706' }}>{stats.in_progress || 0}</div>
+          <div className="sh-metric-val" style={{ color: '#d97706' }}><AnimatedNumber value={stats.in_progress || 0} /></div>
           <div className="sh-metric-desc">Under active investigation</div>
         </div>
 
@@ -247,7 +248,7 @@ export default function Support() {
             <span className="sh-metric-label" style={{ color: '#16a34a' }}>Resolved</span>
             <CheckCircle2 size={16} color="#16a34a" />
           </div>
-          <div className="sh-metric-val" style={{ color: '#16a34a' }}>{stats.resolved || 0}</div>
+          <div className="sh-metric-val" style={{ color: '#16a34a' }}><AnimatedNumber value={stats.resolved || 0} /></div>
           <div className="sh-metric-desc">Completed & audited solutions</div>
         </div>
       </div>

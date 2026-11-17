@@ -3,6 +3,8 @@
    Ultra-Refined Multi-Palette Design System (v6)
    ═══════════════════════════════════════════════════════════ */
 
+@import './NexifyAnimations.css';
+
 :root {
   --bg: #f5f6f9;
   --sf: #ffffff;

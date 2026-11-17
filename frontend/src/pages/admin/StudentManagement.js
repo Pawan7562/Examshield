@@ -3,30 +3,30 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { 
-  Search, 
-  Upload, 
-  Edit2, 
-  Trash2, 
-  UserPlus, 
-  Download, 
-  ChevronLeft, 
-  ChevronRight, 
-  X, 
-  Mail, 
-  Phone, 
-  Users, 
-  GraduationCap, 
-  Building, 
-  Calendar, 
-  CheckCircle, 
-  CheckCircle2, 
-  AlertCircle, 
-  Key, 
-  RefreshCw, 
-  Copy, 
-  Send, 
-  FileSpreadsheet, 
+import {
+  Search,
+  Upload,
+  Edit2,
+  Trash2,
+  UserPlus,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Mail,
+  Phone,
+  Users,
+  GraduationCap,
+  Building,
+  Calendar,
+  CheckCircle,
+  CheckCircle2,
+  AlertCircle,
+  Key,
+  RefreshCw,
+  Copy,
+  Send,
+  FileSpreadsheet,
   FileText,
   ShieldCheck,
   Sparkles,
@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './CandidateRegistry.css';
+import AnimatedNumber from '../../components/common/AnimatedNumber';
 
 /* ── Modern Executive Modal ────────────────────────────────────────────────── */
 const Modal = ({ open, onClose, title, icon: Icon, children }) => {
@@ -108,13 +109,13 @@ export default function StudentManagement() {
   const [exams, setExams] = useState([]);
   const [credentialFallback, setCredentialFallback] = useState(null);
   const [editStudent, setEditStudent] = useState(null);
-  const [form, setForm] = useState({ 
-    name: '', 
-    email: '', 
-    rollNo: '', 
-    department: '', 
-    semester: '', 
-    batch: '', 
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    rollNo: '',
+    department: '',
+    semester: '',
+    batch: '',
     phone: '',
     examId: ''
   });
@@ -238,9 +239,9 @@ export default function StudentManagement() {
   const fetchStudents = async (page = 1, isBackground = false) => {
     if (!isBackground) setLoading(true);
     try {
-      const res = await adminAPI.getStudents({ 
-        page, 
-        limit: 15, 
+      const res = await adminAPI.getStudents({
+        page,
+        limit: 15,
         search: search || undefined,
         department: selectedDeptFilter !== 'all' ? selectedDeptFilter : undefined
       });
@@ -254,13 +255,13 @@ export default function StudentManagement() {
         setDepartmentsList(payload.departments);
       }
       if (storageKey) {
-        try { sessionStorage.setItem(storageKey, JSON.stringify(list)); } catch (_) {}
+        try { sessionStorage.setItem(storageKey, JSON.stringify(list)); } catch (_) { }
       }
       const totalCount = payload?.total ?? payload?.data?.total ?? payload?.pagination?.total ?? list.length;
       const totalPages = payload?.pagination?.pages ?? payload?.data?.pagination?.pages ?? Math.ceil(totalCount / 15) ?? 1;
-      setPagination({ 
-        page, 
-        total: totalCount, 
+      setPagination({
+        page,
+        total: totalCount,
         pages: Math.max(1, totalPages)
       });
     } catch {
@@ -305,13 +306,13 @@ export default function StudentManagement() {
   };
 
   const openAdd = () => {
-    setForm({ 
-      name: '', 
-      email: '', 
-      rollNo: '', 
-      department: '', 
-      semester: '', 
-      batch: '', 
+    setForm({
+      name: '',
+      email: '',
+      rollNo: '',
+      department: '',
+      semester: '',
+      batch: '',
       phone: '',
       examId: ''
     });
@@ -319,18 +320,18 @@ export default function StudentManagement() {
     setFormErrors({});
     adminAPI.getExams({ page: 1, limit: 50 })
       .then(res => setExams(res.data?.exams || []))
-      .catch(() => {});
+      .catch(() => { });
     setAddModal(true);
   };
 
   const openEdit = (student) => {
-    setForm({ 
-      name: student.name, 
-      email: student.email, 
-      rollNo: student.roll_no, 
-      department: student.department || '', 
-      semester: student.semester || '', 
-      batch: student.batch || '', 
+    setForm({
+      name: student.name,
+      email: student.email,
+      rollNo: student.roll_no,
+      department: student.department || '',
+      semester: student.semester || '',
+      batch: student.batch || '',
       phone: student.phone || '',
       examId: ''
     });
@@ -351,7 +352,7 @@ export default function StudentManagement() {
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-    
+
     setSubmitting(true);
     try {
       if (editStudent) {
@@ -416,7 +417,7 @@ export default function StudentManagement() {
           const cached = JSON.parse(sessionStorage.getItem(storageKey) || '[]');
           const updated = cached.filter(s => s.id !== id && s.student_id !== id);
           sessionStorage.setItem(storageKey, JSON.stringify(updated));
-        } catch (_) {}
+        } catch (_) { }
       }
     };
 
@@ -442,7 +443,7 @@ export default function StudentManagement() {
     setBulkExamId('');
     adminAPI.getExams({ page: 1, limit: 50 })
       .then(res => setExams(res.data?.exams || []))
-      .catch(() => {});
+      .catch(() => { });
     setBulkModal(true);
   };
 
@@ -582,7 +583,7 @@ export default function StudentManagement() {
           </div>
           <div className="cr-metric-content">
             <span className="cr-metric-label">Total Enrolled</span>
-            <span className="cr-metric-value">{pagination.total.toLocaleString()}</span>
+            <span className="cr-metric-value"><AnimatedNumber value={pagination.total} /></span>
           </div>
         </div>
 
@@ -592,7 +593,7 @@ export default function StudentManagement() {
           </div>
           <div className="cr-metric-content">
             <span className="cr-metric-label">Active on Roster</span>
-            <span className="cr-metric-value">{activeCount}</span>
+            <span className="cr-metric-value"><AnimatedNumber value={activeCount} /></span>
           </div>
         </div>
 
@@ -613,7 +614,7 @@ export default function StudentManagement() {
           <div className="cr-metric-content">
             <span className="cr-metric-label">Password Queue</span>
             <span className="cr-metric-value" style={{ color: pendingRequestsCount > 0 ? 'var(--bad, #c2410c)' : 'inherit' }}>
-              {pendingRequestsCount}
+              <AnimatedNumber value={pendingRequestsCount} />
             </span>
           </div>
         </div>
@@ -1033,66 +1034,66 @@ export default function StudentManagement() {
         icon={editStudent ? Edit2 : UserPlus}
       >
         <div className="cr-form-grid">
-          <FormInput 
-            label="Candidate Full Name *" 
+          <FormInput
+            label="Candidate Full Name *"
             icon={Users}
-            value={form.name} 
-            onChange={setFormField('name')} 
+            value={form.name}
+            onChange={setFormField('name')}
             placeholder="e.g. Aarav Sharma"
             error={formErrors.name}
           />
 
-          <FormInput 
-            label="Institutional Email *" 
-            type="email" 
+          <FormInput
+            label="Institutional Email *"
+            type="email"
             icon={Mail}
-            value={form.email} 
-            onChange={setFormField('email')} 
-            placeholder="candidate@university.edu" 
+            value={form.email}
+            onChange={setFormField('email')}
+            placeholder="candidate@university.edu"
             disabled={!!editStudent}
             error={formErrors.email}
           />
 
-          <FormInput 
-            label="University / College Roll No *" 
+          <FormInput
+            label="University / College Roll No *"
             icon={GraduationCap}
-            value={form.rollNo} 
-            onChange={setFormField('rollNo')} 
+            value={form.rollNo}
+            onChange={setFormField('rollNo')}
             placeholder="e.g. CS2026-042"
             error={formErrors.rollNo}
           />
 
-          <FormInput 
-            label="Academic Department" 
+          <FormInput
+            label="Academic Department"
             icon={Building}
-            value={form.department} 
-            onChange={setFormField('department')} 
-            placeholder="e.g. Computer Science" 
+            value={form.department}
+            onChange={setFormField('department')}
+            placeholder="e.g. Computer Science"
           />
 
-          <FormInput 
-            label="Current Semester" 
+          <FormInput
+            label="Current Semester"
             icon={Calendar}
-            value={form.semester} 
-            onChange={setFormField('semester')} 
-            placeholder="e.g. 6th Semester" 
+            value={form.semester}
+            onChange={setFormField('semester')}
+            placeholder="e.g. 6th Semester"
           />
 
-          <FormInput 
-            label="Academic Batch" 
+          <FormInput
+            label="Academic Batch"
             icon={Calendar}
-            value={form.batch} 
-            onChange={setFormField('batch')} 
-            placeholder="e.g. 2022-2026" 
+            value={form.batch}
+            onChange={setFormField('batch')}
+            placeholder="e.g. 2022-2026"
           />
 
           <div className="cr-form-group full">
-            <FormInput 
-              label="Contact Phone (Optional)" 
+            <FormInput
+              label="Contact Phone (Optional)"
               icon={Phone}
-              value={form.phone} 
-              onChange={setFormField('phone')} 
-              placeholder="+91 98765 43210" 
+              value={form.phone}
+              onChange={setFormField('phone')}
+              placeholder="+91 98765 43210"
             />
           </div>
 
@@ -1241,7 +1242,7 @@ export default function StudentManagement() {
           )}
 
           {/* Interactive Dropzone */}
-          <div 
+          <div
             className={`cr-dropzone ${csvFile ? 'has-file' : ''}`}
             onClick={() => fileRef.current.click()}
           >
@@ -1274,16 +1275,16 @@ export default function StudentManagement() {
               </>
             )}
 
-            <input 
-              ref={fileRef} 
-              type="file" 
-              accept=".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv" 
-              style={{ display: 'none' }} 
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
+              style={{ display: 'none' }}
               onChange={e => {
                 if (e.target.files && e.target.files[0]) {
                   setCsvFile(e.target.files[0]);
                 }
-              }} 
+              }}
             />
           </div>
 
@@ -1309,10 +1310,10 @@ export default function StudentManagement() {
           <button type="button" className="cr-btn secondary" onClick={() => setBulkModal(false)} disabled={submitting}>
             Cancel
           </button>
-          <button 
-            type="button" 
-            className="cr-btn primary" 
-            onClick={handleBulkUpload} 
+          <button
+            type="button"
+            className="cr-btn primary"
+            onClick={handleBulkUpload}
             disabled={!csvFile || submitting}
           >
             <Send size={15} />

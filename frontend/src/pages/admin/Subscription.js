@@ -32,6 +32,7 @@ import {
 import '../../components/admin/AdminSidebar.css';
 import './Subscription.css';
 import './LicenseQuotas.css';
+import AnimatedNumber from '../../components/common/AnimatedNumber';
 
 const planConfig = {
   basic: { 
@@ -537,7 +538,7 @@ export default function Subscription() {
             </span>
           </div>
           <div className="lq-metric-val-row">
-            <span className="lq-metric-val">{currentStudents}</span>
+            <span className="lq-metric-val"><AnimatedNumber value={currentStudents} /></span>
             <span className="lq-metric-limit">
               / {isUnlimitedStudents ? '∞ Unlimited' : `${maxStudents} enrolled`}
             </span>
@@ -571,7 +572,7 @@ export default function Subscription() {
             </span>
           </div>
           <div className="lq-metric-val-row">
-            <span className="lq-metric-val">{currentExams}</span>
+            <span className="lq-metric-val"><AnimatedNumber value={currentExams} /></span>
             <span className="lq-metric-limit">
               / {isUnlimitedExams ? '∞ Unlimited' : `${maxExams} slots`}
             </span>
@@ -603,7 +604,7 @@ export default function Subscription() {
             <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#10b981' }}>100% Valid</span>
           </div>
           <div className="lq-metric-val-row">
-            <span className="lq-metric-val" style={{ color: '#10b981' }}>{currentResults}</span>
+            <span className="lq-metric-val" style={{ color: '#10b981' }}><AnimatedNumber value={currentResults} /></span>
             <span className="lq-metric-limit">transcripts</span>
           </div>
           <div className="lq-metric-track">
