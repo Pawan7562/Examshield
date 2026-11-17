@@ -1,9 +1,7 @@
-// src/pages/student/Profile.js — Candidate Academic Records & Identity Passport
-// Ultra-Refined Executive Implementation matching College Admin Design (v6)
-import React, { useEffect, useState, useMemo } from 'react';
+// src/pages/student/Profile.js
+import React, { useEffect, useState } from 'react';
 import { studentAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { NexifyIcon } from '../../components/admin/NexifyIcons';
 import { 
   User, 
   Mail, 
@@ -13,11 +11,12 @@ import {
   Lock, 
   Eye, 
   EyeOff,
+  Save,
   Building,
   GraduationCap,
   CheckCircle2,
-  Clock,
-  Sparkles
+  Fingerprint,
+  Clock
 } from 'lucide-react';
 import './Profile.css';
 
@@ -66,136 +65,110 @@ export default function Profile() {
     }
   };
 
-  const formattedDate = useMemo(() => {
-    return new Date().toLocaleDateString('en-GB', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
-  }, []);
-
   if (loading) {
     return (
-      <div className="wrap" style={{ textAlign: 'center', padding: '100px 20px' }}>
+      <div className="pf-container" style={{ padding: '60px 0', textAlign: 'center' }}>
         <div style={{
-          width: 44, height: 44, border: '3.5px solid var(--prs)', borderTopColor: 'var(--c1)',
-          borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px'
+          width: '42px',
+          height: '42px',
+          border: '3px solid #e2e8f0',
+          borderTopColor: '#0a74da',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+          margin: '0 auto 16px'
         }} />
-        <h3 style={{ color: 'var(--tx)', margin: '0 0 6px', fontWeight: 700 }}>Authenticating Candidate Profile...</h3>
-        <p style={{ color: 'var(--mu)', fontSize: '13px' }}>Loading verified institutional credentials and clearance</p>
+        <h4 style={{ color: '#0f172a', margin: '0 0 6px', fontWeight: 700 }}>Authenticating Candidate Profile...</h4>
+        <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Loading verified institutional credentials</p>
       </div>
     );
   }
 
   const initial = profile?.name ? profile.name.charAt(0).toUpperCase() : 'S';
-  const candidateId = profile?.student_id || profile?.id 
-    ? `EXS-${(profile.student_id || profile.id).slice(0, 8).toUpperCase()}` 
-    : 'EXS-CANDIDATE';
 
   return (
-    <div className="wrap">
-      {/* ── 1. Page Header (College Admin Layout) ────────────────────── */}
-      <section className="head rise" style={{ '--d': 0 }}>
-        <div>
-          <h1>Candidate Academic Profile &amp; Records</h1>
-          <p id="date">
-            {formattedDate}. Verified records for {profile?.name || 'Enrolled Candidate'} · {profile?.college_name || 'Academic Institution'}
-          </p>
-        </div>
-        <div className="btns">
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'var(--goods)',
-            border: '1px solid var(--good)',
-            padding: '8px 16px',
-            borderRadius: '10px'
-          }}>
-            <NexifyIcon name="shield" size={16} style={{ color: 'var(--good)' }} />
-            <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--good)' }}>
-              Clearance: Active &amp; Verified
-            </span>
+    <div className="pf-container">
+      {/* Header Banner */}
+      <div className="pf-header-banner">
+        <div className="pf-header-left">
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0a74da', fontSize: '0.82rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+            <Fingerprint size={16} /> Verified Candidate Identity
           </div>
+          <h1>Candidate Records & Credentials</h1>
+          <p>Institutional registration details, biometric verification clearance, and account access controls.</p>
         </div>
-      </section>
 
-      {/* ── 2. Two-Column Profile & Security Workspace ──────────────── */}
-      <div className="pf-grid">
-        {/* ── LEFT COLUMN: Identity Passport Card ── */}
-        <article className="card pf-passport-card rise" style={{ '--d': 1 }}>
-          <div className="pf-passport-hero">
-            <div className="pf-passport-tag">
-              <NexifyIcon name="shield" size={13} style={{ color: '#38bdf8' }} />
-              <span>Official Examination Passport</span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#ecfdf5', border: '1.5px solid #a7f3d0', padding: '8px 16px', borderRadius: '12px' }}>
+          <CheckCircle2 size={18} color="#059669" />
+          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#065f46' }}>
+            Status: Active & Authorized
+          </span>
+        </div>
+      </div>
+
+      <div className="pf-layout-grid">
+        {/* Left Column: Candidate ID Card */}
+        <div className="pf-passport-card">
+          <div className="pf-passport-header">
+            <div className="pf-passport-shield">
+              <ShieldCheck size={14} /> Official ID Passport
             </div>
-            <div className="pf-avatar-circle">
+            <div className="pf-avatar-wrap">
               {initial}
-              <div className="pf-avatar-verified-badge" title="Biometrically Verified Candidate">
-                <CheckCircle2 size={15} />
+              <div className="pf-avatar-verified" title="Biometrically Verified">
+                <CheckCircle2 size={16} />
               </div>
             </div>
           </div>
 
           <div className="pf-passport-body">
-            <h2 className="pf-passport-name">{profile?.name || 'Verified Student'}</h2>
-            <div className="pf-passport-id-chip">
-              ID: {candidateId}
+            <h2 className="pf-candidate-name">{profile?.name || 'Verified Student'}</h2>
+            <div className="pf-candidate-id">
+              ID: {profile?.student_id || profile?.id ? `EXS-${(profile.student_id || profile.id).slice(0, 8).toUpperCase()}` : 'EXS-CANDIDATE'}
             </div>
-            <div className="pf-passport-college">
+            <div className="pf-institution-name">
               {profile?.college_name || 'Enrolled Academic Institution'}
             </div>
 
-            <div className="pf-passport-meta-list">
-              <div className="pf-passport-row">
-                <span className="pf-passport-row-label">Roll / Enrollment:</span>
-                <span className="pf-passport-row-val">{profile?.roll_no || 'Assigned via Portal'}</span>
+            <div className="pf-passport-list">
+              <div className="pf-passport-item">
+                <span>Roll / Reg No:</span>
+                <span>{profile?.roll_no || 'Assigned via Portal'}</span>
               </div>
-              <div className="pf-passport-row">
-                <span className="pf-passport-row-label">Department:</span>
-                <span className="pf-passport-row-val">{profile?.department || 'Information Technology'}</span>
+              <div className="pf-passport-item">
+                <span>Department:</span>
+                <span>{profile?.department || 'Information Technology'}</span>
               </div>
-              <div className="pf-passport-row">
-                <span className="pf-passport-row-label">Academic Semester:</span>
-                <span className="pf-passport-row-val">{profile?.semester ? `Semester ${profile.semester}` : 'Current Term'}</span>
+              <div className="pf-passport-item">
+                <span>Academic Semester:</span>
+                <span>{profile?.semester ? `Semester ${profile.semester}` : 'Current Term'}</span>
               </div>
-              <div className="pf-passport-row">
-                <span className="pf-passport-row-label">Graduation Batch:</span>
-                <span className="pf-passport-row-val">{profile?.batch || '2024 - 2028'}</span>
-              </div>
-              <div className="pf-passport-row">
-                <span className="pf-passport-row-label">Integrity Status:</span>
-                <span className="pf-passport-row-val" style={{ color: 'var(--good)' }}>100% Good Standing</span>
+              <div className="pf-passport-item">
+                <span>Graduation Batch:</span>
+                <span>{profile?.batch || '2024 - 2028'}</span>
               </div>
             </div>
 
-            <div className="pf-clearance-alert">
-              <ShieldCheck size={22} style={{ color: 'var(--good)', flexShrink: 0, marginTop: 2 }} />
+            <div className="pf-clearance-box">
+              <ShieldCheck size={26} color="#16a34a" style={{ flexShrink: 0 }} />
               <div>
                 <h5>Proctoring Clearance Active</h5>
-                <p>Cleared for AI-monitored high-stakes examinations with automated video, audio, and browser security telemetry.</p>
+                <p>Eligible for AI-proctored high-stakes online examinations with automated video and audio auditing.</p>
               </div>
             </div>
           </div>
-        </article>
+        </div>
 
-        {/* ── RIGHT COLUMN: Detailed Records & Credentials Form ── */}
+        {/* Right Column: Detailed Information & Security Form */}
         <div className="pf-right-column">
-          {/* Academic & Contact Records Card */}
-          <article className="card pad rise" style={{ '--d': 2 }}>
-            <div className="ph">
-              <div>
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <GraduationCap size={20} style={{ color: 'var(--c1)' }} />
-                  <span>Academic &amp; Institutional Registry</span>
-                </h2>
-                <p className="s">Verified identity parameters synced from college administration records.</p>
-              </div>
-              <span className="bdg" style={{ background: 'var(--prs)', color: 'var(--pr)' }}>
-                Institutional Record
-              </span>
-            </div>
+          {/* Institutional Information Card */}
+          <div className="pf-section-card">
+            <h2 className="pf-section-title">
+              <GraduationCap size={20} color="#0a74da" />
+              Academic & Contact Profile
+            </h2>
+            <p className="pf-section-subtitle">
+              Verified records provided during institutional onboarding.
+            </p>
 
             <div className="pf-fields-grid">
               <div className="pf-field-item">
@@ -260,31 +233,26 @@ export default function Profile() {
                 </div>
               </div>
             </div>
-          </article>
+          </div>
 
-          {/* Account Security & Password Update Card */}
-          <article className="card pad rise" style={{ '--d': 3 }}>
-            <div className="ph">
-              <div>
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Lock size={19} style={{ color: 'var(--c1)' }} />
-                  <span>Access Credentials &amp; Security Key</span>
-                </h2>
-                <p className="s">Update your account password to safeguard your assessment submissions and transcripts.</p>
-              </div>
-              <span className="bdg" style={{ background: 'var(--goods)', color: 'var(--good)' }}>
-                Encrypted SHA-256
-              </span>
-            </div>
+          {/* Security Credentials Update */}
+          <div className="pf-section-card">
+            <h2 className="pf-section-title">
+              <Lock size={20} color="#0a74da" />
+              Account Security & Access Key
+            </h2>
+            <p className="pf-section-subtitle">
+              Update your account password to protect access to your assessments and transcripts.
+            </p>
 
-            <form onSubmit={handlePwChange} style={{ marginTop: '16px' }}>
+            <form onSubmit={handlePwChange}>
               <div className="pf-form-row">
-                <label className="pf-input-label">Current Security Password</label>
-                <div className="pf-input-wrap">
+                <label className="pf-input-label">Current Password</label>
+                <div className="pf-input-wrapper">
                   <input
                     type={showCurrentPassword ? 'text' : 'password'}
-                    className="pf-input"
-                    placeholder="Enter existing account password"
+                    className="pf-input-field"
+                    placeholder="Enter existing password"
                     value={pwForm.currentPassword}
                     onChange={(e) => setPwForm(p => ({ ...p, currentPassword: e.target.value }))}
                     required
@@ -293,20 +261,19 @@ export default function Profile() {
                     type="button"
                     className="pf-input-toggle"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    title={showCurrentPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '24px' }}>
                 <div>
                   <label className="pf-input-label">New Password</label>
-                  <div className="pf-input-wrap">
+                  <div className="pf-input-wrapper">
                     <input
                       type={showNewPassword ? 'text' : 'password'}
-                      className="pf-input"
+                      className="pf-input-field"
                       placeholder="Minimum 6 characters"
                       value={pwForm.newPassword}
                       onChange={(e) => setPwForm(p => ({ ...p, newPassword: e.target.value }))}
@@ -316,19 +283,18 @@ export default function Profile() {
                       type="button"
                       className="pf-input-toggle"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      title={showNewPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <label className="pf-input-label">Confirm New Password</label>
-                  <div className="pf-input-wrap">
+                  <div className="pf-input-wrapper">
                     <input
                       type={showConfirmPassword ? 'text' : 'password'}
-                      className="pf-input"
+                      className="pf-input-field"
                       placeholder="Re-enter new password"
                       value={pwForm.confirm}
                       onChange={(e) => setPwForm(p => ({ ...p, confirm: e.target.value }))}
@@ -338,22 +304,21 @@ export default function Profile() {
                       type="button"
                       className="pf-input-toggle"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="pf-form-footer">
-                <button type="submit" className="btn pri" disabled={pwLoading}>
-                  <Sparkles size={15} />
-                  <span>{pwLoading ? 'Securing Credentials...' : 'Update Password'}</span>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="submit" className="pf-btn-submit" disabled={pwLoading}>
+                  <Save size={16} />
+                  {pwLoading ? 'Securing Credentials...' : 'Update Password'}
                 </button>
               </div>
             </form>
-          </article>
+          </div>
         </div>
       </div>
     </div>
