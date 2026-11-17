@@ -32,14 +32,7 @@ const curve = (pts) =>
 
 export default function CandidateActivityChart() {
   const [range, setRange] = useState(7);
-  const [tipState, setTipState] = useState({
-    visible: false,
-    title: '',
-    valA: 0,
-    valB: 0,
-    left: 0,
-    top: 0
-  });
+  const [tipState, setTipState] = useState({ visible: false, text: '', left: 0, top: 0 });
   const [cursorState, setCursorState] = useState({ visible: false, x: 0, y1: 0, y2: 0 });
   const [pathKey, setPathKey] = useState(0);
 
@@ -57,7 +50,7 @@ export default function CandidateActivityChart() {
 
   useEffect(() => {
     setPathKey((k) => k + 1);
-    setTipState({ visible: false, title: '', valA: 0, valB: 0, left: 0, top: 0 });
+    setTipState({ visible: false, text: '', left: 0, top: 0 });
     setCursorState({ visible: false, x: 0, y1: 0, y2: 0 });
   }, [range]);
 
@@ -77,7 +70,8 @@ export default function CandidateActivityChart() {
     const yValA = getY(data[idx][0]);
     const yValB = getY(data[idx][1]);
 
-    const title = range === 7 ? LABELS[idx] : `Day ${idx + 1}`;
+    const labelText = range === 7 ? LABELS[idx] : `Day ${idx + 1}`;
+    const text = `${labelText}: ${data[idx][0]} enrolled, ${data[idx][1]} submitted`;
 
     setCursorState({
       visible: true,
@@ -88,11 +82,9 @@ export default function CandidateActivityChart() {
 
     setTipState({
       visible: true,
-      title,
-      valA: data[idx][0],
-      valB: data[idx][1],
+      text,
       left: (xVal / W) * rc.width,
-      top: (Math.min(yValA, yValB) / H) * rc.height
+      top: (yValA / H) * rc.height
     });
   };
 
@@ -108,14 +100,13 @@ export default function CandidateActivityChart() {
   const pathA = curve(ptsA);
   const pathB = curve(ptsB);
   const areaA = `${pathA} L${ptsA[ptsA.length - 1][0]} ${baseY} L${ptsA[0][0]} ${baseY}Z`;
-  const areaB = `${pathB} L${ptsB[ptsB.length - 1][0]} ${baseY} L${ptsB[0][0]} ${baseY}Z`;
 
   return (
     <article className="card pad rise" style={{ '--d': 2 }}>
       <div className="ph">
         <div>
           <h2>Candidate activity</h2>
-          <p>Enrollments and exam submissions over time</p>
+          <p>Enrollments and submissions over time</p>
         </div>
         <div className="seg" id="seg">
           <button
@@ -162,14 +153,8 @@ export default function CandidateActivityChart() {
         >
           <defs>
             <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--c1)" stopOpacity="0.22" />
-              <stop offset="60%" stopColor="var(--c1)" stopOpacity="0.06" />
-              <stop offset="100%" stopColor="var(--c1)" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="gb" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--gold)" stopOpacity="0.16" />
-              <stop offset="70%" stopColor="var(--gold)" stopOpacity="0.04" />
-              <stop offset="100%" stopColor="var(--gold)" stopOpacity="0" />
+              <stop offset="0" stopColor="var(--c1)" stopOpacity="0.16" />
+              <stop offset="1" stopColor="var(--c1)" stopOpacity="0" />
             </linearGradient>
           </defs>
 
@@ -182,15 +167,12 @@ export default function CandidateActivityChart() {
                 y1={getY(v)}
                 y2={getY(v)}
                 stroke="var(--bd)"
-                strokeDasharray={v === 0 ? 'none' : '3 4'}
-                strokeWidth={v === 0 ? '1.2' : '1'}
               />
               <text
                 x="0"
                 y={getY(v) + 4}
                 fill="var(--mu)"
                 fontSize="11"
-                fontWeight="500"
               >
                 {v}
               </text>
@@ -209,7 +191,6 @@ export default function CandidateActivityChart() {
                   fill="var(--mu)"
                   fontSize="11"
                   textAnchor="middle"
-                  fontWeight="500"
                 >
                   {label}
                 </text>
@@ -218,21 +199,29 @@ export default function CandidateActivityChart() {
             return null;
           })}
 
-          {/* Area Gradients */}
+          {/* Area Gradient */}
           <path
             key={`area-a-${pathKey}`}
             d={areaA}
             fill="url(#ga)"
             style={{
-              animation: 'rise 0.8s ease forwards'
+              transition: 'opacity 1s 0.3s ease'
             }}
           />
+
+          {/* Enrollments (Blue Curve) */}
           <path
-            key={`area-b-${pathKey}`}
-            d={areaB}
-            fill="url(#gb)"
+            key={`path-a-${pathKey}`}
+            d={pathA}
+            fill="none"
+            stroke="var(--c1)"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            pathLength="1"
+            strokeDasharray="1"
+            strokeDashoffset="1"
             style={{
-              animation: 'rise 0.9s ease forwards'
+              animation: 'draw 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards'
             }}
           />
 
@@ -252,22 +241,6 @@ export default function CandidateActivityChart() {
             }}
           />
 
-          {/* Enrollments (Blue Curve) */}
-          <path
-            key={`path-a-${pathKey}`}
-            d={pathA}
-            fill="none"
-            stroke="var(--c1)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            pathLength="1"
-            strokeDasharray="1"
-            strokeDashoffset="1"
-            style={{
-              animation: 'draw 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards'
-            }}
-          />
-
           {/* Interactive cursor line */}
           <line
             y1={T}
@@ -276,21 +249,20 @@ export default function CandidateActivityChart() {
             x2={cursorState.x}
             stroke="var(--mu)"
             strokeDasharray="3 4"
-            strokeWidth="1.2"
-            opacity={cursorState.visible ? 0.9 : 0}
-            style={{ transition: 'opacity 0.15s ease' }}
+            opacity={cursorState.visible ? 1 : 0}
+            style={{ transition: 'opacity 0.15s' }}
           />
 
           {/* Data point dot for Enrollments (A) */}
           <circle
             cx={cursorState.x}
             cy={cursorState.y1}
-            r="5.5"
+            r="5"
             fill="var(--sf)"
             stroke="var(--c1)"
-            strokeWidth="2.6"
+            strokeWidth="2.4"
             opacity={cursorState.visible ? 1 : 0}
-            style={{ transition: 'opacity 0.15s ease' }}
+            style={{ transition: 'opacity 0.15s' }}
           />
 
           {/* Data point dot for Submissions (B) */}
@@ -300,35 +272,23 @@ export default function CandidateActivityChart() {
             r="5"
             fill="var(--sf)"
             stroke="var(--gold)"
-            strokeWidth="2.6"
+            strokeWidth="2.4"
             opacity={cursorState.visible ? 1 : 0}
-            style={{ transition: 'opacity 0.15s ease' }}
+            style={{ transition: 'opacity 0.15s' }}
           />
         </svg>
 
-        {/* Enhanced Glass Tooltip */}
+        {/* Clean Executive Tooltip matching prototype */}
         <div
           className="tip"
           id="tip"
           style={{
             left: `${tipState.left}px`,
             top: `${tipState.top}px`,
-            opacity: tipState.visible ? 1 : 0,
-            transform: tipState.visible ? 'translate(-50%, -120%) scale(1)' : 'translate(-50%, -110%) scale(0.95)',
-            pointerEvents: 'none'
+            opacity: tipState.visible ? 1 : 0
           }}
         >
-          <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: 'var(--tx)' }}>
-            {tipState.title}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'var(--c1)', marginBottom: '2px' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--c1)', display: 'inline-block' }}></span>
-            <span><strong>{tipState.valA}</strong> Enrolled candidates</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'var(--gold)' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--gold)', display: 'inline-block' }}></span>
-            <span><strong>{tipState.valB}</strong> Exam submissions</span>
-          </div>
+          {tipState.text}
         </div>
       </div>
     </article>

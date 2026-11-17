@@ -1,5 +1,5 @@
 // src/pages/admin/Dashboard.js — Nexify Examina · College Admin Command Center
-// Ultra-Enhanced Executive Design & Aesthetics
+// Professional Executive Implementation of nexify-dashboard-v3.html
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -64,7 +64,7 @@ export default function Dashboard() {
         if (storageKey) {
           try {
             sessionStorage.setItem(storageKey, JSON.stringify(res.data));
-          } catch (_) {}
+          } catch (_) { }
         }
       })
       .catch(() => toast.error('Failed to load college dashboard'))
@@ -110,9 +110,9 @@ export default function Dashboard() {
 
       {/* ── Active Exam Fast Launch Alert (if exam is live) ────────── */}
       {liveExam && (
-        <section 
-          className="card pad rise" 
-          style={{ 
+        <section
+          className="card pad rise"
+          style={{
             '--d': 0.5,
             borderLeft: '4px solid var(--good)',
             background: 'var(--goods)',
@@ -120,40 +120,38 @@ export default function Dashboard() {
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '16px',
-            flexWrap: 'wrap',
-            boxShadow: '0 4px 18px -4px var(--good-glow)'
+            flexWrap: 'wrap'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div 
-              style={{ 
-                width: '44px', 
-                height: '44px', 
-                borderRadius: '12px', 
-                background: 'var(--sf)', 
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'var(--sf)',
                 color: 'var(--good)',
-                display: 'grid', 
-                placeItems: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                display: 'grid',
+                placeItems: 'center'
               }}
             >
-              <NexifyIcon name="radio" size={22} />
+              <NexifyIcon name="radio" size={20} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="bdg live">Live Invigilation In Progress</span>
+                <span className="bdg live">Live Invigilation</span>
               </div>
-              <h3 style={{ margin: '3px 0 0', fontSize: '18px', fontWeight: 600, color: 'var(--tx)' }}>
+              <h3 style={{ margin: '2px 0 0', fontSize: '17px', fontWeight: 600, color: 'var(--tx)' }}>
                 {liveExam.name || liveExam.title}
               </h3>
             </div>
           </div>
-          <button 
-            className="btn pri" 
+          <button
+            className="btn pri"
             onClick={() => navigate(`/admin/exams/${liveExam.id}/monitor`)}
           >
             <NexifyIcon name="shield" />
-            <span>Launch Live Monitor Grid</span>
+            <span>Launch Live Monitor</span>
           </button>
         </section>
       )}
@@ -243,21 +241,8 @@ export default function Dashboard() {
           <div className="ph">
             <div>
               <h2>Proctoring integrity</h2>
-              <p>Autonomous AI invigilation audit</p>
+              <p>Latest audit summary</p>
             </div>
-            <span 
-              style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--good)',
-                background: 'var(--goods)',
-                padding: '2.5px 8px',
-                borderRadius: '99px',
-                border: '1px solid rgba(13, 130, 95, 0.2)'
-              }}
-            >
-              Audited
-            </span>
           </div>
 
           <div className="big">
@@ -278,7 +263,7 @@ export default function Dashboard() {
                 <em>99%</em>
               </div>
               <div className="mb">
-                <i style={{ width: '99%', background: 'linear-gradient(90deg, #059669, #34d399)' }}></i>
+                <i style={{ width: '99%' }}></i>
               </div>
             </li>
             <li>
@@ -287,7 +272,7 @@ export default function Dashboard() {
                 <em>97%</em>
               </div>
               <div className="mb">
-                <i style={{ width: '97%', background: 'linear-gradient(90deg, #1d4ed8, #60a5fa)' }}></i>
+                <i style={{ width: '97%' }}></i>
               </div>
             </li>
             <li>
@@ -296,7 +281,7 @@ export default function Dashboard() {
                 <em>4%</em>
               </div>
               <div className="mb">
-                <i style={{ width: '4%', background: 'linear-gradient(90deg, #b45309, #f59e0b)' }}></i>
+                <i style={{ width: '4%' }}></i>
               </div>
             </li>
           </ul>
@@ -304,20 +289,17 @@ export default function Dashboard() {
       </section>
 
       {/* ── Institutional Management Hub ───────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '-6px' }} className="rise" style={{ '--d': 4 }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 600, letterSpacing: '-0.3px', margin: 0 }}>
-          Institutional management hub
-        </h2>
-        <span style={{ fontSize: '13px', color: 'var(--mu)' }}>Direct control shortcuts</span>
-      </div>
+      <h2 className="rise" style={{ '--d': 4, marginBottom: '-6px' }}>
+        Institutional management hub
+      </h2>
 
       <section className="hubs">
-        <button 
-          className="card hub rise" 
-          style={{ '--d': 5 }} 
+        <button
+          className="card hub rise"
+          style={{ '--d': 5 }}
           onClick={() => navigate('/admin/students')}
         >
-          <div className="ico" style={{ background: 'var(--prs)', color: 'var(--c1)' }}>
+          <div className="ico">
             <NexifyIcon name="users" />
           </div>
           <div>
@@ -329,12 +311,12 @@ export default function Dashboard() {
           </span>
         </button>
 
-        <button 
-          className="card hub rise" 
-          style={{ '--d': 6 }} 
+        <button
+          className="card hub rise"
+          style={{ '--d': 6 }}
           onClick={() => navigate('/admin/exams')}
         >
-          <div className="ico" style={{ background: 'var(--goods)', color: 'var(--good)' }}>
+          <div className="ico">
             <NexifyIcon name="file" />
           </div>
           <div>
@@ -346,19 +328,16 @@ export default function Dashboard() {
           </span>
         </button>
 
-        <button 
-          className="card hub rise" 
-          style={{ '--d': 7 }} 
+        <button
+          className="card hub rise"
+          style={{ '--d': 7 }}
           onClick={() => navigate('/admin/ai-questions')}
         >
-          <div className="ico" style={{ background: 'var(--golds)', color: 'var(--gold)' }}>
+          <div className="ico">
             <NexifyIcon name="brain" />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <b>AI question studio</b>
-              <span className="bdg ai" style={{ fontSize: '10px', padding: '1px 6px' }}>v2</span>
-            </div>
+            <b>AI question studio</b>
             <small>Generate high-rigor MCQs and coding challenges</small>
           </div>
           <span className="go">
@@ -370,10 +349,7 @@ export default function Dashboard() {
       {/* ── Scheduled & Active Examination Queue ───────────────────── */}
       <section className="card pad rise" style={{ '--d': 8 }}>
         <div className="ph">
-          <div>
-            <h2>Scheduled &amp; active examination queue</h2>
-            <p>Live candidate rosters and invigilation pipelines</p>
-          </div>
+          <h2>Scheduled &amp; active examination queue</h2>
           <button className="link" onClick={() => navigate('/admin/exams')}>
             <NexifyIcon name="eye" />
             <span>Manage all assessments</span>
@@ -396,26 +372,25 @@ export default function Dashboard() {
               const isCompleted = isEnded || exam.status === 'completed';
 
               return (
-                <div 
-                  key={exam.id} 
+                <div
+                  key={exam.id}
                   className="tr-row"
                   onClick={() => navigate(isLive ? `/admin/exams/${exam.id}/monitor` : '/admin/exams')}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--tx)', fontSize: '14.5px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--tx)' }}>
                       {exam.name || exam.title}
                     </span>
                     {exam.exam_code && (
-                      <span style={{ 
-                        fontSize: '11px', 
-                        fontFamily: 'monospace', 
-                        color: 'var(--mu)', 
-                        background: 'var(--s2)', 
-                        padding: '1.5px 7px', 
-                        borderRadius: '5px',
+                      <span style={{
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        color: 'var(--mu)',
+                        background: 'var(--s2)',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
                         display: 'inline-block',
-                        width: 'fit-content',
-                        border: '1px solid var(--bd)'
+                        width: 'fit-content'
                       }}>
                         KEY: {exam.exam_code}
                       </span>
@@ -426,23 +401,19 @@ export default function Dashboard() {
                     {formatIST(exam.date_time, 'dateTime')}
                   </div>
 
-                  <div style={{ fontSize: '13px', color: 'var(--tx)', fontWeight: 500 }}>
+                  <div style={{ fontSize: '13px', color: 'var(--tx)' }}>
                     {exam.duration} mins · {exam.student_count ?? 'All assigned'}
                   </div>
 
                   <div>
-                    <span style={{ 
-                      fontSize: '11.5px', 
-                      fontWeight: 600, 
-                      color: 'var(--c1)', 
-                      background: 'var(--prs)', 
-                      padding: '3px 9px', 
-                      borderRadius: '7px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px'
+                    <span style={{
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      color: 'var(--c1)',
+                      background: 'var(--prs)',
+                      padding: '2px 8px',
+                      borderRadius: '6px'
                     }}>
-                      <NexifyIcon name="shield" size={13} />
                       AI Proctoring
                     </span>
                   </div>
@@ -453,7 +424,7 @@ export default function Dashboard() {
                     ) : isCompleted ? (
                       <span className="bdg" style={{ background: 'var(--goods)', color: 'var(--good)' }}>Completed</span>
                     ) : (
-                      <span className="bdg" style={{ background: 'var(--prs)', color: 'var(--c1)' }}>Scheduled</span>
+                      <span className="bdg" style={{ background: 'var(--prs)', color: 'var(--pr)' }}>Scheduled</span>
                     )}
                   </div>
                 </div>
@@ -462,7 +433,7 @@ export default function Dashboard() {
           ) : (
             <div className="empty">
               <div className="ill">
-                <NexifyIcon name="cal" size={30} />
+                <NexifyIcon name="cal" size={28} />
               </div>
               <h3>No active examinations in queue</h3>
               <p>Schedule your first assessment to monitor candidate telemetry and AI proctoring in real time.</p>
