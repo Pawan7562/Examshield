@@ -164,6 +164,10 @@ export default function StudentDashboard() {
             {user?.name ? user.name.charAt(0).toUpperCase() : 'S'}
           </div>
           <div className="sd-hero-info">
+            <div className="sd-hero-eyebrow">
+              <span className="sd-hero-eyebrow-dot" />
+              Candidate Examination Cockpit
+            </div>
             <h1>Welcome back, {user?.name ? user.name.split(' ')[0] : 'Candidate'}!</h1>
             <div className="sd-hero-meta-row">
               <span className="sd-hero-chip sd-hero-chip-verified">
