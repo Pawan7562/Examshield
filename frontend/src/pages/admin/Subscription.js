@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import '../../components/admin/AdminSidebar.css';
 import './Subscription.css';
+import './LicenseQuotas.css';
 
 const planConfig = {
   basic: { 
@@ -468,254 +469,265 @@ export default function Subscription() {
   ];
 
   return (
-    <div className="admin-quota-container">
-      {/* ── Page Header ────────────────────────────────────── */}
-      <div className="admin-page-header">
-        <div className="admin-header-content">
-          <div className="admin-header-pretitle">
-            <Layers size={14} /> Institutional Capacity & Licensing
+    <div className="lq-container">
+      {/* ── Page Header ────────────────────────────────────────── */}
+      <div className="lq-header">
+        <div className="lq-header-left">
+          <div className="lq-eyebrow">
+            <span className="lq-eyebrow-dot" />
+            <Layers size={13} />
+            Institutional Capacity & Licensing
           </div>
-          <h1 className="admin-page-title">Licenses & Capacity Quotas</h1>
-          <p className="admin-page-subtitle">
-            Manage your university proctoring license, real-time candidate seat allocations, and scale monthly or annual capacity.
+          <h1 className="lq-title">Licenses & Capacity Quotas</h1>
+          <p className="lq-subtitle">
+            Manage your university proctoring accreditation, candidate seat allocations, and scale monthly or annual throughput.
           </p>
         </div>
-        <div className="admin-header-actions">
-          <Button 
-            variant="secondary" 
-            icon={FileText} 
+        <div className="lq-header-actions">
+          <button 
+            type="button"
+            className="lq-btn lq-btn-secondary" 
             onClick={() => setShowInvoiceModal(true)}
           >
+            <FileText size={16} />
             License Certificate
-          </Button>
-          <Button 
-            variant="primary" 
-            icon={Building} 
+          </button>
+          <button 
+            type="button"
+            className="lq-btn lq-btn-primary" 
             onClick={() => setShowQuoteModal(true)}
           >
+            <Building size={16} />
             Custom Enterprise Quote
-          </Button>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Executive Metric KPI Cards Strip ──────────────────── */}
+      <div className="lq-metrics-grid">
+        {/* Metric 1: Active Tier */}
+        <div className="lq-metric-card">
+          <div className="lq-metric-top">
+            <span className="lq-metric-label">
+              <Crown size={14} color="#f59e0b" />
+              Active Tier
+            </span>
+            <span className="lq-days-badge">{daysRemaining} days left</span>
+          </div>
+          <div className="lq-metric-val-row">
+            <span className="lq-metric-val" style={{ textTransform: 'capitalize' }}>
+              {subscription?.plan || 'Standard'}
+            </span>
+          </div>
+          <div className="lq-metric-footer">
+            <span>{planConfig[subscription?.plan]?.badge || 'Accredited Faculty License'}</span>
+            <span style={{ color: '#10b981', fontWeight: 700 }}>● Active</span>
+          </div>
+        </div>
+
+        {/* Metric 2: Candidate Seats */}
+        <div className="lq-metric-card">
+          <div className="lq-metric-top">
+            <span className="lq-metric-label">
+              <Users size={14} color="#0a74da" />
+              Candidate Seats
+            </span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0a74da' }}>
+              {isUnlimitedStudents ? 'Unlimited' : `${studentPercent}%`}
+            </span>
+          </div>
+          <div className="lq-metric-val-row">
+            <span className="lq-metric-val">{currentStudents}</span>
+            <span className="lq-metric-limit">
+              / {isUnlimitedStudents ? '∞ Unlimited' : `${maxStudents} enrolled`}
+            </span>
+          </div>
+          <div className="lq-metric-track">
+            <div 
+              className="lq-metric-fill" 
+              style={{ 
+                width: `${studentPercent}%`,
+                background: studentPercent > 90 ? '#ef4444' : studentPercent > 70 ? '#f59e0b' : '#0a74da'
+              }} 
+            />
+          </div>
+          <div className="lq-metric-footer">
+            <span>
+              {isUnlimitedStudents ? 'Campus-wide seat expansion' : `${Math.max(0, maxStudents - currentStudents)} seats left`}
+            </span>
+            <a href="/admin/students" className="lq-metric-link">Roster →</a>
+          </div>
+        </div>
+
+        {/* Metric 3: Monthly Assessment Slots */}
+        <div className="lq-metric-card">
+          <div className="lq-metric-top">
+            <span className="lq-metric-label">
+              <FileText size={14} color="#6366f1" />
+              Monthly Tests
+            </span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#6366f1' }}>
+              {isUnlimitedExams ? 'Unlimited' : `${examPercent}%`}
+            </span>
+          </div>
+          <div className="lq-metric-val-row">
+            <span className="lq-metric-val">{currentExams}</span>
+            <span className="lq-metric-limit">
+              / {isUnlimitedExams ? '∞ Unlimited' : `${maxExams} slots`}
+            </span>
+          </div>
+          <div className="lq-metric-track">
+            <div 
+              className="lq-metric-fill" 
+              style={{ 
+                width: `${examPercent}%`,
+                background: examPercent > 90 ? '#ef4444' : '#6366f1'
+              }} 
+            />
+          </div>
+          <div className="lq-metric-footer">
+            <span>
+              {isUnlimitedExams ? 'Unlimited concurrent tests' : `${Math.max(0, maxExams - currentExams)} slots left`}
+            </span>
+            <a href="/admin/exams" className="lq-metric-link">Exams →</a>
+          </div>
+        </div>
+
+        {/* Metric 4: Verified Audited Submissions */}
+        <div className="lq-metric-card">
+          <div className="lq-metric-top">
+            <span className="lq-metric-label">
+              <Trophy size={14} color="#10b981" />
+              Audited Logs
+            </span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#10b981' }}>100% Valid</span>
+          </div>
+          <div className="lq-metric-val-row">
+            <span className="lq-metric-val" style={{ color: '#10b981' }}>{currentResults}</span>
+            <span className="lq-metric-limit">transcripts</span>
+          </div>
+          <div className="lq-metric-track">
+            <div className="lq-metric-fill" style={{ width: '100%', background: '#10b981' }} />
+          </div>
+          <div className="lq-metric-footer">
+            <span>Encrypted anti-cheat logs</span>
+            <a href="/admin/results" className="lq-metric-link">Gradebook →</a>
+          </div>
         </div>
       </div>
 
       {/* ── Active Institutional License Hero Card ─────────── */}
       {subscription && (
-        <div className="admin-current-plan-card">
-          <div className="admin-current-plan-info">
-            <div className="admin-current-plan-label">
+        <div className="lq-hero-card">
+          <div className="lq-hero-info">
+            <div className="lq-hero-badge">
               <Sparkles size={14} /> Active Institutional Accreditation
             </div>
             
-            <div className="admin-current-plan-name">
+            <div className="lq-hero-title-row">
               <div 
-                className="admin-plan-icon" 
+                className="lq-hero-plan-icon" 
                 style={{ background: planConfig[subscription.plan]?.gradient || '#0a74da' }}
               >
                 {React.createElement(planConfig[subscription.plan]?.icon || ShieldCheck, { size: 24 })}
               </div>
               <div>
-                <span>{(subscription.plan || 'Standard').toUpperCase()} TIER</span>
-                <span className="admin-plan-tagline">
+                <div className="lq-hero-tier-name">
+                  {(subscription.plan || 'Standard').toUpperCase()} TIER
+                </div>
+                <div className="lq-hero-tier-tagline">
                   {planConfig[subscription.plan]?.badge || 'Accredited Faculty License'}
-                </span>
+                </div>
               </div>
             </div>
 
             {/* License Key & Verification Row */}
-            <div className="admin-license-key-pill">
-              <span className="license-label">LICENSE KEY:</span>
-              <code className="license-code">{licenseKey}</code>
+            <div className="lq-key-pill">
+              <span className="lq-key-label">LICENSE KEY:</span>
+              <code className="lq-key-code">{licenseKey}</code>
               <button 
                 type="button" 
-                className="license-copy-btn" 
+                className="lq-copy-btn" 
                 onClick={() => handleCopyLicenseKey(licenseKey)}
                 title="Copy License Key"
               >
-                {copiedKey ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+                {copiedKey ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
                 <span>{copiedKey ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
 
-            <div className="admin-current-plan-details">
-              <div className="admin-plan-detail-item">
+            <div className="lq-hero-meta">
+              <div className="lq-meta-item">
                 <Calendar size={15} color="#38bdf8" />
                 Valid Until: <strong>{formatIST(expirationDate, 'dateOnly')}</strong>
-                <span className="admin-days-pill">{daysRemaining} days left</span>
+                <span className="lq-days-badge">{daysRemaining} days remaining</span>
               </div>
               <span className="dot-divider">•</span>
-              <div className="admin-plan-detail-item">
+              <div className="lq-meta-item">
                 <Users size={15} color="#38bdf8" />
                 Enrolled Capacity: <strong>{isUnlimitedStudents ? 'Unlimited Seats' : `${maxStudents} Candidate Seats`}</strong>
               </div>
               <span className="dot-divider">•</span>
-              <div className="admin-plan-detail-item">
+              <div className="lq-meta-item">
                 <MonitorCheck size={15} color="#38bdf8" />
                 Auto-Renewal: <strong>Active & Compliant</strong>
               </div>
             </div>
           </div>
 
-          <div className="admin-current-plan-pricing">
-            <div className="admin-plan-price">
+          <div className="lq-hero-pricing">
+            <div className="lq-hero-price">
               ₹{Number(subscription.amount || 2999).toLocaleString('en-IN')} 
-              <span className="admin-price-period">/ cycle</span>
+              <span className="lq-hero-cycle">/ cycle</span>
             </div>
             <StatusBadge status={subscription.status} />
-            <div className="admin-invoice-quicklink" onClick={() => setShowInvoiceModal(true)}>
+            <div className="lq-invoice-link" onClick={() => setShowInvoiceModal(true)}>
               View Billing & GST Receipt →
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Quota Telemetry Meters ─────────────────────────── */}
-      <div className="admin-quota-meters-grid">
-        {/* Metric 1: Candidate Seats */}
-        <div className="admin-quota-card">
-          <div className="admin-quota-header">
-            <span className="admin-quota-title">
-              <Users size={16} color="#0a74da" /> Candidate Seats Quota
-            </span>
-            <span className="admin-quota-percent">
-              {isUnlimitedStudents ? 'Unlimited' : `${studentPercent}% Used`}
-            </span>
-          </div>
-
-          <div className="admin-quota-value-row">
-            <span className="admin-quota-current">{currentStudents}</span>
-            <span className="admin-quota-limit">
-              / {isUnlimitedStudents ? '∞ Unlimited' : `${maxStudents} enrolled`}
-            </span>
-          </div>
-
-          <div className="admin-quota-progress-track">
-            <div 
-              className="admin-quota-progress-fill" 
-              style={{ 
-                width: `${studentPercent}%`, 
-                background: studentPercent > 90 ? '#ef4444' : studentPercent > 70 ? '#f59e0b' : '#0a74da' 
-              }} 
-            />
-          </div>
-
-          <div className="admin-quota-footer">
-            <span className="admin-quota-note">
-              {isUnlimitedStudents 
-                ? 'Campus-wide seat expansion unlocked' 
-                : `${Math.max(0, maxStudents - currentStudents)} candidate seats available`}
-            </span>
-            <a href="/admin/students" className="admin-quota-link">Manage →</a>
-          </div>
-        </div>
-
-        {/* Metric 2: Monthly Assessment Slots */}
-        <div className="admin-quota-card">
-          <div className="admin-quota-header">
-            <span className="admin-quota-title">
-              <FileText size={16} color="#6366f1" /> Monthly Assessment Slots
-            </span>
-            <span className="admin-quota-percent" style={{ color: '#6366f1' }}>
-              {isUnlimitedExams ? 'Unlimited' : `${examPercent}% Created`}
-            </span>
-          </div>
-
-          <div className="admin-quota-value-row">
-            <span className="admin-quota-current">{currentExams}</span>
-            <span className="admin-quota-limit">
-              / {isUnlimitedExams ? '∞ Unlimited' : `${maxExams} monthly tests`}
-            </span>
-          </div>
-
-          <div className="admin-quota-progress-track">
-            <div 
-              className="admin-quota-progress-fill" 
-              style={{ 
-                width: `${examPercent}%`, 
-                background: examPercent > 90 ? '#ef4444' : '#6366f1' 
-              }} 
-            />
-          </div>
-
-          <div className="admin-quota-footer">
-            <span className="admin-quota-note">
-              {isUnlimitedExams 
-                ? 'Unlimited concurrent sessions' 
-                : `${Math.max(0, maxExams - currentExams)} examination slots remaining`}
-            </span>
-            <a href="/admin/exams" className="admin-quota-link">View Exams →</a>
-          </div>
-        </div>
-
-        {/* Metric 3: Submissions & Proctored Transcripts */}
-        <div className="admin-quota-card">
-          <div className="admin-quota-header">
-            <span className="admin-quota-title">
-              <Trophy size={16} color="#10b981" /> Verified Submissions
-            </span>
-            <span className="admin-quota-percent" style={{ color: '#10b981' }}>
-              Audited 100%
-            </span>
-          </div>
-
-          <div className="admin-quota-value-row">
-            <span className="admin-quota-current" style={{ color: '#10b981' }}>{currentResults}</span>
-            <span className="admin-quota-limit">evaluated transcripts</span>
-          </div>
-
-          <div className="admin-quota-progress-track">
-            <div 
-              className="admin-quota-progress-fill" 
-              style={{ width: '100%', background: '#10b981' }} 
-            />
-          </div>
-
-          <div className="admin-quota-footer">
-            <span className="admin-quota-note">All anti-cheat logs encrypted</span>
-            <a href="/admin/results" className="admin-quota-link">Gradebook →</a>
-          </div>
-        </div>
-      </div>
-
       {/* ── Plans & Capacity Switcher Section ───────────────── */}
-      <div className="admin-content-card">
-        <div className="admin-plans-section-header">
-          <div className="admin-plans-titles">
-            <h2 className="admin-card-title">
+      <div className="lq-card">
+        <div className="lq-card-head">
+          <div>
+            <h2 className="lq-card-title">
               <Rocket size={22} color="#0a74da" />
               Scale Institutional Capacity & Licensing
             </h2>
-            <p className="admin-plans-subtitle">
+            <p className="lq-card-desc">
               Choose the license tier that fits your institution. Switch between Monthly and Annual billing anytime.
             </p>
           </div>
 
           {/* Monthly / Annual Billing Toggle */}
-          <div className="admin-billing-toggle-container">
-            <div className="admin-billing-toggle">
+          <div className="lq-switcher-wrap">
+            <div className="lq-cycle-switcher">
               <button
                 type="button"
-                className={`toggle-option ${billingCycle === 'monthly' ? 'active' : ''}`}
+                className={`lq-cycle-btn ${billingCycle === 'monthly' ? 'active' : ''}`}
                 onClick={() => setBillingCycle('monthly')}
               >
                 Monthly Billing
               </button>
               <button
                 type="button"
-                className={`toggle-option ${billingCycle === 'annually' ? 'active' : ''}`}
+                className={`lq-cycle-btn ${billingCycle === 'annually' ? 'active' : ''}`}
                 onClick={() => setBillingCycle('annually')}
               >
                 Annual Billing
-                <span className="toggle-discount-badge">Save 20% ✨</span>
+                <span className="lq-savings-tag">Save 20% ✨</span>
               </button>
             </div>
-            <div className="billing-savings-callout">
+            <div className="lq-cycle-callout">
               {billingCycle === 'annually' ? '⚡ 2 Months Free applied to all annual plans' : 'Pay as you go monthly'}
             </div>
           </div>
         </div>
 
         {/* Plan Cards Grid */}
-        <div className="admin-plans-grid">
+        <div className="lq-plans-grid">
           {Object.entries(currentPlans).map(([key, plan]) => {
             const config = planConfig[key] || planConfig.standard;
             const isCurrentPlan = subscription?.plan === key;
@@ -724,83 +736,83 @@ export default function Subscription() {
             return (
               <div 
                 key={key} 
-                className={`admin-plan-card ${isCurrentPlan ? 'current' : ''} ${isPopular ? 'popular' : ''}`}
+                className={`lq-plan-card ${isCurrentPlan ? 'current' : ''} ${isPopular ? 'popular' : ''}`}
               >
                 {isPopular && (
-                  <div className="admin-plan-badge">
+                  <div className="lq-popular-pill">
                     <Star size={12} fill="#ffffff" />
                     RECOMMENDED FOR INSTITUTIONS
                   </div>
                 )}
                 
-                <div className="admin-plan-header">
+                <div className="lq-plan-top">
                   <div className="admin-plan-icon" style={{ background: config.gradient }}>
                     {React.createElement(config.icon, { size: 24 })}
                   </div>
                   <div>
-                    <h3 className="admin-plan-name">{plan.name}</h3>
-                    <span className="admin-plan-tier-label">{plan.tier || 'Academic'}</span>
+                    <h3 className="lq-plan-name">{plan.name}</h3>
+                    <span className="lq-plan-tier-label">{plan.tier || 'Academic'}</span>
                   </div>
                 </div>
 
-                <p className="admin-plan-tagline-text">{plan.tagline}</p>
+                <p className="lq-plan-tagline">{plan.tagline}</p>
                 
-                <div className="admin-plan-pricing">
-                  <div className="admin-price-row">
-                    <div className="admin-plan-price">
+                <div className="lq-plan-pricing-box">
+                  <div className="lq-plan-num-row">
+                    <div className="lq-plan-num">
                       ₹{Number(plan.price).toLocaleString('en-IN')}
                     </div>
-                    <div className="admin-plan-billing">
+                    <div className="lq-plan-billing-label">
                       {plan.periodLabel || (billingCycle === 'annually' ? '/ mo' : '/ month')}
                     </div>
                   </div>
 
                   {billingCycle === 'annually' && plan.originalPrice && (
-                    <div className="admin-annual-breakdown">
-                      <span className="original-strike">₹{plan.originalPrice}/mo</span>
-                      <span className="annual-billed">Billed ₹{Number(plan.annualTotal).toLocaleString('en-IN')}/year</span>
+                    <div className="lq-annual-detail">
+                      <span className="lq-strike-price">₹{plan.originalPrice}/mo</span>
+                      <span className="lq-annual-billed">Billed ₹{Number(plan.annualTotal).toLocaleString('en-IN')}/year</span>
                     </div>
                   )}
 
                   {plan.savingsLabel && (
-                    <div className="admin-savings-pill">
+                    <div className="lq-discount-badge">
                       <Sparkles size={12} /> {plan.savingsLabel}
                     </div>
                   )}
                 </div>
 
                 {/* Quota Highlights */}
-                <div className="admin-plan-quota-summary">
+                <div className="lq-quota-mini-grid">
                   <div className="quota-summary-item">
-                    <span className="quota-summary-label">Candidate Seats</span>
-                    <span className="quota-summary-val">
+                    <span className="lq-mini-label">Candidate Seats</span>
+                    <span className="lq-mini-val">
                       {plan.maxStudents ? `${plan.maxStudents} Students` : 'Unlimited'}
                     </span>
                   </div>
                   <div className="quota-summary-item">
-                    <span className="quota-summary-label">Monthly Exams</span>
-                    <span className="quota-summary-val">
+                    <span className="lq-mini-label">Monthly Exams</span>
+                    <span className="lq-mini-val">
                       {plan.maxExams ? `${plan.maxExams} Exams` : 'Unlimited'}
                     </span>
                   </div>
                 </div>
                 
                 {/* Feature Checklist */}
-                <div className="admin-plan-features">
+                <div className="lq-features-list">
                   {plan.features?.map((feature, index) => (
-                    <div key={index} className="admin-plan-feature">
+                    <div key={index} className="lq-feature-row">
                       <CheckCircle2 size={16} />
                       <span>{feature}</span>
                     </div>
                   ))}
                 </div>
                 
-                <Button
+                <button
+                  type="button"
                   onClick={() => handleUpgrade(key)}
                   disabled={isCurrentPlan || upgrading === key}
-                  variant={isCurrentPlan ? 'secondary' : isPopular ? 'primary' : 'outline'}
-                  loading={upgrading === key}
-                  className="admin-plan-button"
+                  className={`lq-btn lq-action-btn ${isCurrentPlan ? 'lq-btn-secondary' : isPopular ? 'lq-btn-primary' : 'lq-btn-secondary'}`}
+                  style={{ opacity: upgrading === key ? 0.7 : 1 }}
                 >
                   {isCurrentPlan ? (
                     <>
@@ -815,7 +827,7 @@ export default function Subscription() {
                       {billingCycle === 'annually' ? `Upgrade Annually (Save 20%)` : `Upgrade to ${plan.name}`}
                     </>
                   )}
-                </Button>
+                </button>
               </div>
             );
           })}
@@ -823,19 +835,21 @@ export default function Subscription() {
       </div>
 
       {/* ── Feature Comparison Matrix ───────────────────────── */}
-      <div className="admin-content-card">
-        <div className="admin-card-header">
-          <h2 className="admin-card-title">
-            <Cpu size={22} color="#0a74da" />
-            Institutional Capability Matrix
-          </h2>
-          <span style={{ fontSize: '0.86rem', color: '#64748b' }}>
-            Detailed quota breakdown and proctoring depth comparison
-          </span>
+      <div className="lq-card">
+        <div className="lq-card-head" style={{ marginBottom: '20px' }}>
+          <div>
+            <h2 className="lq-card-title">
+              <Cpu size={22} color="#0a74da" />
+              Institutional Capability Matrix
+            </h2>
+            <p className="lq-card-desc">
+              Detailed quota breakdown and proctoring depth comparison across academic license tiers
+            </p>
+          </div>
         </div>
 
-        <div className="admin-matrix-table-wrapper">
-          <table className="admin-matrix-table">
+        <div className="lq-matrix-wrap">
+          <table className="lq-matrix-table">
             <thead>
               <tr>
                 <th style={{ width: '40%' }}>Core Capabilities & Quotas</th>
@@ -899,9 +913,9 @@ export default function Subscription() {
       </div>
 
       {/* ── Enterprise Custom Volume Banner ─────────────────── */}
-      <div className="admin-enterprise-banner">
-        <div className="enterprise-banner-content">
-          <div className="enterprise-badge">
+      <div className="lq-enterprise-banner">
+        <div className="lq-enterprise-info">
+          <div className="lq-enterprise-pill">
             <Building size={16} /> University-Wide Accreditation
           </div>
           <h3>Need over 1,000+ candidate seats or private campus cloud hosting?</h3>
@@ -910,10 +924,10 @@ export default function Subscription() {
             and recruitment agencies with high concurrency requirements, on-premise deployments, and custom LMS integrations.
           </p>
         </div>
-        <div className="enterprise-banner-action">
+        <div>
           <button 
             type="button" 
-            className="enterprise-quote-btn"
+            className="lq-enterprise-action-btn"
             onClick={() => setShowQuoteModal(true)}
           >
             <Send size={16} /> Request Custom University Quote
@@ -922,29 +936,32 @@ export default function Subscription() {
       </div>
 
       {/* ── FAQ Accordion Section ───────────────────────────── */}
-      <div className="admin-content-card">
-        <div className="admin-card-header">
-          <h2 className="admin-card-title">
-            <HelpCircle size={22} color="#0a74da" />
-            Institutional Licensing & Quota FAQs
-          </h2>
+      <div className="lq-card">
+        <div className="lq-card-head" style={{ marginBottom: '20px' }}>
+          <div>
+            <h2 className="lq-card-title">
+              <HelpCircle size={22} color="#0a74da" />
+              Institutional Licensing & Quota FAQs
+            </h2>
+            <p className="lq-card-desc">Common questions regarding quota expansion, billing cycles, and university audits</p>
+          </div>
         </div>
 
-        <div className="admin-faqs-list">
+        <div className="lq-faqs-grid">
           {faqs.map((faq, index) => {
             const isOpen = openFaq === index;
             return (
-              <div key={index} className={`admin-faq-item ${isOpen ? 'open' : ''}`}>
+              <div key={index} className={`lq-faq-item ${isOpen ? 'open' : ''}`}>
                 <button 
                   type="button" 
-                  className="admin-faq-question"
+                  className="lq-faq-trigger"
                   onClick={() => setOpenFaq(isOpen ? null : index)}
                 >
                   <span>{faq.q}</span>
                   {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                 </button>
                 {isOpen && (
-                  <div className="admin-faq-answer">
+                  <div className="lq-faq-body">
                     <p>{faq.a}</p>
                   </div>
                 )}
@@ -955,51 +972,51 @@ export default function Subscription() {
       </div>
 
       {/* ── Security & Encrypted Payments Footer ────────────── */}
-      <div className="admin-payment-info-card">
-        <div className="admin-payment-icon">
+      <div className="lq-security-card">
+        <div className="lq-security-icon">
           <Lock size={24} />
         </div>
-        <div className="admin-payment-content">
+        <div className="lq-security-content">
           <h3>Enterprise Bank-Grade 256-Bit TLS Payment Security</h3>
           <p>
             All subscriptions, renewals, and invoice transactions are processed directly with PCI-DSS Level 1 certified 
             Razorpay banking gateways. Automated receipts and tax invoices are issued immediately upon transaction clearance.
           </p>
-          <div className="admin-security-badges">
-            <span className="badge-item"><CheckCircle2 size={13} /> 100% High-Availability SLA</span>
-            <span className="badge-item"><CheckCircle2 size={13} /> Indian GST Compliant Invoices</span>
-            <span className="badge-item"><CheckCircle2 size={13} /> SOC2 / ISO-27001 Data Encryption</span>
+          <div className="lq-badges-row">
+            <span className="lq-badge-item"><CheckCircle2 size={14} /> 100% High-Availability SLA</span>
+            <span className="lq-badge-item"><CheckCircle2 size={14} /> Indian GST Compliant Invoices</span>
+            <span className="lq-badge-item"><CheckCircle2 size={14} /> SOC2 / ISO-27001 Data Encryption</span>
           </div>
         </div>
       </div>
 
       {/* ── MODAL: Request Custom Enterprise Quote ─────────── */}
       {showQuoteModal && (
-        <div className="admin-modal-backdrop" onClick={() => setShowQuoteModal(false)}>
-          <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header">
+        <div className="lq-modal-overlay" onClick={() => setShowQuoteModal(false)}>
+          <div className="lq-modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="lq-modal-head">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Building size={20} color="#0a74da" />
-                <h3 className="admin-modal-title">Request Custom Institutional Quote</h3>
+                <h3 className="lq-modal-title">Request Custom Institutional Quote</h3>
               </div>
               <button 
                 type="button" 
-                className="admin-modal-close" 
+                className="lq-close-btn" 
                 onClick={() => setShowQuoteModal(false)}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleQuoteSubmit} className="admin-modal-form">
-              <p className="admin-modal-desc">
+            <form onSubmit={handleQuoteSubmit} className="lq-form">
+              <p style={{ fontSize: '0.9rem', color: 'var(--mu, #64748b)', margin: '0 0 16px 0', lineHeight: 1.5 }}>
                 Tell us about your university assessment requirements. Our institutional solutions team will create a tailored proposal within 4 business hours.
               </p>
 
-              <div className="admin-form-group">
-                <label className="admin-form-label">Required Candidate Seat Capacity</label>
+              <div className="lq-form-group">
+                <label className="lq-form-label">Required Candidate Seat Capacity</label>
                 <select
-                  className="admin-form-select"
+                  className="lq-select"
                   value={quoteForm.candidateCapacity}
                   onChange={(e) => setQuoteForm({ ...quoteForm, candidateCapacity: e.target.value })}
                 >
@@ -1011,10 +1028,10 @@ export default function Subscription() {
                 </select>
               </div>
 
-              <div className="admin-form-group">
-                <label className="admin-form-label">Estimated Monthly Examinations</label>
+              <div className="lq-form-group">
+                <label className="lq-form-label">Estimated Monthly Examinations</label>
                 <select
-                  className="admin-form-select"
+                  className="lq-select"
                   value={quoteForm.examsPerMonth}
                   onChange={(e) => setQuoteForm({ ...quoteForm, examsPerMonth: e.target.value })}
                 >
@@ -1025,58 +1042,62 @@ export default function Subscription() {
                 </select>
               </div>
 
-              <div className="admin-form-row">
-                <div className="admin-form-group">
-                  <label className="admin-form-label">Institutional Contact Name *</label>
+              <div className="lq-form-row">
+                <div className="lq-form-group">
+                  <label className="lq-form-label">Institutional Contact Name *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Dr. Ramesh Sharma, Dean"
-                    className="admin-form-input"
+                    className="lq-input"
                     value={quoteForm.contactPerson}
                     onChange={(e) => setQuoteForm({ ...quoteForm, contactPerson: e.target.value })}
                   />
                 </div>
-                <div className="admin-form-group">
-                  <label className="admin-form-label">Contact Phone / Mobile *</label>
+                <div className="lq-form-group">
+                  <label className="lq-form-label">Contact Phone / Mobile *</label>
                   <input
                     type="tel"
                     required
                     placeholder="+91 98765 43210"
-                    className="admin-form-input"
+                    className="lq-input"
                     value={quoteForm.contactPhone}
                     onChange={(e) => setQuoteForm({ ...quoteForm, contactPhone: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="admin-form-group">
-                <label className="admin-form-label">Special Requirements / Notes</label>
+              <div className="lq-form-group">
+                <label className="lq-form-label">Special Requirements / Notes</label>
                 <textarea
                   rows={3}
                   placeholder="Specify any ERP/Moodle integrations, custom proctoring policies, or RFP deadlines..."
-                  className="admin-form-textarea"
+                  className="lq-textarea"
                   value={quoteForm.notes}
                   onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })}
                 />
               </div>
 
-              <div className="admin-modal-actions">
-                <Button 
+              <div className="lq-modal-foot">
+                <button 
                   type="button" 
-                  variant="secondary" 
+                  className="lq-btn lq-btn-secondary" 
                   onClick={() => setShowQuoteModal(false)}
                 >
                   Cancel
-                </Button>
-                <Button 
+                </button>
+                <button 
                   type="submit" 
-                  variant="primary" 
-                  icon={Send} 
-                  loading={submittingQuote}
+                  className="lq-btn lq-btn-primary" 
+                  disabled={submittingQuote}
                 >
-                  Submit Quote Request
-                </Button>
+                  {submittingQuote ? 'Submitting...' : (
+                    <>
+                      <Send size={16} />
+                      Submit Quote Request
+                    </>
+                  )}
+                </button>
               </div>
             </form>
           </div>
@@ -1085,96 +1106,98 @@ export default function Subscription() {
 
       {/* ── MODAL: Institutional Invoicing & Certificate ───── */}
       {showInvoiceModal && (
-        <div className="admin-modal-backdrop" onClick={() => setShowInvoiceModal(false)}>
-          <div className="admin-modal-box admin-certificate-box" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header">
+        <div className="lq-modal-overlay" onClick={() => setShowInvoiceModal(false)}>
+          <div className="lq-modal-dialog lq-cert-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="lq-modal-head">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <ShieldCheck size={22} color="#10b981" />
-                <h3 className="admin-modal-title">Institutional License Certificate & Billing Summary</h3>
+                <h3 className="lq-modal-title">Institutional License Certificate & Billing Summary</h3>
               </div>
               <button 
                 type="button" 
-                className="admin-modal-close" 
+                className="lq-close-btn" 
                 onClick={() => setShowInvoiceModal(false)}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="admin-certificate-content">
-              <div className="certificate-frame">
-                <div className="certificate-header">
-                  <span className="cert-org">NEXIFY EXAMINA GLOBAL ACCREDITATION</span>
-                  <h4 className="cert-title">CERTIFICATE OF PROCTORING LICENSE</h4>
-                  <p className="cert-subtitle">Valid Institutional Examination Center Authorization</p>
+            <div>
+              <div className="lq-cert-frame">
+                <div className="lq-cert-header">
+                  <span className="lq-cert-org">NEXIFY EXAMINA GLOBAL ACCREDITATION</span>
+                  <h4 className="lq-cert-title">CERTIFICATE OF PROCTORING LICENSE</h4>
+                  <p className="lq-cert-subtitle">Valid Institutional Examination Center Authorization</p>
                 </div>
 
-                <div className="cert-body">
-                  <div className="cert-detail-grid">
-                    <div className="cert-item">
-                      <span className="cert-label">Licensed Institution:</span>
-                      <span className="cert-value">{college?.name || 'Accredited Institution'}</span>
+                <div>
+                  <div className="lq-cert-grid">
+                    <div className="lq-cert-item">
+                      <span className="lq-cert-lbl">Licensed Institution:</span>
+                      <span className="lq-cert-val">{college?.name || 'Accredited Institution'}</span>
                     </div>
-                    <div className="cert-item">
-                      <span className="cert-label">License Key:</span>
-                      <span className="cert-value"><code>{licenseKey}</code></span>
+                    <div className="lq-cert-item">
+                      <span className="lq-cert-lbl">License Key:</span>
+                      <span className="lq-cert-val"><code>{licenseKey}</code></span>
                     </div>
-                    <div className="cert-item">
-                      <span className="cert-label">Subscription Tier:</span>
-                      <span className="cert-value" style={{ textTransform: 'uppercase', fontWeight: 800, color: '#0a74da' }}>
+                    <div className="lq-cert-item">
+                      <span className="lq-cert-lbl">Subscription Tier:</span>
+                      <span className="lq-cert-val" style={{ textTransform: 'uppercase', fontWeight: 800, color: '#0a74da' }}>
                         {subscription?.plan || 'Standard'} Tier
                       </span>
                     </div>
-                    <div className="cert-item">
-                      <span className="cert-label">Status:</span>
-                      <span className="cert-value" style={{ color: '#10b981', fontWeight: 700 }}>
+                    <div className="lq-cert-item">
+                      <span className="lq-cert-lbl">Status:</span>
+                      <span className="lq-cert-val" style={{ color: '#10b981', fontWeight: 700 }}>
                         Active & Verified
                       </span>
                     </div>
-                    <div className="cert-item">
-                      <span className="cert-label">Valid Period:</span>
-                      <span className="cert-value">
+                    <div className="lq-cert-item">
+                      <span className="lq-cert-lbl">Valid Period:</span>
+                      <span className="lq-cert-val">
                         {formatIST(subscription?.start_date || Date.now(), 'dateOnly')} — {formatIST(expirationDate, 'dateOnly')}
                       </span>
                     </div>
-                    <div className="cert-item">
-                      <span className="cert-label">Seat Quota:</span>
-                      <span className="cert-value">
+                    <div className="lq-cert-item">
+                      <span className="lq-cert-lbl">Seat Quota:</span>
+                      <span className="lq-cert-val">
                         {isUnlimitedStudents ? 'Unlimited Candidates' : `${maxStudents} Enrolled Candidates`}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="cert-footer">
-                  <div className="cert-seal">
+                <div className="lq-cert-footer">
+                  <div className="lq-cert-seal">
                     <ShieldCheck size={36} color="#0a74da" />
                     <span>DIGITALLY VERIFIED</span>
                   </div>
-                  <div className="cert-meta">
+                  <div className="lq-cert-meta">
                     <span>Tax Invoice Ref: INV-{Date.now().toString().slice(-8)}</span>
                     <span>GSTIN Status: Registered Educational Provider</span>
                   </div>
                 </div>
               </div>
 
-              <div className="admin-modal-actions" style={{ marginTop: '20px' }}>
-                <Button 
-                  variant="secondary" 
+              <div className="lq-modal-foot" style={{ marginTop: '20px' }}>
+                <button 
+                  type="button"
+                  className="lq-btn lq-btn-secondary" 
                   onClick={() => setShowInvoiceModal(false)}
                 >
                   Close
-                </Button>
-                <Button 
-                  variant="primary" 
-                  icon={Download} 
+                </button>
+                <button 
+                  type="button"
+                  className="lq-btn lq-btn-primary" 
                   onClick={() => {
                     window.print();
                     toast.success('Ready to print or save as PDF!');
                   }}
                 >
+                  <Download size={16} />
                   Print / Save Certificate
-                </Button>
+                </button>
               </div>
             </div>
           </div>
