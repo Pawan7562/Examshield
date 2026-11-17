@@ -1107,6 +1107,188 @@ h2 {
   transition: width 1.3s 0.4s var(--ease);
 }
 
+/* ── PROCTORING HEALTH CARD (RADIAL DONUT & METRIC BARS) ── */
+.proctoring-health-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.proctoring-health-card .ph-title {
+  font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 19px !important;
+  font-weight: 700 !important;
+  color: var(--tx) !important;
+  margin: 0 0 4px 0 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.proctoring-health-card .ph-subtitle {
+  font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 400 !important;
+  color: var(--mu) !important;
+  margin: 0 !important;
+}
+
+.proctoring-health-body {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex: 1;
+  padding: 6px 0 10px;
+}
+
+.proctoring-donut-wrap {
+  position: relative;
+  width: 136px;
+  height: 136px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.proctoring-donut-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.proctoring-donut-track {
+  stroke: var(--s2, #f1f5f9);
+}
+
+[data-theme="dark"] .proctoring-donut-track {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.proctoring-donut-val {
+  stroke: #0d9488;
+  transition: stroke-dashoffset 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+}
+
+[data-theme="dark"] .proctoring-donut-val {
+  stroke: #14b8a6;
+}
+
+.proctoring-donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.proctoring-donut-num {
+  font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--tx);
+  letter-spacing: -0.02em;
+}
+
+.proctoring-donut-label {
+  font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mu);
+  margin-top: 5px;
+  white-space: nowrap;
+}
+
+.proctoring-health-bars {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.ph-metric-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ph-metric-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.ph-metric-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--tx);
+}
+
+.ph-metric-pct {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tx);
+  font-variant-numeric: tabular-nums;
+}
+
+.ph-metric-track {
+  width: 100%;
+  height: 5.5px;
+  border-radius: 99px;
+  background: var(--s2, #f1f5f9);
+  overflow: hidden;
+}
+
+[data-theme="dark"] .ph-metric-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ph-metric-bar {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+}
+
+.ph-metric-bar.blue {
+  background: #2563eb;
+}
+
+.ph-metric-bar.teal {
+  background: #0d9488;
+}
+
+.ph-metric-bar.purple {
+  background: #6366f1;
+}
+
+[data-theme="dark"] .ph-metric-bar.blue {
+  background: #3b82f6;
+}
+
+[data-theme="dark"] .ph-metric-bar.teal {
+  background: #14b8a6;
+}
+
+[data-theme="dark"] .ph-metric-bar.purple {
+  background: #818cf8;
+}
+
+@media (max-width: 640px) {
+  .proctoring-health-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+  }
+  .proctoring-donut-wrap {
+    margin: 0 auto;
+  }
+}
+
 /* ── HUB BUTTONS ─────────────────────────────────────────────── */
 .hubs {
   display: grid;

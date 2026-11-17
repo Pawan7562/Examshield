@@ -236,55 +236,78 @@ export default function Dashboard() {
         {/* Left: Interactive Candidate Activity Chart */}
         <CandidateActivityChart />
 
-        {/* Right: Proctoring Integrity Summary */}
-        <article className="card pad rise" style={{ '--d': 3 }}>
-          <div className="ph">
+        {/* Right: Proctoring Health & Audit Breakdown */}
+        <article className="card pad rise proctoring-health-card" style={{ '--d': 3 }}>
+          <div className="ph" style={{ marginBottom: '16px' }}>
             <div>
-              <h2>Proctoring integrity</h2>
-              <p>Latest audit summary</p>
+              <h2 className="ph-title">Proctoring health</h2>
+              <p className="ph-subtitle">Based on the latest audits</p>
             </div>
           </div>
 
-          <div className="big">
-            <b>96%</b>
-            <span>↗ 4% this term</span>
-          </div>
+          <div className="proctoring-health-body">
+            {/* Left: Donut Gauge Ring */}
+            <div className="proctoring-donut-wrap">
+              <svg className="proctoring-donut-svg" viewBox="0 0 120 120">
+                <circle
+                  className="proctoring-donut-track"
+                  cx="60"
+                  cy="60"
+                  r="48"
+                  fill="none"
+                  strokeWidth="12"
+                />
+                <circle
+                  className="proctoring-donut-val"
+                  cx="60"
+                  cy="60"
+                  r="48"
+                  fill="none"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                  strokeDasharray={301.6}
+                  strokeDashoffset={301.6 * (1 - (stats?.successRate ?? 96) / 100)}
+                />
+              </svg>
+              <div className="proctoring-donut-center">
+                <span className="proctoring-donut-num">{stats?.successRate ?? 96}%</span>
+                <span className="proctoring-donut-label">Clean audits</span>
+              </div>
+            </div>
 
-          <div className="stack">
-            <i style={{ width: '96%', background: 'var(--good)' }}></i>
-            <i style={{ width: '3%', background: 'var(--gold)' }}></i>
-            <i style={{ width: '1%', background: 'var(--bad)' }}></i>
-          </div>
+            {/* Right: Colored Metric Bars */}
+            <div className="proctoring-health-bars">
+              <div className="ph-metric-row">
+                <div className="ph-metric-info">
+                  <span className="ph-metric-name">Identity verified</span>
+                  <span className="ph-metric-pct">100%</span>
+                </div>
+                <div className="ph-metric-track">
+                  <div className="ph-metric-bar blue" style={{ width: '100%' }}></div>
+                </div>
+              </div>
 
-          <ul className="chk">
-            <li>
-              <div>
-                <span>Identity verification</span>
-                <em>99%</em>
+              <div className="ph-metric-row">
+                <div className="ph-metric-info">
+                  <span className="ph-metric-name">Browser lockdown</span>
+                  <span className="ph-metric-pct">97%</span>
+                </div>
+                <div className="ph-metric-track">
+                  <div className="ph-metric-bar teal" style={{ width: '97%' }}></div>
+                </div>
               </div>
-              <div className="mb">
-                <i style={{ width: '99%' }}></i>
+
+              <div className="ph-metric-row">
+                <div className="ph-metric-info">
+                  <span className="ph-metric-name">Behavior flags cleared</span>
+                  <span className="ph-metric-pct">92%</span>
+                </div>
+                <div className="ph-metric-track">
+                  <div className="ph-metric-bar purple" style={{ width: '92%' }}></div>
+                </div>
               </div>
-            </li>
-            <li>
-              <div>
-                <span>Browser lock compliance</span>
-                <em>97%</em>
-              </div>
-              <div className="mb">
-                <i style={{ width: '97%' }}></i>
-              </div>
-            </li>
-            <li>
-              <div>
-                <span>Flagged for review</span>
-                <em>4%</em>
-              </div>
-              <div className="mb">
-                <i style={{ width: '4%' }}></i>
-              </div>
-            </li>
-          </ul>
+            </div>
+          </div>
         </article>
       </section>
 

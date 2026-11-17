@@ -313,8 +313,15 @@ const Login = ({ role }) => {
         return;
       }
 
-      let displayMsg = rawMsg;
-      if (rawMsg.includes('Invalid Student ID') || rawMsg.includes('Invalid email or password') || rawMsg.includes('password')) {
+      let displayMsg = typeof rawMsg === 'string' ? rawMsg : 'Unable to sign in. Please verify your credentials.';
+      const lowerMsg = typeof rawMsg === 'string' ? rawMsg.toLowerCase() : '';
+      if (
+        lowerMsg.includes('invalid') ||
+        lowerMsg.includes('password') ||
+        lowerMsg.includes('credential') ||
+        lowerMsg.includes('not match') ||
+        lowerMsg.includes('unauthorized')
+      ) {
         displayMsg = isStudent
           ? 'The Student ID, Roll Number, or password does not match our records. Please verify your credentials or contact your college exam department.'
           : 'The institutional email or password does not match our records. Please verify your credentials or use the password reset link below.';
