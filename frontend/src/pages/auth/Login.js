@@ -314,10 +314,31 @@ const Login = ({ role }) => {
       }
 
       let displayMsg = rawMsg;
-      if (rawMsg.includes('Invalid Student ID') || rawMsg.includes('Invalid email or password') || rawMsg.includes('password')) {
+      // Normalize all credential/auth mismatch errors into a clean, professional message
+      const credentialErrorPatterns = [
+        'Invalid Student ID',
+        'Invalid email or password',
+        'invalid credentials',
+        'incorrect password',
+        'wrong password',
+        'password does not match',
+        'authentication failed',
+        'invalid login',
+        'login failed',
+        'no account found',
+        'user not found',
+        'account not found',
+        'not registered',
+        'does not exist',
+        'Unauthorized',
+      ];
+      const isCredentialError = credentialErrorPatterns.some(p =>
+        rawMsg.toLowerCase().includes(p.toLowerCase())
+      );
+      if (isCredentialError) {
         displayMsg = isStudent
-          ? 'The Student ID, Roll Number, or password does not match our records. Please verify your credentials or contact your college exam department.'
-          : 'The institutional email or password does not match our records. Please verify your credentials or use the password reset link below.';
+          ? 'The Student ID, Roll Number, or password does not match our records. Please verify your credentials or contact your college examination department.'
+          : 'The institutional email or password does not match our records. Please verify your credentials or use the "Forgot Password" link below.';
       }
 
       setErrorMessage(displayMsg);
