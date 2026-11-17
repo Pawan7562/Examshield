@@ -1,4 +1,4 @@
-// src/pages/student/ExamList.js — Professional Examination Schedule & Catalog
+// src/pages/student/ExamList.js — Executive Examination Schedule & Catalog (v6)
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { studentAPI } from '../../services/api';
@@ -7,14 +7,17 @@ import toast from 'react-hot-toast';
 import { 
   Calendar, 
   Clock, 
-  Play,
-  FileText,
-  Search,
-  KeyRound,
-  Shield,
-  Copy,
-  Award,
-  CheckCircle2
+  Play, 
+  FileText, 
+  Search, 
+  KeyRound, 
+  Shield, 
+  Copy, 
+  Award, 
+  CheckCircle2,
+  X,
+  ArrowRight,
+  ExternalLink
 } from 'lucide-react';
 import './ExamList.css';
 
@@ -23,12 +26,16 @@ export default function ExamList() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // 'all' | 'live' | 'upcoming' | 'completed'
   const [searchQuery, setSearchQuery] = useState('');
+  const [directKey, setDirectKey] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     studentAPI.getExams()
       .then(r => setExams(r.data?.exams || []))
-      .catch(err => console.error('Error loading examinations:', err))
+      .catch(err => {
+        console.error('Error loading examinations:', err);
+        toast.error('Unable to fetch assessments catalog');
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -48,6 +55,16 @@ export default function ExamList() {
     e.stopPropagation();
     navigator.clipboard.writeText(key);
     toast.success(`Copied key "${key}" to clipboard!`);
+  };
+
+  const handleDirectKeySubmit = (e) => {
+    e.preventDefault();
+    const clean = directKey.trim();
+    if (!clean) {
+      toast.error('Please enter an examination access key');
+      return;
+    }
+    navigate(`/student/exams/${clean}`);
   };
 
   // Filtered exams
@@ -75,22 +92,20 @@ export default function ExamList() {
     });
   }, [exams, filter, searchQuery]);
 
-  // Counts
+  // Dynamic counts
   const counts = useMemo(() => {
     const live = exams.filter(e => isStartable(e)).length;
     const completed = exams.filter(e => isCompletedExam(e)).length;
-    return { total: exams.length, live, completed };
+    const upcoming = exams.filter(e => !isCompletedExam(e) && !isStartable(e)).length;
+    return { total: exams.length, live, completed, upcoming };
   }, [exams]);
 
   if (loading) {
     return (
       <div className="el-container">
-        <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748b' }}>
-          <div style={{
-            width: 40, height: 40, border: '3px solid #e2e8f0', borderTopColor: '#0a74da',
-            borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px'
-          }} />
-          <p style={{ fontWeight: 600 }}>Loading Assigned Examinations...</p>
+        <div className="el-loading-wrap">
+          <div className="el-spinner" />
+          <p className="el-loading-text">Synchronizing Assessment Catalog & Access Tokens...</p>
         </div>
       </div>
     );
@@ -98,81 +113,128 @@ export default function ExamList() {
 
   return (
     <div className="el-container">
-      {/* ── Header Banner ── */}
+      {/* ── 1. Editorial Header Banner ── */}
       <div className="el-header-banner">
         <div className="el-header-left">
-          <h1>My Assigned Examinations</h1>
-          <p>View your scheduled institutional assessments, access keys, and proctoring requirements.</p>
+          <div className="el-eyebrow">
+            <span className="el-eyebrow-dot" />
+            Institutional Examination Center
+          </div>
+          <h1>My Assigned Assessments</h1>
+          <p>
+            Official institutional examination roster, proctoring integrity guidelines, and real-time room dispatch.
+          </p>
         </div>
 
         <div className="el-stats-pills">
           <div className="el-stat-chip">
-            <span>Total Enrolled:</span>
+            <span className="el-stat-label">Enrolled:</span>
             <span className="el-stat-num">{counts.total}</span>
           </div>
-          <div className="el-stat-chip" style={{ background: counts.live > 0 ? '#fef2f2' : undefined, borderColor: counts.live > 0 ? '#fecaca' : undefined }}>
-            <span style={{ color: counts.live > 0 ? '#dc2626' : undefined }}>Live Now:</span>
-            <span className="el-stat-num" style={{ color: counts.live > 0 ? '#dc2626' : undefined }}>{counts.live}</span>
+
+          <div className={`el-stat-chip ${counts.live > 0 ? 'live-active' : ''}`}>
+            {counts.live > 0 && <span className="el-live-ping" />}
+            <span className="el-stat-label">Live Now:</span>
+            <span className="el-stat-num">{counts.live}</span>
           </div>
+
           <div className="el-stat-chip">
-            <span>Completed:</span>
+            <span className="el-stat-label">Completed:</span>
             <span className="el-stat-num" style={{ color: '#10b981' }}>{counts.completed}</span>
           </div>
         </div>
       </div>
 
-      {/* ── Search & Filter Controls ── */}
+      {/* ── 2. Search, Filter & Quick Key Launch Bar ── */}
       <div className="el-controls-bar">
-        <div className="el-search-input-wrap">
-          <Search size={18} color="#94a3b8" />
+        <div className="el-controls-left">
+          <div className="el-search-input-wrap">
+            <Search size={18} color="var(--el-text-muted)" />
+            <input
+              type="text"
+              placeholder="Search by title, subject, or key..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button 
+                type="button" 
+                className="el-search-clear" 
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
+          <div className="el-filter-tabs">
+            <button
+              onClick={() => setFilter('all')}
+              className={`el-filter-btn ${filter === 'all' ? 'active' : ''}`}
+            >
+              All Assessments <span className="el-tab-count">{counts.total}</span>
+            </button>
+            <button
+              onClick={() => setFilter('live')}
+              className={`el-filter-btn ${filter === 'live' ? 'active' : ''}`}
+            >
+              Live Today <span className="el-tab-count">{counts.live}</span>
+            </button>
+            <button
+              onClick={() => setFilter('upcoming')}
+              className={`el-filter-btn ${filter === 'upcoming' ? 'active' : ''}`}
+            >
+              Upcoming <span className="el-tab-count">{counts.upcoming}</span>
+            </button>
+            <button
+              onClick={() => setFilter('completed')}
+              className={`el-filter-btn ${filter === 'completed' ? 'active' : ''}`}
+            >
+              Completed <span className="el-tab-count">{counts.completed}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Launch by Key */}
+        <form onSubmit={handleDirectKeySubmit} className="el-key-launcher-form">
           <input
             type="text"
-            placeholder="Search by title, subject, or key..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            className="el-key-input-inline"
+            placeholder="ENTER EXAM KEY"
+            value={directKey}
+            onChange={(e) => setDirectKey(e.target.value)}
           />
-        </div>
-
-        <div className="el-filter-tabs">
-          <button
-            onClick={() => setFilter('all')}
-            className={`el-filter-btn ${filter === 'all' ? 'active' : ''}`}
-          >
-            All ({counts.total})
+          <button type="submit" className="el-key-btn-join">
+            <span>Join</span>
+            <ArrowRight size={14} />
           </button>
-          <button
-            onClick={() => setFilter('live')}
-            className={`el-filter-btn ${filter === 'live' ? 'active' : ''}`}
-          >
-            Live Today ({counts.live})
-          </button>
-          <button
-            onClick={() => setFilter('upcoming')}
-            className={`el-filter-btn ${filter === 'upcoming' ? 'active' : ''}`}
-          >
-            Upcoming Schedule
-          </button>
-          <button
-            onClick={() => setFilter('completed')}
-            className={`el-filter-btn ${filter === 'completed' ? 'active' : ''}`}
-          >
-            Completed ({counts.completed})
-          </button>
-        </div>
+        </form>
       </div>
 
-      {/* ── Examinations Cards Grid ── */}
+      {/* ── 3. Examination Cards Grid ── */}
       {filteredExams.length === 0 ? (
         <div className="el-empty-box">
           <div className="el-empty-icon">
-            <FileText size={30} />
+            <FileText size={28} />
           </div>
-          <h3>No Examinations Match Your Filter</h3>
+          <h3>No Assessments Match Your Filter</h3>
           <p>
             {searchQuery
-              ? `No assessments found matching "${searchQuery}".`
-              : 'There are no assessments in this category at this moment.'}
+              ? `No assessments found matching "${searchQuery}". Please check your search query or reset your filters.`
+              : 'There are no assigned assessments found under this filter at the moment.'}
           </p>
+          {(searchQuery || filter !== 'all') && (
+            <button
+              className="el-empty-reset-btn"
+              onClick={() => {
+                setSearchQuery('');
+                setFilter('all');
+              }}
+            >
+              Reset All Filters
+            </button>
+          )}
         </div>
       ) : (
         <div className="el-cards-grid">
@@ -182,7 +244,10 @@ export default function ExamList() {
             const examCode = exam.exam_code || exam.exam_key;
 
             return (
-              <div key={exam.id} className="el-card">
+              <div 
+                key={exam.id} 
+                className={`el-card ${startable ? 'is-live-card' : ''}`}
+              >
                 <div>
                   <div className="el-card-top-bar">
                     <span className="el-subject-pill">
@@ -191,15 +256,17 @@ export default function ExamList() {
 
                     {startable ? (
                       <span className="el-status-pill status-live">
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#dc2626' }} />
+                        <span className="el-live-ping" />
                         Live Now
                       </span>
                     ) : isCompleted ? (
                       <span className="el-status-pill status-completed">
+                        <CheckCircle2 size={12} />
                         {exam.session_status === 'submitted' ? 'Completed' : 'Ended'}
                       </span>
                     ) : (
                       <span className="el-status-pill status-upcoming">
+                        <Clock size={12} />
                         Scheduled
                       </span>
                     )}
@@ -217,7 +284,7 @@ export default function ExamList() {
                     >
                       <KeyRound size={13} />
                       <span>Key: {examCode}</span>
-                      <Copy size={11} style={{ marginLeft: 2 }} />
+                      <Copy size={12} style={{ marginLeft: 2 }} />
                     </div>
                   )}
 
@@ -281,6 +348,7 @@ export default function ExamList() {
                       className="el-btn-secondary"
                     >
                       <span>{exam.session_status === 'submitted' ? 'View Transcript' : 'Exam Ended'}</span>
+                      <ExternalLink size={13} />
                     </button>
                   ) : (
                     <button
@@ -288,6 +356,7 @@ export default function ExamList() {
                       className="el-btn-secondary"
                     >
                       <span>Instructions & Room</span>
+                      <ArrowRight size={13} />
                     </button>
                   )}
                 </div>
