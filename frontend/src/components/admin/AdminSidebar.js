@@ -72,10 +72,10 @@ export default function AdminSidebar({ mobileOpen, setMobileOpen }) {
 
   return (
     <>
-      <div 
-        className="scrim" 
-        id="scrim" 
-        onClick={() => setMobileOpen && setMobileOpen(false)} 
+      <div
+        className="scrim"
+        id="scrim"
+        onClick={() => setMobileOpen && setMobileOpen(false)}
         style={{ pointerEvents: mobileOpen ? 'auto' : 'none', opacity: mobileOpen ? 1 : 0 }}
       />
       <aside className={`side ${mobileOpen ? 'open' : ''}`} id="side" aria-label="Main navigation">

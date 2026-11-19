@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const { parseToIST, toISTISOString, formatIST, getExamWindowStatus } = require('../utils/timezone');
 const { evaluateMCQAnswer, calculateGrade } = require('../utils/evaluation');
 const { autoCloseExpiredExams, checkAndCloseSpecificExam } = require('../services/examLifecycleService');
+const { sendErrorResponse } = require('../utils/errorSanitizer');
 
 /**
  * Generate unique exam code
@@ -879,19 +880,13 @@ exports.createExam = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('=== CREATE EXAM ERROR ===');
-    console.error('Error type:', typeof error);
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    console.error('Full error:', error);
-    
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create exam',
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    console.error('=== CREATE EXAM ERROR ===', error);
+    return sendErrorResponse(
+      res,
+      500,
+      error,
+      'Unable to create examination. Please verify the exam parameters.'
+    );
   }
 };
 
@@ -2236,7 +2231,13 @@ exports.startExam = async (req, res) => {
     });
   } catch (error) {
     console.error('Start exam error:', error);
-    res.status(500).json({ success: false, message: 'Failed to start exam', error: error.message });
+    return sendErrorResponse(
+      res,
+      500,
+      error,
+      'The examination session could not be initiated right now. Your registration is active.',
+      { action: 'Please re-enter your examination key or contact your proctor.' }
+    );
   }
 };
 
@@ -2249,8 +2250,9 @@ exports.saveAnswer = async (req, res) => {
     const { id } = req.params;
     const sessionId = req.body.sessionId || req.body.session_id;
     const questionId = req.body.questionId || req.body.question_id;
-    const answerText = req.body.answerText !== undefined ? req.body.answerText : req.body.answer_text;
-    const selectedOption = req.body.selectedOption !== undefined ? req.body.selectedOption : req.body.selected_option;
+    const genericAnswer = req.body.answer !== undefined ? req.body.answer : undefined;
+    const answerText = req.body.answerText !== undefined ? req.body.answerText : (req.body.answer_text !== undefined ? req.body.answer_text : genericAnswer);
+    const selectedOption = req.body.selectedOption !== undefined ? req.body.selectedOption : (req.body.selected_option !== undefined ? req.body.selected_option : genericAnswer);
     const codeSubmission = req.body.codeSubmission !== undefined ? req.body.codeSubmission : req.body.code_submission;
     const selectedLanguage = req.body.selectedLanguage || req.body.selected_language || req.body.language;
     const studentId = req.user.id;
@@ -2298,13 +2300,13 @@ exports.saveAnswer = async (req, res) => {
 
     if (saveError) {
       console.error('❌ Backend: Error saving answer:', saveError);
-      return res.status(500).json({ success: false, message: 'Failed to save answer efficiently', error: saveError.message });
+      return sendErrorResponse(res, 500, saveError, 'Answer synchronization temporarily delayed. Your response remains safely buffered on device.');
     }
 
     res.json({ success: true, message: 'Answer saved.' });
   } catch (error) {
     console.error('❌ Backend: Save answer exception:', error);
-    res.status(500).json({ success: false, message: 'Failed to save answer', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Unable to synchronize answer. Response is cached locally and will auto-sync.');
   }
 };
 
@@ -2370,13 +2372,13 @@ exports.saveAnswersBulk = async (req, res) => {
 
     if (bulkError) {
       console.error('❌ Backend: Error in bulk answer save:', bulkError);
-      return res.status(500).json({ success: false, message: 'Failed to bulk save answers', error: bulkError.message });
+      return sendErrorResponse(res, 500, bulkError, 'Answers could not be bulk-synced immediately. Local cache is active.');
     }
 
     res.json({ success: true, count: rows.length, message: `${rows.length} answers saved.` });
   } catch (error) {
     console.error('Bulk save answers error:', error);
-    res.status(500).json({ success: false, message: 'Failed to bulk save answers', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Unable to bulk-save answers. Responses are protected locally.');
   }
 };
 
@@ -2846,7 +2848,13 @@ exports.submitExam = async (req, res) => {
 
   } catch (error) {
     console.error('❌ [SUBMIT-EXAM] CRITICAL Submission Fault:', error);
-    res.status(500).json({ success: false, message: 'A server error occurred during submission. Your answers are safe.', error: error.message });
+    return sendErrorResponse(
+      res,
+      500,
+      error,
+      'A server issue occurred while finalizing your submission. Your answers are safely preserved in browser storage.',
+      { action: 'Please click Submit Exam again to finalize recording.' }
+    );
   }
 };
 

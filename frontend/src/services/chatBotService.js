@@ -172,7 +172,7 @@ class ChatBotService {
 
     if (q.includes('price') || q.includes('pricing') || q.includes('cost') || q.includes('plan') || q.includes('subscription')) {
       return {
-        response: `### 🏛️ Institutional Licensing & Custom Quotes\n\nNexify Examina provides custom institutional licensing tailored to your campus or testing board's scale:\n\n* **Academic & State Boards**: Unlimited department seats, dedicated Neon/AWS compute isolation, and volume-based licensing.\n* **Turnkey LMS Integration**: LTI 1.3 single sign-on with Moodle, Canvas, and Blackboard.\n* **24/7 Mission Control SLA**: Dedicated technical account manager and exam-day live support.\n\nTo request a tailored institutional proposal or schedule a faculty pilot, please contact our solutions team.`,
+        response: `### 🏛️ Institutional Licensing & Custom Quotes\n\nNexify Examina provides custom institutional licensing tailored to your campus or testing board's scale:\n\n* **Academic & State Boards**: Unlimited department seats, dedicated high-performance compute isolation, and volume-based licensing.\n* **Turnkey LMS Integration**: LTI 1.3 single sign-on with Moodle, Canvas, and Blackboard.\n* **24/7 Mission Control SLA**: Dedicated technical account manager and exam-day live support.\n\nTo request a tailored institutional proposal or schedule a faculty pilot, please contact our solutions team.`,
         confidence: 0.95,
         intent: 'institutional_licensing',
         suggestions: [

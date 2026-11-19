@@ -488,7 +488,7 @@ export default function StudentSettings() {
                   <RefreshCw size={16} color="#1d4ed8" /> Automated Cloud Heartbeat & Autosave
                 </h4>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#1e3a8a' }}>
-                  Candidate answers are securely synched with Neon Database every 10 seconds.
+                  Candidate answers are securely synced with the ExamShield database every 10 seconds.
                 </p>
               </div>
               <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', background: '#ffffff', padding: '4px 10px', borderRadius: '8px', border: '1px solid #bfdbfe' }}>

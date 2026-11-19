@@ -250,7 +250,7 @@ Nexify Examina is engineered to comply with the strictest global educational and
 * **Compliance Standards**:
   * **FERPA**: Strict student educational record privacy protection.
   * **GDPR & CCPA**: Full data sovereignty, right-to-be-forgotten, and minimal telemetry collection.
-  * **SOC 2 Type II Certified Datacenters**: Hosted on enterprise AWS and Neon Lakebase Postgres infrastructure.
+  * **SOC 2 Type II Certified Datacenters**: Hosted on dedicated enterprise cloud and isolated PostgreSQL infrastructure.
 * **Role-Based Access Control**: Strict segregation between Super Admins, College Admins, and Student personas.`,
     suggestions: [
       'Read security architecture whitepaper',

@@ -2,16 +2,16 @@
 import React, { useEffect, useState } from 'react';
 import { studentAPI } from '../../services/api';
 import { formatIST } from '../../utils/timezone';
-import { 
-  Trophy, 
-  Calendar, 
-  Award, 
-  TrendingUp, 
-  Download, 
-  Eye, 
-  Search, 
-  CheckCircle2, 
-  Clock, 
+import {
+  Trophy,
+  Calendar,
+  Award,
+  TrendingUp,
+  Download,
+  Eye,
+  Search,
+  CheckCircle2,
+  Clock,
   Sparkles,
   FileCheck,
   X
@@ -47,7 +47,7 @@ export default function StudentResults() {
     if (resultData.status === 'fail') doc.setFillColor(185, 28, 28);
     if (resultData.status === 'pass') doc.setFillColor(16, 185, 129);
     doc.rect(0, 0, pageWidth, 42, 'F');
-    
+
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
@@ -62,7 +62,7 @@ export default function StudentResults() {
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.text("Candidate Information", 14, 56);
-    
+
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     const nameStr = resultData.student_name || resultData.name || 'Candidate';
@@ -74,13 +74,13 @@ export default function StudentResults() {
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.text("Assessment Metadata", pageWidth / 2 + 10, 56);
-    
+
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text(`Exam Name: ${resultData.exam_name || 'Proctored Assessment'}`, pageWidth / 2 + 10, 66);
     doc.text(`Subject: ${resultData.subject || 'Standard Domain'}`, pageWidth / 2 + 10, 73);
     if (resultData.exam_code) doc.text(`Access Key: ${resultData.exam_code}`, pageWidth / 2 + 10, 80);
-    
+
     const dateVal = resultData.date_time || resultData.exam_date || new Date().toISOString();
     doc.text(`Completed: ${formatIST(dateVal, 'dateTime')} (IST)`, pageWidth / 2 + 10, 87);
 
@@ -143,12 +143,12 @@ export default function StudentResults() {
         fontSize: '13px'
       }
     });
-    
+
     try {
       const response = await studentAPI.getResultByKey(key);
       const payload = response?.data || response;
       const resData = payload?.data?.result || payload?.result;
-      
+
       if (!payload?.success || !resData) {
         // Pending evaluation or informational status
         const infoMsg = payload?.message || 'Evaluation in Progress: Official transcripts will be released once grading is approved by your institution.';
@@ -212,7 +212,7 @@ export default function StudentResults() {
     const passed = results.filter(r => r.status === 'pass').length;
     const failed = results.filter(r => r.status === 'fail').length;
     const pending = results.filter(r => r.status === 'pending').length;
-    const averageScore = results.length > 0 
+    const averageScore = results.length > 0
       ? Math.round(results.reduce((acc, r) => acc + (r.percentage || 0), 0) / results.length)
       : 0;
 
@@ -222,13 +222,13 @@ export default function StudentResults() {
   const stats = calculateStats();
 
   const filteredResults = results.filter(r => {
-    const matchesSearch = 
+    const matchesSearch =
       (r.exam_name && r.exam_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (r.subject && r.subject.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (r.exam_code && r.exam_code.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesStatus = 
-      statusFilter === 'all' || 
+    const matchesStatus =
+      statusFilter === 'all' ||
       r.status === statusFilter;
 
     return matchesSearch && matchesStatus;
@@ -255,7 +255,7 @@ export default function StudentResults() {
           margin: '0 auto 16px'
         }} />
         <h4 style={{ color: '#0f172a', margin: '0 0 6px', fontWeight: 700 }}>Synchronizing Academic Transcripts...</h4>
-        <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Fetching secured grading evaluation records from Neon DB</p>
+        <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Fetching verified grading evaluation records from ExamShield Database</p>
       </div>
     );
   }
@@ -273,8 +273,8 @@ export default function StudentResults() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            className="rs-lookup-btn" 
+          <button
+            className="rs-lookup-btn"
             style={{ background: '#ffffff', color: '#0f172a', border: '1.5px solid #cbd5e1' }}
             onClick={() => {
               if (results.length === 0) return toast('No transcripts available to export', { icon: 'ℹ️' });
@@ -300,7 +300,7 @@ export default function StudentResults() {
             value={examKeyInput}
             onChange={(e) => setExamKeyInput(e.target.value.toUpperCase())}
           />
-          <button 
+          <button
             className="rs-lookup-btn"
             onClick={handleDownloadByKey}
             disabled={downloadingKey || !examKeyInput.trim()}
@@ -411,7 +411,7 @@ export default function StudentResults() {
             {results.length === 0 ? 'No Transcripts Generated Yet' : 'No Matching Records Found'}
           </h3>
           <p style={{ color: '#64748b', fontSize: '0.88rem', maxWidth: '420px', margin: '0 auto' }}>
-            {results.length === 0 
+            {results.length === 0
               ? 'Complete your scheduled assessments to view comprehensive evaluations and verified score cards.'
               : 'Try clearing your search query or switching filter tabs to locate your results.'}
           </p>
@@ -427,9 +427,15 @@ export default function StudentResults() {
                     KEY: {result.exam_code}
                   </span>
                 )}
-                <span className={`rs-grade-badge ${getGradeClass(result.grade)}`}>
-                  GRADE {result.grade || 'A'}
-                </span>
+                {result.is_published === false ? (
+                  <span className="rs-grade-badge" style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={11} /> EVALUATION IN PROGRESS
+                  </span>
+                ) : (
+                  <span className={`rs-grade-badge ${getGradeClass(result.grade)}`}>
+                    GRADE {result.grade || 'A'}
+                  </span>
+                )}
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#10b981', fontWeight: 700, background: '#ecfdf5', padding: '2px 8px', borderRadius: '6px' }}>
                   <CheckCircle2 size={12} /> Proctoring Passed
                 </span>
@@ -445,36 +451,73 @@ export default function StudentResults() {
                 <span>•</span>
                 <span>Type: {result.exam_type ? result.exam_type.toUpperCase() : 'STANDARD'}</span>
                 <span>•</span>
-                <span>Score: <strong>{result.marks_obtained || 0}</strong> / {result.total_marks || 100}</span>
+                <span>
+                  {result.is_published === false ? (
+                    <em style={{ color: '#d97706' }}>Submitted · Official score review in progress</em>
+                  ) : (
+                    <>Score: <strong>{result.marks_obtained || 0}</strong> / {result.total_marks || 100}</>
+                  )}
+                </span>
               </div>
             </div>
 
             {/* Score Display */}
             <div className="rs-score-column">
-              <div 
-                className="rs-score-val"
-                style={{ 
-                  color: result.status === 'pass' ? '#10b981' : result.status === 'fail' ? '#ef4444' : '#f59e0b'
-                }}
-              >
-                {result.percentage || 0}%
-              </div>
-              <span className={`rs-status-tag tag-${result.status || 'pending'}`}>
-                {result.status ? result.status.toUpperCase() : 'AUDITING'}
-              </span>
+              {result.is_published === false ? (
+                <>
+                  <div className="rs-score-val" style={{ color: '#d97706', fontSize: '1.25rem' }}>
+                    Under Review
+                  </div>
+                  <span className="rs-status-tag" style={{ background: '#fef3c7', color: '#b45309' }}>
+                    PENDING PUBLICATION
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div
+                    className="rs-score-val"
+                    style={{
+                      color: result.status === 'pass' ? '#10b981' : result.status === 'fail' ? '#ef4444' : '#f59e0b'
+                    }}
+                  >
+                    {result.percentage || 0}%
+                  </div>
+                  <span className={`rs-status-tag tag-${result.status || 'pending'}`}>
+                    {result.status ? result.status.toUpperCase() : 'AUDITING'}
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Action Buttons */}
             <div className="rs-actions-col">
-              <button 
+              <button
                 className="rs-btn-view"
-                onClick={() => setSelectedResult(result)}
+                onClick={() => {
+                  if (result.is_published === false) {
+                    toast('Official score breakdown and detailed answer keys will become visible once your institution publishes the gradebook.', {
+                      icon: '⏳',
+                      style: { background: '#0f172a', color: '#f8fafc', borderRadius: '10px', fontSize: '13px' }
+                    });
+                    return;
+                  }
+                  setSelectedResult(result);
+                }}
               >
                 <Eye size={15} /> View Audit
               </button>
-              <button 
+              <button
                 className="rs-btn-pdf"
-                onClick={() => downloadResultPDF(result)}
+                onClick={() => {
+                  if (result.is_published === false) {
+                    toast('Official certified transcripts become downloadable as soon as results are published by the examination authority.', {
+                      icon: '📄',
+                      style: { background: '#0f172a', color: '#f8fafc', borderRadius: '10px', fontSize: '13px' }
+                    });
+                    return;
+                  }
+                  downloadResultPDF(result);
+                }}
               >
                 <Download size={14} /> PDF Slip
               </button>
@@ -496,7 +539,7 @@ export default function StudentResults() {
                   {selectedResult.exam_name}
                 </h3>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedResult(null)}
                 style={{ background: '#f1f5f9', border: 'none', borderRadius: '10px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
               >
@@ -555,7 +598,7 @@ export default function StudentResults() {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button 
+              <button
                 onClick={() => setSelectedResult(null)}
                 style={{
                   height: '42px',
@@ -571,7 +614,7 @@ export default function StudentResults() {
               >
                 Close Audit
               </button>
-              <button 
+              <button
                 onClick={() => downloadResultPDF(selectedResult)}
                 className="rs-lookup-btn"
                 style={{ height: '42px' }}

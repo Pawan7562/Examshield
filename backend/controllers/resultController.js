@@ -2,6 +2,7 @@
 const { query, pool } = require('../config/database');
 const { sendResultNotification } = require('../services/emailService');
 const { evaluateMCQAnswer, calculateGrade } = require('../utils/evaluation');
+const { sendErrorResponse } = require('../utils/errorSanitizer');
 
 /**
  * GET /api/admin/results
@@ -315,7 +316,13 @@ exports.getStudentResults = async (req, res) => {
     const studentId = req.user.id;
 
     const result = await query(
-      `SELECT r.*, COALESCE(e.title, e.name, 'Examination') as exam_name, e.type as exam_type, e.subject, e.date_time,
+      `SELECT r.id, r.exam_id, r.student_id, r.session_id, r.status, r.is_published, r.created_at, r.submitted_at,
+              COALESCE(e.title, e.name, 'Examination') as exam_name, e.type as exam_type, e.subject, e.date_time, e.exam_code,
+              CASE WHEN r.is_published = true THEN r.marks_obtained ELSE NULL END as marks_obtained,
+              CASE WHEN r.is_published = true THEN r.total_marks ELSE e.total_marks END as total_marks,
+              CASE WHEN r.is_published = true THEN r.percentage ELSE NULL END as percentage,
+              CASE WHEN r.is_published = true THEN r.grade ELSE 'Pending' END as grade,
+              CASE WHEN r.is_published = true THEN r.status ELSE 'evaluation_pending' END as display_status,
               (SELECT COUNT(*) FROM questions q WHERE q.exam_id = r.exam_id) as total_questions,
               (SELECT COUNT(*) FROM answers a WHERE (a.session_id = r.session_id OR (a.student_id = r.student_id AND a.exam_id = r.exam_id)) AND (
                  (a.selected_option IS NOT NULL AND TRIM(a.selected_option) != '') OR
@@ -323,14 +330,14 @@ exports.getStudentResults = async (req, res) => {
                  (a.code_submission IS NOT NULL AND TRIM(a.code_submission) != '')
               )) as questions_attempted
        FROM results r JOIN exams e ON r.exam_id = e.id
-       WHERE r.student_id = $1 AND r.is_published = true
+       WHERE r.student_id = $1
        ORDER BY r.created_at DESC`,
       [studentId]
     );
 
     res.json({ success: true, data: { results: result.rows } });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch results', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Failed to retrieve assessment transcripts. Please try again shortly.');
   }
 };
 
@@ -346,12 +353,34 @@ exports.getStudentExamResult = async (req, res) => {
     const result = await query(
       `SELECT r.*, COALESCE(e.title, e.name, 'Examination') as exam_name, e.type, e.total_marks, e.passing_marks, e.subject
        FROM results r JOIN exams e ON r.exam_id = e.id
-       WHERE r.exam_id = $1 AND r.student_id = $2 AND r.is_published = true`,
+       WHERE r.exam_id = $1 AND r.student_id = $2`,
       [examId, studentId]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Result not found or not yet published.' });
+      return res.status(404).json({
+        success: false,
+        message: 'No record found for this examination.',
+        action: 'Please verify that you have completed and submitted this examination.'
+      });
+    }
+
+    const row = result.rows[0];
+    if (!row.is_published) {
+      return res.json({
+        success: true,
+        data: {
+          result: {
+            ...row,
+            marks_obtained: null,
+            percentage: null,
+            grade: 'Pending Review',
+            display_status: 'evaluation_pending'
+          },
+          answers: [],
+          notice: 'Official scores and detailed answer reviews will be made available once your institution publishes the exam gradebook.'
+        }
+      });
     }
 
     const answers = await query(
@@ -364,10 +393,10 @@ exports.getStudentExamResult = async (req, res) => {
 
     res.json({
       success: true,
-      data: { result: result.rows[0], answers: answers.rows },
+      data: { result: row, answers: answers.rows },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch result', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Failed to fetch detailed result.');
   }
 };
 

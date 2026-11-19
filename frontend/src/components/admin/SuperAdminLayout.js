@@ -118,7 +118,7 @@ export default function SuperAdminLayout() {
               <span className="sa-pulse-bullet" />
             </div>
             <div className="sa-cluster-row">
-              <span>Neon Database</span>
+              <span>PostgreSQL Cluster</span>
               <span className="sa-cluster-val">Connected</span>
             </div>
             <div className="sa-cluster-row">

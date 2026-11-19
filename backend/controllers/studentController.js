@@ -8,6 +8,7 @@ const path = require('path');
 const { supabase } = require('../config/supabase');
 const { pool } = require('../config/database');
 const { sendStudentCredentials } = require('../services/emailService');
+const { sendErrorResponse } = require('../utils/errorSanitizer');
 
 /**
  * Generate unique student ID: ES-YYYY-random
@@ -114,12 +115,7 @@ exports.getStudents = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get students error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch students',
-      error: error.message
-    });
+    return sendErrorResponse(res, 500, error, 'Unable to retrieve enrolled candidates list.');
   }
 };
 
@@ -315,12 +311,7 @@ exports.addStudent = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Add student error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to add student',
-      error: error.message
-    });
+    return sendErrorResponse(res, 500, error, 'Unable to enroll candidate. Please check the provided details.');
   }
 };
 

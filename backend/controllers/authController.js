@@ -13,6 +13,7 @@ const { pool } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const { sendCollegeWelcome } = require('../services/emailService');
 const { getRedisClient } = require('../config/redis');
+const { sendErrorResponse } = require('../utils/errorSanitizer');
 
 /**
  * Generate JWT tokens
@@ -301,7 +302,7 @@ exports.collegeLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Login failed', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Unable to complete administrator sign-in. Please try again.');
   }
 };
 
@@ -482,7 +483,7 @@ exports.studentLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Login failed', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Unable to complete candidate sign-in. Please try again.');
   }
 };
 

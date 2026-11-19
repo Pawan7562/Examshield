@@ -3,6 +3,7 @@ const Razorpay = require('razorpay');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/database');
 const { supabase } = require('../config/supabase-clean');
+const { sendErrorResponse } = require('../utils/errorSanitizer');
 
 const PLANS = {
   monthly: {
@@ -629,8 +630,7 @@ exports.getSuperAdminDashboard = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Dashboard fetch error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch dashboard', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Unable to load executive dashboard metrics.');
   }
 };
 
@@ -684,8 +684,7 @@ exports.getAllColleges = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Fetch colleges error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch colleges', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Unable to retrieve multi-tenant institutions directory.');
   }
 };
 
@@ -781,8 +780,7 @@ exports.createCollegeByAdmin = async (req, res) => {
       data: { college: newCollege },
     });
   } catch (error) {
-    console.error('Onboard college error:', error);
-    res.status(500).json({ success: false, message: 'Failed to onboard institution', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Failed to onboard institution. Please verify the institutional details.');
   }
 };
 

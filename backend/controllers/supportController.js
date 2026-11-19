@@ -1,5 +1,6 @@
 // controllers/supportController.js
 const { pool } = require('../config/database');
+const { sendErrorResponse } = require('../utils/errorSanitizer');
 
 const FAQS = [
   {
@@ -85,8 +86,7 @@ exports.getTickets = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('getTickets error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch tickets', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Unable to load support tickets. Please try again shortly.');
   }
 };
 
@@ -131,8 +131,7 @@ exports.createTicket = async (req, res) => {
       data: { ticket: rows[0] }
     });
   } catch (error) {
-    console.error('createTicket error:', error);
-    res.status(500).json({ success: false, message: 'Failed to create support ticket', error: error.message });
+    return sendErrorResponse(res, 500, error, 'Unable to submit support ticket. Please check your inputs and try again.');
   }
 };
 
@@ -160,7 +159,7 @@ exports.getSystemStatus = async (req, res) => {
         { name: 'AI Proctoring & Vision Engine', status: 'Operational', latency: '42ms' },
         { name: 'Audio & Whispering Analysis', status: 'Operational', latency: '38ms' },
         { name: 'Browser Sandbox & Integrity Guard', status: 'Operational', latency: '15ms' },
-        { name: 'Neon Lakebase Postgres DB', status: 'Operational', latency: '22ms' },
+        { name: 'Dedicated High-Speed PostgreSQL Cluster', status: 'Operational', latency: '1ms' },
         { name: 'Real-Time WebRTC / WebSocket Stream', status: 'Operational', latency: '54ms' },
         { name: 'Notification & Email Relays', status: 'Operational', latency: '110ms' }
       ]

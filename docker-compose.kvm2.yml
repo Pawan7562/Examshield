@@ -18,6 +18,16 @@ services:
       - backend_4
       - backend_5
       - backend_6
+      - backend_7
+      - backend_8
+      - backend_9
+      - backend_10
+      - backend_11
+      - backend_12
+      - backend_13
+      - backend_14
+      - backend_15
+      - backend_16
       - frontend
     networks:
       - examshield_network
@@ -51,7 +61,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     command: >
       postgres
-      -c max_connections=300
+      -c max_connections=400
       -c shared_buffers=256MB
       -c effective_cache_size=768MB
       -c work_mem=8MB
@@ -167,6 +177,136 @@ services:
       NODE_ENV: production
       PORT: 5000
       INSTANCE_ID: cluster_node_6
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_7:
+    <<: *backend_template
+    container_name: examshield-backend-7
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_7
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_8:
+    <<: *backend_template
+    container_name: examshield-backend-8
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_8
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_9:
+    <<: *backend_template
+    container_name: examshield-backend-9
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_9
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_10:
+    <<: *backend_template
+    container_name: examshield-backend-10
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_10
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_11:
+    <<: *backend_template
+    container_name: examshield-backend-11
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_11
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_12:
+    <<: *backend_template
+    container_name: examshield-backend-12
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_12
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_13:
+    <<: *backend_template
+    container_name: examshield-backend-13
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_13
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_14:
+    <<: *backend_template
+    container_name: examshield-backend-14
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_14
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_15:
+    <<: *backend_template
+    container_name: examshield-backend-15
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_15
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
+      PG_POOL_MAX: 15
+      PG_CONNECTION_TIMEOUT_MS: 10000
+
+  backend_16:
+    <<: *backend_template
+    container_name: examshield-backend-16
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      INSTANCE_ID: cluster_node_16
       REDIS_URL: redis://redis:6379
       DATABASE_URL: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable
       DATABASE_URL_UNPOOLED: postgresql://examshield_admin:Ex%40mShield_Pr0d_Db_2026%21@postgres:5432/examshield_prod?sslmode=disable

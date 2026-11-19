@@ -995,33 +995,17 @@ app.use('*', (req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found.` });
 });
 
-// Global error handler
+// Global error handler — Enterprise Sanitized & Professional Response
+const { sendErrorResponse } = require('./utils/errorSanitizer');
+
 app.use((err, req, res, next) => {
-  logger.error(`Error: ${err.message}`, { stack: err.stack });
-  
-  if (err.code === '23505') {
-    return res.status(409).json({ success: false, message: 'Duplicate entry. Record already exists.' });
-  }
-  if (err.code === '23503') {
-    return res.status(400).json({ success: false, message: 'Referenced record does not exist.' });
-  }
-
-  const isProduction = process.env.NODE_ENV === 'production';
   const statusCode = err.status || err.statusCode || 500;
-  
-  let safeMessage = err.message || 'An unexpected error occurred.';
-  if (isProduction && statusCode === 500) {
-    const lower = safeMessage.toLowerCase();
-    if (lower.includes('syntax') || lower.includes('postgres') || lower.includes('query') || lower.includes('relation') || lower.includes('column') || lower.includes('fatal') || lower.includes('pool')) {
-      safeMessage = 'An unexpected server issue occurred while processing your request. Please try again or notify exam administration.';
-    }
-  }
-
-  res.status(statusCode).json({
-    success: false,
-    message: safeMessage,
-    ...(!isProduction && { stack: err.stack }),
-  });
+  return sendErrorResponse(
+    res,
+    statusCode,
+    err,
+    'An unexpected server issue occurred while processing your request. Your data remains safely preserved.'
+  );
 });
 
 // =====================================================

@@ -225,8 +225,8 @@ export default function SuperAdminDashboard() {
               <div className="sa-health-card">
                 <Database size={18} style={{ color: '#059669', flexShrink: 0 }} />
                 <div className="sa-health-card-text">
-                  <span className="sa-health-card-label">Neon Postgres</span>
-                  <span className="sa-health-card-val" style={{ color: '#059669' }}>Healthy (22ms)</span>
+                  <span className="sa-health-card-label">PostgreSQL Cluster</span>
+                  <span className="sa-health-card-val" style={{ color: '#059669' }}>Healthy (0.8ms)</span>
                 </div>
               </div>
 

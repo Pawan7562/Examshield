@@ -45,37 +45,54 @@ const handleAuthRedirect = () => {
 api.interceptors.response.use(
   (response) => response.data,
   async (error) => {
-    const reqMethod = (error.config?.method || 'UNKNOWN').toUpperCase();
-    const reqUrl = (error.config?.baseURL || '') + (error.config?.url || '');
     const resStatus = error.response?.status;
     const resData = error.response?.data;
-
-    console.error(`=== API ERROR [${resStatus || 'NO_STATUS'}] ${reqMethod} ${reqUrl} ===`);
-    console.error('Server Response Data:', resData);
-    console.error('Error config:', error.config);
-    console.error('Error message:', error.message);
-    console.error('Error response:', error.response);
-
     const original = error.config || {};
     const isAuthRequest = original.url?.includes('/auth/');
 
+    // Filter out raw SQL / database stack traces from leaking to client components
+    const sanitizeText = (txt, fallback) => {
+      if (!txt || typeof txt !== 'string') return fallback;
+      const lower = txt.toLowerCase();
+      if (
+        lower.includes('syntax error') ||
+        lower.includes('relation') ||
+        lower.includes('column') ||
+        lower.includes('table') ||
+        lower.includes('database') ||
+        lower.includes('violates') ||
+        lower.includes('foreign key') ||
+        lower.includes('pg_') ||
+        lower.includes('psql') ||
+        lower.includes('select ') ||
+        lower.includes('insert into') ||
+        lower.includes('update ') ||
+        lower.includes('pool') ||
+        lower.includes('deadlock')
+      ) {
+        return fallback;
+      }
+      return txt;
+    };
+
     if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
-      console.warn('Network connectivity issue detected. Session preserved in browser storage.');
       return Promise.reject({
         success: false,
         message: 'The examination system is briefly reconnecting. Your session and exam answers are safely preserved.',
+        action: 'Please wait a moment while the connection resumes automatically.',
         code: error.code,
         isNetworkError: true,
       });
     }
 
     if (error.response?.status === 401) {
-      // Login failures are expected sometimes; keep the browser console clean.
       if (isAuthRequest) {
-        return Promise.reject(error.response?.data || error);
+        const rawMsg = resData?.message || error.message;
+        return Promise.reject({
+          ...resData,
+          message: sanitizeText(rawMsg, 'Invalid credentials. Please verify your details and try again.')
+        });
       }
-
-      console.error('401 Unauthorized - Checking authentication...');
 
       const refreshToken = localStorage.getItem('refreshToken');
 
@@ -95,11 +112,14 @@ api.interceptors.response.use(
 
           return api(original);
         } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           handleAuthRedirect();
-          return Promise.reject(refreshError);
+          return Promise.reject({
+            success: false,
+            message: 'Your security session has expired. Please sign in again.',
+            action: 'Sign in with your credentials to resume.'
+          });
         }
       } else {
         localStorage.removeItem('accessToken');
@@ -109,13 +129,14 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 403 && error.response.data?.code === 'SUBSCRIPTION_EXPIRED') {
-      toast.error('Your subscription has expired. Please renew.');
+      toast.error('Your subscription has expired. Please contact support or renew.');
     }
 
     if (!error.response) {
       return Promise.reject({
         success: false,
         message: 'Network connection temporarily unavailable. Your exam progress is safely cached.',
+        action: 'Check your internet connection; the system will auto-sync when online.',
         isNetworkError: true,
       });
     }
@@ -129,30 +150,44 @@ api.interceptors.response.use(
         status,
         code: 'CLUSTER_SYNCHRONIZING',
         message: 'The examination cluster is momentarily synchronizing traffic. Your exam progress is safely preserved.',
+        action: 'Please wait a moment; your answers are protected and sync will resume automatically.'
       });
     }
 
     // Handle 500 Internal Server Error
     if (status === 500) {
-      const serverMsg = error.response.data?.message;
+      const serverMsg = resData?.message || resData?.error;
+      const cleanMsg = sanitizeText(
+        serverMsg,
+        'An unexpected server issue occurred. Your data is protected; please try again shortly.'
+      );
       return Promise.reject({
         success: false,
         status: 500,
-        message: serverMsg && !serverMsg.toLowerCase().includes('error:') && !serverMsg.toLowerCase().includes('sql')
-          ? serverMsg
-          : 'An unexpected server issue occurred. Your data is protected; please try again shortly.',
+        message: cleanMsg,
+        action: resData?.action || 'If this continues, please contact your examination administrator.'
       });
     }
 
-    if (typeof error.response.data === 'string') {
+    if (typeof resData === 'string') {
       return Promise.reject({
         success: false,
         status,
-        message: 'Service is momentarily synchronizing. Please try again in a moment.',
+        message: sanitizeText(resData, 'Service is momentarily synchronizing. Please try again in a moment.'),
+        action: 'Please try again.'
       });
     }
 
-    return Promise.reject(error.response.data || error);
+    // Sanitize any other error data
+    const safeData = typeof resData === 'object' && resData !== null ? { ...resData } : {};
+    if (safeData.message) {
+      safeData.message = sanitizeText(safeData.message, 'Unable to complete request. Please verify inputs and try again.');
+    }
+    if (safeData.error && typeof safeData.error === 'string') {
+      safeData.error = sanitizeText(safeData.error, 'An unexpected issue occurred.');
+    }
+
+    return Promise.reject(safeData || error);
   }
 );
 

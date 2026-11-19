@@ -1,8 +1,9 @@
 // src/pages/student/ExamList.js — Professional Examination Schedule & Catalog
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { studentAPI } from '../../services/api';
 import { formatIST, isExamStartable, isExamEnded } from '../../utils/timezone';
+import { getFriendlyErrorMessage } from '../../utils/errorHandler';
 import toast from 'react-hot-toast';
 import { 
   Calendar, 
@@ -14,23 +15,35 @@ import {
   Shield,
   Copy,
   Award,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import './ExamList.css';
 
 export default function ExamList() {
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [filter, setFilter] = useState('all'); // 'all' | 'live' | 'upcoming' | 'completed'
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const loadExams = useCallback(() => {
+    setLoading(true);
+    setErrorMessage(null);
     studentAPI.getExams()
       .then(r => setExams(r.data?.exams || []))
-      .catch(err => console.error('Error loading examinations:', err))
+      .catch(err => {
+        const cleanMsg = getFriendlyErrorMessage(err, 'Unable to load examination schedule. Please verify your connection.');
+        setErrorMessage(cleanMsg);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadExams();
+  }, [loadExams]);
 
   // Determine whether an exam is startable right now in IST (never true if expired)
   const isStartable = (exam) => {
@@ -91,6 +104,51 @@ export default function ExamList() {
             borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px'
           }} />
           <p style={{ fontWeight: 600 }}>Loading Assigned Examinations...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="el-container">
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '60px 24px', 
+          maxWidth: 480, 
+          margin: '40px auto',
+          background: '#ffffff',
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+        }}>
+          <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+            <AlertCircle size={24} color="#ef4444" />
+          </div>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>
+            Unable to Load Examination Schedule
+          </h3>
+          <p style={{ color: '#64748b', fontSize: '0.88rem', lineHeight: '1.5', margin: '0 0 20px' }}>
+            {errorMessage}
+          </p>
+          <button 
+            onClick={loadExams} 
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              background: '#0a74da',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              cursor: 'pointer'
+            }}
+          >
+            <RefreshCw size={15} /> Retry
+          </button>
         </div>
       </div>
     );
