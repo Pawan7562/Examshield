@@ -100,7 +100,7 @@ exports.getResults = async (req, res) => {
       } 
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch results', error: error.message });
+    return sendErrorResponse(res, error, 'Failed to fetch results. Please try again.');
   }
 };
 
@@ -151,7 +151,7 @@ exports.updateResult = async (req, res) => {
     });
   } catch (error) {
     console.error('Update result error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update result', error: error.message });
+    return sendErrorResponse(res, error, 'Failed to update result. Please try again.');
   }
 };
 
@@ -185,15 +185,16 @@ exports.evaluateResult = async (req, res) => {
       for (const ev of evaluations) {
         if (!ev || !ev.answerId) continue;
         const awardedMarks = Math.max(0, parseFloat(ev.marksObtained) || 0);
+        const isCorrect = awardedMarks > 0;
         await query(
           `UPDATE answers 
            SET marks_obtained = $1, 
                evaluator_remarks = $2, 
                is_evaluated = true, 
-               is_correct = ($1 > 0),
+               is_correct = $3,
                updated_at = NOW()
-           WHERE id = $3`,
-          [awardedMarks, ev.remarks || null, ev.answerId]
+           WHERE id = $4`,
+          [awardedMarks, ev.remarks || null, isCorrect, ev.answerId]
         );
       }
     }
@@ -260,7 +261,7 @@ exports.evaluateResult = async (req, res) => {
     });
   } catch (error) {
     console.error('evaluateResult error:', error);
-    res.status(500).json({ success: false, message: 'Evaluation failed', error: error.message });
+    return sendErrorResponse(res, error, 'Failed to save evaluation. Please try again.');
   }
 };
 
@@ -303,7 +304,7 @@ exports.publishResults = async (req, res) => {
 
     res.json({ success: true, message: `Results published. ${results.rows.length} students notified.` });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Publish failed', error: error.message });
+    return sendErrorResponse(res, error, 'Publish failed. Please try again.');
   }
 };
 
@@ -472,7 +473,7 @@ exports.getStudentResultByKey = async (req, res) => {
       message: 'Access Key Not Found: Please verify the examination code on your admission ticket.'
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch result by key', error: error.message });
+    return sendErrorResponse(res, error, 'Failed to fetch result by key. Please try again.');
   }
 };
 
@@ -665,7 +666,7 @@ exports.getAdminStudentSubmission = async (req, res) => {
     });
   } catch (error) {
     console.error('getAdminStudentSubmission error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch student submission', error: error.message });
+    return sendErrorResponse(res, error, 'Failed to fetch student submission. Please try again.');
   }
 };
 
@@ -812,7 +813,7 @@ exports.reevaluateResult = async (req, res) => {
     });
   } catch (error) {
     console.error('reevaluateResult error:', error);
-    res.status(500).json({ success: false, message: 'Failed to re-evaluate result', error: error.message });
+    return sendErrorResponse(res, error, 'Failed to re-evaluate result. Please try again.');
   }
 };
 
@@ -949,7 +950,7 @@ exports.reevaluateExam = async (req, res) => {
     });
   } catch (error) {
     console.error('reevaluateExam error:', error);
-    res.status(500).json({ success: false, message: 'Failed to batch re-evaluate exam', error: error.message });
+    return sendErrorResponse(res, error, 'Failed to batch re-evaluate exam. Please try again.');
   }
 };
 
