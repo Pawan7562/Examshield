@@ -1,5 +1,6 @@
 // middleware/rateLimiter.js - Multi-Tier Cluster-Aware Enterprise Rate Limiter
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 const { getRedisClient } = require('../config/redis');
 
 /**
@@ -233,13 +234,20 @@ const apiGeneralLimiter = rateLimit({
   keyGenerator: (req) => {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      return `token:${authHeader.slice(7, 39)}`;
+      try {
+        const token = authHeader.slice(7);
+        const decoded = jwt.decode(token);
+        if (decoded && decoded.id) {
+          return `user:${decoded.role || 'u'}:${decoded.id}`;
+        }
+      } catch (_) {}
     }
     return `ip:${getClientIp(req)}`;
   },
   skip: (req) => {
     if (req.method === 'OPTIONS') return true;
     if (req.originalUrl?.includes('/api/student/exam/') && req.originalUrl?.includes('/heartbeat')) return true;
+    if (req.originalUrl?.includes('/run-code') || req.originalUrl?.includes('/submit-code')) return true;
     return false;
   },
   handler: (req, res) => {
@@ -264,8 +272,19 @@ const codeExecutionLimiter = rateLimit({
   legacyHeaders: false,
   store: new ClusterRateLimitStore('rl:code_exec:'),
   keyGenerator: (req) => {
-    const examSession = req.body?.exam_id && req.body?.student_id ? `${req.body.exam_id}_${req.body.student_id}` : null;
-    if (examSession) return `session:${examSession}`;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.decode(authHeader.slice(7));
+        if (decoded && decoded.id) {
+          return `student:${decoded.id}`;
+        }
+      } catch (_) {}
+    }
+    const studentId = req.user?.id || req.body?.studentId || req.body?.student_id;
+    const session = req.body?.sessionId || req.body?.session_id;
+    if (studentId) return `student:${studentId}`;
+    if (session) return `session:${session}`;
     return `ip:${getClientIp(req)}`;
   },
   skip: (req) => req.method === 'OPTIONS',

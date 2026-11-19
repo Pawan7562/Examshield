@@ -3,6 +3,7 @@
 
 const { pool } = require('../config/database');
 const { supabase } = require('../config/supabase-clean');
+const { sendErrorResponse } = require('../utils/errorSanitizer');
 const {
   evaluateTestCases,
   normalizeOutput,
@@ -153,10 +154,7 @@ exports.runCode = async (req, res) => {
     });
   } catch (error) {
     console.error('Run code error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Execution error: ' + error.message,
-    });
+    return sendErrorResponse(res, 500, error, 'Code execution failed. Please check your syntax and logic.');
   }
 };
 
@@ -258,10 +256,11 @@ exports.submitCode = async (req, res) => {
     if (activeSessionId && studentId) {
       const isCorrect = evaluation.status === 'Accepted';
       await pool.query(
-        `INSERT INTO answers (session_id, question_id, student_id, exam_id, code_submission, selected_language, marks_obtained, is_correct, is_evaluated, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW())
+        `INSERT INTO answers (session_id, question_id, student_id, exam_id, answer_text, code_submission, selected_language, marks_obtained, is_correct, is_evaluated, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, true, NOW())
          ON CONFLICT (session_id, question_id)
          DO UPDATE SET
+           answer_text = EXCLUDED.answer_text,
            code_submission = EXCLUDED.code_submission,
            selected_language = EXCLUDED.selected_language,
            marks_obtained = EXCLUDED.marks_obtained,
@@ -291,9 +290,6 @@ exports.submitCode = async (req, res) => {
     });
   } catch (error) {
     console.error('Submit code error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Submission evaluation error: ' + error.message,
-    });
+    return sendErrorResponse(res, 500, error, 'Evaluation service encountered an error while grading your submission. Your code has been preserved.');
   }
 };

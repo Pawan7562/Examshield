@@ -4,6 +4,7 @@
 const { generateCompleteSource } = require('./wrapperGenerator');
 const { compileOnce } = require('./secureSandbox');
 const { compareOutputs, normalizeOutput } = require('./comparator');
+const { scheduleExecution } = require('./executionQueue');
 
 /**
  * Normalizes test cases from various input shapes (options.testCases, question.test_cases, etc.)
@@ -52,11 +53,7 @@ async function evaluateSubmission(studentCode, language = 'cpp', testCases = [],
   }
 
   const {
-    timeLimitMs = 2000,
-    memoryLimitMb = 256,
-    isSampleOnly = false,
     questionMarks = 10,
-    comparisonMode = (resolvedMetadata.comparisonMode || resolvedMetadata.comparison_mode || 'ARRAY'),
   } = resolvedOptions;
 
   if (!studentCode || typeof studentCode !== 'string' || studentCode.trim() === '') {
@@ -74,6 +71,21 @@ async function evaluateSubmission(studentCode, language = 'cpp', testCases = [],
       testCases: [],
     };
   }
+
+  return await scheduleExecution(
+    () => _runEvaluation(studentCode, language, testCases, resolvedMetadata, resolvedOptions),
+    { code: studentCode, language, testCases, metadata: resolvedMetadata }
+  );
+}
+
+async function _runEvaluation(studentCode, language, testCases, resolvedMetadata, resolvedOptions) {
+  const {
+    timeLimitMs = 2000,
+    memoryLimitMb = 256,
+    isSampleOnly = false,
+    questionMarks = 10,
+    comparisonMode = (resolvedMetadata.comparisonMode || resolvedMetadata.comparison_mode || 'ARRAY'),
+  } = resolvedOptions;
 
   // 1. Generate complete compilable source code via Language Adapter & Wrapper
   const { completeSource, executionMode, resolvedMetadata: metaUsed, adapter } = generateCompleteSource(studentCode, language, resolvedMetadata);

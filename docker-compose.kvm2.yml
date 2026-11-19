@@ -99,7 +99,7 @@ services:
     image: examshield-backend:latest
     container_name: examshield-backend-1
     restart: always
-    mem_limit: 220m
+    mem_limit: 300m
     env_file: ./backend/.env
     environment:
       NODE_ENV: production

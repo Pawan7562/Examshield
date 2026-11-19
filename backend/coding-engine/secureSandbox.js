@@ -339,7 +339,7 @@ async function compileOnce(language, completeSource, options = {}) {
       // Compile ONCE
       const compileStart = Date.now();
       const compileResult = await new Promise((resolve) => {
-        execFile(gppPath, ['-O2', srcFile, '-o', exeFile], { cwd: tmpDir, env: compileEnv, timeout: 8000 }, (compErr, _, compStderr) => {
+        execFile(gppPath, ['-O1', srcFile, '-o', exeFile], { cwd: tmpDir, env: compileEnv, timeout: 8000 }, (compErr, _, compStderr) => {
           if (compErr || !fs.existsSync(exeFile)) {
             cleanup();
             return resolve({
@@ -536,7 +536,7 @@ async function compileOnce(language, completeSource, options = {}) {
       const compileResult = await new Promise((resolve) => {
         execFile(
           javaPaths.javac,
-          ['-encoding', 'UTF-8', srcFile],
+          ['-J-Xmx96m', '-J-Xms32m', '-encoding', 'UTF-8', srcFile],
           { cwd: javaTmpDir, env: compileEnv, timeout: 10000 },
           (compErr, _, compStderr) => {
             const classFile = path.join(javaTmpDir, `${className}.class`);
@@ -559,6 +559,8 @@ async function compileOnce(language, completeSource, options = {}) {
         return compileResult;
       }
 
+      const javaHeapMb = Math.min(96, Math.max(32, memoryLimitMb || 64));
+
       return {
         compileFailed: false,
         language: 'java',
@@ -577,7 +579,8 @@ async function compileOnce(language, completeSource, options = {}) {
               child = spawn(
                 javaPaths.java,
                 [
-                  `-Xmx${memoryLimitMb}m`,
+                  `-Xmx${javaHeapMb}m`,
+                  '-Xms16m',
                   '-cp',
                   javaTmpDir,
                   className
@@ -893,9 +896,10 @@ async function compileOnce(language, completeSource, options = {}) {
         return new Promise((resolve) => {
           const startTime = Date.now();
 
+          const jsMemoryMb = Math.min(64, memoryLimitMb || 64);
           const child = spawn(
             process.execPath,
-            ['--max-old-space-size=' + memoryLimitMb, scriptFile],
+            ['--max-old-space-size=' + jsMemoryMb, scriptFile],
             {
               cwd: jsTmpDir,
               env: getSanitizedEnv(),

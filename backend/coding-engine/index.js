@@ -6,6 +6,7 @@ const { resolveExecutionMode, generateCompleteSource } = require('./wrapperGener
 const { compileOnce, sanitizeCompilerError, executeOnJudge0 } = require('./secureSandbox');
 const { compareOutputs, normalizeOutput } = require('./comparator');
 const { evaluateSubmission, normalizeTestCaseList } = require('./testRunner');
+const { scheduleExecution, getQueueStats } = require('./executionQueue');
 
 module.exports = {
   getAdapter,
@@ -19,4 +20,6 @@ module.exports = {
   normalizeOutput,
   evaluateSubmission,
   normalizeTestCaseList,
+  scheduleExecution,
+  getQueueStats,
 };
