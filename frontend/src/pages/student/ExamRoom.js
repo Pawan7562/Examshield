@@ -335,6 +335,7 @@ export default function ExamRoom() {
   const languagesRef = useRef({});
   const questionsRef = useRef([]);
   const debounceTimersRef = useRef({});
+  const localStorageDebounceRef = useRef(null);
   const isFlushingRef = useRef(false);
   const startTriggeredRef = useRef(false);
 
@@ -812,20 +813,9 @@ export default function ExamRoom() {
                   { answerText: ans }),
             };
           });
-
-        if (answersList.length > 0) {
-          try {
-            await studentAPI.saveAnswersBulk(examId, {
-              sessionId: currentSessionId,
-              answers: answersList,
-            });
-          } catch (flushErr) {
-            console.warn('Bulk flush notice before submit:', flushErr);
-          }
-        }
       }
 
-      // 2. Submit the entire examination
+      // 2. Submit the entire examination (includes authoritative answers payload for atomic transaction)
       const response = await studentAPI.submitExam(examId, {
         sessionId: currentSessionId,
         autoSubmit,
@@ -1228,39 +1218,45 @@ export default function ExamRoom() {
   }, [examId, phase, refreshExamDetails]);
 
   // ─── Answer Handler & Offline Local Backup ──────────────────────────────────
-  // ─── Answer Handler & Offline Local Backup ──────────────────────────────────
   const persistAnswersToLocalStorage = useCallback((updatedAnswers, updatedLanguages = {}) => {
-    try {
-      const storageKey = `examshield_backup_${examId}_${user?.id || 'candidate'}`;
-      let existingBackup = {};
+    if (localStorageDebounceRef.current) {
+      clearTimeout(localStorageDebounceRef.current);
+    }
+
+    localStorageDebounceRef.current = setTimeout(() => {
       try {
-        const raw = localStorage.getItem(storageKey);
-        if (raw) existingBackup = JSON.parse(raw);
-      } catch (_) {}
+        const storageKey = `examshield_backup_${examId}_${user?.id || 'candidate'}`;
+        let existingBackup = {};
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (raw) existingBackup = JSON.parse(raw);
+        } catch (_) {}
 
-      const previousEntries = (existingBackup && existingBackup.entries) ? existingBackup.entries : {};
-      const now = Date.now();
+        const previousEntries = (existingBackup && existingBackup.entries) ? existingBackup.entries : {};
+        const now = Date.now();
 
-      const newEntries = {};
-      Object.entries(updatedAnswers || {}).forEach(([qId, val]) => {
-        const prev = previousEntries[qId];
-        const hasChanged = !prev || prev.value !== val;
-        newEntries[qId] = {
-          value: val,
-          updatedAt: hasChanged ? now : (prev.updatedAt || now),
-          language: updatedLanguages[qId] || languagesRef.current?.[qId] || prev?.language || null
+        const newEntries = {};
+        Object.entries(updatedAnswers || {}).forEach(([qId, val]) => {
+          const prev = previousEntries[qId];
+          const hasChanged = !prev || prev.value !== val;
+          newEntries[qId] = {
+            value: val,
+            updatedAt: hasChanged ? now : (prev.updatedAt || now),
+            language: updatedLanguages[qId] || languagesRef.current?.[qId] || prev?.language || null
+          };
+        });
+
+        const backupEnvelope = {
+          version: 2,
+          savedAt: now,
+          answers: updatedAnswers,
+          entries: newEntries
         };
-      });
 
-      const backupEnvelope = {
-        version: 2,
-        savedAt: now,
-        answers: updatedAnswers,
-        entries: newEntries
-      };
-
-      localStorage.setItem(storageKey, JSON.stringify(backupEnvelope));
-    } catch (_) {}
+        localStorage.setItem(storageKey, JSON.stringify(backupEnvelope));
+      } catch (_) {}
+      localStorageDebounceRef.current = null;
+    }, 400);
   }, [examId, user]);
 
   const handleAnswer = useCallback((questionId, answer, language = null) => {

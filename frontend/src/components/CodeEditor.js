@@ -218,16 +218,50 @@ const CodeEditor = ({
     }
   }, [testResults]);
 
-  // Code change handler
+  // High-performance debounced answer sync (prevents freeze/re-renders on every keystroke)
+  const onAnswerTimerRef = useRef(null);
+
+  const flushPendingAnswer = useCallback((codeToFlush, langToFlush) => {
+    if (onAnswerTimerRef.current) {
+      clearTimeout(onAnswerTimerRef.current);
+      onAnswerTimerRef.current = null;
+    }
+    const finalCode = codeToFlush !== undefined ? codeToFlush : code;
+    const finalLang = langToFlush || language;
+    onAnswer?.(finalCode, finalLang);
+  }, [code, language, onAnswer]);
+
+  // Clean up debounce timer on unmount and flush latest state
+  useEffect(() => {
+    return () => {
+      if (onAnswerTimerRef.current) {
+        clearTimeout(onAnswerTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Code change handler: Instant editor responsiveness + 500ms debounced parent sync
   const handleCodeChange = (newCode) => {
-    setCode(newCode || '');
-    onAnswer?.(newCode || '', language);
+    const val = newCode || '';
+    setCode(val);
+    if (onAnswerTimerRef.current) {
+      clearTimeout(onAnswerTimerRef.current);
+    }
+    onAnswerTimerRef.current = setTimeout(() => {
+      onAnswer?.(val, language);
+      onAnswerTimerRef.current = null;
+    }, 500);
   };
 
   // Language switch handler
   const handleSelectLanguage = (newLangId) => {
     const langObj = SUPPORTED_LANGUAGES.find(l => l.id === newLangId);
     if (!langObj) return;
+
+    if (onAnswerTimerRef.current) {
+      clearTimeout(onAnswerTimerRef.current);
+      onAnswerTimerRef.current = null;
+    }
 
     onLanguageChange?.(newLangId);
     const newTemplate = getTemplateForLanguage(newLangId);
@@ -238,6 +272,10 @@ const CodeEditor = ({
 
   // Reset to initial boilerplate template
   const handleResetCode = () => {
+    if (onAnswerTimerRef.current) {
+      clearTimeout(onAnswerTimerRef.current);
+      onAnswerTimerRef.current = null;
+    }
     const resetTemplate = getTemplateForLanguage(language);
     setCode(resetTemplate);
     onAnswer?.(resetTemplate, language);
@@ -275,6 +313,7 @@ const CodeEditor = ({
 
   // Run code handler (supports custom input or sample cases with edited parameters)
   const handleRun = useCallback(() => {
+    flushPendingAnswer(code, language);
     if (isCustomCase) {
       onRunCode?.(code, language, customInput, null);
     } else {
@@ -289,10 +328,11 @@ const CodeEditor = ({
       });
       onRunCode?.(code, language, null, casesToRun);
     }
-  }, [code, language, isCustomCase, customInput, cases, editedParamsMap, onRunCode]);
+  }, [code, language, isCustomCase, customInput, cases, editedParamsMap, onRunCode, flushPendingAnswer]);
 
   // Submit solution handler
   const handleSubmit = () => {
+    flushPendingAnswer(code, language);
     onSubmit?.(code, language);
   };
 

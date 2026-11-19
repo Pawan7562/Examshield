@@ -4,36 +4,49 @@ const Timer = ({ seconds, onExpire }) => {
   const [timeLeft, setTimeLeft] = useState(seconds);
   const onExpireRef = useRef(onExpire);
   const firedRef = useRef(false);
+  const endTimeRef = useRef(Date.now() + seconds * 1000);
 
   // Keep callback ref fresh
   useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
 
-  // Reset when seconds prop changes
+  // Synchronize target end timestamp when seconds prop changes
   useEffect(() => {
     setTimeLeft(seconds);
+    endTimeRef.current = Date.now() + seconds * 1000;
     firedRef.current = false;
   }, [seconds]);
 
-  // Single stable interval
+  // True wall-clock interval with background tab throttle resistance
   useEffect(() => {
     if (seconds <= 0) return;
 
-    const interval = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          if (!firedRef.current) {
-            firedRef.current = true;
-            onExpireRef.current?.();
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const checkTime = () => {
+      const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
+      setTimeLeft(remaining);
 
-    return () => clearInterval(interval);
-  }, [seconds]); // Only re-run if initial seconds changes
+      if (remaining <= 0) {
+        if (!firedRef.current) {
+          firedRef.current = true;
+          onExpireRef.current?.();
+        }
+      }
+    };
+
+    const interval = setInterval(checkTime, 1000);
+
+    // Sync immediately when tab regains focus or visibility
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkTime();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [seconds]);
 
   const formatTime = (total) => {
     const h = Math.floor(total / 3600);

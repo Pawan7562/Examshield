@@ -2606,19 +2606,23 @@ exports.submitExam = async (req, res) => {
               const { evaluateTestCases, detectLanguageFromCode } = require('../services/codeExecutionService');
               const languageToRun = answer.selected_language || detectLanguageFromCode(answer.code_submission) || 'javascript';
               try {
-                const evalRes = await evaluateTestCases(
+                // Enforce 4.5s deadline per question during final submit so 2,000 concurrent submissions never hang or timeout
+                const evalPromise = evaluateTestCases(
                   answer.code_submission,
                   languageToRun,
                   testCases,
                   {
-                    timeLimitMs: question.time_limit || 2000,
+                    timeLimitMs: Math.min(question.time_limit || 2000, 3000),
                     memoryLimitMb: question.memory_limit || 256,
                     questionMarks: maxQMarks,
                     questionMetadata: opts
                   }
                 );
+                const deadlinePromise = new Promise((_, reject) => setTimeout(() => reject(new Error('EVAL_TIMEOUT')), 4500));
+                const evalRes = await Promise.race([evalPromise, deadlinePromise]);
                 earnedQMarks = evalRes.earnedMarks || 0;
               } catch (evalErr) {
+                console.warn(`[SUBMIT-EXAM] Fast-path evaluation deferred for question ${question.id}: ${evalErr.message}`);
                 earnedQMarks = answer.marks_obtained !== null && answer.marks_obtained !== undefined
                   ? Number(answer.marks_obtained)
                   : 0;

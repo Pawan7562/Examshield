@@ -168,17 +168,26 @@ const collegeRegisterLimiter = rateLimit({
 
 /**
  * Student Login Limiter
- * Account-level rate limiter: 10 attempts per 15 minutes per Student ID / Email.
+ * Account-level rate limiter: 15 attempts per 15 minutes per Student ID / Email.
  * Crucial: Prevents campus Wi-Fi NAT collision while completely blocking targeted brute-force.
  */
 const studentLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: (req) => {
+    const rawId = req.body?.email || req.body?.student_id || req.body?.studentId ||
+                  req.body?.roll_number || req.body?.rollNo || req.body?.emailOrId ||
+                  req.body?.id || req.body?.identifier || req.body?.username || '';
+    const cleanId = String(rawId).trim().toLowerCase();
+    // 15 attempts per unique account; 10,000 attempts per shared campus IP NAT
+    return cleanId ? 15 : 10000;
+  },
   standardHeaders: true,
   legacyHeaders: false,
   store: new ClusterRateLimitStore('rl:student_login:'),
   keyGenerator: (req) => {
-    const rawId = req.body?.student_id || req.body?.email || req.body?.roll_number || '';
+    const rawId = req.body?.email || req.body?.student_id || req.body?.studentId ||
+                  req.body?.roll_number || req.body?.rollNo || req.body?.emailOrId ||
+                  req.body?.id || req.body?.identifier || req.body?.username || '';
     const cleanId = String(rawId).trim().toLowerCase();
     if (cleanId) return `account:${cleanId}`;
     return `ip:${getClientIp(req)}`;
@@ -188,8 +197,8 @@ const studentLoginLimiter = rateLimit({
     res.status(429).json({
       success: false,
       code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many sign-in attempts for this student account. Please wait 15 minutes or contact your college exam coordinator.',
-      retryAfter: 900
+      message: 'Too many sign-in attempts for this student account. Please wait a few minutes or contact your college exam coordinator.',
+      retryAfter: 300
     });
   }
 });

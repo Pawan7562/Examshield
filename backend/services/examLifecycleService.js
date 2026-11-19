@@ -57,6 +57,7 @@ async function autoCloseExpiredExams() {
 
     if (closedCount > 0 || closedSessionsCount > 0) {
       console.log(`[ExamLifecycle] Auto-closed ${closedCount} expired exams and auto-submitted ${closedSessionsCount} hanging sessions.`);
+      await syncMissingResultsForSubmittedSessions();
     }
 
     return {
@@ -66,6 +67,53 @@ async function autoCloseExpiredExams() {
   } catch (error) {
     console.error('[ExamLifecycle] Error during autoCloseExpiredExams:', error.message);
     return { error: error.message };
+  }
+}
+
+/**
+ * Ensures all submitted sessions have corresponding result records in the database
+ */
+async function syncMissingResultsForSubmittedSessions(examId = null) {
+  const insertQuery = `
+    INSERT INTO results (
+      session_id, student_id, exam_id,
+      mcq_marks, coding_marks, subjective_marks,
+      total_marks, marks_obtained, percentage, grade,
+      status, submitted_at, updated_at
+    )
+    SELECT
+      es.id as session_id,
+      es.student_id,
+      es.exam_id,
+      COALESCE(SUM(CASE WHEN q.type IN ('mcq', 'true_false') AND a.is_correct = true THEN COALESCE(a.marks_obtained, q.marks, 1) ELSE 0 END), 0) as mcq_marks,
+      COALESCE(SUM(CASE WHEN q.type = 'coding' THEN COALESCE(a.marks_obtained, 0) ELSE 0 END), 0) as coding_marks,
+      0 as subjective_marks,
+      COALESCE(e.total_marks, 100) as total_marks,
+      COALESCE(SUM(COALESCE(a.marks_obtained, 0)), 0) as marks_obtained,
+      CASE WHEN COALESCE(e.total_marks, 100) > 0
+           THEN ROUND((COALESCE(SUM(COALESCE(a.marks_obtained, 0)), 0) / COALESCE(e.total_marks, 100)) * 100, 2)
+           ELSE 0 END as percentage,
+      'F' as grade,
+      CASE WHEN COALESCE(SUM(COALESCE(a.marks_obtained, 0)), 0) >= COALESCE(e.passing_marks, 40) THEN 'pass' ELSE 'fail' END as status,
+      COALESCE(es.submitted_at, NOW()) as submitted_at,
+      NOW() as updated_at
+    FROM exam_sessions es
+    JOIN exams e ON es.exam_id = e.id
+    LEFT JOIN answers a ON a.session_id = es.id
+    LEFT JOIN questions q ON a.question_id = q.id
+    WHERE es.status = 'submitted'
+      ${examId ? 'AND es.exam_id = $1' : ''}
+      AND NOT EXISTS (
+        SELECT 1 FROM results r WHERE r.student_id = es.student_id AND r.exam_id = es.exam_id
+      )
+    GROUP BY es.id, es.student_id, es.exam_id, es.submitted_at, e.total_marks, e.passing_marks
+    ON CONFLICT (student_id, exam_id) DO NOTHING;
+  `;
+  try {
+    const params = examId ? [examId] : [];
+    await pool.query(insertQuery, params);
+  } catch (err) {
+    console.warn('[ExamLifecycle] syncMissingResults notice:', err.message);
   }
 }
 
@@ -101,6 +149,7 @@ async function checkAndCloseSpecificExam(examId) {
          WHERE exam_id = $1 AND status = 'active'`,
         [examId]
       );
+      await syncMissingResultsForSubmittedSessions(examId);
       return true;
     }
     return row.is_expired || row.status === 'completed';
@@ -112,5 +161,6 @@ async function checkAndCloseSpecificExam(examId) {
 
 module.exports = {
   autoCloseExpiredExams,
-  checkAndCloseSpecificExam
+  checkAndCloseSpecificExam,
+  syncMissingResultsForSubmittedSessions
 };
