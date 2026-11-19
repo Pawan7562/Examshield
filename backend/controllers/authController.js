@@ -7,7 +7,6 @@ try {
 }
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { createClient } = require('@supabase/supabase-js');
 const { supabase } = require('../config/supabase-clean');
 const { pool } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
