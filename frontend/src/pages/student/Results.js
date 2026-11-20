@@ -151,7 +151,7 @@ export default function StudentResults() {
 
       if (!payload?.success || !resData) {
         // Pending evaluation or informational status
-        const infoMsg = payload?.message || 'The results have not yet been published by the College Admin. Your results are currently unavailable and will be accessible once the College Admin officially publishes them.';
+        const infoMsg = payload?.message || 'Evaluation in Progress: Official transcripts will be released once grading is approved by your institution.';
         toast(infoMsg, {
           id: downloadId,
           icon: '📋',
@@ -384,43 +384,6 @@ export default function StudentResults() {
         </div>
       </div>
 
-      {/* Notice Banner when results are unpublished */}
-      {results.some(r => r.is_published === false) && (
-        <div style={{
-          background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-          border: '1.5px solid #fde68a',
-          borderRadius: '16px',
-          padding: '18px 22px',
-          marginBottom: '24px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '14px',
-          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
-        }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '10px',
-            background: '#fef3c7',
-            color: '#d97706',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
-            <Clock size={20} />
-          </div>
-          <div>
-            <h4 style={{ margin: '0 0 4px', fontSize: '0.94rem', fontWeight: 800, color: '#92400e' }}>
-              Results Awaiting Official College Release
-            </h4>
-            <p style={{ margin: 0, fontSize: '0.86rem', color: '#78350f', lineHeight: 1.55, fontWeight: 500 }}>
-              The results have not yet been published by the College Admin. Your examination submissions have been securely recorded, but official marks and certified transcripts will become accessible once the College Admin officially publishes them.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Transcripts List */}
       {filteredResults.length === 0 ? (
         <div style={{
@@ -530,7 +493,16 @@ export default function StudentResults() {
             <div className="rs-actions-col">
               <button
                 className="rs-btn-view"
-                onClick={() => setSelectedResult(result)}
+                onClick={() => {
+                  if (result.is_published === false) {
+                    toast('Official score breakdown and detailed answer keys will become visible once your institution publishes the gradebook.', {
+                      icon: '⏳',
+                      style: { background: '#0f172a', color: '#f8fafc', borderRadius: '10px', fontSize: '13px' }
+                    });
+                    return;
+                  }
+                  setSelectedResult(result);
+                }}
               >
                 <Eye size={15} /> View Audit
               </button>
@@ -538,8 +510,8 @@ export default function StudentResults() {
                 className="rs-btn-pdf"
                 onClick={() => {
                   if (result.is_published === false) {
-                    toast('The results have not yet been published by the College Admin. Transcripts will become downloadable once officially published.', {
-                      icon: '⏳',
+                    toast('Official certified transcripts become downloadable as soon as results are published by the examination authority.', {
+                      icon: '📄',
                       style: { background: '#0f172a', color: '#f8fafc', borderRadius: '10px', fontSize: '13px' }
                     });
                     return;
@@ -575,172 +547,81 @@ export default function StudentResults() {
               </button>
             </div>
 
-            {selectedResult.is_published === false ? (
-              <div>
-                {/* Institutional Notice Box */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                  border: '1.5px solid #fcd34d',
-                  borderRadius: '16px',
-                  padding: '20px 22px',
-                  marginBottom: '20px'
-                }}>
-                  <h4 style={{ margin: '0 0 6px', fontSize: '0.98rem', fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Clock size={18} color="#d97706" /> Results Awaiting Official College Release
-                  </h4>
-                  <p style={{ margin: 0, fontSize: '0.92rem', color: '#78350f', lineHeight: 1.6, fontWeight: 500 }}>
-                    The results have not yet been published by the College Admin. Please note that your results are currently unavailable and will be accessible once the College Admin officially publishes them.
-                  </p>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '20px' }}>
-                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Subject Domain</span>
-                    <p style={{ margin: '4px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selectedResult.subject || 'Core Curriculum'}</p>
-                  </div>
-
-                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Date Submitted</span>
-                    <p style={{ margin: '4px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>
-                      {formatIST(selectedResult.date_time || Date.now(), 'dateTime')}
-                    </p>
-                  </div>
-
-                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Submission Status</span>
-                    <p style={{ margin: '4px 0 0', fontWeight: 800, color: '#d97706', fontSize: '0.95rem' }}>
-                      Recorded · Pending Approval
-                    </p>
-                  </div>
-
-                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Official Transcripts</span>
-                    <p style={{ margin: '4px 0 0', fontWeight: 800, color: '#64748b', fontSize: '0.95rem' }}>
-                      Locked by College Admin
-                    </p>
-                  </div>
-                </div>
-
-                {/* Proctoring Verification Box */}
-                <div style={{
-                  background: '#f0fdf4',
-                  border: '1.5px solid #bbf7d0',
-                  borderRadius: '14px',
-                  padding: '14px 18px',
-                  marginBottom: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
-                  <CheckCircle2 size={24} color="#16a34a" style={{ flexShrink: 0 }} />
-                  <div>
-                    <h5 style={{ margin: '0 0 2px', fontSize: '0.88rem', fontWeight: 800, color: '#166534' }}>
-                      Proctoring Audit Confirmed
-                    </h5>
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#15803d' }}>
-                      Zero biometric anomalies or active tab-switches recorded during the proctored duration.
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={() => setSelectedResult(null)}
-                    style={{
-                      height: '42px',
-                      padding: '0 24px',
-                      background: '#0f172a',
-                      border: 'none',
-                      borderRadius: '10px',
-                      color: '#ffffff',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Got It, Return
-                  </button>
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '24px' }}>
+              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Subject Domain</span>
+                <p style={{ margin: '4px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selectedResult.subject || 'Core Curriculum'}</p>
               </div>
-            ) : (
-              <div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '24px' }}>
-                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Subject Domain</span>
-                    <p style={{ margin: '4px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selectedResult.subject || 'Core Curriculum'}</p>
-                  </div>
 
-                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Date Submitted</span>
-                    <p style={{ margin: '4px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>
-                      {formatIST(selectedResult.date_time || Date.now(), 'dateTime')}
-                    </p>
-                  </div>
-
-                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Score / Maximum</span>
-                    <p style={{ margin: '4px 0 0', fontWeight: 800, color: '#0f172a', fontSize: '1.1rem' }}>
-                      {selectedResult.marks_obtained} <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>/ {selectedResult.total_marks}</span>
-                    </p>
-                  </div>
-
-                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Academic Rating</span>
-                    <p style={{ margin: '4px 0 0', fontWeight: 800, color: '#0a74da', fontSize: '1.1rem' }}>
-                      Grade {selectedResult.grade || 'A'} ({selectedResult.percentage}%)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Proctoring Verification Box */}
-                <div style={{
-                  background: '#f0fdf4',
-                  border: '1.5px solid #bbf7d0',
-                  borderRadius: '14px',
-                  padding: '14px 18px',
-                  marginBottom: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
-                  <CheckCircle2 size={24} color="#16a34a" style={{ flexShrink: 0 }} />
-                  <div>
-                    <h5 style={{ margin: '0 0 2px', fontSize: '0.88rem', fontWeight: 800, color: '#166534' }}>
-                      Proctoring Audit Confirmed
-                    </h5>
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#15803d' }}>
-                      Zero biometric anomalies or active tab-switches recorded during the proctored duration.
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={() => setSelectedResult(null)}
-                    style={{
-                      height: '42px',
-                      padding: '0 18px',
-                      background: '#f1f5f9',
-                      border: 'none',
-                      borderRadius: '10px',
-                      color: '#475569',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Close Audit
-                  </button>
-                  <button
-                    onClick={() => downloadResultPDF(selectedResult)}
-                    className="rs-lookup-btn"
-                    style={{ height: '42px' }}
-                  >
-                    <Download size={16} /> Download Signed PDF Slip
-                  </button>
-                </div>
+              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Date Submitted</span>
+                <p style={{ margin: '4px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>
+                  {formatIST(selectedResult.date_time || Date.now(), 'dateTime')}
+                </p>
               </div>
-            )}
+
+              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Score / Maximum</span>
+                <p style={{ margin: '4px 0 0', fontWeight: 800, color: '#0f172a', fontSize: '1.1rem' }}>
+                  {selectedResult.marks_obtained} <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>/ {selectedResult.total_marks}</span>
+                </p>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Academic Rating</span>
+                <p style={{ margin: '4px 0 0', fontWeight: 800, color: '#0a74da', fontSize: '1.1rem' }}>
+                  Grade {selectedResult.grade || 'A'} ({selectedResult.percentage}%)
+                </p>
+              </div>
+            </div>
+
+            {/* Proctoring Verification Box */}
+            <div style={{
+              background: '#f0fdf4',
+              border: '1.5px solid #bbf7d0',
+              borderRadius: '14px',
+              padding: '14px 18px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <CheckCircle2 size={24} color="#16a34a" style={{ flexShrink: 0 }} />
+              <div>
+                <h5 style={{ margin: '0 0 2px', fontSize: '0.88rem', fontWeight: 800, color: '#166534' }}>
+                  Proctoring Audit Confirmed
+                </h5>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#15803d' }}>
+                  Zero biometric anomalies or active tab-switches recorded during the proctored duration.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setSelectedResult(null)}
+                style={{
+                  height: '42px',
+                  padding: '0 18px',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Close Audit
+              </button>
+              <button
+                onClick={() => downloadResultPDF(selectedResult)}
+                className="rs-lookup-btn"
+                style={{ height: '42px' }}
+              >
+                <Download size={16} /> Download Signed PDF Slip
+              </button>
+            </div>
           </div>
         </div>
       )}

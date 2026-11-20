@@ -433,7 +433,6 @@ export default function StudentDashboard() {
               <div>
                 {results.slice(0, 3).map((resItem, idx) => {
                   const pct = Number(resItem.percentage) || 0;
-                  const isPublished = resItem.is_published !== false;
                   const isPassed = resItem.status === 'pass' || pct >= 40;
 
                   return (
@@ -441,7 +440,6 @@ export default function StudentDashboard() {
                       key={resItem.id || idx}
                       className="sd-result-item"
                       onClick={() => navigate(`/student/results/${resItem.exam_id || resItem.id}`)}
-                      title={!isPublished ? 'The results have not yet been published by the College Admin' : 'View official transcript'}
                     >
                       <div className="sd-exam-info-col">
                         <div className="sd-exam-tag-row">
@@ -460,32 +458,17 @@ export default function StudentDashboard() {
                       </div>
 
                       <div className="sd-result-score-block">
-                        {!isPublished ? (
-                          <>
-                            <span className="sd-score-num" style={{ color: '#d97706', fontSize: '0.85rem', fontWeight: 800 }}>
-                              Results Pending
-                            </span>
-                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                              <span className="sd-badge-eval" style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontSize: '0.7rem' }}>
-                                AWAITING PUBLICATION
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <span className="sd-score-num" style={{ color: isPassed ? '#10b981' : '#b45309' }}>
-                              {resItem.score !== undefined ? resItem.score : resItem.marks_obtained ?? '—'} / {resItem.total_marks || resItem.totalMarks || 100}
-                            </span>
-                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                              <span className={isPassed ? 'sd-badge-pass' : 'sd-badge-eval'}>
-                                {resItem.status === 'pending' ? 'Evaluating' : isPassed ? 'PASSED' : 'COMPLETED'}
-                              </span>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>
-                                ({pct}%)
-                              </span>
-                            </div>
-                          </>
-                        )}
+                        <span className="sd-score-num" style={{ color: isPassed ? '#10b981' : '#b45309' }}>
+                          {resItem.score !== undefined ? resItem.score : resItem.marks_obtained ?? '—'} / {resItem.total_marks || resItem.totalMarks || 100}
+                        </span>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <span className={isPassed ? 'sd-badge-pass' : 'sd-badge-eval'}>
+                            {resItem.status === 'pending' ? 'Evaluating' : isPassed ? 'PASSED' : 'COMPLETED'}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>
+                            ({pct}%)
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
