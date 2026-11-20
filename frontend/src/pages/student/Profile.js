@@ -1,6 +1,7 @@
 // src/pages/student/Profile.js
 import React, { useEffect, useState } from 'react';
 import { studentAPI } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { 
   User, 
@@ -21,21 +22,32 @@ import {
 import './Profile.css';
 
 export default function Profile() {
-  const [profile, setProfile] = useState(null);
+  const { user: authUser } = useAuth();
+  const [profile, setProfile] = useState(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      return stored ? JSON.parse(stored) : null;
+    } catch (_) {
+      return null;
+    }
+  });
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [pwLoading, setPwLoading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!profile);
 
   useEffect(() => {
     studentAPI.getProfile()
       .then(r => {
-        setProfile(r.data.profile || r.data.data);
+        const studentProfile = r?.data?.student || r?.data?.profile || r?.data || r?.profile || r?.student || r;
+        if (studentProfile && typeof studentProfile === 'object') {
+          setProfile(prev => ({ ...(prev || {}), ...studentProfile }));
+        }
       })
-      .catch(() => {
-        toast.error('Failed to load candidate profile');
+      .catch((err) => {
+        console.error('Failed to load candidate profile:', err);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -83,7 +95,7 @@ export default function Profile() {
     );
   }
 
-  const initial = profile?.name ? profile.name.charAt(0).toUpperCase() : 'S';
+  const initial = (profile?.name || authUser?.name) ? (profile?.name || authUser?.name).charAt(0).toUpperCase() : 'S';
 
   return (
     <div className="pf-container">
@@ -121,30 +133,30 @@ export default function Profile() {
           </div>
 
           <div className="pf-passport-body">
-            <h2 className="pf-candidate-name">{profile?.name || 'Verified Student'}</h2>
+            <h2 className="pf-candidate-name">{profile?.name || authUser?.name || 'Verified Student'}</h2>
             <div className="pf-candidate-id">
-              ID: {profile?.student_id || profile?.id ? `EXS-${(profile.student_id || profile.id).slice(0, 8).toUpperCase()}` : 'EXS-CANDIDATE'}
+              ID: {profile?.student_id || profile?.studentId || authUser?.studentId || (profile?.id ? `EXS-${profile.id.slice(0, 8).toUpperCase()}` : 'EXS-CANDIDATE')}
             </div>
             <div className="pf-institution-name">
-              {profile?.college_name || 'Enrolled Academic Institution'}
+              {profile?.college_name || profile?.collegeName || authUser?.collegeName || 'Enrolled Academic Institution'}
             </div>
 
             <div className="pf-passport-list">
               <div className="pf-passport-item">
                 <span>Roll / Reg No:</span>
-                <span>{profile?.roll_no || 'Assigned via Portal'}</span>
+                <span>{profile?.roll_no || profile?.rollNo || authUser?.rollNo || 'Assigned via Portal'}</span>
               </div>
               <div className="pf-passport-item">
                 <span>Department:</span>
-                <span>{profile?.department || 'Information Technology'}</span>
+                <span>{profile?.department || authUser?.department || 'Information Technology'}</span>
               </div>
               <div className="pf-passport-item">
                 <span>Academic Semester:</span>
-                <span>{profile?.semester ? `Semester ${profile.semester}` : 'Current Term'}</span>
+                <span>{profile?.semester ? `Semester ${profile.semester}` : (profile?.department ? 'Current Term' : 'N/A')}</span>
               </div>
               <div className="pf-passport-item">
                 <span>Graduation Batch:</span>
-                <span>{profile?.batch || '2024 - 2028'}</span>
+                <span>{profile?.batch || authUser?.batch || '2024 - 2028'}</span>
               </div>
             </div>
 
@@ -177,7 +189,7 @@ export default function Profile() {
                 </div>
                 <div>
                   <div className="pf-field-label">Full Legal Name</div>
-                  <div className="pf-field-val">{profile?.name || 'Candidate'}</div>
+                  <div className="pf-field-val">{profile?.name || authUser?.name || 'Candidate'}</div>
                 </div>
               </div>
 
@@ -187,7 +199,7 @@ export default function Profile() {
                 </div>
                 <div>
                   <div className="pf-field-label">Institutional Email</div>
-                  <div className="pf-field-val">{profile?.email || 'N/A'}</div>
+                  <div className="pf-field-val">{profile?.email || authUser?.email || 'N/A'}</div>
                 </div>
               </div>
 
@@ -197,7 +209,7 @@ export default function Profile() {
                 </div>
                 <div>
                   <div className="pf-field-label">College / University</div>
-                  <div className="pf-field-val">{profile?.college_name || 'Academic Institution'}</div>
+                  <div className="pf-field-val">{profile?.college_name || profile?.collegeName || authUser?.collegeName || 'Academic Institution'}</div>
                 </div>
               </div>
 
@@ -207,7 +219,7 @@ export default function Profile() {
                 </div>
                 <div>
                   <div className="pf-field-label">Assigned Roll Number</div>
-                  <div className="pf-field-val">{profile?.roll_no || 'Not Assigned'}</div>
+                  <div className="pf-field-val">{profile?.roll_no || profile?.rollNo || authUser?.rollNo || 'Not Assigned'}</div>
                 </div>
               </div>
 
@@ -217,7 +229,7 @@ export default function Profile() {
                 </div>
                 <div>
                   <div className="pf-field-label">Enrolled Batch</div>
-                  <div className="pf-field-val">{profile?.batch || 'Active Academic Year'}</div>
+                  <div className="pf-field-val">{profile?.batch || authUser?.batch || 'Active Academic Year'}</div>
                 </div>
               </div>
 
@@ -228,7 +240,9 @@ export default function Profile() {
                 <div>
                   <div className="pf-field-label">Registration Date</div>
                   <div className="pf-field-val">
-                    {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'Verified Account'}
+                    {(profile?.created_at || authUser?.created_at)
+                      ? new Date(profile?.created_at || authUser?.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : 'Verified Account'}
                   </div>
                 </div>
               </div>

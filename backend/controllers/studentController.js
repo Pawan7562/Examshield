@@ -529,39 +529,34 @@ exports.getStudentProfile = async (req, res) => {
   try {
     const studentId = req.user.id;
     
-    const { data: student, error } = await supabase
-      .from('students')
-      .select('*')
-      .eq('id', studentId)
-      .single();
+    const result = await pool.query(
+      `SELECT 
+        s.id, s.student_id, s.name, s.email, s.roll_no, s.department, 
+        s.semester, s.batch, s.phone, s.college_id, s.is_active, s.created_at,
+        c.name as college_name
+       FROM students s
+       LEFT JOIN colleges c ON s.college_id = c.id
+       WHERE s.id = $1`,
+      [studentId]
+    );
 
-    if (error) {
-      console.error('Get student profile error:', error);
-      throw error;
-    }
-
-    if (!student) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Student not found'
       });
     }
 
-    // Remove password from response
-    const { password, ...studentData } = student;
+    const studentData = result.rows[0];
 
     res.json({
       success: true,
-      data: studentData
+      data: studentData,
+      profile: studentData
     });
-
   } catch (error) {
     console.error('Get student profile error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get student profile',
-      error: error.message
-    });
+    return sendErrorResponse(res, error, 'Failed to get student profile');
   }
 };
 
