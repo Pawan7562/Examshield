@@ -38,6 +38,7 @@ const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
 const ExamList = lazy(() => import('./pages/student/ExamList'));
 const ExamRoom = lazy(() => import('./pages/student/ExamRoom'));
 const StudentResults = lazy(() => import('./pages/student/Results'));
+const StudentResultDetail = lazy(() => import('./pages/student/StudentResultDetail'));
 const Profile = lazy(() => import('./pages/student/Profile'));
 const PasswordReset = lazy(() => import('./pages/student/PasswordReset'));
 const Settings = lazy(() => import('./pages/student/Settings'));
@@ -166,6 +167,7 @@ function App() {
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="exams" element={<ExamList />} />
             <Route path="results" element={<StudentResults />} />
+            <Route path="results/:id" element={<StudentResultDetail />} />
             <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />
           </Route>

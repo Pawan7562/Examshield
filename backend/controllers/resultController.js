@@ -352,9 +352,11 @@ exports.getStudentExamResult = async (req, res) => {
     const studentId = req.user.id;
 
     const result = await query(
-      `SELECT r.*, COALESCE(e.title, e.name, 'Examination') as exam_name, e.type, e.total_marks, e.passing_marks, e.subject
-       FROM results r JOIN exams e ON r.exam_id = e.id
-       WHERE r.exam_id = $1 AND r.student_id = $2`,
+      `SELECT r.*, COALESCE(e.title, e.name, 'Examination') as exam_name, e.type, e.total_marks, e.passing_marks, e.subject, e.exam_code, e.date_time as exam_date, s.name as student_name, s.student_id as student_roll_no
+       FROM results r 
+       JOIN exams e ON r.exam_id = e.id
+       JOIN students s ON r.student_id = s.id
+       WHERE (r.exam_id = $1 OR r.id = $1) AND r.student_id = $2`,
       [examId, studentId]
     );
 
@@ -376,10 +378,11 @@ exports.getStudentExamResult = async (req, res) => {
             marks_obtained: null,
             percentage: null,
             grade: 'Pending Review',
-            display_status: 'evaluation_pending'
+            display_status: 'evaluation_pending',
+            is_published: false
           },
           answers: [],
-          notice: 'Official scores and detailed answer reviews will be made available once your institution publishes the exam gradebook.'
+          notice: 'The results have not yet been published by the College Admin. Your results are currently unavailable and will be accessible once the College Admin officially publishes them.'
         }
       });
     }
@@ -426,7 +429,7 @@ exports.getStudentResultByKey = async (req, res) => {
         return res.status(200).json({
           success: false,
           isPending: true,
-          message: 'Evaluation Under Review: Your exam has been completed. Official transcripts will be released once grading is approved by your institution.'
+          message: 'The results have not yet been published by the College Admin. Your results are currently unavailable and will be accessible once the College Admin officially publishes them.'
         });
       }
 
