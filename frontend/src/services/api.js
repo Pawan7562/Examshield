@@ -381,6 +381,7 @@ export const superAdminAPI = {
   getEnquiries: (params) => api.get('/super-admin/enquiries', { params }),
   updateEnquiryStatus: (id, data) => api.patch(`/super-admin/enquiries/${id}/status`, data),
   deleteEnquiry: (id) => api.delete(`/super-admin/enquiries/${id}`),
+  getGrowthMetrics: () => api.get('/super-admin/growth-metrics'),
 };
 
 export default api;

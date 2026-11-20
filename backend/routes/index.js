@@ -282,6 +282,7 @@ superAdmin.put('/settings', subscriptionController.updatePlatformSettings);
 superAdmin.get('/enquiries', enquiryController.getAllEnquiries);
 superAdmin.patch('/enquiries/:id/status', enquiryController.updateEnquiryStatus);
 superAdmin.delete('/enquiries/:id', enquiryController.deleteEnquiry);
+superAdmin.get('/growth-metrics', enquiryController.getGrowthMetrics);
 
 router.use('/super-admin', superAdmin);
 

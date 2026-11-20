@@ -51,6 +51,7 @@ const AdminResetPassword = lazy(() => import('./pages/auth/AdminResetPassword'))
 const SuperAdminDashboard = lazy(() => import('./pages/super-admin/Dashboard'));
 const CollegeManagement = lazy(() => import('./pages/super-admin/CollegeManagement'));
 const SuperAdminEnquiries = lazy(() => import('./pages/super-admin/Enquiries'));
+const SuperAdminGrowth = lazy(() => import('./pages/super-admin/GrowthDashboard'));
 const PaymentManagement = lazy(() => import('./pages/super-admin/PaymentManagement'));
 const AuditLogs = lazy(() => import('./pages/super-admin/AuditLogs'));
 const PlatformSettings = lazy(() => import('./pages/super-admin/PlatformSettings'));
@@ -223,6 +224,7 @@ function App() {
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="colleges" element={<CollegeManagement />} />
             <Route path="enquiries" element={<SuperAdminEnquiries />} />
+            <Route path="growth" element={<SuperAdminGrowth />} />
             <Route path="payments" element={<PaymentManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="settings" element={<PlatformSettings />} />

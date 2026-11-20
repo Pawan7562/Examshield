@@ -1693,7 +1693,17 @@ const sendPasswordChangedAlert = async ({ name, email, collegeName, ip, userAgen
   }
 };
 
+const sendCustomEmail = async (to, subject, html, text) => {
+  return sendWithRetry({
+    to,
+    subject,
+    text: text || (html ? html.replace(/<[^>]*>?/gm, '') : subject),
+    html,
+  });
+};
+
 module.exports = {
+  sendCustomEmail,
   sendStudentCredentials,
   sendExamNotification,
   sendExamReminder,

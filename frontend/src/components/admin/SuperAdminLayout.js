@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Building2,
   Inbox,
+  TrendingUp,
   CreditCard,
   ShieldCheck,
   Sliders,
@@ -34,6 +35,7 @@ export default function SuperAdminLayout() {
   };
 
   const getPageTitle = () => {
+    if (location.pathname.includes('/growth')) return 'National Organic SEO & Customer Acquisition';
     if (location.pathname.includes('/enquiries')) return 'Institutional Inquiries & Demo Leads';
     if (location.pathname.includes('/colleges')) return 'Multi-Tenant Directory & Onboarding';
     if (location.pathname.includes('/payments')) return 'Payments, MRR & Financial Ledger';
@@ -60,6 +62,12 @@ export default function SuperAdminLayout() {
       icon: Inbox,
       label: 'Institutional Leads',
       badge: 'Leads',
+    },
+    {
+      to: '/super-admin/growth',
+      icon: TrendingUp,
+      label: 'SEO & Growth Engine',
+      badge: 'Metrics',
     },
     {
       to: '/super-admin/payments',
