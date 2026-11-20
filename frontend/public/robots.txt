@@ -1,15 +1,27 @@
 # robots.txt for Nexify Examina (https://exam.nexifyforge.in/)
-# Online Exam & AI Proctoring Platform for Colleges and Schools
+# India's Leading Online Examination, Coding Assessment & AI Proctoring Platform
 
 User-agent: *
-# Allow crawling of all public institutional marketing, features, and documentation
+# Allow crawling of all public institutional solutions, features, pricing, blog, and documentation
 Allow: /
+Allow: /online-examination-software
+Allow: /college-examination-software
+Allow: /university-examination-software
+Allow: /school-examination-software
+Allow: /coaching-institute-examination-software
+Allow: /ai-proctoring-software
+Allow: /coding-assessment-platform
+Allow: /online-assessment-software
+Allow: /book-demo
+Allow: /pricing
 Allow: /features
 Allow: /how-it-works
-Allow: /pricing
+Allow: /faq
+Allow: /blog
+Allow: /blog/
 Allow: /about
 Allow: /contact
-Allow: /faq
+Allow: /llms.txt
 
 # Block crawling of authenticated portals, candidate examination sessions, and internal APIs
 Disallow: /admin/

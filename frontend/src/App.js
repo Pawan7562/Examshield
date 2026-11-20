@@ -14,6 +14,11 @@ import HowItWorksPage from './pages/public/HowItWorks';
 import PricingPage from './pages/public/Pricing';
 import ContactPage from './pages/public/Contact';
 import AboutPage from './pages/public/About';
+import FAQPage from './pages/public/FAQ';
+import BookDemo from './pages/public/BookDemo';
+import InstitutionalLandingPage from './pages/public/InstitutionalLandingPage';
+import BlogIndex from './pages/public/BlogIndex';
+import BlogPost from './pages/public/BlogPost';
 
 import AdminLayout from './components/admin/AdminLayout';
 import StudentLayout from './components/student/StudentLayout';
@@ -45,6 +50,7 @@ const AdminResetPassword = lazy(() => import('./pages/auth/AdminResetPassword'))
 
 const SuperAdminDashboard = lazy(() => import('./pages/super-admin/Dashboard'));
 const CollegeManagement = lazy(() => import('./pages/super-admin/CollegeManagement'));
+const SuperAdminEnquiries = lazy(() => import('./pages/super-admin/Enquiries'));
 const PaymentManagement = lazy(() => import('./pages/super-admin/PaymentManagement'));
 const AuditLogs = lazy(() => import('./pages/super-admin/AuditLogs'));
 const PlatformSettings = lazy(() => import('./pages/super-admin/PlatformSettings'));
@@ -111,11 +117,29 @@ function App() {
           <Suspense fallback={<PageFallback />}>
             <Routes>
             <Route path="/" element={<Home />} />
-          <Route path="/features" element={<FeaturesPage />} />
-          <Route path="/how-it-works" element={<HowItWorksPage />} />
-          <Route path="/pricing" element={<Navigate to="/" replace />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/about" element={<AboutPage />} />
+            <Route path="/features" element={<FeaturesPage />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/book-demo" element={<BookDemo />} />
+            <Route path="/demo" element={<Navigate to="/book-demo" replace />} />
+            <Route path="/free-trial" element={<Navigate to="/book-demo" replace />} />
+
+            {/* Dedicated High-Converting Institutional Landing Pages */}
+            <Route path="/online-examination-software" element={<InstitutionalLandingPage forcedSlug="online-examination-software" />} />
+            <Route path="/college-examination-software" element={<InstitutionalLandingPage forcedSlug="college-examination-software" />} />
+            <Route path="/university-examination-software" element={<InstitutionalLandingPage forcedSlug="university-examination-software" />} />
+            <Route path="/school-examination-software" element={<InstitutionalLandingPage forcedSlug="school-examination-software" />} />
+            <Route path="/coaching-institute-examination-software" element={<InstitutionalLandingPage forcedSlug="coaching-institute-examination-software" />} />
+            <Route path="/ai-proctoring-software" element={<InstitutionalLandingPage forcedSlug="ai-proctoring-software" />} />
+            <Route path="/coding-assessment-platform" element={<InstitutionalLandingPage forcedSlug="coding-assessment-platform" />} />
+            <Route path="/online-assessment-software" element={<InstitutionalLandingPage forcedSlug="online-assessment-software" />} />
+
+            {/* Educational Knowledge Hub & Blog Engine */}
+            <Route path="/blog" element={<BlogIndex />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<Login role="admin" />} />
           <Route path="/register" element={<Register />} />
@@ -198,6 +222,7 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="colleges" element={<CollegeManagement />} />
+            <Route path="enquiries" element={<SuperAdminEnquiries />} />
             <Route path="payments" element={<PaymentManagement />} />
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="settings" element={<PlatformSettings />} />

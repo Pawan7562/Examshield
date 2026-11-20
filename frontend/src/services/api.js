@@ -378,6 +378,9 @@ export const superAdminAPI = {
   getAuditLogs: (params) => api.get('/super-admin/audit-logs', { params }),
   getSettings: () => api.get('/super-admin/settings'),
   updateSettings: (data) => api.put('/super-admin/settings', data),
+  getEnquiries: (params) => api.get('/super-admin/enquiries', { params }),
+  updateEnquiryStatus: (id, data) => api.patch(`/super-admin/enquiries/${id}/status`, data),
+  deleteEnquiry: (id) => api.delete(`/super-admin/enquiries/${id}`),
 };
 
 export default api;

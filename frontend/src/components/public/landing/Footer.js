@@ -76,12 +76,12 @@ export default function Footer() {
           <div className="es-footer-col">
             <h4 className="es-footer-heading">Campus Solutions</h4>
             <ul className="es-footer-links-list" role="list">
-              <li><a href="#solutions">Universities &amp; Colleges</a></li>
-              <li><a href="#solutions">Certification Boards</a></li>
-              <li><a href="#solutions">Invigilators &amp; Faculty</a></li>
-              <li><a href="#solutions">Students &amp; Candidates</a></li>
-              <li><Link to={PORTAL_LINKS.contact}>Custom Institutional SLA</Link></li>
-              <li><Link to={PORTAL_LINKS.contact}>Faculty Accreditation Pilot</Link></li>
+              <li><Link to="/college-examination-software">College Examination Software</Link></li>
+              <li><Link to="/university-examination-software">University Exam Management</Link></li>
+              <li><Link to="/school-examination-software">School Examination Software</Link></li>
+              <li><Link to="/coaching-institute-examination-software">Coaching Test Series Platform</Link></li>
+              <li><Link to="/coding-assessment-platform">Coding Assessment Compiler</Link></li>
+              <li><Link to="/ai-proctoring-software">AI Proctoring &amp; Invigilation</Link></li>
             </ul>
           </div>
 
@@ -105,15 +105,14 @@ export default function Footer() {
 
           {/* Column 5: Company & Governance */}
           <div className="es-footer-col">
-            <h4 className="es-footer-heading">Company &amp; Trust</h4>
+            <h4 className="es-footer-heading">Company &amp; Resources</h4>
             <ul className="es-footer-links-list" role="list">
-              <li><Link to="/about">About Nexify Examina &amp; Team</Link></li>
+              <li><Link to="/about">About Nexify Examina</Link></li>
+              <li><Link to="/blog">Knowledge Hub &amp; Blog</Link></li>
+              <li><Link to="/pricing">Institutional Pricing</Link></li>
+              <li><Link to="/faq">Frequently Asked Questions</Link></li>
+              <li><Link to="/online-examination-software">National CBT Platform</Link></li>
               <li><Link to="/contact">Contact Support &amp; Sales</Link></li>
-              <li><a href="#security">Security Architecture</a></li>
-              <li><a href="#security">Zero-Data Retention Policy</a></li>
-              <li><a href="#security">Human-in-the-Loop Standard</a></li>
-              <li><a href="#faq">Institutional FAQ</a></li>
-              <li><a href="https://exam.nexifyforge.in/">Production Host</a></li>
             </ul>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-do
 import {
   LayoutDashboard,
   Building2,
+  Inbox,
   CreditCard,
   ShieldCheck,
   Sliders,
@@ -33,6 +34,7 @@ export default function SuperAdminLayout() {
   };
 
   const getPageTitle = () => {
+    if (location.pathname.includes('/enquiries')) return 'Institutional Inquiries & Demo Leads';
     if (location.pathname.includes('/colleges')) return 'Multi-Tenant Directory & Onboarding';
     if (location.pathname.includes('/payments')) return 'Payments, MRR & Financial Ledger';
     if (location.pathname.includes('/audit-logs')) return 'Security Audit & Compliance Logs';
@@ -52,6 +54,12 @@ export default function SuperAdminLayout() {
       icon: Building2,
       label: 'Tenants & Onboarding',
       badge: null,
+    },
+    {
+      to: '/super-admin/enquiries',
+      icon: Inbox,
+      label: 'Institutional Leads',
+      badge: 'Leads',
     },
     {
       to: '/super-admin/payments',

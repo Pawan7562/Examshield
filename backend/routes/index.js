@@ -17,6 +17,7 @@ const aiQuestionController = require('../controllers/aiQuestionController');
 const codeExecutionController = require('../controllers/codeExecutionController');
 const liveMonitoringController = require('../controllers/liveMonitoringController');
 const supportController = require('../controllers/supportController');
+const enquiryController = require('../controllers/enquiryController');
 
 // Student password routes
 const studentPasswordRoutes = require('./studentPasswordRoutes');
@@ -278,7 +279,15 @@ superAdmin.get('/audit-logs', subscriptionController.getAuditLogs);
 superAdmin.get('/settings', subscriptionController.getPlatformSettings);
 superAdmin.put('/settings', subscriptionController.updatePlatformSettings);
 
+superAdmin.get('/enquiries', enquiryController.getAllEnquiries);
+superAdmin.patch('/enquiries/:id/status', enquiryController.updateEnquiryStatus);
+superAdmin.delete('/enquiries/:id', enquiryController.deleteEnquiry);
+
 router.use('/super-admin', superAdmin);
+
+// Institutional Enquiries
+router.post('/public/enquiries', enquiryController.createEnquiry);
+router.post('/enquiries', enquiryController.createEnquiry);
 
 // =====================================================
 // STUDENT PASSWORD ROUTES (Public - No authentication required)

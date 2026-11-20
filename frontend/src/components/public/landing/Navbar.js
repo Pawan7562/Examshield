@@ -70,7 +70,8 @@ export default function Navbar() {
   const desktopNavItems = [
     { label: 'Features', to: '/features' },
     { label: 'How It Works', to: '/how-it-works' },
-    { label: 'Institutions', href: isHome ? '#command-suite' : '/#command-suite' },
+    { label: 'Pricing', to: '/pricing' },
+    { label: 'Blog', to: '/blog' },
     { label: 'About', to: '/about' },
     { label: 'Contact', to: '/contact' },
   ];
@@ -80,8 +81,9 @@ export default function Navbar() {
     { label: 'Overview', to: '/' },
     { label: 'Features', to: '/features' },
     { label: 'How It Works', to: '/how-it-works' },
-    { label: 'Institutions', href: isHome ? '#command-suite' : '/#command-suite' },
-    { label: 'Security & Compliance', href: isHome ? '#security' : '/#security' },
+    { label: 'Pricing Plans', to: '/pricing' },
+    { label: 'Knowledge Hub & Blog', to: '/blog' },
+    { label: 'Book Demo & Trial', to: '/book-demo' },
     { label: 'About Nexify Examina', to: '/about' },
     { label: 'Contact & Support', to: '/contact' },
   ];

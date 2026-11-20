@@ -11,51 +11,154 @@
     <priority>1.0</priority>
   </url>
 
-  <!-- Features: AI Proctoring, Coding Sandbox Compiler, Kiosk Lockdown -->
+  <!-- Core National & Institutional Solutions -->
   <url>
-    <loc>https://exam.nexifyforge.in/features</loc>
+    <loc>https://exam.nexifyforge.in/online-examination-software</loc>
     <lastmod>2026-11-20</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.95</priority>
   </url>
 
-  <!-- How It Works: Step-by-Step Exam Conduct & Live Invigilation -->
   <url>
-    <loc>https://exam.nexifyforge.in/how-it-works</loc>
+    <loc>https://exam.nexifyforge.in/college-examination-software</loc>
     <lastmod>2026-11-20</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.95</priority>
   </url>
 
-  <!-- Pricing: Institutional & College Subscription Plans -->
+  <url>
+    <loc>https://exam.nexifyforge.in/university-examination-software</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/ai-proctoring-software</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/coding-assessment-platform</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/school-examination-software</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/coaching-institute-examination-software</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/online-assessment-software</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Lead Conversion & Booking -->
+  <url>
+    <loc>https://exam.nexifyforge.in/book-demo</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+
   <url>
     <loc>https://exam.nexifyforge.in/pricing</loc>
     <lastmod>2026-11-20</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.85</priority>
   </url>
 
-  <!-- FAQ: Frequently Asked Questions on College Online Exams & AI Proctoring -->
+  <!-- Knowledge Hub & Educational Blog -->
+  <url>
+    <loc>https://exam.nexifyforge.in/blog</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/blog/best-online-examination-software-for-colleges-india</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/blog/how-ai-proctoring-works-in-online-examinations</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/blog/online-coding-assessment-platform-for-engineering-colleges</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/blog/how-to-conduct-online-exams-for-2000-students</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/blog/how-schools-can-conduct-secure-online-examinations</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+
+  <!-- Product & Trust Documentation -->
+  <url>
+    <loc>https://exam.nexifyforge.in/features</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://exam.nexifyforge.in/how-it-works</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
   <url>
     <loc>https://exam.nexifyforge.in/faq</loc>
     <lastmod>2026-11-20</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.80</priority>
   </url>
 
-  <!-- About Us: Nexify Forge Platform Architecture & Founders -->
   <url>
     <loc>https://exam.nexifyforge.in/about</loc>
     <lastmod>2026-11-20</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.70</priority>
   </url>
 
-  <!-- Contact: College Demo, University Pilot & Institutional Consultation -->
   <url>
     <loc>https://exam.nexifyforge.in/contact</loc>
     <lastmod>2026-11-20</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.75</priority>
   </url>
 </urlset>

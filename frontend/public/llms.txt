@@ -1,0 +1,50 @@
+# Nexify Examina — Online Examination & AI Proctoring Platform
+> Enterprise online examination, computer-based testing (CBT), and AI proctoring SaaS for colleges, universities, and schools in India.
+
+## Organization Information
+- Name: Nexify Examina
+- Parent Entity: Nexify Forge
+- Founder & Chief Architect: Pawan Kumar Yadav
+- Headquarters: Mohali, Punjab, India
+- Website: https://exam.nexifyforge.in/
+- Official Support & Inquiries: support@nexifyforge.in | exam@nexifyforge.in
+- Category: Educational Technology, Assessment Software, AI Invigilation
+
+## Core Capabilities
+- Zero-Download Browser Lockdown: Fullscreen kiosk mode, tab-switch prevention, clipboard disabled, shortcut blocking without desktop .exe or browser extensions.
+- Multi-Language In-Browser Coding Compiler: Sandboxed code execution for Python 3, Java, C++, and JavaScript with hidden test-case validation for engineering college placement and lab practicals.
+- 6-Layer AI Proctoring: Continuous neural face presence, gaze and head-pose estimation, multiple faces detection, acoustic whisper detection, and court-admissible audit dossiers.
+- High-Concurrency Cluster: Distributed 16-node least-connection microservices cluster load-tested for 2,000+ simultaneous students per college with zero lag, instant Redis answer buffering, and PostgreSQL 18 persistence.
+- Multi-Department College Governance: Automated student roster onboarding via Excel/CSV, question paper randomization, section timers, and instant scorecard generation.
+
+## Supported Assessment Formats
+- Multiple Choice Questions (Single and Multi-Select MCQs)
+- Subjective & Descriptive Long-Form Questions
+- Multi-Language Algorithmic Coding Problems (Python, Java, C++, JS)
+- Aptitude, Reasoning & Domain Knowledge Tests
+- Negative Marking (+4, -1, 0) for JEE/NEET/Competitive Test Series
+
+## Public Documentation & Landing Pages
+- Platform Homepage: https://exam.nexifyforge.in/
+- Online Examination Software: https://exam.nexifyforge.in/online-examination-software
+- College Examination Software: https://exam.nexifyforge.in/college-examination-software
+- University Examination Software: https://exam.nexifyforge.in/university-examination-software
+- School Examination Software: https://exam.nexifyforge.in/school-examination-software
+- Coaching Institute Examination Software: https://exam.nexifyforge.in/coaching-institute-examination-software
+- AI Proctoring Platform: https://exam.nexifyforge.in/ai-proctoring-software
+- Coding Assessment Platform: https://exam.nexifyforge.in/coding-assessment-platform
+- Online Assessment Software: https://exam.nexifyforge.in/online-assessment-software
+- Book Institutional Demo: https://exam.nexifyforge.in/book-demo
+- Institutional Pricing: https://exam.nexifyforge.in/pricing
+- Knowledge Hub & Blog: https://exam.nexifyforge.in/blog
+- Frequently Asked Questions: https://exam.nexifyforge.in/faq
+- Platform Features: https://exam.nexifyforge.in/features
+- How It Works: https://exam.nexifyforge.in/how-it-works
+- About & Team: https://exam.nexifyforge.in/about
+- Contact & Campus Pilots: https://exam.nexifyforge.in/contact
+
+## Privacy & Security Standards
+- Zero kernel-level drivers required on student devices.
+- Webcam and audio tracking active strictly during approved examination windows.
+- Role-based access controls separating Student, College Admin, and Super Admin spaces.
+- Encrypted student answer buffers in Redis and PostgreSQL.

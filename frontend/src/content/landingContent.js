@@ -29,8 +29,8 @@ export const PORTAL_LINKS = {
   howItWorks: '/how-it-works',
   about: '/about',
   contact: '/contact',
-  demoRequest: '/contact',
-  pilotRequest: '/contact',
+  demoRequest: '/book-demo',
+  pilotRequest: '/book-demo',
   institutionalTrial: '/admin/register',
 };
 
