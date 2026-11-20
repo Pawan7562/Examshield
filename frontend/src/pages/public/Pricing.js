@@ -39,9 +39,9 @@ export default function PricingPage() {
   return (
     <PublicLayout>
       <SEOHead
-        title="Institutional & University Pricing Plans | Nexify Examina"
-        description="Transparent institutional pricing for AI exam proctoring: Basic, Standard, and Premium university tiers with unlimited exams, coding sandbox, and live invigilation."
-        keywords="AI exam proctoring cost, online proctoring pricing, university exam software cost, college exam monitoring subscription, secure exam software price"
+        title="College & University Exam Pricing Plans | Nexify Examina"
+        description="Transparent pricing for colleges and universities: Basic, Standard, and Premium tiers with online examinations, coding compiler, and live AI proctoring."
+        keywords="college exam platform pricing, university exam software cost, online proctoring pricing, school assessment software plans, AI proctoring cost"
         canonical="https://exam.nexifyforge.in/pricing"
         jsonLd={pricingJsonLd}
       />

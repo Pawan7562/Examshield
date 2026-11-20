@@ -58,9 +58,9 @@ export default function Home() {
   return (
     <ThemeProvider>
       <SEOHead
-        title="Nexify Examina — Enterprise AI Exam Proctoring & Live Invigilation Platform"
-        description="Nexify Examina is the enterprise AI exam-proctoring SaaS for universities, certification boards, and colleges. Zero software installation, neural biometric verification, browser kiosk lockdown, and court-admissible audit dossiers."
-        keywords="Nexify Examina, AI exam proctoring, online exam monitoring, university proctoring software, browser lockdown kiosk, biometric facial verification, cheating prevention, exam integrity"
+        title="Nexify Examina — Online Exam & AI Proctoring Platform for Colleges & Schools"
+        description="Enterprise online exam and AI proctoring platform for colleges, universities & schools. Secure exams with facial biometrics, kiosk lockdown & coding compiler."
+        keywords="online exam platform for colleges, AI proctoring software for universities, online examination system for schools, campus placement coding test portal, secure browser lockdown exam, college semester exam software, anti-cheating exam portal, live invigilation platform"
         canonical="https://exam.nexifyforge.in/"
         jsonLd={homeJsonLd}
       />

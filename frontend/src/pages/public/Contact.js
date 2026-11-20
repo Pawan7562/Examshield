@@ -79,9 +79,9 @@ export default function Contact() {
   return (
     <PublicLayout>
       <SEOHead
-        title="Contact Us & Request Institutional Demo | Nexify Examina"
-        description="Get in touch with Nexify Examina sales, technical support, and campus deployment engineers. Schedule a customized university demo or pilot trial in Mohali, Punjab."
-        keywords="contact Nexify Examina, schedule exam software demo, university exam proctoring support, Nexify Forge contact, Mohali Punjab exam software"
+        title="Contact & Request College Demo | Nexify Examina"
+        description="Get in touch with Nexify Examina to schedule an online examination & AI proctoring demo or pilot trial for your college, university, or school."
+        keywords="request college exam software demo, university exam proctoring consultation, contact Nexify Examina, online examination demo for schools"
         canonical="https://exam.nexifyforge.in/contact"
         jsonLd={{
           '@context': 'https://schema.org',

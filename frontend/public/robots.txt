@@ -1,8 +1,8 @@
-# robots.txt for ExamShield by Nexify Forge
-# Domain: https://exam.nexifyforge.in/
+# robots.txt for Nexify Examina (https://exam.nexifyforge.in/)
+# Online Exam & AI Proctoring Platform for Colleges and Schools
 
 User-agent: *
-# Allow crawling of all public marketing, product, and institutional pages
+# Allow crawling of all public institutional marketing, features, and documentation
 Allow: /
 Allow: /features
 Allow: /how-it-works

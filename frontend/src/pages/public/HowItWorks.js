@@ -131,9 +131,9 @@ export default function HowItWorksPage() {
   return (
     <PublicLayout>
       <SEOHead
-        title="How It Works: End-to-End Online Exam Proctoring Lifecycle | Nexify Examina"
-        description="Discover how Nexify Examina delivers cheat-proof exams in 5 steps: pre-exam roster sync, biometric check-in, kiosk sandbox activation, real-time AI invigilation, and forensic audit dossiers."
-        keywords="how online proctoring works, exam proctoring process, online test invigilation steps, biometric exam check-in, cheating prevention lifecycle"
+        title="How It Works: College Exam & AI Proctoring Lifecycle | Nexify Examina"
+        description="Discover how colleges conduct online exams in 5 steps: roster sync, biometric check-in, kiosk sandbox activation, live AI invigilation, and forensic audit reports."
+        keywords="how college online exams work, exam proctoring process for universities, online test invigilation steps, biometric exam check-in, cheating prevention lifecycle"
         canonical="https://exam.nexifyforge.in/how-it-works"
         jsonLd={{
           '@context': 'https://schema.org',

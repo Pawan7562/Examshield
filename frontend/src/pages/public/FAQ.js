@@ -130,8 +130,9 @@ export default function FAQ() {
   return (
     <PublicLayout className="exam-landing-theme">
       <SEOHead
-        title="Frequently Asked Questions (FAQ) | Online Exam Monitoring & Proctoring"
-        description="Find answers to common questions about Nexify Examina by Nexify Forge: AI exam monitoring, browser lockdown, online coding assessments, student privacy, and university deployment."
+        title="College Online Exam & AI Proctoring FAQ | Nexify Examina"
+        description="Frequently asked questions about Nexify Examina: online examinations for colleges, AI proctoring, coding compiler assessments, browser lockdown, and security."
+        keywords="college exam system FAQ, AI proctoring questions, online examination help for colleges, browser lockdown FAQ, coding exam platform questions"
         canonical="https://exam.nexifyforge.in/faq"
         jsonLd={faqJsonLd}
       />

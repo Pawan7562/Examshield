@@ -338,9 +338,9 @@ export default function FeaturesPage() {
   return (
     <PublicLayout>
       <SEOHead
-        title="Features & AI Invigilation Capabilities | Nexify Examina"
-        description="Explore Nexify Examina's 6 layers of exam integrity: continuous biometric face verification, gaze tracking, browser kiosk lockdown, acoustic monitoring, and court-admissible audit logs."
-        keywords="AI exam proctoring features, browser lockdown, biometric exam verification, gaze tracking proctoring, online exam cheat prevention, acoustic speech detection, LMS exam integration"
+        title="College Exam & AI Proctoring Features | Nexify Examina"
+        description="Explore enterprise exam integrity features: continuous facial biometrics, browser kiosk lockdown, coding sandbox compiler, and live multi-department invigilation."
+        keywords="college exam software features, AI exam proctoring features, browser lockdown kiosk, online coding exam compiler, cheating prevention software, university assessment platform"
         canonical="https://exam.nexifyforge.in/features"
         jsonLd={{
           '@context': 'https://schema.org',
