@@ -243,8 +243,13 @@ const Login = ({ role }) => {
 
     try {
       const isStudent = activeRole === 'student';
+      const pendingKey = (sessionStorage.getItem('pendingExamKey') || new URLSearchParams(location.search).get('examKey') || '').trim();
       const res = isStudent
-        ? await authAPI.studentLogin({ email: cleanIdentifier, password })
+        ? await authAPI.studentLogin({ 
+            email: cleanIdentifier, 
+            password,
+            ...(pendingKey ? { examKey: pendingKey } : {})
+          })
         : await authAPI.collegeLogin({ email: cleanIdentifier, password });
 
       // Save or clear rememberMe
@@ -269,7 +274,11 @@ const Login = ({ role }) => {
       login(payloadUser, payloadTokens);
 
       toast.success(`Welcome back, ${payloadUser?.name || 'Administrator'}!`);
-      navigate(isStudent ? '/student/dashboard' : '/admin/dashboard');
+      if (isStudent && pendingKey) {
+        navigate(`/student/dashboard?joinExamKey=${encodeURIComponent(pendingKey)}`);
+      } else {
+        navigate(isStudent ? '/student/dashboard' : '/admin/dashboard');
+      }
     } catch (err) {
       console.error('Login error details:', err);
       const resCode = err?.response?.data?.code || err?.data?.code;
@@ -419,6 +428,43 @@ const Login = ({ role }) => {
                 >
                   <X size={15} />
                 </button>
+              </div>
+            )}
+
+            {/* Exam Invitation Alert Banner */}
+            {isStudent && (new URLSearchParams(location.search).get('examKey') || sessionStorage.getItem('pendingExamKey')) && (
+              <div style={{
+                background: '#eff6ff',
+                border: '1.5px solid #bfdbfe',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                marginBottom: '18px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px',
+                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.08)'
+              }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: '#dbeafe',
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <KeyRound size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1e3a8a', marginBottom: '2px' }}>
+                    Scheduled Examination Access
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#1e40af', lineHeight: 1.5 }}>
+                    Exam Key: <code style={{ background: '#dbeafe', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.5px' }}>{new URLSearchParams(location.search).get('examKey') || sessionStorage.getItem('pendingExamKey')}</code>. You can sign in using your account password or this Exam Key.
+                  </div>
+                </div>
               </div>
             )}
 

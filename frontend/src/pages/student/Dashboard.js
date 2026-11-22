@@ -38,8 +38,22 @@ export default function StudentDashboard() {
   const [exams, setExams] = useState([]);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [quickExamKey, setQuickExamKey] = useState('');
+  const [quickExamKey, setQuickExamKey] = useState(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      return (searchParams.get('joinExamKey') || sessionStorage.getItem('pendingExamKey') || '').trim().toUpperCase();
+    } catch (_) {
+      return '';
+    }
+  });
   const [joiningKey, setJoiningKey] = useState(false);
+
+  // Clear pending exam key once loaded
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('pendingExamKey');
+    } catch (_) {}
+  }, []);
 
   // Fetch candidate exams and results
   useEffect(() => {

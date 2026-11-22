@@ -317,14 +317,17 @@ exports.studentLogin = async (req, res) => {
     const rawInput = (req.body.email || req.body.studentId || req.body.emailOrId || req.body.id || req.body.rollNo || '').trim();
     const input = rawInput.replace(/\s+/g, ''); // strip accidental internal/copy-paste spaces
     const { password } = req.body;
+    const providedExamKey = (req.body.examKey || req.body.key || req.query?.examKey || req.query?.key || '').trim().toUpperCase();
 
     if (!input || !password) {
       return res.status(400).json({ success: false, message: 'Email / Student ID and password are required.' });
     }
 
+    const trimmedPassword = (password || '').trim();
+
     // High-concurrency Fast-Auth Redis Cache: skips DB & bcrypt for reconnecting/refreshing students (1ms response)
     const redis = getRedisClient();
-    const cacheHash = crypto.createHash('sha256').update(`${input.toLowerCase()}:${password}`).digest('hex');
+    const cacheHash = crypto.createHash('sha256').update(`${input.toLowerCase()}:${trimmedPassword}`).digest('hex');
     const authCacheKey = `fast_auth:student:${cacheHash}`;
 
     if (redis) {
@@ -374,7 +377,7 @@ exports.studentLogin = async (req, res) => {
         FROM students s
         LEFT JOIN colleges c ON s.college_id = c.id
         WHERE LOWER(s.email) = $1 OR s.email = $1
-        LIMIT 1;
+        ORDER BY s.updated_at DESC NULLS LAST, s.created_at DESC
       `;
       studentQueryParams = [normalizeEmail(rawInput)];
     } else {
@@ -387,15 +390,15 @@ exports.studentLogin = async (req, res) => {
            OR s.email ILIKE $1
            OR LOWER(REPLACE(s.roll_no, ' ', '')) = LOWER($2)
            OR LOWER(REPLACE(s.student_id, ' ', '')) = LOWER($2)
-        LIMIT 1;
+        ORDER BY s.updated_at DESC NULLS LAST, s.created_at DESC
       `;
       studentQueryParams = [rawInput, input];
     }
 
     const dbRes = await pool.query(studentQuery, studentQueryParams);
-    const student = dbRes.rows[0] || null;
+    const candidateStudents = dbRes.rows;
 
-    if (!student) {
+    if (!candidateStudents || candidateStudents.length === 0) {
       // Cross-portal intelligent check: Check if user is registered as a College Administrator
       if (isEmailInput) {
         const normEmail = normalizeEmail(rawInput);
@@ -432,22 +435,83 @@ exports.studentLogin = async (req, res) => {
       });
     }
 
-    const trimmedPassword = (password || '').trim();
-    let isPasswordValid = await comparePassword(password, student.password);
-    if (!isPasswordValid && trimmedPassword && trimmedPassword !== password) {
-      isPasswordValid = await comparePassword(trimmedPassword, student.password);
+    // If an examKey is provided, prioritize matching student accounts assigned to that exam
+    let prioritizedList = [...candidateStudents];
+    if (providedExamKey) {
+      try {
+        const candidateIds = candidateStudents.map(s => s.id);
+        const examCheck = await pool.query(
+          `SELECT ea.student_id 
+           FROM exam_assignments ea
+           JOIN exams e ON ea.exam_id = e.id
+           WHERE UPPER(e.exam_code) = $1 AND ea.student_id = ANY($2::uuid[])`,
+          [providedExamKey, candidateIds]
+        );
+        const assignedStudentIds = new Set(examCheck.rows.map(r => r.student_id));
+        if (assignedStudentIds.size > 0) {
+          prioritizedList.sort((a, b) => {
+            const aAssigned = assignedStudentIds.has(a.id) ? 1 : 0;
+            const bAssigned = assignedStudentIds.has(b.id) ? 1 : 0;
+            return bAssigned - aAssigned;
+          });
+        }
+      } catch (err) {
+        console.warn('⚠️ [AUTH] Exam key prioritization check skipped:', err.message);
+      }
     }
 
-    if (!isPasswordValid) {
+    let authenticatedStudent = null;
+    let isDeactivated = false;
+
+    for (const candidate of prioritizedList) {
+      if (candidate.is_active === false) {
+        isDeactivated = true;
+        continue;
+      }
+
+      // 1. Password check: compare plain or bcrypt
+      let isPasswordValid = await comparePassword(password, candidate.password);
+      if (!isPasswordValid && trimmedPassword && trimmedPassword !== password) {
+        isPasswordValid = await comparePassword(trimmedPassword, candidate.password);
+      }
+
+      // 2. Exam Access Key fallback: Check if student entered their active assigned exam code as the password
+      if (!isPasswordValid && trimmedPassword.length >= 4 && trimmedPassword.length <= 25) {
+        try {
+          const examCodeMatch = await pool.query(
+            `SELECT e.id, e.title, e.exam_code 
+             FROM exams e
+             JOIN exam_assignments ea ON ea.exam_id = e.id
+             WHERE ea.student_id = $1 
+               AND UPPER(e.exam_code) = UPPER($2)
+               AND e.status IN ('active', 'published', 'scheduled')
+             LIMIT 1`,
+            [candidate.id, trimmedPassword]
+          );
+          if (examCodeMatch.rows.length > 0) {
+            isPasswordValid = true;
+            console.log(`🔑 [AUTH] Student ${candidate.email} (${candidate.id}) authenticated via assigned exam code "${trimmedPassword}" for exam "${examCodeMatch.rows[0].title}"`);
+          }
+        } catch (_) {}
+      }
+
+      if (isPasswordValid) {
+        authenticatedStudent = candidate;
+        break;
+      }
+    }
+
+    if (!authenticatedStudent) {
+      if (isDeactivated && candidateStudents.every(s => s.is_active === false)) {
+        return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact your College Administration.' });
+      }
       return res.status(401).json({
         success: false,
         message: 'Invalid Student ID/Email or password.',
       });
     }
 
-    if (student.is_active === false) {
-      return res.status(403).json({ success: false, message: 'Your account has been deactivated.' });
-    }
+    const student = authenticatedStudent;
 
     // Update last login in background (non-blocking for ultra-fast response)
     pool.query('UPDATE students SET last_login = NOW() WHERE id = $1', [student.id]).catch(() => {});
